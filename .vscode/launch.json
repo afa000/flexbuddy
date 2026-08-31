@@ -1,0 +1,14 @@
+{
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Spring Boot-FlexbuddyApplication<flexbuddy>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.angel.flexbuddy.FlexbuddyApplication",
+            "projectName": "flexbuddy",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
+        }
+    ]
+}
