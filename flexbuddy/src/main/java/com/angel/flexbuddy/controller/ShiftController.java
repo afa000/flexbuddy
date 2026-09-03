@@ -3,9 +3,11 @@ package com.angel.flexbuddy.controller;
 import java.util.List;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.service.ShiftService;
-
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,8 +35,8 @@ public class ShiftController {
     }
 
     @PostMapping
-    public Shift postShift(@RequestBody Shift shift) {
-        return shiftService.createShift(shift);
+    public Shift createShift(@Valid @RequestBody CreateShiftRequest request) {
+        return shiftService.createShift(request);
     }
     
     @PutMapping("/{id}")

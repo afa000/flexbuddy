@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -23,7 +24,17 @@ public class ShiftService {
         return shiftRepository.findAll();
     }
 
-    public Shift createShift(Shift shift) {
+    public Shift createShift(CreateShiftRequest request) {
+
+        Shift shift = new Shift();
+
+        shift.setStation(request.getStation());
+        shift.setDate(request.getDate());
+        shift.setStartTime(request.getStartTime());
+        shift.setEndTime(request.getEndTime());
+        shift.setBasePay(request.getBasePay());
+        shift.setTips(request.getTips());
+
         return shiftRepository.save(shift);
     }
 
