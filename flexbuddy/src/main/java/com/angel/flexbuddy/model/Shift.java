@@ -4,90 +4,51 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Shift {
 
-        private int id;
-    private String Station;
-    private LocalDate Date;
-    private LocalTime StartTime;
-    private LocalTime EndTime;
-    private BigDecimal BasePay;
-    private BigDecimal Tips;
-    private BigDecimal TotalPay;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    public ShiftService(int id, String station, LocalDate date, LocalTime startTime, LocalTime endTime, BigDecimal basePay, BigDecimal tips) {
-        this.id = id;
-        this.Station = station;
-        this.Date = date;
-        this.StartTime = startTime;
-        this.EndTime = endTime;
-        this.BasePay = basePay;
-        this.Tips = tips;
-        this.TotalPay = basePay.add(tips);
-    }
-
-    public int getId() {
-        return id;
-    }
-
-    public String getStation() {
-        return Station;
-    }   
-
-    public LocalDate getDate() {
-        return Date;
-    }
-
-    public LocalTime getStartTime() {
-        return StartTime;
-    }
-
-    public LocalTime getEndTime() {
-        return EndTime;
-    }
-
-    public BigDecimal getBasePay() {
-        return BasePay;
-    }
-
-    public BigDecimal getTips() {
-        return Tips;
-    }
+    private String station;
+    private LocalDate date;
+    private LocalTime startTime;
+    private LocalTime endTime;
+    private BigDecimal basePay;
+    private BigDecimal tips;
 
     public BigDecimal getTotalPay() {
-        return TotalPay;
-    }
+        BigDecimal base;
+        if (basePay != null) {
+            base = basePay;
+        } 
+        else {
+            base = BigDecimal.ZERO;
+        }
 
-    public void setId(int id) {
-        this.id = id;
-    }
+        BigDecimal tip;
+        if (tips != null) {
+            tip = tips;
+        } 
+        else {
+            tip = BigDecimal.ZERO;
+        }
 
-    public void setStation(String station) {
-        this.Station = station;
-    }
-
-    public void setDate(LocalDate date) {
-        this.Date = date;
-    }
-
-    public void setStartTime(LocalTime startTime) {
-        this.StartTime = startTime;
-    }
-
-    public void setEndTime(LocalTime endTime) {
-        this.EndTime = endTime;
-    }
-
-    public void setBasePay(BigDecimal basePay) {
-        this.BasePay = basePay;
-    }
-
-    public void setTips(BigDecimal tips) {
-        this.Tips = tips;
-    }
-
-    public void setTotalPay(BigDecimal totalPay) {
-        this.TotalPay = totalPay;
+        return base.add(tip);
     }
 
 }
