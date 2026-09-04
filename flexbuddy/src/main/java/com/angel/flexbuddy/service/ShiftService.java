@@ -1,13 +1,11 @@
 package com.angel.flexbuddy.service;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
-
 import org.springframework.stereotype.Service;
-
 import com.angel.flexbuddy.dto.CreateShiftRequest;
+import com.angel.flexbuddy.dto.ShiftResponse;
+import com.angel.flexbuddy.dto.UpdateShiftRequest;
+import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -20,11 +18,22 @@ public class ShiftService {
         this.shiftRepository = shiftRepository;
     }
 
-    public List<Shift> getAllShifts() {
-        return shiftRepository.findAll();
+    public List<ShiftResponse> getAllShifts() {
+        return shiftRepository.findAll().stream()
+                .map(shift -> new ShiftResponse(
+                        shift.getId(),
+                        shift.getStation(),
+                        shift.getDate(),
+                        shift.getStartTime(),
+                        shift.getEndTime(),
+                        shift.getBasePay(),
+                        shift.getTips(),
+                        shift.getTotalPay()
+                ))
+                .toList();
     }
 
-    public Shift createShift(CreateShiftRequest request) {
+    public ShiftResponse createShift(CreateShiftRequest request) {
 
         Shift shift = new Shift();
 
@@ -35,33 +44,48 @@ public class ShiftService {
         shift.setBasePay(request.getBasePay());
         shift.setTips(request.getTips());
 
-        return shiftRepository.save(shift);
+        Shift updatedShift = shiftRepository.save(shift);
+
+        return new ShiftResponse(
+
+                updatedShift.getId(),
+                updatedShift.getStation(),
+                updatedShift.getDate(),
+                updatedShift.getStartTime(),
+                updatedShift.getEndTime(),
+                updatedShift.getBasePay(),
+                updatedShift.getTips(),
+                updatedShift.getTotalPay()
+        );
     }
 
-    public Shift updateShift(Long id, Shift updatedShift) {
-        return shiftRepository.findById(id)
-                .map(shift -> {
-                    if (updatedShift.getStation() != null) {
-                        shift.setStation(updatedShift.getStation());
-                    }
-                    if (updatedShift.getDate() != null) {
-                        shift.setDate(updatedShift.getDate());
-                    }
-                    if (updatedShift.getStartTime() != null) {
-                        shift.setStartTime(updatedShift.getStartTime());
-                    }
-                    if (updatedShift.getEndTime() != null) {
-                        shift.setEndTime(updatedShift.getEndTime());
-                    }
-                    if (updatedShift.getBasePay() != null) {
-                        shift.setBasePay(updatedShift.getBasePay());
-                    }
-                    if (updatedShift.getTips() != null) {
-                        shift.setTips(updatedShift.getTips());
-                    }
-                    return shiftRepository.save(shift);
-                })
-                .orElseThrow(() -> new RuntimeException("Shift not found with id " + id));
+
+    public ShiftResponse updateShift(Long id, UpdateShiftRequest request) {
+
+        Shift shift = shiftRepository.findById(id)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+
+        
+        shift.setStation(request.getStation());
+        shift.setDate(request.getDate());
+        shift.setStartTime(request.getStartTime());
+        shift.setEndTime(request.getEndTime());
+        shift.setBasePay(request.getBasePay());
+        shift.setTips(request.getTips());
+
+        Shift updatedShift = shiftRepository.save(shift);
+
+        return new ShiftResponse(
+
+                updatedShift.getId(),
+                updatedShift.getStation(),
+                updatedShift.getDate(),
+                updatedShift.getStartTime(),
+                updatedShift.getEndTime(),
+                updatedShift.getBasePay(),
+                updatedShift.getTips(),
+                updatedShift.getTotalPay()
+        );
     }
 
     public void deleteShift(Long id) {

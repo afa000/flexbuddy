@@ -17,6 +17,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.CreateShiftRequest;
+import com.angel.flexbuddy.dto.ShiftResponse;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -41,7 +42,7 @@ class ShiftServiceTest {
 
         when(shiftRepository.save(any(Shift.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        Shift result = shiftService.createShift(request);
+        ShiftResponse result = shiftService.createShift(request);
 
         ArgumentCaptor<Shift> captor = ArgumentCaptor.forClass(Shift.class);
         verify(shiftRepository).save(captor.capture());

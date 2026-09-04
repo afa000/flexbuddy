@@ -5,6 +5,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.angel.flexbuddy.dto.CreateShiftRequest;
+import com.angel.flexbuddy.dto.ShiftResponse;
+import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.service.ShiftService;
 import jakarta.validation.Valid;
@@ -14,6 +16,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 
 
@@ -30,18 +34,18 @@ public class ShiftController {
     }
     
     @GetMapping
-    public List<Shift> getAllShifts() {
+    public List<ShiftResponse> getAllShifts() {
         return shiftService.getAllShifts();
     }
 
     @PostMapping
-    public Shift createShift(@Valid @RequestBody CreateShiftRequest request) {
+    public ShiftResponse createShift(@Valid @RequestBody CreateShiftRequest request) {
         return shiftService.createShift(request);
     }
     
     @PutMapping("/{id}")
-    public Shift putShift(@PathVariable Long id, @RequestBody Shift shift) {
-        return shiftService.updateShift(id, shift);
+    public ShiftResponse updateShift(@PathVariable Long id, @Valid @RequestBody UpdateShiftRequest request) {
+        return shiftService.updateShift(id, request);
     }
 
     @DeleteMapping("/{id}")
