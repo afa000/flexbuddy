@@ -7,7 +7,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftResponse;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
-import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.service.ShiftService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -16,7 +15,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
 
 
 

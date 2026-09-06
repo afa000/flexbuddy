@@ -89,7 +89,10 @@ public class ShiftService {
     }
 
     public void deleteShift(Long id) {
-        shiftRepository.deleteById(id);
+        Shift shift = shiftRepository.findById(id)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+
+        shiftRepository.delete(shift);
     }
 
 }

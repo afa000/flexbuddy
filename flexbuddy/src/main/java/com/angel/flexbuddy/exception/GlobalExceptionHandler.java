@@ -13,6 +13,4 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleShiftNotFoundException(ShiftNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
     }
-
 }
-1
