@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftResponse;
+import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.service.ShiftService;
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+
 
 
 
@@ -35,6 +37,12 @@ public class ShiftController {
     public List<ShiftResponse> getAllShifts() {
         return shiftService.getAllShifts();
     }
+
+    @GetMapping("/statistics")
+    public ShiftStatisticsResponse getShiftStatistics() {
+        return shiftService.getShiftStatistics();
+    }
+    
 
     @PostMapping
     public ShiftResponse createShift(@Valid @RequestBody CreateShiftRequest request) {

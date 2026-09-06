@@ -1,9 +1,12 @@
 package com.angel.flexbuddy.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import org.springframework.stereotype.Service;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftResponse;
+import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.model.Shift;
@@ -31,6 +34,46 @@ public class ShiftService {
                         shift.getTotalPay()
                 ))
                 .toList();
+    }
+
+    public ShiftStatisticsResponse getShiftStatistics() {
+
+        List<Shift> shifts = shiftRepository.findAll();
+
+        int totalShifts = shifts.size();
+        BigDecimal totalBasePay = BigDecimal.ZERO;
+        BigDecimal totalTips = BigDecimal.ZERO;
+        int totalTimeWorked = 0;
+
+        for (Shift shift : shifts) {
+            totalBasePay = totalBasePay.add(shift.getBasePay());
+            totalTips = totalTips.add(shift.getTips());
+            totalTimeWorked = totalTimeWorked + shift.getTimeWorked();
+        }
+
+        BigDecimal totalEarnings = totalBasePay.add(totalTips);
+
+        BigDecimal averagePayPerShift;
+
+        if (totalShifts == 0) {
+            averagePayPerShift = BigDecimal.ZERO;
+        }
+        else {
+            averagePayPerShift = totalEarnings.divide(
+                BigDecimal.valueOf(totalShifts),
+                2,
+                RoundingMode.HALF_UP
+            );
+        }
+
+        return new ShiftStatisticsResponse(
+            totalShifts,
+            totalBasePay,
+            totalTips,
+            totalEarnings,
+            averagePayPerShift,
+            totalTimeWorked
+        );
     }
 
     public ShiftResponse createShift(CreateShiftRequest request) {

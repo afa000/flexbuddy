@@ -3,6 +3,7 @@ package com.angel.flexbuddy.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -49,6 +50,13 @@ public class Shift {
         }
 
         return base.add(tip);
+    }
+
+    public int getTimeWorked() {
+
+        int totalMinutes = (int) ChronoUnit.MINUTES.between(startTime, endTime);
+        
+        return totalMinutes;
     }
 
 }
