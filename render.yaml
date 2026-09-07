@@ -1,0 +1,35 @@
+services:
+  - type: web
+    name: flexbuddy
+    runtime: docker
+    plan: free
+    region: ohio
+    dockerfilePath: ./flexbuddy/Dockerfile
+    dockerContext: ./flexbuddy
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: flexbuddy-postgres
+          property: connectionString
+      - key: DB_NAME
+        fromDatabase:
+          name: flexbuddy-postgres
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: flexbuddy-postgres
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: flexbuddy-postgres
+          property: password
+
+databases:
+  - name: flexbuddy-postgres
+    plan: free
+    region: ohio
+    databaseName: flexbuddy
+    user: flexbuddy
+    postgresMajorVersion: "18"
+    ipAllowList: []
