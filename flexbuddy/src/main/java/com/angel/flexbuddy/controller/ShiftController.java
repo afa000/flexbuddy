@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.controller;
 
 import java.util.List;
+import java.security.Principal;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -42,19 +43,19 @@ public class ShiftController {
     }
     
     @GetMapping
-    public List<ShiftResponse> getAllShifts() {
-        return shiftService.getAllShifts();
+    public List<ShiftResponse> getAllShifts(Principal principal) {
+        return shiftService.getAllShifts(principal.getName());
     }
 
     @GetMapping("/statistics")
-    public ShiftStatisticsResponse getShiftStatistics() {
-        return shiftService.getShiftStatistics();
+    public ShiftStatisticsResponse getShiftStatistics(Principal principal) {
+        return shiftService.getShiftStatistics(principal.getName());
     }
     
 
     @PostMapping
-    public ShiftResponse createShift(@Valid @RequestBody CreateShiftRequest request) {
-        return shiftService.createShift(request);
+    public ShiftResponse createShift(Principal principal, @Valid @RequestBody CreateShiftRequest request) {
+        return shiftService.createShift(principal.getName(), request);
     }
 
     @PostMapping(value = "/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -66,13 +67,17 @@ public class ShiftController {
 
     
     @PutMapping("/{id}")
-    public ShiftResponse updateShift(@PathVariable Long id, @Valid @RequestBody UpdateShiftRequest request) {
-        return shiftService.updateShift(id, request);
+    public ShiftResponse updateShift(
+            Principal principal,
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateShiftRequest request
+    ) {
+        return shiftService.updateShift(principal.getName(), id, request);
     }
 
     @DeleteMapping("/{id}")
-    public void deleteShift(@PathVariable Long id) {
-        shiftService.deleteShift(id);
+    public void deleteShift(Principal principal, @PathVariable Long id) {
+        shiftService.deleteShift(principal.getName(), id);
     }
 
 }

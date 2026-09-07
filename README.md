@@ -9,8 +9,9 @@ The app is hosted on Render. Because it uses a free web service, the first reque
 ## Features
 
 - Import shift details from PNG or JPEG screenshots
+- Create a private account and sign in securely
 - Review and correct OCR results before saving
-- View, edit, and delete saved shifts
+- View, edit, and delete only your own saved shifts
 - Track total earnings, base pay, tips, time worked, and average earnings
 - Switch between light and dark themes
 - Store shift data in PostgreSQL

@@ -9,20 +9,24 @@ import com.angel.flexbuddy.dto.ShiftResponse;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
+import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
 @Service
 public class ShiftService {
 
     private final ShiftRepository shiftRepository;
+    private final AppUserRepository userRepository;
 
-    public ShiftService(ShiftRepository shiftRepository) {
+    public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository) {
         this.shiftRepository = shiftRepository;
+        this.userRepository = userRepository;
     }
 
-    public List<ShiftResponse> getAllShifts() {
-        return shiftRepository.findAll().stream()
+    public List<ShiftResponse> getAllShifts(String email) {
+        return shiftRepository.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(email).stream()
                 .map(shift -> new ShiftResponse(
                         shift.getId(),
                         shift.getStation(),
@@ -36,9 +40,9 @@ public class ShiftService {
                 .toList();
     }
 
-    public ShiftStatisticsResponse getShiftStatistics() {
+    public ShiftStatisticsResponse getShiftStatistics(String email) {
 
-        List<Shift> shifts = shiftRepository.findAll();
+        List<Shift> shifts = shiftRepository.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(email);
 
         int totalShifts = shifts.size();
         BigDecimal totalBasePay = BigDecimal.ZERO;
@@ -76,9 +80,12 @@ public class ShiftService {
         );
     }
 
-    public ShiftResponse createShift(CreateShiftRequest request) {
+    public ShiftResponse createShift(String email, CreateShiftRequest request) {
 
         Shift shift = new Shift();
+
+        AppUser owner = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
 
         shift.setStation(request.getStation());
         shift.setDate(request.getDate());
@@ -86,6 +93,7 @@ public class ShiftService {
         shift.setEndTime(request.getEndTime());
         shift.setBasePay(request.getBasePay());
         shift.setTips(request.getTips());
+        shift.setOwner(owner);
 
         Shift updatedShift = shiftRepository.save(shift);
 
@@ -103,9 +111,9 @@ public class ShiftService {
     }
 
 
-    public ShiftResponse updateShift(Long id, UpdateShiftRequest request) {
+    public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request) {
 
-        Shift shift = shiftRepository.findById(id)
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
 
         
@@ -131,8 +139,8 @@ public class ShiftService {
         );
     }
 
-    public void deleteShift(Long id) {
-        Shift shift = shiftRepository.findById(id)
+    public void deleteShift(String email, Long id) {
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
 
         shiftRepository.delete(shift);

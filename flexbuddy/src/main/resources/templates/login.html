@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Sign in to FlexBuddy.">
+    <title>Sign in | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="auth-page">
+<main class="auth-layout">
+    <section class="auth-card" aria-labelledby="login-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+        </div>
+
+        <p class="eyebrow">WELCOME BACK</p>
+        <h1 id="login-title">Sign in</h1>
+        <p class="auth-copy">Access your private shift history and earnings.</p>
+
+        <div class="notice success-notice" th:if="${param.registered}">
+            Account created. Sign in to get started.
+        </div>
+        <div class="notice error-notice auth-notice" th:if="${param.error}">
+            The email or password was incorrect.
+        </div>
+        <div class="notice success-notice" th:if="${param.logout}">
+            You have signed out.
+        </div>
+
+        <form class="auth-form" th:action="@{/login}" method="post">
+            <label class="field">
+                <span>Email</span>
+                <input name="username" type="email" autocomplete="email" required autofocus>
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input name="password" type="password" autocomplete="current-password" required>
+            </label>
+            <button class="primary-button auth-submit" type="submit">Sign in</button>
+        </form>
+
+        <p class="auth-switch">New to FlexBuddy? <a href="/register">Create an account</a></p>
+    </section>
+</main>
+</body>
+</html>

@@ -10,7 +10,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -25,7 +28,9 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.context.support.WithAnonymousUser;
 
+import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
@@ -34,9 +39,10 @@ import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
+import com.angel.flexbuddy.repository.AppUserRepository;
 
 @WebMvcTest(ShiftController.class)
-@Import(GlobalExceptionHandler.class)
+@Import({GlobalExceptionHandler.class, SecurityConfig.class})
 class ShiftControllerTest {
 
     @Autowired
@@ -47,6 +53,17 @@ class ShiftControllerTest {
 
     @MockitoBean
     private ShiftImportService shiftImportService;
+
+    @MockitoBean
+    private AppUserRepository userRepository;
+
+    @Test
+    @WithAnonymousUser
+    void shiftsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/shifts"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
 
     @Test
     void getShiftStatistics_returnsStatisticsJson() throws Exception {
@@ -59,9 +76,9 @@ class ShiftControllerTest {
                 750
         );
 
-        when(shiftService.getShiftStatistics()).thenReturn(statistics);
+        when(shiftService.getShiftStatistics("angel@example.com")).thenReturn(statistics);
 
-        mockMvc.perform(get("/shifts/statistics"))
+        mockMvc.perform(get("/shifts/statistics").with(user("angel@example.com")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalShifts").value(2))
                 .andExpect(jsonPath("$.totalBasePay").value(200.00))
@@ -85,6 +102,8 @@ class ShiftControllerTest {
                 """;
 
         mockMvc.perform(post("/shifts")
+                        .with(user("angel@example.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(invalidRequest))
                 .andExpect(status().isBadRequest());
@@ -106,10 +125,12 @@ class ShiftControllerTest {
                 }
                 """;
 
-        when(shiftService.updateShift(eq(id), any(UpdateShiftRequest.class)))
+        when(shiftService.updateShift(eq("angel@example.com"), eq(id), any(UpdateShiftRequest.class)))
                 .thenThrow(new ShiftNotFoundException(id));
 
         mockMvc.perform(put("/shifts/{id}", id)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validRequest))
                 .andExpect(status().isNotFound())
@@ -142,7 +163,10 @@ class ShiftControllerTest {
 
         when(shiftImportService.createPreview(any())).thenReturn(response);
 
-        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot))
+        mockMvc.perform(multipart("/shifts/import-preview")
+                        .file(screenshot)
+                        .with(user("angel@example.com"))
+                        .with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.originalFilename").value("shift.png"))
                 .andExpect(jsonPath("$.contentType").value("image/png"))
@@ -171,7 +195,10 @@ class ShiftControllerTest {
         when(shiftImportService.createPreview(any()))
                 .thenThrow(new InvalidScreenshotException("Unsupported screenshot type."));
 
-        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot))
+        mockMvc.perform(multipart("/shifts/import-preview")
+                        .file(screenshot)
+                        .with(user("angel@example.com"))
+                        .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Unsupported screenshot type."));
     }

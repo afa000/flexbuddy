@@ -55,6 +55,8 @@ let selectedFileUrl;
 let toastTimer;
 let editingShiftId;
 let lastFocusedElement;
+const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
+const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
 elements.importNavButton.addEventListener('click', () => {
@@ -153,6 +155,7 @@ async function processScreenshot(file) {
     try {
         const response = await fetch('/shifts/import-preview', {
             method: 'POST',
+            headers: csrfHeaders(),
             body: formData
         });
 
@@ -226,7 +229,7 @@ async function saveShift(event) {
     try {
         const response = await fetch('/shifts', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
 
@@ -364,7 +367,7 @@ async function saveEditedShift(event) {
     try {
         const response = await fetch(`/shifts/${shiftId}`, {
             method: 'PUT',
-            headers: {'Content-Type': 'application/json'},
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
 
@@ -473,6 +476,13 @@ function escapeHtml(value) {
     const element = document.createElement('span');
     element.textContent = value ?? '';
     return element.innerHTML;
+}
+
+function csrfHeaders(headers = {}) {
+    if (csrfToken && csrfHeader) {
+        headers[csrfHeader] = csrfToken;
+    }
+    return headers;
 }
 
 updateThemeToggle(document.documentElement.dataset.theme);

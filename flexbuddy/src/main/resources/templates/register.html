@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Create a FlexBuddy account.">
+    <title>Create account | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body class="auth-page">
+<main class="auth-layout">
+    <section class="auth-card" aria-labelledby="register-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+        </div>
+
+        <p class="eyebrow">CREATE YOUR ACCOUNT</p>
+        <h1 id="register-title">Start tracking</h1>
+        <p class="auth-copy">Your shifts and statistics will belong only to your account.</p>
+
+        <form class="auth-form" th:action="@{/register}" th:object="${registration}" method="post">
+            <label class="field">
+                <span>Name</span>
+                <input th:field="*{displayName}" type="text" autocomplete="name" maxlength="80" required autofocus>
+                <small class="field-error" th:if="${#fields.hasErrors('displayName')}" th:errors="*{displayName}"></small>
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input th:field="*{email}" type="email" autocomplete="email" maxlength="254" required>
+                <small class="field-error" th:if="${#fields.hasErrors('email')}" th:errors="*{email}"></small>
+            </label>
+            <label class="field">
+                <span>Password</span>
+                <input th:field="*{password}" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+                <small class="field-hint">Use at least 8 characters.</small>
+                <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
+            </label>
+            <button class="primary-button auth-submit" type="submit">Create account</button>
+        </form>
+
+        <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
+    </section>
+</main>
+</body>
+</html>

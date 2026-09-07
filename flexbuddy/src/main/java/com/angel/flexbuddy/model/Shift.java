@@ -9,7 +9,9 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import lombok.AllArgsConstructor;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -18,7 +20,6 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
-@AllArgsConstructor
 public class Shift {
 
     @Id
@@ -31,6 +32,42 @@ public class Shift {
     private LocalTime endTime;
     private BigDecimal basePay;
     private BigDecimal tips;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "owner_id")
+    private AppUser owner;
+
+    public Shift(
+            Long id,
+            String station,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime,
+            BigDecimal basePay,
+            BigDecimal tips
+    ) {
+        this(id, station, date, startTime, endTime, basePay, tips, null);
+    }
+
+    public Shift(
+            Long id,
+            String station,
+            LocalDate date,
+            LocalTime startTime,
+            LocalTime endTime,
+            BigDecimal basePay,
+            BigDecimal tips,
+            AppUser owner
+    ) {
+        this.id = id;
+        this.station = station;
+        this.date = date;
+        this.startTime = startTime;
+        this.endTime = endTime;
+        this.basePay = basePay;
+        this.tips = tips;
+        this.owner = owner;
+    }
 
     public BigDecimal getTotalPay() {
         BigDecimal base;
