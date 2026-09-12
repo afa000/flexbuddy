@@ -7,14 +7,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
+import jakarta.persistence.EntityListeners;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @Table(name = "app_users")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @NoArgsConstructor
@@ -34,7 +37,10 @@ public class AppUser {
     private String passwordHash;
 
     @Column(nullable = false, updatable = false)
+    @CreatedDate
     private Instant createdAt;
+
+    private Instant lastBackupAt;
 
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;
@@ -42,10 +48,4 @@ public class AppUser {
         this.passwordHash = passwordHash;
     }
 
-    @PrePersist
-    void setCreationTime() {
-        if (createdAt == null) {
-            createdAt = Instant.now();
-        }
-    }
 }

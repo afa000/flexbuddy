@@ -3,9 +3,14 @@ package com.angel.flexbuddy.controller;
 import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
+import java.time.Clock;
+import java.time.format.DateTimeFormatter;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,6 +33,7 @@ import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.service.ShiftService;
+import com.angel.flexbuddy.service.ShiftCsvWriter;
 
 import jakarta.validation.Valid;
 
@@ -38,11 +44,16 @@ public class ShiftController {
     private final ShiftService shiftService;
     private final ShiftReportService reportService;
     private final ShiftImportService shiftImportService;
+    private final ShiftCsvWriter csvWriter;
+    private final Clock clock;
 
-    public ShiftController(ShiftService shiftService, ShiftReportService reportService, ShiftImportService shiftImportService) {
+    public ShiftController(ShiftService shiftService, ShiftReportService reportService,
+            ShiftImportService shiftImportService, ShiftCsvWriter csvWriter, Clock clock) {
         this.shiftService = shiftService;
         this.reportService = reportService;
         this.shiftImportService = shiftImportService;
+        this.csvWriter = csvWriter;
+        this.clock = clock;
     }
 
     @GetMapping
@@ -97,7 +108,61 @@ public class ShiftController {
     }
 
     @DeleteMapping("/{id}")
-    public void deleteShift(Principal principal, @PathVariable Long id) {
-        shiftService.deleteShift(principal.getName(), id);
+    public ResponseEntity<Void> deleteShift(Principal principal, @PathVariable Long id) {
+        String batch = shiftService.deleteShift(principal.getName(), id);
+        return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
+    }
+
+    @PostMapping("/{id}/restore")
+    public ShiftResponse restoreShift(Principal principal, @PathVariable Long id) {
+        return shiftService.restoreShift(principal.getName(), id);
+    }
+
+    @PostMapping("/restore-batch/{batchId}")
+    public java.util.Map<String, Integer> restoreBatch(Principal principal, @PathVariable String batchId) {
+        return java.util.Map.of("restored", shiftService.restoreBatch(principal.getName(), batchId));
+    }
+
+    @GetMapping("/trash")
+    public List<ShiftResponse> getTrash(Principal principal) {
+        return shiftService.getTrash(principal.getName());
+    }
+
+    @DeleteMapping("/trash/{id}")
+    public ResponseEntity<Void> permanentlyDelete(Principal principal, @PathVariable Long id) {
+        shiftService.permanentlyDelete(principal.getName(), id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/trash")
+    public java.util.Map<String, Integer> emptyTrash(Principal principal) {
+        return java.util.Map.of("deleted", shiftService.emptyTrash(principal.getName()));
+    }
+
+    @GetMapping(value = "/export.csv", produces = "text/csv")
+    public ResponseEntity<StreamingResponseBody> exportCsv(Principal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String station,
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(required = false) String sort,
+            @RequestParam(name = "dir", required = false) String direction) {
+        ShiftFilter filter = ShiftFilter.of(from, to, station, query, sort, direction);
+        List<ShiftResponse> shifts = shiftService.getShifts(principal.getName(), filter);
+        StreamingResponseBody body = output -> csvWriter.write(shifts, output);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv; charset=UTF-8"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + exportFilename(from, to) + "\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store")
+                .body(body);
+    }
+
+    private String exportFilename(LocalDate from, LocalDate to) {
+        if (from != null || to != null) {
+            String start = from == null ? "start" : from.toString();
+            String end = to == null ? "today" : to.toString();
+            return "flexbuddy-shifts-" + start + "_to_" + end + ".csv";
+        }
+        return "flexbuddy-shifts-" + LocalDate.now(clock).format(DateTimeFormatter.ISO_DATE) + ".csv";
     }
 }

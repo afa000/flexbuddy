@@ -24,7 +24,7 @@
             <small>Shift tracker</small>
         </a>
         <div class="header-actions">
-            <span class="account-name" th:text="${currentUser != null ? currentUser.displayName : ''}">Account</span>
+            <a class="account-name account-name-link" href="/account" th:text="${currentUser != null ? currentUser.displayName : ''}">Account</a>
             <form th:action="@{/logout}" method="post">
                 <button class="round-header-button" type="submit" aria-label="Sign out" title="Sign out">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4m4-4H9"/></svg>
@@ -46,6 +46,11 @@
                 <p class="filter-summary" id="activeFilterSummary">Showing: All shifts</p>
             </div>
         </section>
+
+        <aside class="backup-nudge" th:if="${backupDue}">
+            <div><strong>Your shift history is worth keeping.</strong><span>Download a backup so you can recover it if the database is ever lost.</span></div>
+            <a class="secondary-button" href="/account">Back up now</a>
+        </aside>
 
         <section class="stats-grid" aria-label="Shift statistics">
             <article class="stat-card stat-card-accent">
@@ -224,7 +229,8 @@
                     <option value="date">Date</option><option value="station">Station</option>
                     <option value="basePay">Base pay</option><option value="tips">Tips</option>
                     <option value="totalPay">Total pay</option><option value="timeWorked">Hours</option>
-                    <option value="hourlyRate">Hourly rate</option>
+                    <option value="hourlyRate">Hourly rate</option><option value="createdAt">Recently added</option>
+                    <option value="updatedAt">Recently edited</option>
                 </select></label>
                 <button class="sort-direction" id="sortDirectionButton" type="button" aria-label="Sort descending">↓ Desc</button>
             </div>
@@ -273,12 +279,20 @@
                     <h2 id="history-title">Shift history</h2>
                     <p>Every shift matching the active filters.</p>
                 </div>
-                <button class="text-button" id="refreshButton" type="button">Refresh</button>
+                <div class="history-actions">
+                    <a class="text-button export-link" id="exportCsvButton" href="/shifts/export.csv" download>Export CSV</a>
+                    <button class="text-button" id="refreshButton" type="button">Refresh</button>
+                </div>
             </div>
             <div class="history-list" id="historyList">
                 <div class="history-empty">Loading shifts…</div>
             </div>
             <button class="secondary-button show-more-button is-hidden" id="showMoreButton" type="button">Show 20 more</button>
+            <details class="trash-section" id="trashSection">
+                <summary>Recently deleted <span id="trashCount"></span></summary>
+                <div class="trash-toolbar"><p>Deleted shifts stay here for 30 days.</p><button class="danger-text-button is-hidden" id="emptyTrashButton" type="button">Empty recently deleted</button></div>
+                <div class="trash-list" id="trashList"><p>Open to load deleted shifts.</p></div>
+            </details>
         </section>
     </main>
 
@@ -327,12 +341,20 @@
                 </label>
 
                 <div class="notice error-notice is-hidden field-wide" id="editError" role="alert"></div>
+                <p class="shift-timestamps field-wide" id="editTimestamps"></p>
                 <div class="form-actions field-wide">
+                    <button class="danger-text-button delete-shift-button" id="deleteShiftButton" type="button">Delete shift</button>
+                    <span class="action-spacer"></span>
                     <button class="secondary-button" id="cancelEditButton" type="button">Cancel</button>
                     <button class="primary-button" id="saveEditButton" type="submit">
                         <span>Save changes</span>
                         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
                     </button>
+                </div>
+                <div class="delete-confirm field-wide is-hidden" id="deleteConfirm">
+                    <span><strong>Delete this shift?</strong><small>You can undo for a few seconds or restore it later.</small></span>
+                    <button class="secondary-button" id="cancelDeleteButton" type="button">Cancel</button>
+                    <button class="danger-button" id="confirmDeleteButton" type="button">Delete</button>
                 </div>
             </form>
         </section>
@@ -352,6 +374,16 @@
     <div class="toast is-hidden" id="successToast" role="status" aria-live="polite">
         <span aria-hidden="true">✓</span>
         <div><strong id="toastTitle">Shift added</strong><small id="toastMessage">Your earnings history is up to date.</small></div>
+        <button class="toast-action is-hidden" id="toastAction" type="button">Undo</button>
+        <i class="toast-countdown" id="toastCountdown" aria-hidden="true"></i>
+    </div>
+
+    <div class="modal-backdrop is-hidden" id="confirmModal">
+        <section class="confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle">
+            <h2 id="confirmTitle">Delete permanently?</h2>
+            <p id="confirmMessage">This cannot be undone.</p>
+            <div class="form-actions"><button class="secondary-button" id="cancelConfirmButton" type="button">Cancel</button><button class="danger-button" id="acceptConfirmButton" type="button">Delete permanently</button></div>
+        </section>
     </div>
 </div>
 

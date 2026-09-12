@@ -3,9 +3,12 @@ package com.angel.flexbuddy.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
@@ -29,10 +32,12 @@ public class ShiftService {
 
     private final ShiftRepository shiftRepository;
     private final AppUserRepository userRepository;
+    private final Clock clock;
 
-    public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository) {
+    public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository, Clock clock) {
         this.shiftRepository = shiftRepository;
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     public List<ShiftResponse> getAllShifts(String email) {
@@ -84,10 +89,44 @@ public class ShiftService {
         return toResponse(shiftRepository.save(shift));
     }
 
-    public void deleteShift(String email, Long id) {
+    public String deleteShift(String email, Long id) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
-        shiftRepository.delete(shift);
+        String batch = UUID.randomUUID().toString();
+        shift.setDeletedAt(Instant.now(clock));
+        shift.setDeleteBatch(batch);
+        shiftRepository.save(shift);
+        return batch;
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public ShiftResponse restoreShift(String email, Long id) {
+        int updated = shiftRepository.restoreDeleted(email, id, Instant.now(clock));
+        if (updated == 0) throw new ShiftNotFoundException(id);
+        return shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public int restoreBatch(String email, String batch) {
+        return shiftRepository.restoreBatch(email, batch, Instant.now(clock));
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public List<ShiftResponse> getTrash(String email) {
+        shiftRepository.purgeDeletedBefore(Instant.now(clock).minus(30, java.time.temporal.ChronoUnit.DAYS));
+        return shiftRepository.findTrash(email).stream().map(this::toResponse).toList();
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void permanentlyDelete(String email, Long id) {
+        if (shiftRepository.permanentlyDelete(email, id) == 0) throw new ShiftNotFoundException(id);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public int emptyTrash(String email) {
+        return shiftRepository.emptyTrash(email);
     }
 
     private void applyRequest(Shift shift, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
@@ -103,7 +142,8 @@ public class ShiftService {
     private ShiftResponse toResponse(Shift shift) {
         return new ShiftResponse(
                 shift.getId(), shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
-                shift.getBasePay(), shift.getTips(), shift.getTotalPay(), shift.getTimeWorked(), shift.getHourlyRate()
+                shift.getBasePay(), shift.getTips(), shift.getTotalPay(), shift.getTimeWorked(), shift.getHourlyRate(),
+                shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt()
         );
     }
 
@@ -127,6 +167,8 @@ public class ShiftService {
             case TOTAL_PAY -> Comparator.comparing(Shift::getTotalPay);
             case TIME_WORKED -> Comparator.comparingInt(Shift::getTimeWorked);
             case HOURLY_RATE -> Comparator.comparing(Shift::getHourlyRate);
+            case CREATED_AT -> Comparator.comparing(Shift::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
+            case UPDATED_AT -> Comparator.comparing(Shift::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case DATE -> throw new IllegalStateException("Date sorting is handled above.");
         };
         if (filter.direction() == SortDirection.DESC) primary = primary.reversed();

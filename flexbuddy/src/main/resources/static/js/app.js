@@ -61,9 +61,16 @@ const elements = {
     historyList: document.querySelector('#historyList'),
     showMoreButton: document.querySelector('#showMoreButton'),
     refreshButton: document.querySelector('#refreshButton'),
+    exportCsvButton: document.querySelector('#exportCsvButton'),
+    trashSection: document.querySelector('#trashSection'),
+    trashList: document.querySelector('#trashList'),
+    trashCount: document.querySelector('#trashCount'),
+    emptyTrashButton: document.querySelector('#emptyTrashButton'),
     successToast: document.querySelector('#successToast'),
     toastTitle: document.querySelector('#toastTitle'),
     toastMessage: document.querySelector('#toastMessage'),
+    toastAction: document.querySelector('#toastAction'),
+    toastCountdown: document.querySelector('#toastCountdown'),
     editModal: document.querySelector('#editModal'),
     editForm: document.querySelector('#editForm'),
     editStation: document.querySelector('#editStation'),
@@ -75,12 +82,25 @@ const elements = {
     editError: document.querySelector('#editError'),
     closeEditButton: document.querySelector('#closeEditButton'),
     cancelEditButton: document.querySelector('#cancelEditButton'),
-    saveEditButton: document.querySelector('#saveEditButton')
+    saveEditButton: document.querySelector('#saveEditButton'),
+    editTimestamps: document.querySelector('#editTimestamps'),
+    deleteShiftButton: document.querySelector('#deleteShiftButton'),
+    deleteConfirm: document.querySelector('#deleteConfirm'),
+    cancelDeleteButton: document.querySelector('#cancelDeleteButton'),
+    confirmDeleteButton: document.querySelector('#confirmDeleteButton'),
+    confirmModal: document.querySelector('#confirmModal'),
+    confirmTitle: document.querySelector('#confirmTitle'),
+    confirmMessage: document.querySelector('#confirmMessage'),
+    cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
+    acceptConfirmButton: document.querySelector('#acceptConfirmButton')
 };
 
 let selectedFileUrl;
-let toastTimer;
+let toastState;
+const toastQueue = [];
 let editingShiftId;
+let editSnapshot;
+let pendingConfirmAction;
 let lastFocusedElement;
 let visibleShiftCount = 25;
 let currentShifts = [];
@@ -120,6 +140,9 @@ elements.removeFileButton.addEventListener('click', resetImport);
 elements.resetButton.addEventListener('click', resetImport);
 elements.previewForm.addEventListener('submit', saveShift);
 elements.refreshButton.addEventListener('click', loadDashboard);
+elements.exportCsvButton.addEventListener('click', event => {
+    if (elements.exportCsvButton.getAttribute('aria-disabled') === 'true') event.preventDefault();
+});
 elements.showMoreButton.addEventListener('click', () => {
     visibleShiftCount += 20;
     renderShifts(currentShifts);
@@ -148,12 +171,51 @@ elements.groupButtons.forEach(button => button.addEventListener('click', () => {
 elements.editForm.addEventListener('submit', saveEditedShift);
 elements.closeEditButton.addEventListener('click', closeEditModal);
 elements.cancelEditButton.addEventListener('click', closeEditModal);
+elements.deleteShiftButton.addEventListener('click', showDeleteConfirmation);
+elements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
+elements.confirmDeleteButton.addEventListener('click', deleteEditedShift);
+elements.trashSection.addEventListener('toggle', () => {
+    if (elements.trashSection.open) loadTrash();
+});
+elements.emptyTrashButton.addEventListener('click', () => openConfirm(
+    'Empty Recently deleted?',
+    'Every deleted shift will be permanently removed. This cannot be undone.',
+    emptyTrash
+));
+elements.cancelConfirmButton.addEventListener('click', closeConfirm);
+elements.acceptConfirmButton.addEventListener('click', async () => {
+    const action = pendingConfirmAction;
+    closeConfirm();
+    if (!action) return;
+    try {
+        await action();
+    } catch (error) {
+        showToast('Action failed', error.message || 'The action could not be completed.', {alert: true});
+    }
+});
+elements.successToast.addEventListener('mouseenter', pauseToast);
+elements.successToast.addEventListener('mouseleave', resumeToast);
+elements.successToast.addEventListener('focusin', pauseToast);
+elements.successToast.addEventListener('focusout', event => {
+    if (!elements.successToast.contains(event.relatedTarget)) resumeToast();
+});
 elements.editModal.addEventListener('click', event => {
     if (event.target === elements.editModal) closeEditModal();
 });
 document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !elements.confirmModal.classList.contains('is-hidden')) {
+        closeConfirm();
+        return;
+    }
     if (event.key === 'Escape' && !elements.editModal.classList.contains('is-hidden')) {
         closeEditModal();
+        return;
+    }
+    if (event.key === 'Escape' && toastState) hideCurrentToast();
+    if (event.key === 'Tab' && !elements.confirmModal.classList.contains('is-hidden')) {
+        trapFocus(elements.confirmModal, event);
+    } else if (event.key === 'Tab' && !elements.editModal.classList.contains('is-hidden')) {
+        trapFocus(elements.editModal, event);
     }
 });
 
@@ -478,10 +540,12 @@ function renderShifts(shifts) {
         const day = date.getDate();
         const weekday = date.toLocaleDateString(undefined, {weekday: 'short'});
         const total = shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
+        const edited = shift.createdAt && shift.updatedAt
+                && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
 
         row.innerHTML = `
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
-            <div class="shift-main"><strong>${escapeHtml(shift.station)}</strong><span>${escapeHtml(weekday)} shift</span></div>
+            <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}</strong><span>${escapeHtml(weekday)} shift</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
             <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr</span><span>${formatMoney(shift.basePay)} base · ${formatMoney(shift.tips)} tips</span></div>
             <button class="edit-shift-button" type="button">
@@ -500,12 +564,16 @@ function renderShifts(shifts) {
 function openEditModal(shift, trigger) {
     editingShiftId = shift.id;
     lastFocusedElement = trigger;
+    editSnapshot = {...shift};
     elements.editStation.value = shift.station ?? '';
     elements.editDate.value = shift.date ?? '';
     elements.editStartTime.value = trimTime(shift.startTime);
     elements.editEndTime.value = trimTime(shift.endTime);
     elements.editBasePay.value = shift.basePay ?? '';
     elements.editTips.value = shift.tips ?? 0;
+    elements.editTimestamps.textContent = timestampSummary(shift);
+    elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
+    hideDeleteConfirmation();
     hideMessage(elements.editError);
     elements.editModal.classList.remove('is-hidden');
     document.body.classList.add('modal-open');
@@ -518,6 +586,7 @@ function closeEditModal() {
     elements.editForm.reset();
     hideMessage(elements.editError);
     editingShiftId = undefined;
+    editSnapshot = undefined;
 
     if (lastFocusedElement?.isConnected) lastFocusedElement.focus();
     lastFocusedElement = undefined;
@@ -553,14 +622,167 @@ async function saveEditedShift(event) {
             throw new Error(message || 'The shift could not be updated. Check each field and try again.');
         }
 
+        const previous = editSnapshot;
         closeEditModal();
-        showToast('Shift updated', 'Your changes have been saved.');
+        showToast('Shift updated', 'Your changes have been saved.', {
+            actionLabel: 'Undo',
+            duration: 8000,
+            onAction: () => undoEdit(shiftId, previous)
+        });
         await loadStations();
         await loadDashboard();
     } catch (error) {
         showMessage(elements.editError, error.message || 'The shift could not be updated.');
     } finally {
         setEditSaving(false);
+    }
+}
+
+function showDeleteConfirmation() {
+    elements.editForm.querySelector('.form-actions').classList.add('is-hidden');
+    elements.deleteConfirm.classList.remove('is-hidden');
+    elements.cancelDeleteButton.focus();
+}
+
+function hideDeleteConfirmation() {
+    elements.editForm.querySelector('.form-actions').classList.remove('is-hidden');
+    elements.deleteConfirm.classList.add('is-hidden');
+}
+
+async function deleteEditedShift() {
+    const id = editingShiftId;
+    if (id === undefined) return;
+    elements.confirmDeleteButton.disabled = true;
+    try {
+        const response = await fetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
+        if (!response.ok) throw new Error(await response.text());
+        const batch = response.headers.get('X-Delete-Batch');
+        closeEditModal();
+        showToast('Shift deleted', 'It is available in Recently deleted for 30 days.', {
+            actionLabel: 'Undo',
+            duration: 8000,
+            alert: true,
+            onAction: () => restoreBatch(batch)
+        });
+        await loadStations();
+        await loadDashboard();
+    } catch (error) {
+        showMessage(elements.editError, error.message || 'The shift could not be deleted.');
+    } finally {
+        elements.confirmDeleteButton.disabled = false;
+    }
+}
+
+async function undoEdit(id, previous) {
+    if (!previous) return;
+    const response = await fetch(`/shifts/${id}`, {
+        method: 'PUT',
+        headers: csrfHeaders({'Content-Type': 'application/json'}),
+        body: JSON.stringify(previous)
+    });
+    if (!response.ok) throw new Error(await response.text());
+    showToast('Edit undone', 'The previous shift values were restored.');
+    await loadDashboard();
+}
+
+async function restoreBatch(batch) {
+    if (!batch) return;
+    const response = await fetch(`/shifts/restore-batch/${encodeURIComponent(batch)}`, {
+        method: 'POST', headers: csrfHeaders()
+    });
+    if (!response.ok) throw new Error(await response.text());
+    showToast('Shift restored', 'The shift is back in your history.');
+    await loadStations();
+    await loadDashboard();
+    if (elements.trashSection.open) await loadTrash();
+}
+
+async function loadTrash() {
+    elements.trashList.innerHTML = '<p>Loading recently deleted shifts…</p>';
+    try {
+        const response = await fetch('/shifts/trash');
+        if (!response.ok) throw new Error(await response.text());
+        renderTrash(await response.json());
+    } catch (error) {
+        elements.trashList.innerHTML = `<p>${escapeHtml(error.message || 'Recently deleted could not be loaded.')}</p>`;
+    }
+}
+
+function renderTrash(shifts) {
+    elements.trashCount.textContent = shifts.length ? `(${shifts.length})` : '';
+    elements.emptyTrashButton.classList.toggle('is-hidden', shifts.length === 0);
+    elements.trashList.replaceChildren();
+    if (!shifts.length) {
+        elements.trashList.innerHTML = '<p>There are no recently deleted shifts.</p>';
+        return;
+    }
+    shifts.forEach(shift => {
+        const row = document.createElement('article');
+        row.className = 'trash-row';
+        row.innerHTML = `<div><strong>${escapeHtml(shift.station)} · ${formatDate(shift.date)}</strong><span>Deleted ${formatTimestamp(shift.deletedAt)}</span></div><div><button class="text-button restore-trash" type="button">Restore</button><button class="danger-text-button permanent-trash" type="button">Delete permanently</button></div>`;
+        row.querySelector('.restore-trash').addEventListener('click', () => restoreTrashShift(shift.id));
+        row.querySelector('.permanent-trash').addEventListener('click', () => openConfirm(
+            'Delete this shift permanently?',
+            `${shift.station} on ${formatDate(shift.date)} will be removed forever.`,
+            () => permanentlyDeleteShift(shift.id)
+        ));
+        elements.trashList.append(row);
+    });
+}
+
+async function restoreTrashShift(id) {
+    const response = await fetch(`/shifts/${id}/restore`, {method: 'POST', headers: csrfHeaders()});
+    if (!response.ok) throw new Error(await response.text());
+    showToast('Shift restored', 'The shift is back in your history.');
+    await loadTrash();
+    await loadStations();
+    await loadDashboard();
+}
+
+async function permanentlyDeleteShift(id) {
+    const response = await fetch(`/shifts/trash/${id}`, {method: 'DELETE', headers: csrfHeaders()});
+    if (!response.ok) throw new Error(await response.text());
+    showToast('Shift permanently deleted', 'The shift can no longer be restored.', {alert: true});
+    await loadTrash();
+}
+
+async function emptyTrash() {
+    const response = await fetch('/shifts/trash', {method: 'DELETE', headers: csrfHeaders()});
+    if (!response.ok) throw new Error(await response.text());
+    const result = await response.json();
+    showToast('Recently deleted emptied', `${result.deleted} shifts were permanently removed.`, {alert: true});
+    await loadTrash();
+}
+
+function openConfirm(title, message, action) {
+    pendingConfirmAction = action;
+    lastFocusedElement = document.activeElement;
+    elements.confirmTitle.textContent = title;
+    elements.confirmMessage.textContent = message;
+    elements.confirmModal.classList.remove('is-hidden');
+    document.body.classList.add('modal-open');
+    elements.cancelConfirmButton.focus();
+}
+
+function closeConfirm() {
+    elements.confirmModal.classList.add('is-hidden');
+    document.body.classList.remove('modal-open');
+    pendingConfirmAction = undefined;
+    if (lastFocusedElement?.isConnected) lastFocusedElement.focus();
+}
+
+function trapFocus(container, event) {
+    const focusable = [...container.querySelectorAll('button, input, select, textarea, a[href]')]
+            .filter(element => !element.disabled && !element.classList.contains('is-hidden'));
+    if (!focusable.length) return;
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
     }
 }
 
@@ -615,12 +837,61 @@ function hideMessage(element) {
     element.classList.add('is-hidden');
 }
 
-function showToast(title, message) {
-    window.clearTimeout(toastTimer);
-    elements.toastTitle.textContent = title;
-    elements.toastMessage.textContent = message;
+function showToast(title, message, options = {}) {
+    toastQueue.push({title, message, duration: options.duration || 3500, ...options});
+    if (!toastState) displayNextToast();
+}
+
+function displayNextToast() {
+    const next = toastQueue.shift();
+    if (!next) return;
+    toastState = {...next, remaining: next.duration, started: Date.now()};
+    elements.toastTitle.textContent = next.title;
+    elements.toastMessage.textContent = next.message;
+    elements.successToast.setAttribute('role', next.alert ? 'alert' : 'status');
+    elements.toastAction.textContent = next.actionLabel || 'Undo';
+    elements.toastAction.classList.toggle('is-hidden', !next.onAction);
+    elements.toastAction.onclick = next.onAction ? async () => {
+        const action = next.onAction;
+        hideCurrentToast();
+        try {
+            await action();
+        } catch (error) {
+            showToast('Undo failed', error.message || 'The action could not be undone.', {alert: true});
+        }
+    } : null;
+    elements.toastCountdown.style.animation = 'none';
+    void elements.toastCountdown.offsetWidth;
+    elements.toastCountdown.style.animation = `toast-countdown ${next.duration}ms linear forwards`;
     elements.successToast.classList.remove('is-hidden');
-    toastTimer = window.setTimeout(() => elements.successToast.classList.add('is-hidden'), 3500);
+    scheduleToast();
+}
+
+function scheduleToast() {
+    if (!toastState) return;
+    toastState.started = Date.now();
+    toastState.timer = window.setTimeout(hideCurrentToast, toastState.remaining);
+    elements.toastCountdown.style.animationPlayState = 'running';
+}
+
+function pauseToast() {
+    if (!toastState?.timer) return;
+    window.clearTimeout(toastState.timer);
+    toastState.timer = null;
+    toastState.remaining -= Date.now() - toastState.started;
+    elements.toastCountdown.style.animationPlayState = 'paused';
+}
+
+function resumeToast() {
+    if (toastState && !toastState.timer) scheduleToast();
+}
+
+function hideCurrentToast() {
+    if (!toastState) return;
+    window.clearTimeout(toastState.timer);
+    elements.successToast.classList.add('is-hidden');
+    toastState = undefined;
+    window.setTimeout(displayNextToast, 100);
 }
 
 function trimTime(time) {
@@ -815,7 +1086,13 @@ function updateResultSummary(shifts) {
         range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
     }
     const station = filterState.station ? ` · ${filterState.station}` : '';
-    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station}`;
+    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station} · export includes these`;
+    elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
+    elements.exportCsvButton.classList.toggle('is-disabled', count === 0);
+    elements.exportCsvButton.setAttribute('aria-disabled', String(count === 0));
+    elements.exportCsvButton.title = count === 0
+            ? 'No shifts match the active filters'
+            : `Export ${count} matching shifts`;
 }
 
 function drillIntoBucket(bucket, groupBy) {
@@ -833,6 +1110,21 @@ function drillIntoBucket(bucket, groupBy) {
 
 function formatDate(value) {
     return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+}
+
+function formatTimestamp(value) {
+    return value ? new Date(value).toLocaleString() : 'Unknown';
+}
+
+function timestampSummary(shift) {
+    if (!shift.createdAt) return '';
+    const added = new Date(shift.createdAt).toLocaleDateString(undefined, {
+        month: 'short', day: 'numeric', year: 'numeric'
+    });
+    const edited = shift.updatedAt && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000
+            ? ` · Last edited ${new Date(shift.updatedAt).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`
+            : '';
+    return `Added ${added}${edited}`;
 }
 
 function startOfToday() {

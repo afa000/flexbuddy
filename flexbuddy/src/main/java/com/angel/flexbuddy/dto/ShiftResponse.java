@@ -3,6 +3,7 @@ package com.angel.flexbuddy.dto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,4 +25,7 @@ public class ShiftResponse {
     private BigDecimal totalPay;
     private int timeWorked;
     private BigDecimal hourlyRate;
+    private Instant createdAt;
+    private Instant updatedAt;
+    private Instant deletedAt;
 }

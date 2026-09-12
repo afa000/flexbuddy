@@ -11,6 +11,9 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 
@@ -40,12 +43,15 @@ class ShiftServiceTest {
 
     @Mock ShiftRepository shiftRepository;
     @Mock AppUserRepository userRepository;
+    @Mock Clock clock;
     @InjectMocks ShiftService shiftService;
 
     private AppUser owner;
 
     @BeforeEach
     void setUpOwner() {
+        org.mockito.Mockito.lenient().when(clock.instant()).thenReturn(Instant.parse("2026-09-11T12:00:00Z"));
+        org.mockito.Mockito.lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
         owner = new AppUser("Angel", OWNER_EMAIL, "password-hash");
         owner.setId(10L);
     }
@@ -145,13 +151,16 @@ class ShiftServiceTest {
     }
 
     @Test
-    void deleteShift_deletesAnOwnedShift() {
+    void deleteShift_softDeletesAnOwnedShiftAndReturnsItsUndoBatch() {
         Shift existing = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
         when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(existing));
 
-        shiftService.deleteShift(OWNER_EMAIL, 1L);
+        String batch = shiftService.deleteShift(OWNER_EMAIL, 1L);
 
-        verify(shiftRepository).delete(existing);
+        assertThat(batch).isNotBlank();
+        assertThat(existing.getDeletedAt()).isEqualTo(Instant.parse("2026-09-11T12:00:00Z"));
+        assertThat(existing.getDeleteBatch()).isEqualTo(batch);
+        verify(shiftRepository).save(existing);
     }
 
     private CreateShiftRequest request() {

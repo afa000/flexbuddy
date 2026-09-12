@@ -5,7 +5,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.doAnswer;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -13,12 +15,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.Clock;
+import java.io.OutputStream;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -28,6 +34,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 
@@ -43,6 +50,7 @@ import com.angel.flexbuddy.exception.InvalidScreenshotException;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
 import com.angel.flexbuddy.service.ShiftReportService;
+import com.angel.flexbuddy.service.ShiftCsvWriter;
 import com.angel.flexbuddy.service.OcrLine;
 import com.angel.flexbuddy.service.ParsedField;
 import com.angel.flexbuddy.repository.AppUserRepository;
@@ -64,6 +72,12 @@ class ShiftControllerTest {
     private ShiftReportService reportService;
 
     @MockitoBean
+    private ShiftCsvWriter csvWriter;
+
+    @MockitoBean
+    private Clock clock;
+
+    @MockitoBean
     private AppUserRepository userRepository;
 
     @Test
@@ -72,6 +86,41 @@ class ShiftControllerTest {
         mockMvc.perform(get("/shifts"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    void exportCsv_usesActiveFiltersAndReturnsRangeFilename() throws Exception {
+        when(shiftService.getShifts(eq("angel@example.com"), any(ShiftFilter.class))).thenReturn(List.of());
+        doAnswer(invocation -> {
+            OutputStream output = invocation.getArgument(1);
+            output.write("id,date\r\n".getBytes());
+            return null;
+        }).when(csvWriter).write(any(), any(OutputStream.class));
+
+        MvcResult pending = mockMvc.perform(get("/shifts/export.csv")
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30")
+                        .param("station", "VEA7")
+                        .param("q", "north")
+                        .param("sort", "date")
+                        .param("dir", "desc")
+                        .with(user("angel@example.com")))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        mockMvc.perform(asyncDispatch(pending))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Disposition",
+                        "attachment; filename=\"flexbuddy-shifts-2026-09-01_to_2026-09-30.csv\""))
+                .andExpect(header().string("Cache-Control", "no-store"))
+                .andExpect(content().contentTypeCompatibleWith("text/csv"))
+                .andExpect(content().string("id,date\r\n"));
+
+        verify(shiftService).getShifts(eq("angel@example.com"), org.mockito.ArgumentMatchers.argThat(filter ->
+                filter.from().equals(LocalDate.of(2026, 9, 1))
+                        && filter.to().equals(LocalDate.of(2026, 9, 30))
+                        && filter.station().equals("VEA7")
+                        && filter.query().equals("north")));
     }
 
     @Test
