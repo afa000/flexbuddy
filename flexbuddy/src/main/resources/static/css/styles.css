@@ -1448,11 +1448,11 @@ h1 {
     bottom: 18px;
     left: 50%;
     z-index: 30;
-    width: 330px;
+    width: min(390px, calc(100vw - 32px));
     height: 70px;
     padding: 6px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     transform: translateX(-50%);
     background: var(--mobile-shell);
     border: 1px solid var(--mobile-shell-border);
@@ -1741,7 +1741,7 @@ h1 {
         height: 92px;
         padding: 10px max(58px, calc((100vw - 340px) / 2));
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0;
         transform: none;
         background: var(--mobile-nav);
