@@ -1,28 +1,22 @@
 package com.angel.flexbuddy.dto;
 
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalTime;
 import java.util.List;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import com.angel.flexbuddy.service.OcrLine;
 
-@Getter
-@AllArgsConstructor
-public class ShiftImportPreviewResponse {
-
-    private String originalFilename;
-    private String contentType;
-    private long size;
-    private String message;
-    private String rawText;
-    private int year;
-    private String station;
-    private LocalDate date;
-    private LocalTime startTime;
-    private LocalTime endTime;
-    private BigDecimal basePay;
-    private BigDecimal tips;
-    private List<String> warnings;
+public record ShiftImportPreviewResponse(
+        String originalFilename,
+        String contentType,
+        long size,
+        String message,
+        String rawText,
+        int year,
+        int meanConfidence,
+        List<OcrLine> lines,
+        List<ShiftCandidate> shifts
+) {
+    public ShiftImportPreviewResponse {
+        lines = lines == null ? List.of() : List.copyOf(lines);
+        shifts = shifts == null ? List.of() : List.copyOf(shifts);
+    }
 }

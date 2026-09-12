@@ -44,6 +44,7 @@ class ShiftImportServiceTest {
         shiftImportService = new ShiftImportService(
                 textExtractor,
                 new ShiftScreenshotParser(),
+                new ImportWarningRules(),
                 fixedClock
         );
     }
@@ -58,28 +59,31 @@ class ShiftImportServiceTest {
                 imageBytes
         );
         when(textExtractor.extract(any(BufferedImage.class)))
-                .thenReturn("""
-                        Windsor (DCY1) - Amazon.com
-                        Sunday, 9/6
-                        04:00 - 07:30 (3 hr 30 min)
-                        $124.50
-                        """);
+                .thenReturn(OcrResult.fromLines(java.util.List.of(
+                        line("Windsor (DCY1) - Amazon.com", 92, 0),
+                        line("Sunday, 9/6", 90, 1),
+                        line("04:00 - 07:30 (3 hr 30 min)", 88, 2),
+                        line("$124.50", 86, 3)
+                )));
 
         ShiftImportPreviewResponse result = shiftImportService.createPreview(screenshot);
 
-        assertThat(result.getOriginalFilename()).isEqualTo("shift.png");
-        assertThat(result.getContentType()).isEqualTo("image/png");
-        assertThat(result.getSize()).isEqualTo(imageBytes.length);
-        assertThat(result.getMessage()).isEqualTo("Screenshot processed successfully.");
-        assertThat(result.getRawText()).contains("Windsor (DCY1)");
-        assertThat(result.getYear()).isEqualTo(2026);
-        assertThat(result.getStation()).isEqualTo("DCY1");
-        assertThat(result.getDate()).isEqualTo(LocalDate.of(2026, 9, 6));
-        assertThat(result.getStartTime()).isEqualTo(LocalTime.of(4, 0));
-        assertThat(result.getEndTime()).isEqualTo(LocalTime.of(7, 30));
-        assertThat(result.getBasePay()).isEqualByComparingTo(new BigDecimal("124.50"));
-        assertThat(result.getTips()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(result.getWarnings()).isEmpty();
+        assertThat(result.originalFilename()).isEqualTo("shift.png");
+        assertThat(result.contentType()).isEqualTo("image/png");
+        assertThat(result.size()).isEqualTo(imageBytes.length);
+        assertThat(result.message()).contains("Found 1 shift");
+        assertThat(result.rawText()).contains("Windsor (DCY1)");
+        assertThat(result.year()).isEqualTo(2026);
+        assertThat(result.meanConfidence()).isBetween(86, 92);
+        assertThat(result.shifts()).hasSize(1);
+        var shift = result.shifts().getFirst();
+        assertThat(shift.station().value()).isEqualTo("DCY1");
+        assertThat(shift.date().value()).isEqualTo(LocalDate.of(2026, 9, 6));
+        assertThat(shift.startTime().value()).isEqualTo(LocalTime.of(4, 0));
+        assertThat(shift.endTime().value()).isEqualTo(LocalTime.of(7, 30));
+        assertThat(shift.basePay().value()).isEqualByComparingTo(new BigDecimal("124.50"));
+        assertThat(shift.tips().value()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(shift.warnings()).isEmpty();
     }
 
     @Test
@@ -129,5 +133,9 @@ class ShiftImportServiceTest {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ImageIO.write(image, "png", output);
         return output.toByteArray();
+    }
+
+    private OcrLine line(String text, int confidence, int index) {
+        return new OcrLine(text, confidence, 0, index * 20, 200, 18, index);
     }
 }

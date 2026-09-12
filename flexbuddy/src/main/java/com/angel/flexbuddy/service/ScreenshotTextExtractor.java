@@ -4,5 +4,5 @@ import java.awt.image.BufferedImage;
 
 public interface ScreenshotTextExtractor {
 
-    String extract(BufferedImage image);
+    OcrResult extract(BufferedImage image);
 }

@@ -6,15 +6,23 @@ import java.time.LocalTime;
 import java.util.List;
 
 public record ParsedShiftData(
-        String station,
-        LocalDate date,
-        LocalTime startTime,
-        LocalTime endTime,
-        BigDecimal basePay,
-        BigDecimal tips,
-        List<String> warnings
+        ParsedField<String> station,
+        ParsedField<LocalDate> date,
+        ParsedField<LocalTime> startTime,
+        ParsedField<LocalTime> endTime,
+        ParsedField<BigDecimal> basePay,
+        ParsedField<BigDecimal> tips,
+        List<ImportWarning> warnings
 ) {
     public ParsedShiftData {
-        warnings = List.copyOf(warnings);
+        warnings = warnings == null ? List.of() : List.copyOf(warnings);
+    }
+
+    public ParsedShiftData withDate(ParsedField<LocalDate> replacement) {
+        return new ParsedShiftData(station, replacement, startTime, endTime, basePay, tips, warnings);
+    }
+
+    public ParsedShiftData withWarnings(List<ImportWarning> replacement) {
+        return new ParsedShiftData(station, date, startTime, endTime, basePay, tips, replacement);
     }
 }

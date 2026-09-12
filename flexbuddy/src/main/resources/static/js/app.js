@@ -15,6 +15,9 @@ const elements = {
     uploadError: document.querySelector('#uploadError'),
     ocrDetails: document.querySelector('#ocrDetails'),
     rawText: document.querySelector('#rawText'),
+    readQuality: document.querySelector('#readQuality'),
+    readQualityValue: document.querySelector('#readQualityValue'),
+    readQualityBar: document.querySelector('#readQualityBar'),
     emptyPreview: document.querySelector('#emptyPreview'),
     previewForm: document.querySelector('#previewForm'),
     warningNotice: document.querySelector('#warningNotice'),
@@ -86,6 +89,19 @@ let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
+const previewFields = {
+    station: elements.station,
+    date: elements.date,
+    startTime: elements.startTime,
+    endTime: elements.endTime,
+    basePay: elements.basePay,
+    tips: elements.tips
+};
+
+Object.values(previewFields).forEach(input => input.addEventListener('focus', () => {
+    const sourceLine = input.dataset.lineIndex;
+    highlightRawLine(sourceLine === '' || sourceLine === undefined ? null : Number(sourceLine));
+}));
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
 elements.importNavButton.addEventListener('click', () => {
@@ -239,28 +255,102 @@ function showSelectedFile(file) {
 }
 
 function populatePreview(preview) {
-    elements.station.value = preview.station ?? '';
-    elements.date.value = preview.date ?? '';
-    elements.startTime.value = trimTime(preview.startTime);
-    elements.endTime.value = trimTime(preview.endTime);
-    elements.basePay.value = preview.basePay ?? '';
-    elements.tips.value = preview.tips ?? 0;
-    elements.rawText.textContent = preview.rawText || 'No readable text was found.';
+    const candidate = preview.shifts?.[0];
+    if (!candidate) throw new Error('No shift details were found in this screenshot.');
 
-    elements.warningList.replaceChildren();
-    const warnings = preview.warnings ?? [];
-    for (const warning of warnings) {
-        const item = document.createElement('li');
-        item.textContent = warning;
-        elements.warningList.append(item);
-    }
+    setPreviewField('station', candidate.station);
+    setPreviewField('date', candidate.date);
+    setPreviewField('startTime', candidate.startTime, trimTime);
+    setPreviewField('endTime', candidate.endTime, trimTime);
+    setPreviewField('basePay', candidate.basePay);
+    setPreviewField('tips', candidate.tips, value => value ?? 0);
+    renderRawText(preview.lines, preview.rawText);
+    renderReadQuality(preview.meanConfidence);
+
+    const warnings = candidate.warnings ?? [];
+    renderWarnings(warnings);
 
     elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
     elements.ocrDetails.classList.remove('is-hidden');
     elements.emptyPreview.classList.add('is-hidden');
     elements.previewForm.classList.remove('is-hidden');
 
-    if (!preview.station) elements.station.focus();
+    const missingField = Object.entries(previewFields)
+            .find(([name]) => candidate[name]?.level === 'MISSING');
+    if (missingField) missingField[1].focus();
+}
+
+function setPreviewField(name, parsedField, transform = value => value ?? '') {
+    const input = previewFields[name];
+    const field = parsedField ?? {value: null, level: 'MISSING', confidence: null, lineIndex: null};
+    input.value = transform(field.value);
+    input.dataset.lineIndex = field.lineIndex ?? '';
+    const wrapper = input.closest('.field');
+    wrapper.dataset.confidence = field.level;
+    wrapper.querySelector('.confidence-badge')?.remove();
+    if (field.level !== 'HIGH' || field.confidence < 90) {
+        const badge = document.createElement('small');
+        badge.className = `confidence-badge confidence-${field.level.toLowerCase()}`;
+        badge.textContent = field.level === 'MISSING' ? 'Missing' : `${field.confidence}% read`;
+        wrapper.querySelector('span:first-child').append(badge);
+    }
+}
+
+function renderWarnings(warnings) {
+    elements.warningList.replaceChildren();
+    for (const severity of ['ERROR', 'WARNING', 'INFO']) {
+        const group = warnings.filter(warning => warning.severity === severity);
+        if (!group.length) continue;
+        const heading = document.createElement('li');
+        heading.className = `warning-group warning-${severity.toLowerCase()}`;
+        heading.textContent = severity === 'ERROR' ? 'Needs attention' : severity === 'WARNING' ? 'Please check' : 'For your information';
+        elements.warningList.append(heading);
+        for (const warning of group) {
+            const item = document.createElement('li');
+            item.className = 'warning-item';
+            item.textContent = warning.message;
+            if (warning.field && previewFields[warning.field]) {
+                item.tabIndex = 0;
+                item.setAttribute('role', 'button');
+                const focusField = () => previewFields[warning.field].focus();
+                item.addEventListener('click', focusField);
+                item.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') focusField();
+                });
+            }
+            elements.warningList.append(item);
+        }
+    }
+}
+
+function renderReadQuality(confidence) {
+    const score = Math.max(0, Math.min(100, Number(confidence) || 0));
+    elements.readQualityValue.textContent = `${score}%`;
+    elements.readQualityBar.style.width = `${score}%`;
+    elements.readQuality.dataset.level = score >= 80 ? 'HIGH' : score >= 60 ? 'MEDIUM' : 'LOW';
+    elements.readQuality.classList.remove('is-hidden');
+}
+
+function renderRawText(lines, fallbackText) {
+    elements.rawText.replaceChildren();
+    if (!lines?.length) {
+        elements.rawText.textContent = fallbackText || 'No readable text was found.';
+        return;
+    }
+    lines.forEach((line, position) => {
+        const row = document.createElement('span');
+        row.className = 'ocr-line';
+        row.dataset.lineIndex = line.index;
+        row.textContent = line.text;
+        elements.rawText.append(row);
+        if (position < lines.length - 1) elements.rawText.append(document.createTextNode('\n'));
+    });
+}
+
+function highlightRawLine(lineIndex) {
+    elements.rawText.querySelectorAll('.ocr-line').forEach(line => {
+        line.classList.toggle('is-highlighted', lineIndex !== null && Number(line.dataset.lineIndex) === lineIndex);
+    });
 }
 
 async function saveShift(event) {
@@ -487,6 +577,14 @@ function resetImport() {
     elements.emptyPreview.classList.remove('is-hidden');
     elements.ocrDetails.classList.add('is-hidden');
     elements.ocrDetails.open = false;
+    elements.readQuality.classList.add('is-hidden');
+    elements.warningList.replaceChildren();
+    Object.values(previewFields).forEach(input => {
+        delete input.dataset.lineIndex;
+        const wrapper = input.closest('.field');
+        delete wrapper.dataset.confidence;
+        wrapper.querySelector('.confidence-badge')?.remove();
+    });
     hideMessage(elements.uploadError);
     hideMessage(elements.saveError);
     setActiveNavigation('dashboard');

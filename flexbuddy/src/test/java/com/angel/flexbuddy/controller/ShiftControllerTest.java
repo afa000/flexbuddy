@@ -33,6 +33,7 @@ import org.springframework.security.test.context.support.WithAnonymousUser;
 
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
+import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
@@ -42,6 +43,8 @@ import com.angel.flexbuddy.exception.InvalidScreenshotException;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
 import com.angel.flexbuddy.service.ShiftReportService;
+import com.angel.flexbuddy.service.OcrLine;
+import com.angel.flexbuddy.service.ParsedField;
 import com.angel.flexbuddy.repository.AppUserRepository;
 
 @WebMvcTest(ShiftController.class)
@@ -203,16 +206,23 @@ class ShiftControllerTest {
                 "shift.png",
                 "image/png",
                 3,
-                "Screenshot processed successfully.",
+                "Found 1 shift. Review the imported values before saving.",
                 "Schedule Details",
                 2026,
-                "VEA7",
-                LocalDate.of(2026, 9, 6),
-                LocalTime.of(15, 15),
-                LocalTime.of(19, 15),
-                new BigDecimal("124.00"),
-                BigDecimal.ZERO,
-                List.of()
+                92,
+                List.of(new OcrLine("Schedule Details", 92, 0, 0, 100, 20, 0)),
+                List.of(new ShiftCandidate(
+                        0,
+                        ParsedField.defaulted("VEA7"),
+                        ParsedField.defaulted(LocalDate.of(2026, 9, 6)),
+                        ParsedField.defaulted(LocalTime.of(15, 15)),
+                        ParsedField.defaulted(LocalTime.of(19, 15)),
+                        ParsedField.defaulted(new BigDecimal("124.00")),
+                        ParsedField.defaulted(BigDecimal.ZERO),
+                        List.of(),
+                        List.of(),
+                        List.of(0, 0)
+                ))
         );
 
         when(shiftImportService.createPreview(any())).thenReturn(response);
@@ -225,16 +235,17 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.originalFilename").value("shift.png"))
                 .andExpect(jsonPath("$.contentType").value("image/png"))
                 .andExpect(jsonPath("$.size").value(3))
-                .andExpect(jsonPath("$.message").value("Screenshot processed successfully."))
+                .andExpect(jsonPath("$.message").value("Found 1 shift. Review the imported values before saving."))
                 .andExpect(jsonPath("$.rawText").value("Schedule Details"))
                 .andExpect(jsonPath("$.year").value(2026))
-                .andExpect(jsonPath("$.station").value("VEA7"))
-                .andExpect(jsonPath("$.date").value("2026-09-06"))
-                .andExpect(jsonPath("$.startTime").value("15:15:00"))
-                .andExpect(jsonPath("$.endTime").value("19:15:00"))
-                .andExpect(jsonPath("$.basePay").value(124.00))
-                .andExpect(jsonPath("$.tips").value(0))
-                .andExpect(jsonPath("$.warnings").isEmpty());
+                .andExpect(jsonPath("$.meanConfidence").value(92))
+                .andExpect(jsonPath("$.shifts[0].station.value").value("VEA7"))
+                .andExpect(jsonPath("$.shifts[0].date.value").value("2026-09-06"))
+                .andExpect(jsonPath("$.shifts[0].startTime.value").value("15:15:00"))
+                .andExpect(jsonPath("$.shifts[0].endTime.value").value("19:15:00"))
+                .andExpect(jsonPath("$.shifts[0].basePay.value").value(124.00))
+                .andExpect(jsonPath("$.shifts[0].tips.value").value(0))
+                .andExpect(jsonPath("$.shifts[0].warnings").isEmpty());
     }
 
     @Test
