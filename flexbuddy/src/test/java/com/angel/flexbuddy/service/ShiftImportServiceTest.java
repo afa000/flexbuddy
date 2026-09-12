@@ -142,6 +142,19 @@ class ShiftImportServiceTest {
     }
 
     @Test
+    void createPreview_rejectsAnExtremeAspectRatioOnTheSideCap() throws IOException {
+        ShiftImportService service = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC),
+                30_000_000L);
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "wide.png", "image/png",
+                createPngBytes(12_001, 2));
+
+        assertThatThrownBy(() -> service.createPreview(screenshot))
+                .isInstanceOf(InvalidScreenshotException.class)
+                .hasMessageContaining("Neither side may be over 12000 pixels");
+    }
+
+    @Test
     void createPreview_stillReadsAnImageInsideTheConfiguredLimit() throws IOException {
         ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
                 new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);

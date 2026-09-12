@@ -130,7 +130,13 @@ public class ShiftImportService {
         int width = reader.getWidth(0);
         int height = reader.getHeight(0);
 
-        if (width > MAX_SIDE || height > MAX_SIDE || (long) width * height > maxPixels) {
+        if (width > MAX_SIDE || height > MAX_SIDE) {
+            throw new InvalidScreenshotException(
+                    "The screenshot is too large. Neither side may be over " + MAX_SIDE + " pixels."
+            );
+        }
+
+        if ((long) width * height > maxPixels) {
             throw new InvalidScreenshotException(
                     "The screenshot is too large. Use an image under "
                             + Math.max(1, maxPixels / 1_000_000) + " megapixels."
