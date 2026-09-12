@@ -36,11 +36,22 @@ public class Shift {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String station;
+
+    @Column(nullable = false)
     private LocalDate date;
+
+    @Column(nullable = false)
     private LocalTime startTime;
+
+    @Column(nullable = false)
     private LocalTime endTime;
+
+    @Column(nullable = false)
     private BigDecimal basePay;
+
+    @Column(nullable = false)
     private BigDecimal tips;
 
     @Column(nullable = false, updatable = false)

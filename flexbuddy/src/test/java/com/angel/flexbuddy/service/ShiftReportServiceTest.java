@@ -103,6 +103,23 @@ class ShiftReportServiceTest {
         assertThat(years.buckets()).extracting(bucket -> bucket.key()).containsExactly("2025", "2026");
     }
 
+    @Test
+    void dateReportsPlaceLegacyRowsWithMissingDatesInAnUnknownBucket() {
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(
+                shift("VEA7", LocalDate.of(2026, 2, 10), "75", "0", 60),
+                shift("VEA7", null, "50", "0", 60)
+        ));
+
+        for (GroupBy groupBy : List.of(GroupBy.WEEK, GroupBy.MONTH, GroupBy.YEAR)) {
+            EarningsReportResponse result = reportService.earnings(EMAIL, ALL, groupBy);
+
+            assertThat(result.buckets()).hasSize(2);
+            assertThat(result.buckets().getLast().key()).isEqualTo("unknown");
+            assertThat(result.buckets().getLast().label()).isEqualTo("Unknown date");
+            assertThat(result.buckets().getLast().periodStart()).isNull();
+        }
+    }
+
     private Shift shift(String station, LocalDate date, String base, String tips, int minutes) {
         LocalTime start = LocalTime.of(8, 0);
         LocalTime end = start.plusMinutes(minutes);
@@ -110,4 +127,3 @@ class ShiftReportServiceTest {
                 tips == null ? null : new BigDecimal(tips));
     }
 }
-

@@ -15,6 +15,7 @@ public record RestorePreviewResponse(
         int newDeletedShifts,
         int alreadyPresent,
         int inRecentlyDeleted,
+        int duplicateInBackup,
         int invalid,
         int deletedInBackup,
         List<RestoreProblem> problems,

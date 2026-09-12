@@ -55,6 +55,16 @@ cd flexbuddy
 .\mvnw.cmd test
 ```
 
+The PostgreSQL migration test is skipped unless a test database is configured. It creates
+and removes its own isolated schema:
+
+```powershell
+$env:FLEXBUDDY_TEST_POSTGRES_URL = 'jdbc:postgresql://localhost:5432/flexbuddy'
+$env:FLEXBUDDY_TEST_POSTGRES_USER = 'flexbuddy'
+$env:FLEXBUDDY_TEST_POSTGRES_PASSWORD = 'flexbuddy'
+.\mvnw.cmd -Dtest=PostgresMigrationTest test
+```
+
 ## Deployment
 
 The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Pushes to `main` are automatically deployed through the connected Render Blueprint.
@@ -71,7 +81,7 @@ All of these require a signed-in session and only ever touch the caller's own sh
 |---|---|
 | `GET /shifts/export.csv` | Downloads the filtered shift history as CSV. Accepts the same filters as `GET /shifts`. |
 | `GET /account/backup` | Downloads a `flexbuddy-backup` JSON file with the account profile plus active and recently deleted shifts. It never contains the password hash. |
-| `POST /account/restore/preview` | Multipart upload of a backup file (5 MB max). Returns what a restore would do — totals, new, existing, already in Recently deleted, invalid rows — and stages the file against a one-shot token. One staged backup per session; the token expires after 15 minutes. |
+| `POST /account/restore/preview` | Multipart upload of a backup file (5 MB max). Returns what a restore would do — totals, new, existing, already in Recently deleted, duplicate backup rows, and invalid rows — and stages the file against a one-shot token. One staged backup per session; the token expires after 15 minutes. |
 | `POST /account/restore` | Commits the staged restore. Takes the preview `token`, a `mode` of `MERGE` or `REPLACE`, `includeDeleted`, and `acknowledgeReplace`. `REPLACE` moves the current history to Recently deleted first and returns a batch id. |
 | `POST /account/restore/{batchId}/undo` | Reverses a `REPLACE` restore: removes the inserted rows and restores the batch that was moved to Recently deleted. |
 | `GET /shifts/trash` | Lists Recently deleted shifts. |
@@ -81,4 +91,3 @@ All of these require a signed-in session and only ever touch the caller's own sh
 | `DELETE /shifts/trash` | Permanently removes everything in Recently deleted. |
 
 Deleted shifts stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening the trash listing purges the caller's own expired rows.
-

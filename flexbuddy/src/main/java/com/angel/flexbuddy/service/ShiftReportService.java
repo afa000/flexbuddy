@@ -66,7 +66,8 @@ public class ShiftReportService {
             buckets.sort(Comparator.comparing(EarningsBucket::totalEarnings).reversed()
                     .thenComparing(EarningsBucket::label, String.CASE_INSENSITIVE_ORDER));
         } else {
-            buckets.sort(Comparator.comparing(EarningsBucket::periodStart));
+            buckets.sort(Comparator.comparing(EarningsBucket::periodStart,
+                    Comparator.nullsLast(Comparator.naturalOrder())));
         }
 
         return new EarningsReportResponse(groupBy.name().toLowerCase(Locale.ROOT), filter.from(), filter.to(),
@@ -81,6 +82,9 @@ public class ShiftReportService {
 
     private GroupKey groupKey(Shift shift, GroupBy groupBy) {
         LocalDate date = shift.getDate();
+        if (date == null && groupBy != GroupBy.STATION) {
+            return new GroupKey("unknown", "Unknown date", null, null);
+        }
         return switch (groupBy) {
             case STATION -> {
                 String station = Objects.requireNonNullElse(shift.getStation(), "").trim();
@@ -150,4 +154,3 @@ public class ShiftReportService {
         }
     }
 }
-

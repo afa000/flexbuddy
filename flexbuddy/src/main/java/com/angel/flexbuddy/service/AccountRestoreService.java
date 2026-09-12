@@ -6,9 +6,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.nio.charset.StandardCharsets;
@@ -72,25 +74,30 @@ public class AccountRestoreService {
         List<Shift> owned = shiftRepository.findAllIncludingDeleted(email);
         Set<String> liveKeys = keys(owned.stream().filter(shift -> shift.getDeletedAt() == null).toList());
         Set<String> trashedKeys = keys(owned.stream().filter(shift -> shift.getDeletedAt() != null).toList());
-        Set<String> seen = new HashSet<>(liveKeys);
-        seen.addAll(trashedKeys);
         int alreadyPresent = 0;
         int inRecentlyDeleted = 0;
         int newShifts = 0;
         int newDeletedShifts = 0;
+        int duplicateInBackup = 0;
         Set<Integer> invalidIndexes = new HashSet<>();
         problems.forEach(problem -> invalidIndexes.add(problem.index()));
+        Set<String> backupKeys = new HashSet<>();
+        Set<String> activeBackupKeys = new HashSet<>();
+        Map<String, Integer> backupOccurrences = new HashMap<>();
         for (int index = 0; index < file.shifts().size(); index++) {
             BackupShift shift = file.shifts().get(index);
             if (invalidIndexes.contains(index)) continue;
             String key = key(shift);
-            if (!seen.add(key)) {
-                if (liveKeys.contains(key)) alreadyPresent++; else inRecentlyDeleted++;
-            } else if (shift.deletedAt() != null) {
-                newDeletedShifts++;
-            } else {
-                newShifts++;
-            }
+            backupKeys.add(key);
+            backupOccurrences.merge(key, 1, Integer::sum);
+            if (shift.deletedAt() == null) activeBackupKeys.add(key);
+        }
+        for (String key : backupKeys) {
+            duplicateInBackup += backupOccurrences.get(key) - 1;
+            if (liveKeys.contains(key)) alreadyPresent++;
+            else if (trashedKeys.contains(key)) inRecentlyDeleted++;
+            else if (activeBackupKeys.contains(key)) newShifts++;
+            else newDeletedShifts++;
         }
 
         String token = UUID.randomUUID().toString();
@@ -101,7 +108,8 @@ public class AccountRestoreService {
         return new RestorePreviewResponse(
                 token, file.format(), file.version(), file.exportedAt(), sourceEmail,
                 sourceEmail != null && sourceEmail.equalsIgnoreCase(email), file.shifts().size(), newShifts,
-                newDeletedShifts, alreadyPresent, inRecentlyDeleted, invalidIndexes.size(), deleted, problems,
+                newDeletedShifts, alreadyPresent, inRecentlyDeleted, duplicateInBackup,
+                invalidIndexes.size(), deleted, problems,
                 liveKeys.size()
         );
     }

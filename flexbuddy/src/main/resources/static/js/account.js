@@ -108,6 +108,7 @@ function renderPreview(preview, filename) {
         : '';
     document.querySelector('#previewExisting').textContent = preview.alreadyPresent;
     document.querySelector('#previewTrashed').textContent = preview.inRecentlyDeleted;
+    document.querySelector('#previewDuplicates').textContent = preview.duplicateInBackup;
     document.querySelector('#previewInvalid').textContent = preview.invalid;
     document.querySelector('#previewSource').textContent = `${filename} · ${preview.sameAccount ? 'Same account' : `From ${preview.sourceEmail || 'another account'}`} · ${preview.deletedInBackup} recently deleted`;
     const problems = document.querySelector('#restoreProblems');

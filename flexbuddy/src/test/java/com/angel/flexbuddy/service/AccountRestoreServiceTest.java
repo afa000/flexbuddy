@@ -154,6 +154,28 @@ class AccountRestoreServiceTest {
     }
 
     @Test
+    void duplicateRowsInsideTheBackupAreReportedWithoutBeingCalledRecentlyDeleted() throws Exception {
+        BackupShift duplicate = backupShift("BDL4", null);
+        backup = new AccountBackupFile("flexbuddy-backup", 1, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                List.of(duplicate, duplicate), new BackupCounts(2, 0));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(backup);
+        when(shiftRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of());
+        MockHttpSession session = new MockHttpSession();
+
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+        RestoreResult result = service.restore(EMAIL,
+                new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(preview.newShifts()).isEqualTo(1);
+        assertThat(preview.duplicateInBackup()).isEqualTo(1);
+        assertThat(preview.inRecentlyDeleted()).isZero();
+        assertThat(preview.alreadyPresent()).isZero();
+        assertThat(result.inserted()).isEqualTo(1);
+        assertThat(result.skipped()).isEqualTo(1);
+    }
+
+    @Test
     void previewKeepsOneStagedBackupPerSessionAndClearsItAfterARestore() {
         MockHttpSession session = new MockHttpSession();
         RestorePreviewResponse first = service.preview(EMAIL, upload(), session);
