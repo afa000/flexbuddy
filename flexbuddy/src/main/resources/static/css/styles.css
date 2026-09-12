@@ -1876,6 +1876,17 @@ h1 {
     .expense-form-panel, .expense-history-panel { padding: 20px 18px; border-radius: 0; }
     .expense-row { grid-template-columns: 38px minmax(0, 1fr) auto; }
     .expense-row-actions { grid-column: 2 / -1; }
-    .mobile-nav { grid-template-columns: repeat(3, 1fr); padding-left: max(25px, calc((100vw - 390px) / 2)); padding-right: max(25px, calc((100vw - 390px) / 2)); }
-    .mobile-nav::before { left: max(25px, calc((100vw - 390px) / 2)); right: max(25px, calc((100vw - 390px) / 2)); }
+}
+
+@media (max-width: 620px) {
+    .mobile-nav {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        padding-left: max(25px, calc((100vw - 390px) / 2));
+        padding-right: max(25px, calc((100vw - 390px) / 2));
+    }
+
+    .mobile-nav::before {
+        left: max(25px, calc((100vw - 390px) / 2));
+        right: max(25px, calc((100vw - 390px) / 2));
+    }
 }
