@@ -13,5 +13,11 @@ public record EarningsBucket(
         BigDecimal tips,
         BigDecimal totalEarnings,
         int minutesWorked,
-        BigDecimal hourlyRate
+        BigDecimal hourlyRate,
+        BigDecimal miles,
+        BigDecimal mileageCost,
+        BigDecimal expenses,
+        BigDecimal deductions,
+        BigDecimal netEarnings,
+        BigDecimal netHourlyRate
 ) {}

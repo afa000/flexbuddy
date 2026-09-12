@@ -23,7 +23,8 @@ public class ShiftCsvWriter {
 
     private static final String[] HEADERS = {
             "id", "date", "station", "start_time", "end_time", "minutes_worked", "hours_worked",
-            "base_pay", "tips", "total_pay", "hourly_rate", "created_at", "updated_at"
+            "base_pay", "tips", "total_pay", "hourly_rate", "miles", "mileage_cost",
+            "expenses", "net_pay", "net_hourly_rate", "earnings_per_mile", "created_at", "updated_at"
     };
 
     public void write(List<ShiftResponse> shifts, OutputStream output) throws IOException {
@@ -36,7 +37,9 @@ public class ShiftCsvWriter {
                     time(shift.getStartTime()), time(shift.getEndTime()), text(shift.getTimeWorked()),
                     BigDecimal.valueOf(shift.getTimeWorked()).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP).toPlainString(),
                     money(shift.getBasePay()), money(shift.getTips()), money(shift.getTotalPay()),
-                    money(shift.getHourlyRate()), instant(shift.getCreatedAt()), instant(shift.getUpdatedAt())
+                    money(shift.getHourlyRate()), decimal(shift.getMiles()), money(shift.getMileageCost()),
+                    money(shift.getLinkedExpenses()), money(shift.getNetPay()), money(shift.getNetHourlyRate()),
+                    decimal(shift.getEarningsPerMile()), instant(shift.getCreatedAt()), instant(shift.getUpdatedAt())
             ));
         }
         writer.flush();
@@ -66,6 +69,7 @@ public class ShiftCsvWriter {
     }
 
     private String text(Object value) { return value == null ? "" : value.toString(); }
+    private String decimal(BigDecimal value) { return value == null ? "" : value.stripTrailingZeros().toPlainString(); }
     private String money(BigDecimal value) { return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString(); }
     private String date(LocalDate value) { return value == null ? "" : value.toString(); }
     private String time(LocalTime value) { return value == null ? "" : value.format(DateTimeFormatter.ofPattern("HH:mm")); }

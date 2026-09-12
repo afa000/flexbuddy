@@ -14,6 +14,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
     }
 
+    @ExceptionHandler(ExpenseNotFoundException.class)
+    public ResponseEntity<String> handleExpenseNotFound(ExpenseNotFoundException exception) {
+        return ResponseEntity.status(404).body(exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidScreenshotException.class)
     public ResponseEntity<String> handleInvalidScreenshotException(InvalidScreenshotException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());

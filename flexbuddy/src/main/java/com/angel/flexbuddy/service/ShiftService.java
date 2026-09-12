@@ -9,6 +9,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -21,6 +23,9 @@ import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.Expense;
+import com.angel.flexbuddy.dto.AccountSettingsResponse;
+import com.angel.flexbuddy.dto.NetEarningsResult;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -33,22 +38,33 @@ public class ShiftService {
     private final ShiftRepository shiftRepository;
     private final AppUserRepository userRepository;
     private final Clock clock;
+    private final ExpenseService expenseService;
+    private final AccountSettingsService settingsService;
+    private final NetEarningsCalculator netCalculator;
 
-    public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository, Clock clock) {
+    public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository, Clock clock,
+            ExpenseService expenseService, AccountSettingsService settingsService, NetEarningsCalculator netCalculator) {
         this.shiftRepository = shiftRepository;
         this.userRepository = userRepository;
         this.clock = clock;
+        this.expenseService = expenseService;
+        this.settingsService = settingsService;
+        this.netCalculator = netCalculator;
     }
 
     public List<ShiftResponse> getAllShifts(String email) {
         return getShifts(email, ShiftFilter.report(null, null, null, null));
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ShiftResponse> getShifts(String email, ShiftFilter filter) {
-        return findFiltered(email, filter).stream()
-                .sorted(comparator(filter))
-                .map(this::toResponse)
-                .toList();
+        List<Shift> shifts = findFiltered(email, filter);
+        AccountSettingsResponse settings = settingsService.get(email);
+        Map<Long, List<Expense>> expenses = expenseService.findForShifts(email, shifts).stream()
+                .collect(Collectors.groupingBy(expense -> expense.getShift().getId()));
+        List<ShiftResponse> responses = shifts.stream().map(shift -> toResponse(shift,
+                expenses.getOrDefault(shift.getId(), List.of()), settings)).toList();
+        return responses.stream().sorted(responseComparator(filter)).toList();
     }
 
     public List<String> getStations(String email) {
@@ -76,17 +92,18 @@ public class ShiftService {
 
         Shift shift = new Shift();
         applyRequest(shift, request.getStation(), request.getDate(), request.getStartTime(), request.getEndTime(),
-                request.getBasePay(), request.getTips());
+                request.getBasePay(), request.getTips(), request.getMiles());
         shift.setOwner(owner);
-        return toResponse(shiftRepository.save(shift));
+        return toResponse(shiftRepository.save(shift), List.of(), settingsService.get(email));
     }
 
     public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
         applyRequest(shift, request.getStation(), request.getDate(), request.getStartTime(), request.getEndTime(),
-                request.getBasePay(), request.getTips());
-        return toResponse(shiftRepository.save(shift));
+                request.getBasePay(), request.getTips(), request.getMiles());
+        Shift saved = shiftRepository.save(shift);
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -103,7 +120,7 @@ public class ShiftService {
         int updated = shiftRepository.restoreDeleted(email, id);
         if (updated == 0) throw new ShiftNotFoundException(id);
         return shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
-                .map(this::toResponse)
+                .map(shift -> toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email)))
                 .orElseThrow(() -> new ShiftNotFoundException(id));
     }
 
@@ -115,7 +132,8 @@ public class ShiftService {
     @org.springframework.transaction.annotation.Transactional
     public List<ShiftResponse> getTrash(String email) {
         shiftRepository.purgeDeletedBefore(email, Instant.now(clock).minus(30, java.time.temporal.ChronoUnit.DAYS));
-        return shiftRepository.findTrash(email).stream().map(this::toResponse).toList();
+        AccountSettingsResponse settings = settingsService.get(email);
+        return shiftRepository.findTrash(email).stream().map(shift -> toResponse(shift, List.of(), settings)).toList();
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -129,46 +147,46 @@ public class ShiftService {
     }
 
     private void applyRequest(Shift shift, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
-            BigDecimal basePay, BigDecimal tips) {
+            BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
         shift.setStation(station.trim());
         shift.setDate(date);
         shift.setStartTime(startTime);
         shift.setEndTime(endTime);
         shift.setBasePay(basePay);
         shift.setTips(tips);
+        shift.setMiles(miles);
     }
 
-    private ShiftResponse toResponse(Shift shift) {
+    private ShiftResponse toResponse(Shift shift, List<Expense> expenses, AccountSettingsResponse settings) {
+        NetEarningsResult net = netCalculator.calculate(List.of(shift), expenses,
+                settings.vehicleCostMethod(), settings.mileageRate());
         return new ShiftResponse(
                 shift.getId(), shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 shift.getBasePay(), shift.getTips(), shift.getTotalPay(), shift.getTimeWorked(), shift.getHourlyRate(),
+                shift.getMiles(), shift.getMileageCost(settings.mileageRate()), shift.getEarningsPerMile(),
+                net.cashSpent(), net.netEarnings(), net.netHourlyRate(),
                 shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt()
         );
     }
 
-    private Comparator<Shift> comparator(ShiftFilter filter) {
-        Comparator<Shift> newestFirst = Comparator
-                .comparing(Shift::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
-                .thenComparing(Shift::getStartTime, Comparator.nullsLast(Comparator.reverseOrder()));
-
-        if (filter.sort() == ShiftSort.DATE) {
-            Comparator<Shift> dateOrder = Comparator
-                    .comparing(Shift::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                    .thenComparing(Shift::getStartTime, Comparator.nullsLast(Comparator.naturalOrder()));
-            return filter.direction() == SortDirection.DESC ? dateOrder.reversed() : dateOrder;
-        }
-
-        Comparator<Shift> primary = switch (filter.sort()) {
-            case STATION -> Comparator.comparing(Shift::getStation,
-                    Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
-            case BASE_PAY -> Comparator.comparing(shift -> money(shift.getBasePay()));
-            case TIPS -> Comparator.comparing(shift -> money(shift.getTips()));
-            case TOTAL_PAY -> Comparator.comparing(Shift::getTotalPay);
-            case TIME_WORKED -> Comparator.comparingInt(Shift::getTimeWorked);
-            case HOURLY_RATE -> Comparator.comparing(Shift::getHourlyRate);
-            case CREATED_AT -> Comparator.comparing(Shift::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
-            case UPDATED_AT -> Comparator.comparing(Shift::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
-            case DATE -> throw new IllegalStateException("Date sorting is handled above.");
+    private Comparator<ShiftResponse> responseComparator(ShiftFilter filter) {
+        Comparator<ShiftResponse> newestFirst = Comparator
+                .comparing(ShiftResponse::getDate, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(ShiftResponse::getStartTime, Comparator.nullsLast(Comparator.reverseOrder()));
+        Comparator<ShiftResponse> primary = switch (filter.sort()) {
+            case DATE -> Comparator.comparing(ShiftResponse::getDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                    .thenComparing(ShiftResponse::getStartTime, Comparator.nullsLast(Comparator.naturalOrder()));
+            case STATION -> Comparator.comparing(ShiftResponse::getStation, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER));
+            case BASE_PAY -> Comparator.comparing(response -> money(response.getBasePay()));
+            case TIPS -> Comparator.comparing(response -> money(response.getTips()));
+            case TOTAL_PAY -> Comparator.comparing(ShiftResponse::getTotalPay);
+            case TIME_WORKED -> Comparator.comparingInt(ShiftResponse::getTimeWorked);
+            case HOURLY_RATE -> Comparator.comparing(ShiftResponse::getHourlyRate);
+            case MILES -> Comparator.comparing(response -> money(response.getMiles()));
+            case NET_PAY -> Comparator.comparing(ShiftResponse::getNetPay);
+            case NET_HOURLY_RATE -> Comparator.comparing(ShiftResponse::getNetHourlyRate);
+            case CREATED_AT -> Comparator.comparing(ShiftResponse::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
+            case UPDATED_AT -> Comparator.comparing(ShiftResponse::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
         };
         if (filter.direction() == SortDirection.DESC) primary = primary.reversed();
         return primary.thenComparing(newestFirst);

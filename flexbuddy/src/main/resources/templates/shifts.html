@@ -84,6 +84,21 @@
                 <div class="split-bar" aria-hidden="true"><span id="baseShareBar"></span><span id="tipsShareBar"></span></div>
                 <small id="tipsShare">0.0% from tips</small>
             </article>
+            <article class="stat-card stat-card-accent">
+                <span>Estimated net earnings</span>
+                <strong id="netEarnings">$0.00</strong>
+                <small id="netMargin">After deductions · 0.0% margin</small>
+            </article>
+            <article class="stat-card">
+                <span>Estimated net hourly</span>
+                <strong id="netHourly">$0.00</strong>
+                <small id="expenseTotal">$0.00 expenses</small>
+            </article>
+            <article class="stat-card">
+                <span>Miles logged</span>
+                <strong id="totalMiles">0.0 mi</strong>
+                <small id="mileageCost">$0.00 mileage cost</small>
+            </article>
         </section>
 
         <section class="import-screen is-hidden" id="importScreen" aria-labelledby="import-title">
@@ -198,6 +213,11 @@
                         <span class="input-with-prefix"><b>$</b><input id="tips" name="tips" type="number" min="0" step="0.01" inputmode="decimal" required></span>
                     </label>
 
+                    <label class="field field-wide">
+                        <span>Miles <small>(optional)</small></span>
+                        <input id="miles" name="miles" type="number" min="0" step="0.1" inputmode="decimal" placeholder="0.0">
+                    </label>
+
                     <div class="notice error-notice is-hidden field-wide" id="saveError" role="alert"></div>
                     <div class="form-actions field-wide">
                         <button class="secondary-button" id="resetButton" type="button">Start over</button>
@@ -237,6 +257,8 @@
                     <option value="basePay">Base pay</option><option value="tips">Tips</option>
                     <option value="totalPay">Total pay</option><option value="timeWorked">Hours</option>
                     <option value="hourlyRate">Hourly rate</option><option value="createdAt">Recently added</option>
+                    <option value="miles">Miles</option><option value="netPay">Estimated net pay</option>
+                    <option value="netHourlyRate">Estimated net hourly rate</option>
                     <option value="updatedAt">Recently edited</option>
                 </select></label>
                 <button class="sort-direction" id="sortDirectionButton" type="button" aria-label="Sort descending">↓ Desc</button>
@@ -266,6 +288,10 @@
                     <div class="chart-scroll"><div class="chart" id="earningsChart"></div></div>
                 </article>
                 <article class="chart-card">
+                    <h3>Gross vs estimated net hourly</h3>
+                    <div class="chart-scroll"><div class="chart" id="hourlyChart"></div></div>
+                </article>
+                <article class="chart-card">
                     <h3>Base pay vs tips</h3>
                     <div class="chart donut-chart" id="payMixChart"></div>
                 </article>
@@ -273,10 +299,50 @@
             <div class="breakdown-scroll">
                 <table class="breakdown-table">
                     <caption class="sr-only">Filtered earnings grouped for reporting</caption>
-                    <thead><tr><th>Bucket</th><th>Shifts</th><th>Hours</th><th>Base</th><th>Tips</th><th>Total</th><th>$/hr</th></tr></thead>
+                    <thead><tr><th>Bucket</th><th>Shifts</th><th>Hours</th><th>Gross</th><th>Miles</th><th>Mileage cost</th><th>Expenses</th><th>Deductions</th><th>Est. net</th><th>Est. net $/hr</th></tr></thead>
                     <tbody id="breakdownBody"></tbody>
                 </table>
             </div>
+        </section>
+
+        <section class="expenses-screen is-hidden" id="expensesScreen" aria-labelledby="expenses-title">
+            <header class="screen-heading">
+                <p class="eyebrow">DRIVER EXPENSES</p>
+                <h1 id="expenses-title">Expenses</h1>
+                <p>Track the costs behind each shift and see your real earnings.</p>
+            </header>
+            <section class="stats-grid expense-stats" aria-label="Expense totals">
+                <article class="stat-card stat-card-accent"><span>Filtered expenses</span><strong id="expenseSummaryTotal">$0.00</strong><small id="expenseSummaryCount">0 entries</small></article>
+                <article class="stat-card"><span>Fuel</span><strong id="expenseFuel">$0.00</strong><small>Actual cash spent</small></article>
+                <article class="stat-card"><span>Tolls & parking</span><strong id="expenseRoad">$0.00</strong><small>Road costs</small></article>
+                <article class="stat-card"><span>Vehicle cost method</span><strong id="expenseCostMethod">Standard mileage</strong><small><a class="text-link" href="/account">Change in Account</a></small></article>
+            </section>
+            <section class="expense-layout">
+                <article class="panel expense-form-panel">
+                    <div class="panel-heading"><div><p class="step-label">QUICK ADD</p><h2 id="expenseFormTitle">Log an expense</h2><p>Link it to a shift when the cost belongs to one block.</p></div></div>
+                    <form class="preview-form" id="expenseForm">
+                        <label class="field"><span>Date</span><input id="expenseDate" type="date" required></label>
+                        <label class="field"><span>Category</span><select id="expenseCategory" required><option value="FUEL">Fuel</option><option value="TOLL">Toll</option><option value="PARKING">Parking</option><option value="MAINTENANCE">Maintenance</option><option value="OTHER">Other</option></select></label>
+                        <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" required></span></label>
+                        <label class="field"><span>Shift <small>(optional)</small></span><select id="expenseShift"><option value="">No linked shift</option></select></label>
+                        <label class="field field-wide"><span>Note <small>(optional)</small></span><input id="expenseNote" type="text" maxlength="255" placeholder="Gas station, receipt, or details"></label>
+                        <div class="notice error-notice is-hidden field-wide" id="expenseError" role="alert"></div>
+                        <div class="form-actions field-wide"><button class="secondary-button is-hidden" id="cancelExpenseEdit" type="button">Cancel edit</button><button class="primary-button" id="saveExpenseButton" type="submit">Add expense</button></div>
+                    </form>
+                </article>
+                <article class="panel expense-history-panel">
+                    <div class="panel-heading"><div><p class="step-label">EXPENSE HISTORY</p><h2>Explore expenses</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download>Export CSV</a></div>
+                    <div class="filter-row expense-filters">
+                        <label class="filter-field"><span>From</span><input id="expenseFrom" type="date"></label>
+                        <label class="filter-field"><span>To</span><input id="expenseTo" type="date"></label>
+                        <label class="filter-field"><span>Category</span><select id="expenseFilterCategory"><option value="">All categories</option><option value="FUEL">Fuel</option><option value="TOLL">Toll</option><option value="PARKING">Parking</option><option value="MAINTENANCE">Maintenance</option><option value="OTHER">Other</option></select></label>
+                        <label class="filter-field"><span>Search</span><input id="expenseQuery" type="search" placeholder="Note or station"></label>
+                    </div>
+                    <div class="expense-category-breakdown" id="expenseCategoryBreakdown" aria-label="Expenses by category"></div>
+                    <div class="expense-list" id="expenseList"><p class="history-empty">Loading expenses…</p></div>
+                    <details class="trash-section" id="expenseTrashSection"><summary>Recently deleted expenses <span id="expenseTrashCount"></span></summary><div class="trash-toolbar"><p>Deleted expenses stay here for 30 days.</p><button class="danger-text-button is-hidden" id="emptyExpenseTrashButton" type="button">Empty recently deleted</button></div><div class="trash-list" id="expenseTrashList"><p>Open to load deleted expenses.</p></div></details>
+                </article>
+            </section>
         </section>
 
         <section class="panel history-panel" data-screen="dashboard" aria-labelledby="history-title">
@@ -347,6 +413,13 @@
                     <span class="input-with-prefix"><b>$</b><input id="editTips" type="number" min="0" step="0.01" inputmode="decimal" required></span>
                 </label>
 
+                <label class="field field-wide">
+                    <span>Miles <small>(optional)</small></span>
+                    <input id="editMiles" type="number" min="0" step="0.1" inputmode="decimal">
+                </label>
+
+                <section class="linked-expenses field-wide"><strong>Linked expenses</strong><div id="linkedExpensesList"><small>Loading…</small></div></section>
+
                 <div class="notice error-notice is-hidden field-wide" id="editError" role="alert"></div>
                 <p class="shift-timestamps field-wide" id="editTimestamps"></p>
                 <div class="form-actions field-wide">
@@ -375,6 +448,10 @@
         <button class="mobile-nav-item" id="importNavButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
             <span>Import</span>
+        </button>
+        <button class="mobile-nav-item" id="expensesNavButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg>
+            <span>Expenses</span>
         </button>
     </nav>
 

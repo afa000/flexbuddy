@@ -29,6 +29,7 @@ import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.service.AccountService;
 import com.angel.flexbuddy.service.AccountBackupService;
 import com.angel.flexbuddy.service.AccountRestoreService;
+import com.angel.flexbuddy.service.AccountSettingsService;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -52,6 +53,9 @@ class AccountControllerTest {
 
     @MockitoBean
     private AccountRestoreService restoreService;
+
+    @MockitoBean
+    private AccountSettingsService settingsService;
 
     @MockitoBean
     private Clock clock;

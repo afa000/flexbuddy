@@ -13,6 +13,8 @@ The app is hosted on Render. Because it uses a free web service, the first reque
 - Review and correct OCR results before saving
 - View, edit, and delete only your own saved shifts
 - Track total earnings, base pay, tips, time worked, and average earnings
+- Log mileage and fuel, toll, parking, maintenance, or other driver expenses
+- Compare gross and net earnings using standard-mileage or actual-expense vehicle costs
 - Filter and search history by date or station, then sort by pay, hours, or hourly rate
 - Compare earnings by station, ISO week, month, or year with accessible charts and tables
 - Switch between light and dark themes
@@ -73,14 +75,37 @@ The root [`render.yaml`](render.yaml) defines the Render web service and Postgre
 
 Authenticated requests to `GET /shifts`, `GET /shifts/statistics`, and `GET /shifts/reports/earnings` accept the same optional `from`, `to`, `station`, and `q` filters. Shift history also accepts `sort` and `dir`; reports require `groupBy=station|week|month|year`. `GET /shifts/stations` returns the signed-in user's station choices.
 
+Shift create and update requests accept optional `miles`. Shift responses include mileage cost, earnings per mile, linked expenses, net pay, and net hourly rate. The statistics and grouped report endpoints include mileage, cash expenses, deductions, and net earnings. These figures are planning estimates and are not tax advice.
+
+## Driver expenses API
+
+All expense and settings endpoints require a signed-in session and are scoped to that account.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /expenses` | Lists expenses. Accepts `from`, `to`, `station`, `q`, `category`, and `shiftId`. |
+| `POST /expenses` | Creates an expense with date, category, amount, optional note, and optional owned shift id. |
+| `PUT /expenses/{id}` | Updates an owned expense. |
+| `DELETE /expenses/{id}` | Soft-deletes an owned expense and returns an undo batch header. |
+| `GET /expenses/summary` | Returns filtered totals and category subtotals. |
+| `GET /expenses/export.csv` | Downloads the filtered expense list as CSV. |
+| `GET /expenses/trash` | Lists recently deleted expenses. |
+| `POST /expenses/{id}/restore` | Restores one expense. |
+| `POST /expenses/restore-batch/{batchId}` | Restores a delete batch for Undo. |
+| `DELETE /expenses/trash/{id}` | Permanently deletes one trashed expense. |
+| `DELETE /expenses/trash` | Permanently deletes all trashed expenses. |
+| `GET /shifts/{id}/expenses` | Lists the expenses linked to an owned shift. |
+| `GET /account/settings` | Returns the vehicle cost method and effective mileage rate. |
+| `PUT /account/settings` | Saves `STANDARD_MILEAGE` or `ACTUAL_EXPENSES` and a mileage rate. |
+
 ## Export, backup, and recovery
 
-All of these require a signed-in session and only ever touch the caller's own shifts.
+All of these require a signed-in session and only ever touch the caller's own data.
 
 | Endpoint | Purpose |
 |---|---|
 | `GET /shifts/export.csv` | Downloads the filtered shift history as CSV. Accepts the same filters as `GET /shifts`. |
-| `GET /account/backup` | Downloads a `flexbuddy-backup` JSON file with the account profile plus active and recently deleted shifts. It never contains the password hash. |
+| `GET /account/backup` | Downloads a version 2 `flexbuddy-backup` JSON file with shifts, mileage, expenses, settings, and recently deleted items. It never contains the password hash. |
 | `POST /account/restore/preview` | Multipart upload of a backup file (5 MB max). Returns what a restore would do — totals, new, existing, already in Recently deleted, duplicate backup rows, and invalid rows — and stages the file against a one-shot token. One staged backup per session; the token expires after 15 minutes. |
 | `POST /account/restore` | Commits the staged restore. Takes the preview `token`, a `mode` of `MERGE` or `REPLACE`, `includeDeleted`, and `acknowledgeReplace`. `REPLACE` moves the current history to Recently deleted first and returns a batch id. |
 | `POST /account/restore/{batchId}/undo` | Reverses a `REPLACE` restore: removes the inserted rows and restores the batch that was moved to Recently deleted. |
@@ -90,4 +115,6 @@ All of these require a signed-in session and only ever touch the caller's own sh
 | `DELETE /shifts/trash/{id}` | Permanently removes one shift. |
 | `DELETE /shifts/trash` | Permanently removes everything in Recently deleted. |
 
-Deleted shifts stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening the trash listing purges the caller's own expired rows.
+Version 1 backups remain restorable. Version 2 restore remaps expense-to-shift links and deduplicates both record types. Replace and Undo operate on shifts and expenses together.
+
+Deleted shifts and expenses stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening either trash listing purges expired rows.

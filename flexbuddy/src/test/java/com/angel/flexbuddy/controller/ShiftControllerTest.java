@@ -51,6 +51,7 @@ import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
 import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.service.ShiftCsvWriter;
+import com.angel.flexbuddy.service.ExpenseService;
 import com.angel.flexbuddy.service.OcrLine;
 import com.angel.flexbuddy.service.ParsedField;
 import com.angel.flexbuddy.repository.AppUserRepository;
@@ -73,6 +74,9 @@ class ShiftControllerTest {
 
     @MockitoBean
     private ShiftCsvWriter csvWriter;
+
+    @MockitoBean
+    private ExpenseService expenseService;
 
     @MockitoBean
     private Clock clock;

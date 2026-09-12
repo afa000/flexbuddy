@@ -30,6 +30,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.Expense;
 
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "FLEXBUDDY_TEST_POSTGRES_URL", matches = "jdbc:postgresql://.+")
@@ -40,7 +41,7 @@ class PostgresMigrationTest {
     private static final String PASSWORD = environmentOrDefault("FLEXBUDDY_TEST_POSTGRES_PASSWORD", "postgres");
 
     @Test
-    void v4BackfillsLegacyNullsAndMakesRequiredShiftColumnsNotNull() throws Exception {
+    void v5AddsDriverExpensesWithoutBreakingExistingShiftData() throws Exception {
         String schema = "flexbuddy_migration_test_" + UUID.randomUUID().toString().replace("-", "");
         Flyway throughV3 = flyway(schema, MigrationVersion.fromVersion("3"));
         Flyway latest = flyway(schema, MigrationVersion.LATEST);
@@ -49,14 +50,30 @@ class PostgresMigrationTest {
             throughV3.migrate();
             insertLegacyRow(schema);
 
-            assertThat(latest.migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(latest.migrate().migrationsExecuted).isEqualTo(2);
             assertBackfilledValues(schema);
             assertRequiredColumns(schema);
+            assertDriverExpenseSchema(schema);
             assertHibernateMappingsMatch(schema);
         } finally {
             latest.clean();
             try (Connection connection = connection(); Statement statement = connection.createStatement()) {
                 statement.execute("drop schema if exists " + schema + " cascade");
+            }
+        }
+    }
+
+    private void assertDriverExpenseSchema(String schema) throws Exception {
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("""
+                select count(*) from information_schema.columns
+                where table_schema = ? and ((table_name = 'shift' and column_name = 'miles')
+                  or (table_name = 'app_users' and column_name in ('mileage_rate','vehicle_cost_method'))
+                  or (table_name = 'expense' and column_name in ('id','owner_id','shift_id','date','category','amount','note','created_at','updated_at','deleted_at','delete_batch')))
+                """)) {
+            statement.setString(1, schema);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isEqualTo(14);
             }
         }
     }
@@ -142,7 +159,7 @@ class PostgresMigrationTest {
         StandardServiceRegistry registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {
             Metadata metadata = new MetadataSources(registry)
-                    .addAnnotatedClasses(AppUser.class, Shift.class)
+                    .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }

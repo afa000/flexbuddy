@@ -162,7 +162,7 @@
         if (!buckets.length) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 7;
+            cell.colSpan = 10;
             cell.className = 'table-empty';
             cell.textContent = 'No shifts match these filters.';
             row.append(cell);
@@ -176,8 +176,9 @@
             row.title = `Filter to ${bucket.label}`;
             const values = [
                 bucket.label, bucket.shifts, hours(bucket.minutesWorked),
-                fullMoney(bucket.basePay), fullMoney(bucket.tips),
-                fullMoney(bucket.totalEarnings), fullMoney(bucket.hourlyRate)
+                fullMoney(bucket.totalEarnings), Number(bucket.miles || 0).toFixed(1),
+                fullMoney(bucket.mileageCost), fullMoney(bucket.expenses), fullMoney(bucket.deductions),
+                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate)
             ];
             values.forEach((value, index) => {
                 const cell = document.createElement(index === 0 ? 'th' : 'td');
@@ -197,6 +198,37 @@
         }
     }
 
-    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable};
-})();
+    function renderHourlyChart(container, report) {
+        const buckets = report?.buckets ?? [];
+        container.replaceChildren();
+        if (!buckets.length) return empty(container, 'No shifts match these filters.');
+        const max = Math.max(...buckets.flatMap(bucket => [Number(bucket.hourlyRate || 0), Number(bucket.netHourlyRate || 0)]), 1);
+        const list = document.createElement('div');
+        list.className = 'hourly-comparison';
+        buckets.forEach(bucket => {
+            const row = document.createElement('div');
+            row.className = 'hourly-comparison-row';
+            const label = document.createElement('strong');
+            label.textContent = bucket.label;
+            const grossTrack = document.createElement('div');
+            const grossBar = document.createElement('span');
+            grossBar.className = 'gross-bar';
+            grossBar.style.width = `${Math.max(0, Number(bucket.hourlyRate || 0) / max * 100)}%`;
+            grossTrack.append(grossBar);
+            const grossValue = document.createElement('small');
+            grossValue.textContent = `Gross ${fullMoney(bucket.hourlyRate)}`;
+            const netTrack = document.createElement('div');
+            const netBar = document.createElement('span');
+            netBar.className = 'net-bar';
+            netBar.style.width = `${Math.max(0, Number(bucket.netHourlyRate || 0) / max * 100)}%`;
+            netTrack.append(netBar);
+            const netValue = document.createElement('small');
+            netValue.textContent = `Est. net ${fullMoney(bucket.netHourlyRate)}`;
+            row.append(label, grossTrack, grossValue, netTrack, netValue);
+            list.append(row);
+        });
+        container.append(list);
+    }
 
+    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart};
+})();

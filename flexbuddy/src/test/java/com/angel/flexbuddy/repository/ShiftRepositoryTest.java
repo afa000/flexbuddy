@@ -23,13 +23,13 @@ import org.springframework.context.annotation.Import;
 import com.angel.flexbuddy.config.JpaAuditingConfig;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
-import com.angel.flexbuddy.model.ShiftTimestampListener;
+import com.angel.flexbuddy.model.TimestampListener;
 
 import jakarta.persistence.EntityManager;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({JpaAuditingConfig.class, ShiftTimestampListener.class})
+@Import({JpaAuditingConfig.class, TimestampListener.class})
 class ShiftRepositoryTest {
 
     private static final Instant NOW = Instant.parse("2026-09-11T12:00:00Z");

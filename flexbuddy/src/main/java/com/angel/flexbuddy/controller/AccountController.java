@@ -17,6 +17,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.angel.flexbuddy.dto.RegistrationRequest;
@@ -27,6 +29,9 @@ import com.angel.flexbuddy.dto.RestoreResult;
 import com.angel.flexbuddy.service.AccountService;
 import com.angel.flexbuddy.service.AccountBackupService;
 import com.angel.flexbuddy.service.AccountRestoreService;
+import com.angel.flexbuddy.service.AccountSettingsService;
+import com.angel.flexbuddy.dto.AccountSettingsRequest;
+import com.angel.flexbuddy.dto.AccountSettingsResponse;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -43,16 +48,18 @@ public class AccountController {
     private final AppUserRepository userRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
+    private final AccountSettingsService settingsService;
 
     public AccountController(AccountService accountService, AccountBackupService backupService,
             AccountRestoreService restoreService, AppUserRepository userRepository, ObjectMapper objectMapper,
-            Clock clock) {
+            Clock clock, AccountSettingsService settingsService) {
         this.accountService = accountService;
         this.backupService = backupService;
         this.restoreService = restoreService;
         this.userRepository = userRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
+        this.settingsService = settingsService;
     }
 
     @GetMapping("/login")
@@ -94,6 +101,19 @@ public class AccountController {
         userRepository.findByEmailIgnoreCase(principal.getName())
                 .ifPresent(user -> model.addAttribute("currentUser", user));
         return "account";
+    }
+
+    @GetMapping("/account/settings")
+    @ResponseBody
+    public AccountSettingsResponse getSettings(Principal principal) {
+        return settingsService.get(principal.getName());
+    }
+
+    @PutMapping("/account/settings")
+    @ResponseBody
+    public AccountSettingsResponse updateSettings(Principal principal,
+            @Valid @RequestBody AccountSettingsRequest request) {
+        return settingsService.update(principal.getName(), request);
     }
 
     @GetMapping("/account/backup")

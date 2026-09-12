@@ -13,8 +13,13 @@ public record BackupShift(
         LocalTime endTime,
         String basePay,
         String tips,
+        String miles,
         Instant createdAt,
         Instant updatedAt,
         Instant deletedAt
 ) implements Serializable {
+    public BackupShift(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
+            String basePay, String tips, Instant createdAt, Instant updatedAt, Instant deletedAt) {
+        this(id, station, date, startTime, endTime, basePay, tips, null, createdAt, updatedAt, deletedAt);
+    }
 }

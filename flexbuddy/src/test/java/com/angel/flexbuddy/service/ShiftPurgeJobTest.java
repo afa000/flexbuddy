@@ -14,20 +14,23 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.repository.ShiftRepository;
+import com.angel.flexbuddy.repository.ExpenseRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ShiftPurgeJobTest {
 
     @Mock ShiftRepository shiftRepository;
+    @Mock ExpenseRepository expenseRepository;
 
     @Test
     void purgesOnlyRowsOlderThanThirtyDays() {
         Instant now = Instant.parse("2026-09-11T12:00:00Z");
         Instant cutoff = Instant.parse("2026-08-12T12:00:00Z");
         when(shiftRepository.purgeDeletedBefore(cutoff)).thenReturn(3);
-        ShiftPurgeJob job = new ShiftPurgeJob(shiftRepository, Clock.fixed(now, ZoneOffset.UTC));
+        ShiftPurgeJob job = new ShiftPurgeJob(shiftRepository, expenseRepository, Clock.fixed(now, ZoneOffset.UTC));
 
         assertThat(job.purgeExpired()).isEqualTo(3);
         verify(shiftRepository).purgeDeletedBefore(cutoff);
+        verify(expenseRepository).purgeDeletedBefore(cutoff);
     }
 }

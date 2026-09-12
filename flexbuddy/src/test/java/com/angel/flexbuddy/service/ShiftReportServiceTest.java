@@ -12,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
+import org.junit.jupiter.api.BeforeEach;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.EarningsReportResponse;
@@ -27,7 +29,20 @@ class ShiftReportServiceTest {
     private static final ShiftFilter ALL = ShiftFilter.report(null, null, null, null);
 
     @Mock ShiftService shiftService;
+    @Mock ExpenseService expenseService;
+    @Mock AccountSettingsService settingsService;
+    @Spy NetEarningsCalculator calculator = new NetEarningsCalculator();
     @InjectMocks ShiftReportService reportService;
+
+    @BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+        org.mockito.Mockito.lenient().when(settingsService.get(EMAIL)).thenReturn(
+                new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                        com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+    }
 
     @Test
     void statistics_handlesNullTipsAndCalculatesHourlyValues() {

@@ -33,9 +33,21 @@
 
         <section class="account-grid">
             <article class="panel data-card">
+                <p class="step-label">DRIVER COSTS</p>
+                <h2>Net earnings settings</h2>
+                <p>Choose how FlexBuddy estimates vehicle costs. You can override the standard mileage rate at any time.</p>
+                <form class="settings-form" id="expenseSettingsForm">
+                    <label class="field"><span>Vehicle cost method</span><select id="vehicleCostMethod"><option value="STANDARD_MILEAGE">Standard mileage</option><option value="ACTUAL_EXPENSES">Actual fuel & maintenance</option></select></label>
+                    <label class="field"><span>Mileage rate per mile</span><input id="accountMileageRate" type="number" min="0" max="5.000" step="0.001" required></label>
+                    <small id="mileageRateHelp"></small>
+                    <div class="notice error-notice is-hidden" id="settingsError" role="alert"></div>
+                    <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
+                </form>
+            </article>
+            <article class="panel data-card">
                 <p class="step-label">BACKUP</p>
                 <h2>Download all account data</h2>
-                <p>Your backup contains active and recently deleted shifts. It never contains your password.</p>
+                <p>Your backup contains shifts, expenses, driver cost settings, and recently deleted items. It never contains your password.</p>
                 <p class="backup-status" id="backupStatus" th:attr="data-last-backup=${currentUser.lastBackupAt}" th:text="${currentUser.lastBackupAt == null ? 'Last backup: Never' : 'Last backup recorded'}">Last backup: Never</p>
                 <a class="primary-button download-button" href="/account/backup" download>Download backup</a>
             </article>
@@ -59,17 +71,18 @@
                         <div><strong id="previewTrashed">0</strong><span>In Recently deleted</span></div>
                         <div><strong id="previewDuplicates">0</strong><span>Duplicate rows</span></div>
                         <div><strong id="previewInvalid">0</strong><span>Invalid</span></div>
+                        <div><strong id="previewExpenses">0</strong><span>Expenses</span><small id="previewExpenseNote"></small></div>
                     </div>
                     <p id="previewSource"></p>
                     <ul class="restore-problems" id="restoreProblems"></ul>
                     <fieldset class="restore-options">
                         <legend>Restore method</legend>
-                        <label><input type="radio" name="restoreMode" value="MERGE" checked> <span><strong>Merge</strong><small>Add new shifts and keep current history.</small></span></label>
-                        <label><input type="radio" name="restoreMode" value="REPLACE"> <span><strong>Replace</strong><small>Move current shifts to Recently deleted first.</small></span></label>
-                        <label class="checkbox-row"><input id="includeDeleted" type="checkbox"> Include recently deleted shifts from the backup</label>
-                        <label class="checkbox-row replace-ack is-hidden" id="replaceAckRow"><input id="replaceAck" type="checkbox"> I understand my current shifts will move to Recently deleted</label>
+                        <label><input type="radio" name="restoreMode" value="MERGE" checked> <span><strong>Merge</strong><small>Add new shifts and expenses while keeping current history.</small></span></label>
+                        <label><input type="radio" name="restoreMode" value="REPLACE"> <span><strong>Replace</strong><small>Move current shifts and expenses to Recently deleted first.</small></span></label>
+                        <label class="checkbox-row"><input id="includeDeleted" type="checkbox"> Include recently deleted shifts and expenses from the backup</label>
+                        <label class="checkbox-row replace-ack is-hidden" id="replaceAckRow"><input id="replaceAck" type="checkbox"> I understand my current shifts and expenses will move to Recently deleted</label>
                     </fieldset>
-                    <button class="primary-button" id="restoreButton" type="button">Restore shifts</button>
+                    <button class="primary-button" id="restoreButton" type="button">Restore account data</button>
                 </section>
             </article>
         </section>

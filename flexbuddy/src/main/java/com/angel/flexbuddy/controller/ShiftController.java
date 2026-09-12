@@ -34,6 +34,8 @@ import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.service.ShiftService;
 import com.angel.flexbuddy.service.ShiftCsvWriter;
+import com.angel.flexbuddy.service.ExpenseService;
+import com.angel.flexbuddy.dto.ExpenseResponse;
 
 import jakarta.validation.Valid;
 
@@ -46,14 +48,17 @@ public class ShiftController {
     private final ShiftImportService shiftImportService;
     private final ShiftCsvWriter csvWriter;
     private final Clock clock;
+    private final ExpenseService expenseService;
 
     public ShiftController(ShiftService shiftService, ShiftReportService reportService,
-            ShiftImportService shiftImportService, ShiftCsvWriter csvWriter, Clock clock) {
+            ShiftImportService shiftImportService, ShiftCsvWriter csvWriter, Clock clock,
+            ExpenseService expenseService) {
         this.shiftService = shiftService;
         this.reportService = reportService;
         this.shiftImportService = shiftImportService;
         this.csvWriter = csvWriter;
         this.clock = clock;
+        this.expenseService = expenseService;
     }
 
     @GetMapping
@@ -79,6 +84,11 @@ public class ShiftController {
     @GetMapping("/stations")
     public List<String> getStations(Principal principal) {
         return shiftService.getStations(principal.getName());
+    }
+
+    @GetMapping("/{id}/expenses")
+    public List<ExpenseResponse> getLinkedExpenses(Principal principal, @PathVariable Long id) {
+        return expenseService.getForShift(principal.getName(), id);
     }
 
     @GetMapping("/reports/earnings")

@@ -4,8 +4,10 @@ const elements = {
     dashboardButton: document.querySelector('#dashboardButton'),
     dashboardNavButton: document.querySelector('#dashboardNavButton'),
     importNavButton: document.querySelector('#importNavButton'),
+    expensesNavButton: document.querySelector('#expensesNavButton'),
     dashboardScreens: [...document.querySelectorAll('[data-screen="dashboard"]')],
     importScreen: document.querySelector('#importScreen'),
+    expensesScreen: document.querySelector('#expensesScreen'),
     dropZone: document.querySelector('#dropZone'),
     fileCard: document.querySelector('#fileCard'),
     imagePreview: document.querySelector('#imagePreview'),
@@ -29,6 +31,7 @@ const elements = {
     endTime: document.querySelector('#endTime'),
     basePay: document.querySelector('#basePay'),
     tips: document.querySelector('#tips'),
+    miles: document.querySelector('#miles'),
     saveButton: document.querySelector('#saveButton'),
     resetButton: document.querySelector('#resetButton'),
     saveError: document.querySelector('#saveError'),
@@ -42,6 +45,12 @@ const elements = {
     baseShareBar: document.querySelector('#baseShareBar'),
     tipsShareBar: document.querySelector('#tipsShareBar'),
     tipsShare: document.querySelector('#tipsShare'),
+    netEarnings: document.querySelector('#netEarnings'),
+    netMargin: document.querySelector('#netMargin'),
+    netHourly: document.querySelector('#netHourly'),
+    expenseTotal: document.querySelector('#expenseTotal'),
+    totalMiles: document.querySelector('#totalMiles'),
+    mileageCost: document.querySelector('#mileageCost'),
     activeFilterSummary: document.querySelector('#activeFilterSummary'),
     filterFrom: document.querySelector('#filterFrom'),
     filterTo: document.querySelector('#filterTo'),
@@ -56,6 +65,7 @@ const elements = {
     earningsChartTitle: document.querySelector('#earningsChartTitle'),
     earningsChart: document.querySelector('#earningsChart'),
     payMixChart: document.querySelector('#payMixChart'),
+    hourlyChart: document.querySelector('#hourlyChart'),
     breakdownBody: document.querySelector('#breakdownBody'),
     reportError: document.querySelector('#reportError'),
     historyList: document.querySelector('#historyList'),
@@ -74,6 +84,8 @@ const elements = {
     editEndTime: document.querySelector('#editEndTime'),
     editBasePay: document.querySelector('#editBasePay'),
     editTips: document.querySelector('#editTips'),
+    editMiles: document.querySelector('#editMiles'),
+    linkedExpensesList: document.querySelector('#linkedExpensesList'),
     editError: document.querySelector('#editError'),
     closeEditButton: document.querySelector('#closeEditButton'),
     cancelEditButton: document.querySelector('#cancelEditButton'),
@@ -87,7 +99,20 @@ const elements = {
     confirmTitle: document.querySelector('#confirmTitle'),
     confirmMessage: document.querySelector('#confirmMessage'),
     cancelConfirmButton: document.querySelector('#cancelConfirmButton'),
-    acceptConfirmButton: document.querySelector('#acceptConfirmButton')
+    acceptConfirmButton: document.querySelector('#acceptConfirmButton'),
+    expenseForm: document.querySelector('#expenseForm'), expenseFormTitle: document.querySelector('#expenseFormTitle'),
+    expenseDate: document.querySelector('#expenseDate'), expenseCategory: document.querySelector('#expenseCategory'),
+    expenseAmount: document.querySelector('#expenseAmount'), expenseShift: document.querySelector('#expenseShift'),
+    expenseNote: document.querySelector('#expenseNote'), expenseError: document.querySelector('#expenseError'),
+    saveExpenseButton: document.querySelector('#saveExpenseButton'), cancelExpenseEdit: document.querySelector('#cancelExpenseEdit'),
+    expenseFrom: document.querySelector('#expenseFrom'), expenseTo: document.querySelector('#expenseTo'),
+    expenseFilterCategory: document.querySelector('#expenseFilterCategory'), expenseQuery: document.querySelector('#expenseQuery'),
+    expenseList: document.querySelector('#expenseList'), expenseSummaryTotal: document.querySelector('#expenseSummaryTotal'),
+    expenseSummaryCount: document.querySelector('#expenseSummaryCount'), expenseFuel: document.querySelector('#expenseFuel'),
+    expenseRoad: document.querySelector('#expenseRoad'), exportExpensesButton: document.querySelector('#exportExpensesButton'),
+    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
+    expenseTrashSection: document.querySelector('#expenseTrashSection'), expenseTrashList: document.querySelector('#expenseTrashList'),
+    expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton')
 };
 
 let selectedFileUrl;
@@ -101,6 +126,7 @@ let dashboardAbort;
 let reportAbort;
 let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
+let editingExpenseId;
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 const previewFields = {
@@ -129,6 +155,7 @@ Object.values(previewFields).forEach(input => input.addEventListener('focus', ()
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
 elements.importNavButton.addEventListener('click', showImportScreen);
+elements.expensesNavButton.addEventListener('click', showExpensesScreen);
 elements.dashboardButton.addEventListener('click', () => showDashboard());
 elements.dashboardNavButton.addEventListener('click', () => showDashboard());
 elements.dropZone.addEventListener('click', openFilePicker);
@@ -177,6 +204,17 @@ elements.emptyTrashButton.addEventListener('click', () => openConfirm(
     'Empty Recently deleted?',
     'Every deleted shift will be permanently removed. This cannot be undone.',
     emptyTrash
+));
+elements.expenseForm.addEventListener('submit', saveExpense);
+elements.cancelExpenseEdit.addEventListener('click', resetExpenseForm);
+elements.expenseDate.addEventListener('change', () => populateExpenseShifts(currentShifts));
+[elements.expenseFrom, elements.expenseTo, elements.expenseFilterCategory].forEach(input => input.addEventListener('change', loadExpenses));
+elements.expenseQuery.addEventListener('input', () => { clearTimeout(elements.expenseQuery._timer); elements.expenseQuery._timer = setTimeout(loadExpenses, 250); });
+elements.expenseTrashSection.addEventListener('toggle', () => { if (elements.expenseTrashSection.open) loadExpenseTrash(); });
+elements.emptyExpenseTrashButton.addEventListener('click', () => openConfirm(
+    'Empty deleted expenses?',
+    'Every deleted expense will be permanently removed. This cannot be undone.',
+    emptyExpenseTrash
 ));
 elements.cancelConfirmButton.addEventListener('click', closeConfirm);
 elements.acceptConfirmButton.addEventListener('click', async () => {
@@ -247,6 +285,7 @@ function updateThemeToggle(theme) {
 function showDashboard(smooth = true) {
     elements.dashboardScreens.forEach(section => section.classList.remove('is-hidden'));
     elements.importScreen.classList.add('is-hidden');
+    elements.expensesScreen.classList.add('is-hidden');
     setActiveNavigation('dashboard');
     window.scrollTo({top: 0, behavior: smooth ? 'smooth' : 'auto'});
 }
@@ -254,15 +293,28 @@ function showDashboard(smooth = true) {
 function showImportScreen() {
     elements.dashboardScreens.forEach(section => section.classList.add('is-hidden'));
     elements.importScreen.classList.remove('is-hidden');
+    elements.expensesScreen.classList.add('is-hidden');
     setActiveNavigation('import');
+    window.scrollTo({top: 0, behavior: 'smooth'});
+}
+
+function showExpensesScreen() {
+    elements.dashboardScreens.forEach(section => section.classList.add('is-hidden'));
+    elements.importScreen.classList.add('is-hidden');
+    elements.expensesScreen.classList.remove('is-hidden');
+    setActiveNavigation('expenses');
+    if (!elements.expenseDate.value) elements.expenseDate.value = toIsoDate(new Date());
+    loadExpenses();
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function setActiveNavigation(activeItem) {
     elements.dashboardNavButton.classList.toggle('is-active', activeItem === 'dashboard');
     elements.importNavButton.classList.toggle('is-active', activeItem === 'import');
+    elements.expensesNavButton.classList.toggle('is-active', activeItem === 'expenses');
     setCurrentPage(elements.dashboardNavButton, activeItem === 'dashboard');
     setCurrentPage(elements.importNavButton, activeItem === 'import');
+    setCurrentPage(elements.expensesNavButton, activeItem === 'expenses');
 }
 
 function setCurrentPage(button, current) {
@@ -432,7 +484,8 @@ async function saveShift(event) {
         startTime: elements.startTime.value,
         endTime: elements.endTime.value,
         basePay: Number(elements.basePay.value),
-        tips: Number(elements.tips.value)
+        tips: Number(elements.tips.value),
+        miles: elements.miles.value === '' ? null : Number(elements.miles.value)
     };
 
     setSaving(true);
@@ -492,11 +545,18 @@ async function loadStatistics(query, signal) {
         elements.baseShareBar.style.width = `${100 - tipShare}%`;
         elements.tipsShareBar.style.width = `${tipShare}%`;
         elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
+        elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
+        elements.netHourly.textContent = `${formatMoney(statistics.netHourlyRate)}/hr`;
+        elements.netMargin.textContent = `After deductions · ${Number(statistics.netMargin || 0).toFixed(1)}% margin`;
+        elements.expenseTotal.textContent = `${formatMoney(statistics.totalExpenses)} cash expenses`;
+        elements.totalMiles.textContent = `${Number(statistics.totalMiles || 0).toFixed(1)} mi`;
+        elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
     } catch (error) {
         if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
             elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
-            elements.tipsShare].forEach(element => element.textContent = '—');
+            elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
+            elements.expenseTotal, elements.totalMiles, elements.mileageCost].forEach(element => element.textContent = '—');
         elements.baseShareBar.style.width = '0%';
         elements.tipsShareBar.style.width = '0%';
     }
@@ -508,6 +568,7 @@ async function loadShifts(query, signal) {
         if (!response.ok) throw new Error();
         currentShifts = await response.json();
         renderShifts(currentShifts);
+        populateExpenseShifts(currentShifts);
         updateResultSummary(currentShifts);
     } catch (error) {
         if (error?.name === 'AbortError') return;
@@ -533,12 +594,14 @@ async function loadEarningsReport(query) {
         const report = await response.json();
         window.flexbuddyCharts.renderEarningsChart(elements.earningsChart, report);
         window.flexbuddyCharts.renderDonut(elements.payMixChart, report.totals);
+        window.flexbuddyCharts.renderHourlyChart(elements.hourlyChart, report);
         window.flexbuddyCharts.renderTable(elements.breakdownBody, report, drillIntoBucket);
     } catch (error) {
         if (error?.name === 'AbortError') return;
         showMessage(elements.reportError, error.message || 'The earnings report could not be loaded.');
         elements.earningsChart.replaceChildren();
         elements.payMixChart.replaceChildren();
+        elements.hourlyChart.replaceChildren();
         elements.breakdownBody.replaceChildren();
     }
 }
@@ -574,7 +637,7 @@ function renderShifts(shifts) {
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}</strong><span>${escapeHtml(weekday)} shift</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr</span><span>${formatMoney(shift.basePay)} base · ${formatMoney(shift.tips)} tips</span></div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span></div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -598,6 +661,8 @@ function openEditModal(shift, trigger) {
     elements.editEndTime.value = trimTime(shift.endTime);
     elements.editBasePay.value = shift.basePay ?? '';
     elements.editTips.value = shift.tips ?? 0;
+    elements.editMiles.value = shift.miles ?? '';
+    loadLinkedExpenses(shift.id);
     elements.editTimestamps.textContent = timestampSummary(shift);
     elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
     hideDeleteConfirmation();
@@ -632,7 +697,8 @@ async function saveEditedShift(event) {
         startTime: elements.editStartTime.value,
         endTime: elements.editEndTime.value,
         basePay: Number(elements.editBasePay.value),
-        tips: Number(elements.editTips.value)
+        tips: Number(elements.editTips.value),
+        miles: elements.editMiles.value === '' ? null : Number(elements.editMiles.value)
     };
 
     setEditSaving(true);
@@ -711,7 +777,8 @@ async function undoEdit(id, previous) {
             startTime: previous.startTime,
             endTime: previous.endTime,
             basePay: previous.basePay,
-            tips: previous.tips
+            tips: previous.tips,
+            miles: previous.miles
         })
     });
     if (!response.ok) throw new Error(await response.text());
@@ -1073,7 +1140,10 @@ function updateResultSummary(shifts) {
         range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
     }
     const station = filterState.station ? ` · ${filterState.station}` : '';
-    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station} · export includes these`;
+    const expenseScope = filterState.station
+        ? 'expenses linked to these shifts only'
+        : 'expenses included by date';
+    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station} · ${expenseScope} · export includes these`;
     elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
     elements.exportCsvButton.classList.toggle('is-disabled', count === 0);
     elements.exportCsvButton.setAttribute('aria-disabled', String(count === 0));
@@ -1131,6 +1201,177 @@ function csrfHeaders(headers = {}) {
         headers[csrfHeader] = csrfToken;
     }
     return headers;
+}
+
+function populateExpenseShifts(shifts) {
+    const selected = elements.expenseShift.value;
+    elements.expenseShift.innerHTML = '<option value="">No linked shift</option>';
+    const selectedDate = elements.expenseDate.value;
+    shifts.filter(shift => !selectedDate || shift.date === selectedDate || String(shift.id) === selected).forEach(shift => {
+        const option = document.createElement('option');
+        option.value = shift.id;
+        option.textContent = `${formatDate(shift.date)} · ${shift.station}`;
+        elements.expenseShift.append(option);
+    });
+    if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
+}
+
+function expenseQueryString() {
+    const params = new URLSearchParams();
+    if (elements.expenseFrom.value) params.set('from', elements.expenseFrom.value);
+    if (elements.expenseTo.value) params.set('to', elements.expenseTo.value);
+    if (elements.expenseFilterCategory.value) params.set('category', elements.expenseFilterCategory.value);
+    if (elements.expenseQuery.value.trim()) params.set('q', elements.expenseQuery.value.trim());
+    return params.toString();
+}
+
+async function loadExpenses() {
+    const query = expenseQueryString();
+    elements.exportExpensesButton.href = `/expenses/export.csv${query ? `?${query}` : ''}`;
+    try {
+        const [listResponse, summaryResponse, settingsResponse] = await Promise.all([
+            apiFetch(`/expenses${query ? `?${query}` : ''}`),
+            apiFetch(`/expenses/summary${query ? `?${query}` : ''}`),
+            apiFetch('/account/settings')
+        ]);
+        if (!listResponse.ok) throw new Error(await listResponse.text());
+        if (!summaryResponse.ok) throw new Error(await summaryResponse.text());
+        if (!settingsResponse.ok) throw new Error(await settingsResponse.text());
+        renderExpenses(await listResponse.json());
+        renderExpenseSummary(await summaryResponse.json());
+        const settings = await settingsResponse.json();
+        elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
+            ? 'Actual expenses' : `Standard mileage · ${formatMoney(settings.mileageRate)}/mi`;
+    } catch (error) {
+        elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || 'Expenses could not be loaded.')}</p>`;
+    }
+}
+
+function renderExpenseSummary(summary) {
+    elements.expenseSummaryTotal.textContent = formatMoney(summary.total);
+    elements.expenseSummaryCount.textContent = `${summary.count || 0} ${summary.count === 1 ? 'entry' : 'entries'}`;
+    elements.expenseFuel.textContent = formatMoney(summary.byCategory?.FUEL);
+    elements.expenseRoad.textContent = formatMoney(Number(summary.byCategory?.TOLL || 0) + Number(summary.byCategory?.PARKING || 0));
+    const categories = ['FUEL', 'TOLL', 'PARKING', 'MAINTENANCE', 'OTHER'];
+    const max = Math.max(...categories.map(category => Number(summary.byCategory?.[category] || 0)), 1);
+    elements.expenseCategoryBreakdown.replaceChildren(...categories.map(category => {
+        const row = document.createElement('div');
+        const label = document.createElement('span');
+        label.textContent = category.charAt(0) + category.slice(1).toLowerCase();
+        const track = document.createElement('div');
+        const bar = document.createElement('span');
+        bar.style.width = `${Number(summary.byCategory?.[category] || 0) / max * 100}%`;
+        track.append(bar);
+        const value = document.createElement('strong');
+        value.textContent = formatMoney(summary.byCategory?.[category]);
+        row.append(label, track, value);
+        return row;
+    }));
+}
+
+function renderExpenses(expenses) {
+    elements.expenseList.replaceChildren();
+    if (!expenses.length) {
+        elements.expenseList.innerHTML = '<p class="history-empty">No expenses match these filters.</p>';
+        return;
+    }
+    expenses.forEach(expense => {
+        const row = document.createElement('article');
+        row.className = 'expense-row';
+        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(expense.category.slice(0, 1))}</div><div class="expense-main"><strong>${escapeHtml(expense.category.replace('_', ' '))}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || 'No note')}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">Edit</button><button class="danger-text-button delete-expense" type="button">Delete</button></div>`;
+        row.querySelector('.edit-expense').addEventListener('click', () => editExpense(expense));
+        row.querySelector('.delete-expense').addEventListener('click', () => deleteExpense(expense));
+        elements.expenseList.append(row);
+    });
+}
+
+function editExpense(expense) {
+    editingExpenseId = expense.id;
+    elements.expenseFormTitle.textContent = 'Edit expense';
+    elements.saveExpenseButton.textContent = 'Save expense';
+    elements.cancelExpenseEdit.classList.remove('is-hidden');
+    elements.expenseDate.value = expense.date;
+    elements.expenseCategory.value = expense.category;
+    elements.expenseAmount.value = expense.amount;
+    elements.expenseShift.value = expense.shiftId ?? '';
+    elements.expenseNote.value = expense.note ?? '';
+    elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+}
+
+function resetExpenseForm() {
+    editingExpenseId = undefined;
+    elements.expenseForm.reset();
+    elements.expenseDate.value = toIsoDate(new Date());
+    elements.expenseFormTitle.textContent = 'Log an expense';
+    elements.saveExpenseButton.textContent = 'Add expense';
+    elements.cancelExpenseEdit.classList.add('is-hidden');
+    hideMessage(elements.expenseError);
+}
+
+async function saveExpense(event) {
+    event.preventDefault();
+    hideMessage(elements.expenseError);
+    if (!elements.expenseForm.reportValidity()) return;
+    const body = {date: elements.expenseDate.value, category: elements.expenseCategory.value,
+        amount: Number(elements.expenseAmount.value), note: elements.expenseNote.value.trim() || null,
+        shiftId: elements.expenseShift.value ? Number(elements.expenseShift.value) : null};
+    const id = editingExpenseId;
+    elements.saveExpenseButton.disabled = true;
+    try {
+        const response = await apiFetch(id ? `/expenses/${id}` : '/expenses', {method: id ? 'PUT' : 'POST',
+            headers: csrfHeaders({'Content-Type': 'application/json'}), body: JSON.stringify(body)});
+        if (!response.ok) throw new Error(await response.text());
+        resetExpenseForm();
+        showToast(id ? 'Expense updated' : 'Expense added', 'Net earnings have been recalculated.');
+        await Promise.all([loadExpenses(), loadDashboard()]);
+    } catch (error) { showMessage(elements.expenseError, error.message || 'The expense could not be saved.'); }
+    finally { elements.saveExpenseButton.disabled = false; }
+}
+
+async function deleteExpense(expense) {
+    const response = await apiFetch(`/expenses/${expense.id}`, {method: 'DELETE', headers: csrfHeaders()});
+    if (!response.ok) return showToast('Delete failed', await response.text(), {alert: true});
+    const batch = response.headers.get('X-Delete-Batch');
+    showToast('Expense deleted', 'It is available in Recently deleted for 30 days.', {actionLabel: 'Undo', duration: 8000,
+        onAction: async () => { await apiFetch(`/expenses/restore-batch/${encodeURIComponent(batch)}`, {method:'POST', headers:csrfHeaders()}); await loadExpenses(); await loadDashboard(); }});
+    await Promise.all([loadExpenses(), loadDashboard()]);
+}
+
+async function loadExpenseTrash() {
+    const response = await apiFetch('/expenses/trash');
+    if (!response.ok) return;
+    const expenses = await response.json();
+    elements.expenseTrashCount.textContent = expenses.length ? `(${expenses.length})` : '';
+    elements.emptyExpenseTrashButton.classList.toggle('is-hidden', expenses.length === 0);
+    elements.expenseTrashList.replaceChildren();
+    if (!expenses.length) return elements.expenseTrashList.innerHTML = '<p>There are no recently deleted expenses.</p>';
+    expenses.forEach(expense => {
+        const row = document.createElement('article'); row.className = 'trash-row';
+        row.innerHTML = `<div><strong>${escapeHtml(expense.category)} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}</span></div><div><button class="text-button" type="button">Restore</button><button class="danger-text-button" type="button">Delete permanently</button></div>`;
+        const [restore, remove] = row.querySelectorAll('button');
+        restore.addEventListener('click', async () => { await apiFetch(`/expenses/${expense.id}/restore`, {method:'POST',headers:csrfHeaders()}); await loadExpenseTrash(); await loadExpenses(); await loadDashboard(); });
+        remove.addEventListener('click', () => openConfirm('Delete this expense permanently?', 'This expense cannot be recovered.', async () => { await apiFetch(`/expenses/trash/${expense.id}`, {method:'DELETE',headers:csrfHeaders()}); await loadExpenseTrash(); }));
+        elements.expenseTrashList.append(row);
+    });
+}
+
+async function emptyExpenseTrash() {
+    const response = await apiFetch('/expenses/trash', {method: 'DELETE', headers: csrfHeaders()});
+    if (!response.ok) throw new Error(await response.text() || 'Deleted expenses could not be emptied.');
+    await loadExpenseTrash();
+    showToast('Deleted expenses emptied', 'The deleted expenses were permanently removed.');
+}
+
+async function loadLinkedExpenses(shiftId) {
+    elements.linkedExpensesList.innerHTML = '<small>Loading…</small>';
+    try {
+        const response = await apiFetch(`/shifts/${shiftId}/expenses`);
+        if (!response.ok) throw new Error();
+        const expenses = await response.json();
+        elements.linkedExpensesList.innerHTML = expenses.length
+            ? expenses.map(expense => `<small>${escapeHtml(expense.category)} · ${formatMoney(expense.amount)} · ${formatDate(expense.date)}</small>`).join('')
+            : '<small>No expenses linked to this shift.</small>';
+    } catch { elements.linkedExpensesList.innerHTML = '<small>Linked expenses could not be loaded.</small>'; }
 }
 
 updateThemeToggle(document.documentElement.dataset.theme);

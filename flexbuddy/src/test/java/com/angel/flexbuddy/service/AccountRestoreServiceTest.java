@@ -32,6 +32,8 @@ import org.springframework.util.SerializationUtils;
 import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.BackupAccount;
 import com.angel.flexbuddy.dto.BackupCounts;
+import com.angel.flexbuddy.dto.BackupExpense;
+import com.angel.flexbuddy.dto.BackupSettings;
 import com.angel.flexbuddy.dto.BackupShift;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.RestoreMode;
@@ -40,9 +42,12 @@ import com.angel.flexbuddy.dto.RestoreRequest;
 import com.angel.flexbuddy.dto.RestoreResult;
 import com.angel.flexbuddy.exception.InvalidBackupException;
 import com.angel.flexbuddy.model.AppUser;
+import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.VehicleCostMethod;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
+import com.angel.flexbuddy.repository.ExpenseRepository;
 
 import jakarta.validation.Validator;
 import tools.jackson.databind.ObjectMapper;
@@ -57,6 +62,7 @@ class AccountRestoreServiceTest {
     @Mock Validator validator;
     @Mock ShiftRepository shiftRepository;
     @Mock AppUserRepository userRepository;
+    @Mock ExpenseRepository expenseRepository;
 
     private AccountRestoreService service;
     private AppUser owner;
@@ -65,7 +71,7 @@ class AccountRestoreServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new AccountRestoreService(objectMapper, validator, shiftRepository, userRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC));
+                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository);
         owner = new AppUser("Angel", EMAIL, "hash");
         owner.setId(1L);
         BackupShift existing = backupShift("VEA7", null);
@@ -77,6 +83,7 @@ class AccountRestoreServiceTest {
         lenient().when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(backup);
         lenient().when(validator.validate(any(CreateShiftRequest.class))).thenReturn(Collections.emptySet());
         lenient().when(shiftRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of(entity("VEA7")));
+        lenient().when(expenseRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of());
         lenient().when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(owner));
     }
 
@@ -204,6 +211,42 @@ class AccountRestoreServiceTest {
         assertThat(copy).isEqualTo(staged);
     }
 
+    @Test
+    void versionTwoRestorePreservesMileageExpenseLinksAndSettings() throws Exception {
+        BackupShift sourceShift = new BackupShift(42L, "BDL4", LocalDate.of(2026, 9, 7),
+                LocalTime.of(3, 30), LocalTime.of(8, 0), "157.50", "0.00", "28.4",
+                NOW, NOW, null);
+        BackupExpense sourceExpense = new BackupExpense(90L, LocalDate.of(2026, 9, 7), "TOLL",
+                "6.25", "Bridge", 42L, NOW, NOW, null);
+        backup = new AccountBackupFile("flexbuddy-backup", 2, NOW, "2.0",
+                new BackupAccount("Angel", EMAIL, NOW), List.of(sourceShift), List.of(sourceExpense),
+                new BackupSettings("ACTUAL_EXPENSES", "0.655"), new BackupCounts(1, 0, 1, 0));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(backup);
+        when(shiftRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of());
+        MockHttpSession session = new MockHttpSession();
+
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+        RestoreResult result = service.restore(EMAIL,
+                new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(result.inserted()).isEqualTo(1);
+        assertThat(result.expensesInserted()).isEqualTo(1);
+        ArgumentCaptor<List<Shift>> shiftCaptor = listCaptor();
+        verify(shiftRepository).saveAll(shiftCaptor.capture());
+        Shift restoredShift = shiftCaptor.getValue().getFirst();
+        assertThat(restoredShift.getMiles()).isEqualByComparingTo("28.4");
+        ArgumentCaptor<List<Expense>> expenseCaptor = expenseListCaptor();
+        verify(expenseRepository).saveAll(expenseCaptor.capture());
+        assertThat(expenseCaptor.getValue()).singleElement().satisfies(expense -> {
+            assertThat(expense.getShift()).isSameAs(restoredShift);
+            assertThat(expense.getAmount()).isEqualByComparingTo("6.25");
+            assertThat(expense.getOwner()).isSameAs(owner);
+        });
+        assertThat(owner.getVehicleCostMethod()).isEqualTo(VehicleCostMethod.ACTUAL_EXPENSES);
+        assertThat(owner.getMileageRate()).isEqualByComparingTo("0.655");
+        verify(userRepository).save(owner);
+    }
+
     private List<Shift> shifts(RestoreResult ignored) {
         ArgumentCaptor<List<Shift>> captor = listCaptor();
         verify(shiftRepository).saveAll(captor.capture());
@@ -212,6 +255,11 @@ class AccountRestoreServiceTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     private ArgumentCaptor<List<Shift>> listCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ArgumentCaptor<List<Expense>> expenseListCaptor() {
         return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
     }
 

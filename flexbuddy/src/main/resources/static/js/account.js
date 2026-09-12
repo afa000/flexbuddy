@@ -8,6 +8,7 @@ const restoreButton = document.querySelector('#restoreButton');
 const replaceAckRow = document.querySelector('#replaceAckRow');
 const replaceAck = document.querySelector('#replaceAck');
 let restoreToken;
+const settingsForm = document.querySelector('#expenseSettingsForm');
 
 window.flexbuddyToast.init({
     toast: '#accountToast',
@@ -88,14 +89,14 @@ restoreButton.addEventListener('click', async () => {
         });
         if (!response.ok) throw new Error(await response.text());
         const result = await response.json();
-        showToast('Restore complete', `${result.inserted} shifts restored · ${result.skipped} skipped`,
+        showToast('Restore complete', `${result.inserted} shifts and ${result.expensesInserted || 0} expenses restored · ${result.skipped + (result.expensesSkipped || 0)} skipped`,
             result.batchId ? {duration: 10000, onAction: () => undoRestore(result.batchId)} : {});
         restorePreview.classList.add('is-hidden');
     } catch (error) {
         showError(error.message || 'The backup could not be restored.');
     } finally {
         restoreButton.disabled = false;
-        restoreButton.textContent = 'Restore shifts';
+        restoreButton.textContent = 'Restore account data';
     }
 });
 
@@ -110,12 +111,14 @@ function renderPreview(preview, filename) {
     document.querySelector('#previewTrashed').textContent = preview.inRecentlyDeleted;
     document.querySelector('#previewDuplicates').textContent = preview.duplicateInBackup;
     document.querySelector('#previewInvalid').textContent = preview.invalid;
+    document.querySelector('#previewExpenses').textContent = preview.totalExpenses || 0;
+    document.querySelector('#previewExpenseNote').textContent = preview.duplicateExpenses ? `${preview.duplicateExpenses} duplicates` : `${preview.newExpenses || 0} new`;
     document.querySelector('#previewSource').textContent = `${filename} · ${preview.sameAccount ? 'Same account' : `From ${preview.sourceEmail || 'another account'}`} · ${preview.deletedInBackup} recently deleted`;
     const problems = document.querySelector('#restoreProblems');
     problems.replaceChildren();
     preview.problems.forEach(problem => {
         const item = document.createElement('li');
-        item.textContent = `Shift ${problem.index + 1}, ${problem.field}: ${problem.message}`;
+        item.textContent = `Entry ${problem.index + 1}, ${problem.field}: ${problem.message}`;
         problems.append(item);
     });
     restorePreview.classList.remove('is-hidden');
@@ -139,5 +142,59 @@ async function undoRestore(batchId) {
     const response = await apiFetch(`/account/restore/${encodeURIComponent(batchId)}/undo`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) return showError(await response.text());
     const result = await response.json();
-    showToast('Restore undone', `${result.restored} original shifts restored`);
+    showToast('Restore undone', `${result.restored} shifts and ${result.expensesRestored || 0} expenses restored`);
 }
+
+settingsForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const error = document.querySelector('#settingsError');
+    error.classList.add('is-hidden');
+    const button = document.querySelector('#saveSettingsButton');
+    button.disabled = true;
+    try {
+        const response = await apiFetch('/account/settings', {method: 'PUT', headers: csrfHeaders({'Content-Type':'application/json'}),
+            body: JSON.stringify({vehicleCostMethod: document.querySelector('#vehicleCostMethod').value,
+                mileageRate: Number(document.querySelector('#accountMileageRate').value)})});
+        if (!response.ok) throw new Error(await response.text());
+        const settings = await response.json();
+        renderSettings(settings);
+        showToast('Settings saved', 'Net earnings have been recalculated.');
+    } catch (exception) {
+        error.textContent = exception.message || 'Settings could not be saved.';
+        error.classList.remove('is-hidden');
+    } finally { button.disabled = false; }
+});
+
+document.querySelector('#resetMileageRateButton').addEventListener('click', async () => {
+    const error = document.querySelector('#settingsError');
+    error.classList.add('is-hidden');
+    try {
+        const response = await apiFetch('/account/settings', {
+            method: 'PUT',
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({
+                vehicleCostMethod: document.querySelector('#vehicleCostMethod').value,
+                mileageRate: null
+            })
+        });
+        if (!response.ok) throw new Error(await response.text());
+        renderSettings(await response.json());
+        showToast('Default rate restored', 'Net earnings now use the app default mileage rate.');
+    } catch (exception) {
+        error.textContent = exception.message || 'The default rate could not be restored.';
+        error.classList.remove('is-hidden');
+    }
+});
+
+async function loadSettings() {
+    const response = await apiFetch('/account/settings');
+    if (response.ok) renderSettings(await response.json());
+}
+
+function renderSettings(settings) {
+    document.querySelector('#vehicleCostMethod').value = settings.vehicleCostMethod;
+    document.querySelector('#accountMileageRate').value = settings.mileageRate;
+    document.querySelector('#mileageRateHelp').textContent = `App default: $${Number(settings.defaultMileageRate).toFixed(3)} per mile (${settings.mileageRateYear}). This is an estimate, not tax advice.`;
+}
+
+loadSettings();

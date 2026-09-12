@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.model;
 
 import java.time.Instant;
+import java.math.BigDecimal;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -8,6 +9,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.EntityListeners;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -41,6 +44,13 @@ public class AppUser {
     private Instant createdAt;
 
     private Instant lastBackupAt;
+
+    @Column(precision = 6, scale = 3)
+    private BigDecimal mileageRate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private VehicleCostMethod vehicleCostMethod = VehicleCostMethod.STANDARD_MILEAGE;
 
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;

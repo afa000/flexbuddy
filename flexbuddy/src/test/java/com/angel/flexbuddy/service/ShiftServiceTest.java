@@ -24,6 +24,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.CreateShiftRequest;
@@ -45,6 +46,9 @@ class ShiftServiceTest {
     @Mock ShiftRepository shiftRepository;
     @Mock AppUserRepository userRepository;
     @Mock Clock clock;
+    @Mock ExpenseService expenseService;
+    @Mock AccountSettingsService settingsService;
+    @Spy NetEarningsCalculator netCalculator = new NetEarningsCalculator();
     @InjectMocks ShiftService shiftService;
 
     private AppUser owner;
@@ -55,6 +59,11 @@ class ShiftServiceTest {
         org.mockito.Mockito.lenient().when(clock.getZone()).thenReturn(ZoneOffset.UTC);
         owner = new AppUser("Angel", OWNER_EMAIL, "password-hash");
         owner.setId(10L);
+        org.mockito.Mockito.lenient().when(settingsService.get(OWNER_EMAIL)).thenReturn(
+                new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                        com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+        org.mockito.Mockito.lenient().when(expenseService.findForShifts(eq(OWNER_EMAIL), any())).thenReturn(List.of());
     }
 
     @Test

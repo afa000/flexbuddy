@@ -25,12 +25,12 @@ import org.hibernate.annotations.SQLRestriction;
 
 @Entity
 @Table(name = "shift", indexes = @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"))
-@EntityListeners(ShiftTimestampListener.class)
+@EntityListeners(TimestampListener.class)
 @SQLRestriction("deleted_at is null")
 @Getter
 @Setter
 @NoArgsConstructor
-public class Shift {
+public class Shift implements Timestamped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -53,6 +53,9 @@ public class Shift {
 
     @Column(nullable = false)
     private BigDecimal tips;
+
+    @Column(precision = 8, scale = 1)
+    private BigDecimal miles;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -137,6 +140,16 @@ public class Shift {
         return getTotalPay()
                 .multiply(BigDecimal.valueOf(60))
                 .divide(BigDecimal.valueOf(minutes), 2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal getMileageCost(BigDecimal mileageRate) {
+        if (miles == null || mileageRate == null) return BigDecimal.ZERO.setScale(2);
+        return miles.multiply(mileageRate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    public BigDecimal getEarningsPerMile() {
+        if (miles == null || miles.signum() == 0) return null;
+        return getTotalPay().divide(miles, 2, RoundingMode.HALF_UP);
     }
 
 }
