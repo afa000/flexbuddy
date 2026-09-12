@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
@@ -12,11 +13,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Index;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Table(name = "shift", indexes = @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"))
 @Getter
 @Setter
 @NoArgsConstructor
@@ -90,10 +94,18 @@ public class Shift {
     }
 
     public int getTimeWorked() {
-
         int totalMinutes = (int) ChronoUnit.MINUTES.between(startTime, endTime);
-        
-        return totalMinutes;
+        return totalMinutes < 0 ? totalMinutes + (24 * 60) : totalMinutes;
+    }
+
+    public BigDecimal getHourlyRate() {
+        int minutes = getTimeWorked();
+        if (minutes == 0) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+        return getTotalPay()
+                .multiply(BigDecimal.valueOf(60))
+                .divide(BigDecimal.valueOf(minutes), 2, RoundingMode.HALF_UP);
     }
 
 }

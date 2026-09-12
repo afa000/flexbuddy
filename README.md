@@ -13,6 +13,8 @@ The app is hosted on Render. Because it uses a free web service, the first reque
 - Review and correct OCR results before saving
 - View, edit, and delete only your own saved shifts
 - Track total earnings, base pay, tips, time worked, and average earnings
+- Filter and search history by date or station, then sort by pay, hours, or hourly rate
+- Compare earnings by station, ISO week, month, or year with accessible charts and tables
 - Switch between light and dark themes
 - Store shift data in PostgreSQL
 
@@ -56,3 +58,7 @@ cd flexbuddy
 ## Deployment
 
 The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Pushes to `main` are automatically deployed through the connected Render Blueprint.
+
+## Reporting API
+
+Authenticated requests to `GET /shifts`, `GET /shifts/statistics`, and `GET /shifts/reports/earnings` accept the same optional `from`, `to`, `station`, and `q` filters. Shift history also accepts `sort` and `dir`; reports require `groupBy=station|week|month|year`. `GET /shifts/stations` returns the signed-in user's station choices.

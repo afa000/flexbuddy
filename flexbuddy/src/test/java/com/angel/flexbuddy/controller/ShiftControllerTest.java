@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -33,12 +34,14 @@ import org.springframework.security.test.context.support.WithAnonymousUser;
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
+import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.exception.GlobalExceptionHandler;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
+import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.repository.AppUserRepository;
 
 @WebMvcTest(ShiftController.class)
@@ -53,6 +56,9 @@ class ShiftControllerTest {
 
     @MockitoBean
     private ShiftImportService shiftImportService;
+
+    @MockitoBean
+    private ShiftReportService reportService;
 
     @MockitoBean
     private AppUserRepository userRepository;
@@ -73,10 +79,17 @@ class ShiftControllerTest {
                 new BigDecimal("45.50"),
                 new BigDecimal("245.50"),
                 new BigDecimal("122.75"),
-                750
+                750,
+                new BigDecimal("19.64"),
+                new BigDecimal("16.00"),
+                new BigDecimal("3.64"),
+                new BigDecimal("100.00"),
+                new BigDecimal("22.75"),
+                new BigDecimal("18.5"),
+                375
         );
 
-        when(shiftService.getShiftStatistics("angel@example.com")).thenReturn(statistics);
+        when(reportService.statistics(eq("angel@example.com"), any(ShiftFilter.class))).thenReturn(statistics);
 
         mockMvc.perform(get("/shifts/statistics").with(user("angel@example.com")))
                 .andExpect(status().isOk())
@@ -85,7 +98,48 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.totalTips").value(45.50))
                 .andExpect(jsonPath("$.totalEarnings").value(245.50))
                 .andExpect(jsonPath("$.averagePayPerShift").value(122.75))
-                .andExpect(jsonPath("$.totalTimeWorked").value(750));
+                .andExpect(jsonPath("$.totalTimeWorked").value(750))
+                .andExpect(jsonPath("$.averageHourlyEarnings").value(19.64));
+    }
+
+    @Test
+    void getShifts_passesFilterParametersToTheService() throws Exception {
+        when(shiftService.getShifts(eq("angel@example.com"), any(ShiftFilter.class))).thenReturn(List.of());
+
+        mockMvc.perform(get("/shifts")
+                        .with(user("angel@example.com"))
+                        .param("from", "2026-09-01")
+                        .param("to", "2026-09-30")
+                        .param("station", "VEA7")
+                        .param("q", "vea")
+                        .param("sort", "hourlyRate")
+                        .param("dir", "asc"))
+                .andExpect(status().isOk());
+
+        verify(shiftService).getShifts(eq("angel@example.com"), eq(ShiftFilter.of(
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), "VEA7", "vea", "hourlyRate", "asc")));
+    }
+
+    @Test
+    void getShifts_returnsBadRequestForInvalidSortOrDateRange() throws Exception {
+        mockMvc.perform(get("/shifts").with(user("angel@example.com")).param("sort", "unknown"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(get("/shifts").with(user("angel@example.com"))
+                        .param("from", "2026-09-10").param("to", "2026-09-01"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void earningsReport_requiresGroupBy() throws Exception {
+        mockMvc.perform(get("/shifts/reports/earnings").with(user("angel@example.com")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void newReadEndpointsRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/shifts/stations")).andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
+        mockMvc.perform(get("/shifts/reports/earnings").param("groupBy", "month"))
+                .andExpect(status().is3xxRedirection()).andExpect(redirectedUrl("/login"));
     }
 
     @Test

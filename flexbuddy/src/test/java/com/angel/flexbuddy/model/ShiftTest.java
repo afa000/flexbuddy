@@ -43,4 +43,30 @@ class ShiftTest {
 
         assertThat(result).isEqualTo(270);
     }
+
+    @Test
+    void getTimeWorked_treatsAnEarlierEndTimeAsOvernight() {
+        Shift shift = shift(LocalTime.of(22, 30), LocalTime.of(2, 0), "140.00", "0.00");
+
+        assertThat(shift.getTimeWorked()).isEqualTo(210);
+    }
+
+    @Test
+    void getHourlyRate_usesTotalPayAndRoundsToCents() {
+        Shift shift = shift(LocalTime.of(9, 0), LocalTime.of(14, 30), "100.00", "20.00");
+
+        assertThat(shift.getHourlyRate()).isEqualByComparingTo("21.82");
+    }
+
+    @Test
+    void getHourlyRate_returnsZeroForZeroMinutes() {
+        Shift shift = shift(LocalTime.NOON, LocalTime.NOON, "100.00", "20.00");
+
+        assertThat(shift.getHourlyRate()).isEqualByComparingTo("0.00");
+    }
+
+    private Shift shift(LocalTime start, LocalTime end, String base, String tips) {
+        return new Shift(1L, "VEA7", LocalDate.of(2026, 9, 6), start, end,
+                new BigDecimal(base), new BigDecimal(tips));
+    }
 }

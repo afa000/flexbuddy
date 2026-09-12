@@ -43,6 +43,7 @@
                 <p class="eyebrow">YOUR DASHBOARD</p>
                 <h1 id="page-title">Shift earnings</h1>
                 <p class="hero-copy">Track every block, hour, and dollar in one place.</p>
+                <p class="filter-summary" id="activeFilterSummary">Showing: All shifts</p>
             </div>
         </section>
 
@@ -66,6 +67,17 @@
                 <span>Average shift</span>
                 <strong id="averagePay">$0.00</strong>
                 <small>Earnings per shift</small>
+            </article>
+            <article class="stat-card">
+                <span>Average hourly</span>
+                <strong id="averageHourly">$0.00</strong>
+                <small id="hourlyBreakdown">$0.00 base · $0.00 tips</small>
+            </article>
+            <article class="stat-card">
+                <span>Base vs tips</span>
+                <strong id="baseTipsTotal">$0.00 · $0.00</strong>
+                <div class="split-bar" aria-hidden="true"><span id="baseShareBar"></span><span id="tipsShareBar"></span></div>
+                <small id="tipsShare">0.0% from tips</small>
             </article>
         </section>
 
@@ -178,18 +190,87 @@
             </article>
         </section>
 
+        <section class="panel filter-panel" aria-labelledby="filter-title">
+            <div class="panel-heading filter-heading">
+                <div>
+                    <p class="step-label">FILTERS</p>
+                    <h2 id="filter-title">Explore your shifts</h2>
+                    <p>Use one view for the history, totals, and reports below.</p>
+                </div>
+                <button class="text-button" id="clearFiltersButton" type="button">Clear filters</button>
+            </div>
+            <div class="preset-row" aria-label="Date range presets">
+                <button class="preset-chip" data-preset="all" type="button">All</button>
+                <button class="preset-chip" data-preset="week" type="button">This week</button>
+                <button class="preset-chip" data-preset="month" type="button">This month</button>
+                <button class="preset-chip" data-preset="year" type="button">This year</button>
+                <button class="preset-chip" data-preset="30days" type="button">Last 30 days</button>
+                <button class="preset-chip" data-preset="custom" type="button">Custom</button>
+            </div>
+            <div class="filter-row">
+                <label class="filter-field"><span>From</span><input id="filterFrom" type="date"></label>
+                <label class="filter-field"><span>To</span><input id="filterTo" type="date"></label>
+                <label class="filter-field"><span>Station</span><select id="filterStation"><option value="">All stations</option></select></label>
+                <label class="filter-field filter-search"><span>Search</span><input id="filterQuery" type="search" placeholder="Search station"></label>
+                <label class="filter-field"><span>Sort</span><select id="filterSort">
+                    <option value="date">Date</option><option value="station">Station</option>
+                    <option value="basePay">Base pay</option><option value="tips">Tips</option>
+                    <option value="totalPay">Total pay</option><option value="timeWorked">Hours</option>
+                    <option value="hourlyRate">Hourly rate</option>
+                </select></label>
+                <button class="sort-direction" id="sortDirectionButton" type="button" aria-label="Sort descending">↓ Desc</button>
+            </div>
+            <div class="notice error-notice is-hidden" id="filterError" role="alert"></div>
+            <p class="results-summary" id="resultsSummary">Loading shifts…</p>
+        </section>
+
+        <section class="panel reports-panel" aria-labelledby="reports-title">
+            <div class="panel-heading reports-heading">
+                <div>
+                    <p class="step-label">REPORTS</p>
+                    <h2 id="reports-title">Earnings breakdown</h2>
+                    <p>Compare base pay, tips, hours, and hourly earnings.</p>
+                </div>
+                <div class="segmented-control" id="groupByControl" aria-label="Group earnings by">
+                    <button data-group="station" type="button">Station</button>
+                    <button data-group="week" type="button">Week</button>
+                    <button class="is-active" data-group="month" type="button">Month</button>
+                    <button data-group="year" type="button">Year</button>
+                </div>
+            </div>
+            <div class="report-error notice error-notice is-hidden" id="reportError" role="alert"></div>
+            <div class="charts-grid">
+                <article class="chart-card">
+                    <h3 id="earningsChartTitle">Earnings by month</h3>
+                    <div class="chart-scroll"><div class="chart" id="earningsChart"></div></div>
+                </article>
+                <article class="chart-card">
+                    <h3>Base pay vs tips</h3>
+                    <div class="chart donut-chart" id="payMixChart"></div>
+                </article>
+            </div>
+            <div class="breakdown-scroll">
+                <table class="breakdown-table">
+                    <caption class="sr-only">Filtered earnings grouped for reporting</caption>
+                    <thead><tr><th>Bucket</th><th>Shifts</th><th>Hours</th><th>Base</th><th>Tips</th><th>Total</th><th>$/hr</th></tr></thead>
+                    <tbody id="breakdownBody"></tbody>
+                </table>
+            </div>
+        </section>
+
         <section class="panel history-panel" aria-labelledby="history-title">
             <div class="panel-heading history-heading">
                 <div>
                     <p class="step-label">HISTORY</p>
-                    <h2 id="history-title">Recent shifts</h2>
-                    <p>Your latest earnings at a glance.</p>
+                    <h2 id="history-title">Shift history</h2>
+                    <p>Every shift matching the active filters.</p>
                 </div>
                 <button class="text-button" id="refreshButton" type="button">Refresh</button>
             </div>
             <div class="history-list" id="historyList">
                 <div class="history-empty">Loading shifts…</div>
             </div>
+            <button class="secondary-button show-more-button is-hidden" id="showMoreButton" type="button">Show 20 more</button>
         </section>
     </main>
 
@@ -266,6 +347,7 @@
     </div>
 </div>
 
+<script src="/js/charts.js" defer></script>
 <script src="/js/app.js" defer></script>
 </body>
 </html>

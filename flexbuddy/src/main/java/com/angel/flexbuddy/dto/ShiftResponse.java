@@ -22,4 +22,6 @@ public class ShiftResponse {
     private BigDecimal basePay;
     private BigDecimal tips;
     private BigDecimal totalPay;
+    private int timeWorked;
+    private BigDecimal hourlyRate;
 }

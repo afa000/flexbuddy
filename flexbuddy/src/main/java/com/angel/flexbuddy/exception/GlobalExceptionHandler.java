@@ -23,4 +23,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleScreenshotOcrException(ScreenshotOcrException exception) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(exception.getMessage());
     }
+
+    @ExceptionHandler(InvalidFilterException.class)
+    public ResponseEntity<String> handleInvalidFilterException(InvalidFilterException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
 }

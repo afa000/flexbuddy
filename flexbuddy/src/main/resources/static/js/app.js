@@ -32,7 +32,31 @@ const elements = {
     totalShifts: document.querySelector('#totalShifts'),
     totalTime: document.querySelector('#totalTime'),
     averagePay: document.querySelector('#averagePay'),
+    averageHourly: document.querySelector('#averageHourly'),
+    hourlyBreakdown: document.querySelector('#hourlyBreakdown'),
+    baseTipsTotal: document.querySelector('#baseTipsTotal'),
+    baseShareBar: document.querySelector('#baseShareBar'),
+    tipsShareBar: document.querySelector('#tipsShareBar'),
+    tipsShare: document.querySelector('#tipsShare'),
+    activeFilterSummary: document.querySelector('#activeFilterSummary'),
+    filterFrom: document.querySelector('#filterFrom'),
+    filterTo: document.querySelector('#filterTo'),
+    filterStation: document.querySelector('#filterStation'),
+    filterQuery: document.querySelector('#filterQuery'),
+    filterSort: document.querySelector('#filterSort'),
+    sortDirectionButton: document.querySelector('#sortDirectionButton'),
+    clearFiltersButton: document.querySelector('#clearFiltersButton'),
+    filterError: document.querySelector('#filterError'),
+    resultsSummary: document.querySelector('#resultsSummary'),
+    presetChips: [...document.querySelectorAll('.preset-chip')],
+    groupButtons: [...document.querySelectorAll('[data-group]')],
+    earningsChartTitle: document.querySelector('#earningsChartTitle'),
+    earningsChart: document.querySelector('#earningsChart'),
+    payMixChart: document.querySelector('#payMixChart'),
+    breakdownBody: document.querySelector('#breakdownBody'),
+    reportError: document.querySelector('#reportError'),
     historyList: document.querySelector('#historyList'),
+    showMoreButton: document.querySelector('#showMoreButton'),
     refreshButton: document.querySelector('#refreshButton'),
     successToast: document.querySelector('#successToast'),
     toastTitle: document.querySelector('#toastTitle'),
@@ -55,6 +79,11 @@ let selectedFileUrl;
 let toastTimer;
 let editingShiftId;
 let lastFocusedElement;
+let visibleShiftCount = 25;
+let currentShifts = [];
+let searchTimer;
+let filterState = readFilterState();
+let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 
@@ -75,6 +104,31 @@ elements.removeFileButton.addEventListener('click', resetImport);
 elements.resetButton.addEventListener('click', resetImport);
 elements.previewForm.addEventListener('submit', saveShift);
 elements.refreshButton.addEventListener('click', loadDashboard);
+elements.showMoreButton.addEventListener('click', () => {
+    visibleShiftCount += 20;
+    renderShifts(currentShifts);
+});
+elements.clearFiltersButton.addEventListener('click', clearFilters);
+elements.sortDirectionButton.addEventListener('click', () => {
+    filterState.dir = filterState.dir === 'asc' ? 'desc' : 'asc';
+    syncFilterControls();
+    applyFilters();
+});
+elements.filterFrom.addEventListener('change', handleCustomDates);
+elements.filterTo.addEventListener('change', handleCustomDates);
+elements.filterStation.addEventListener('change', () => updateFilter('station', elements.filterStation.value));
+elements.filterSort.addEventListener('change', () => updateFilter('sort', elements.filterSort.value));
+elements.filterQuery.addEventListener('input', () => {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => updateFilter('q', elements.filterQuery.value.trim()), 250);
+});
+elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
+elements.groupButtons.forEach(button => button.addEventListener('click', () => {
+    reportGroupBy = button.dataset.group;
+    syncFilterControls();
+    persistFilterState();
+    loadEarningsReport(buildQuery(false));
+}));
 elements.editForm.addEventListener('submit', saveEditedShift);
 elements.closeEditButton.addEventListener('click', closeEditModal);
 elements.cancelEditButton.addEventListener('click', closeEditModal);
@@ -240,6 +294,7 @@ async function saveShift(event) {
 
         resetImport();
         showToast('Shift added', 'Your earnings history is up to date.');
+        await loadStations();
         await loadDashboard();
     } catch (error) {
         showMessage(elements.saveError, error.message || 'The shift could not be saved.');
@@ -249,12 +304,15 @@ async function saveShift(event) {
 }
 
 async function loadDashboard() {
-    await Promise.all([loadStatistics(), loadShifts()]);
+    if (!validateDateRange()) return;
+    const query = buildQuery();
+    persistFilterState();
+    await Promise.all([loadStatistics(query), loadShifts(query), loadEarningsReport(buildQuery(false))]);
 }
 
-async function loadStatistics() {
+async function loadStatistics(query) {
     try {
-        const response = await fetch('/shifts/statistics');
+        const response = await fetch(`/shifts/statistics?${query}`);
         if (!response.ok) throw new Error();
         const statistics = await response.json();
 
@@ -262,22 +320,47 @@ async function loadStatistics() {
         elements.totalShifts.textContent = statistics.totalShifts ?? 0;
         elements.totalTime.textContent = formatMinutes(statistics.totalTimeWorked);
         elements.averagePay.textContent = formatMoney(statistics.averagePayPerShift);
+        elements.averageHourly.textContent = formatMoney(statistics.averageHourlyEarnings);
+        elements.hourlyBreakdown.textContent = `${formatMoney(statistics.averageHourlyBasePay)} base · ${formatMoney(statistics.averageHourlyTips)} tips`;
+        elements.baseTipsTotal.textContent = `${formatMoney(statistics.totalBasePay)} · ${formatMoney(statistics.totalTips)}`;
+        const tipShare = Number(statistics.tipsShareOfEarnings || 0);
+        elements.baseShareBar.style.width = `${100 - tipShare}%`;
+        elements.tipsShareBar.style.width = `${tipShare}%`;
+        elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
     } catch {
-        elements.totalEarnings.textContent = '—';
-        elements.totalShifts.textContent = '—';
-        elements.totalTime.textContent = '—';
-        elements.averagePay.textContent = '—';
+        [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
+            elements.averageHourly, elements.baseTipsTotal].forEach(element => element.textContent = '—');
     }
 }
 
-async function loadShifts() {
+async function loadShifts(query) {
     try {
-        const response = await fetch('/shifts');
+        const response = await fetch(`/shifts?${query}`);
         if (!response.ok) throw new Error();
-        const shifts = await response.json();
-        renderShifts(shifts);
+        currentShifts = await response.json();
+        renderShifts(currentShifts);
+        updateResultSummary(currentShifts);
     } catch {
         elements.historyList.innerHTML = '<div class="history-empty">Shifts could not be loaded.</div>';
+        elements.resultsSummary.textContent = 'Shift results unavailable.';
+    }
+}
+
+async function loadEarningsReport(query) {
+    hideMessage(elements.reportError);
+    elements.earningsChartTitle.textContent = `Earnings by ${reportGroupBy}`;
+    try {
+        const response = await fetch(`/shifts/reports/earnings?groupBy=${reportGroupBy}&${query}`);
+        if (!response.ok) throw new Error(await response.text());
+        const report = await response.json();
+        window.flexbuddyCharts.renderEarningsChart(elements.earningsChart, report);
+        window.flexbuddyCharts.renderDonut(elements.payMixChart, report.totals);
+        window.flexbuddyCharts.renderTable(elements.breakdownBody, report, drillIntoBucket);
+    } catch (error) {
+        showMessage(elements.reportError, error.message || 'The earnings report could not be loaded.');
+        elements.earningsChart.replaceChildren();
+        elements.payMixChart.replaceChildren();
+        elements.breakdownBody.replaceChildren();
     }
 }
 
@@ -285,15 +368,18 @@ function renderShifts(shifts) {
     elements.historyList.replaceChildren();
 
     if (!shifts.length) {
-        elements.historyList.innerHTML = '<div class="history-empty">No shifts yet. Import your first screenshot above.</div>';
+        const empty = document.createElement('div');
+        empty.className = 'history-empty';
+        empty.innerHTML = 'No shifts match these filters. <button class="text-button" type="button">Clear filters</button>';
+        empty.querySelector('button').addEventListener('click', clearFilters);
+        elements.historyList.append(empty);
+        elements.showMoreButton.classList.add('is-hidden');
         return;
     }
 
-    const sortedShifts = [...shifts]
-        .sort((a, b) => `${b.date}T${b.startTime}`.localeCompare(`${a.date}T${a.startTime}`))
-        .slice(0, 8);
+    const visibleShifts = shifts.slice(0, visibleShiftCount);
 
-    for (const shift of sortedShifts) {
+    for (const shift of visibleShifts) {
         const row = document.createElement('article');
         row.className = 'shift-row';
 
@@ -307,7 +393,7 @@ function renderShifts(shifts) {
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}</strong><span>${escapeHtml(weekday)} shift</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMoney(shift.basePay)} base · ${formatMoney(shift.tips)} tips</span></div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr</span><span>${formatMoney(shift.basePay)} base · ${formatMoney(shift.tips)} tips</span></div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -318,6 +404,7 @@ function renderShifts(shifts) {
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
         elements.historyList.append(row);
     }
+    elements.showMoreButton.classList.toggle('is-hidden', visibleShiftCount >= shifts.length);
 }
 
 function openEditModal(shift, trigger) {
@@ -378,6 +465,7 @@ async function saveEditedShift(event) {
 
         closeEditModal();
         showToast('Shift updated', 'Your changes have been saved.');
+        await loadStations();
         await loadDashboard();
     } catch (error) {
         showMessage(elements.editError, error.message || 'The shift could not be updated.');
@@ -478,6 +566,189 @@ function escapeHtml(value) {
     return element.innerHTML;
 }
 
+function readFilterState() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+        preset: params.get('preset') || (params.has('from') || params.has('to') ? 'custom' : 'all'),
+        from: params.get('from') || '',
+        to: params.get('to') || '',
+        station: params.get('station') || '',
+        q: params.get('q') || '',
+        sort: params.get('sort') || 'date',
+        dir: params.get('dir') === 'asc' ? 'asc' : 'desc'
+    };
+}
+
+function initializeFilters() {
+    if (!['all', 'week', 'month', 'year', '30days', 'custom'].includes(filterState.preset)) {
+        filterState.preset = filterState.from || filterState.to ? 'custom' : 'all';
+    }
+    if (!['station', 'week', 'month', 'year'].includes(reportGroupBy)) reportGroupBy = 'month';
+    syncFilterControls();
+}
+
+function syncFilterControls() {
+    elements.filterFrom.value = filterState.from;
+    elements.filterTo.value = filterState.to;
+    elements.filterStation.value = filterState.station;
+    elements.filterQuery.value = filterState.q;
+    elements.filterSort.value = filterState.sort;
+    const custom = filterState.preset === 'custom';
+    elements.filterFrom.disabled = !custom;
+    elements.filterTo.disabled = !custom;
+    elements.sortDirectionButton.textContent = filterState.dir === 'asc' ? '↑ Asc' : '↓ Desc';
+    elements.sortDirectionButton.setAttribute('aria-label', `Sort ${filterState.dir === 'asc' ? 'ascending' : 'descending'}`);
+    elements.presetChips.forEach(chip => chip.classList.toggle('is-active', chip.dataset.preset === filterState.preset));
+    elements.groupButtons.forEach(button => button.classList.toggle('is-active', button.dataset.group === reportGroupBy));
+    const presetLabel = elements.presetChips.find(chip => chip.dataset.preset === filterState.preset)?.textContent || 'Custom';
+    elements.activeFilterSummary.textContent = `Showing: ${presetLabel}`;
+}
+
+function applyPreset(preset) {
+    filterState.preset = preset;
+    const today = startOfToday();
+    let from = '';
+    let to = '';
+    if (preset === 'week') {
+        const day = today.getDay() || 7;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - day + 1);
+        from = toIsoDate(monday);
+        to = toIsoDate(today);
+    } else if (preset === 'month') {
+        from = toIsoDate(new Date(today.getFullYear(), today.getMonth(), 1));
+        to = toIsoDate(today);
+    } else if (preset === 'year') {
+        from = `${today.getFullYear()}-01-01`;
+        to = toIsoDate(today);
+    } else if (preset === '30days') {
+        const start = new Date(today);
+        start.setDate(start.getDate() - 29);
+        from = toIsoDate(start);
+        to = toIsoDate(today);
+    } else if (preset === 'custom') {
+        from = filterState.from;
+        to = filterState.to;
+    }
+    filterState.from = from;
+    filterState.to = to;
+    syncFilterControls();
+    if (preset === 'custom') elements.filterFrom.focus();
+    applyFilters();
+}
+
+function handleCustomDates() {
+    filterState.preset = 'custom';
+    filterState.from = elements.filterFrom.value;
+    filterState.to = elements.filterTo.value;
+    syncFilterControls();
+    applyFilters();
+}
+
+function updateFilter(name, value) {
+    filterState[name] = value;
+    applyFilters();
+}
+
+function applyFilters() {
+    visibleShiftCount = 25;
+    syncFilterControls();
+    loadDashboard();
+}
+
+function clearFilters() {
+    filterState = {preset: 'all', from: '', to: '', station: '', q: '', sort: 'date', dir: 'desc'};
+    visibleShiftCount = 25;
+    syncFilterControls();
+    loadDashboard();
+}
+
+function validateDateRange() {
+    if (filterState.from && filterState.to && filterState.from > filterState.to) {
+        showMessage(elements.filterError, 'The start date must be on or before the end date.');
+        return false;
+    }
+    hideMessage(elements.filterError);
+    return true;
+}
+
+function buildQuery(includeSort = true) {
+    const params = new URLSearchParams();
+    for (const key of ['from', 'to', 'station', 'q']) {
+        if (filterState[key]) params.set(key, filterState[key]);
+    }
+    if (includeSort) {
+        params.set('sort', filterState.sort);
+        params.set('dir', filterState.dir);
+    }
+    return params;
+}
+
+function persistFilterState() {
+    const params = buildQuery();
+    params.set('preset', filterState.preset);
+    params.set('groupBy', reportGroupBy);
+    window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
+}
+
+async function loadStations() {
+    try {
+        const response = await fetch('/shifts/stations');
+        if (!response.ok) throw new Error();
+        const stations = await response.json();
+        elements.filterStation.replaceChildren(new Option('All stations', ''));
+        stations.forEach(station => elements.filterStation.add(new Option(station, station)));
+        if (filterState.station && !stations.some(station => station.toLowerCase() === filterState.station.toLowerCase())) {
+            elements.filterStation.add(new Option(filterState.station, filterState.station));
+        }
+        elements.filterStation.value = filterState.station;
+    } catch {
+        elements.filterStation.replaceChildren(new Option('All stations', ''));
+    }
+}
+
+function updateResultSummary(shifts) {
+    const count = shifts.length;
+    let range = 'All dates';
+    if (filterState.from || filterState.to) {
+        range = `${filterState.from ? formatDate(filterState.from) : 'Beginning'} – ${filterState.to ? formatDate(filterState.to) : 'Today'}`;
+    } else if (count) {
+        const dates = shifts.map(shift => shift.date).sort();
+        range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
+    }
+    const station = filterState.station ? ` · ${filterState.station}` : '';
+    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station}`;
+}
+
+function drillIntoBucket(bucket, groupBy) {
+    if (groupBy === 'station') {
+        filterState.station = bucket.label;
+    } else {
+        filterState.preset = 'custom';
+        filterState.from = bucket.periodStart || '';
+        filterState.to = bucket.periodEnd || '';
+    }
+    syncFilterControls();
+    applyFilters();
+    document.querySelector('.filter-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function formatDate(value) {
+    return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+}
+
+function startOfToday() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function toIsoDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 function csrfHeaders(headers = {}) {
     if (csrfToken && csrfHeader) {
         headers[csrfHeader] = csrfToken;
@@ -486,4 +757,6 @@ function csrfHeaders(headers = {}) {
 }
 
 updateThemeToggle(document.documentElement.dataset.theme);
+initializeFilters();
+loadStations();
 loadDashboard();

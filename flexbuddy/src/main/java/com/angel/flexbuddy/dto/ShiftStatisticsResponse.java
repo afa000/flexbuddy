@@ -18,4 +18,11 @@ public class ShiftStatisticsResponse {
     private BigDecimal totalEarnings;
     private BigDecimal averagePayPerShift;
     private int totalTimeWorked;
+    private BigDecimal averageHourlyEarnings;
+    private BigDecimal averageHourlyBasePay;
+    private BigDecimal averageHourlyTips;
+    private BigDecimal averageBasePerShift;
+    private BigDecimal averageTipsPerShift;
+    private BigDecimal tipsShareOfEarnings;
+    private int averageShiftMinutes;
 }
