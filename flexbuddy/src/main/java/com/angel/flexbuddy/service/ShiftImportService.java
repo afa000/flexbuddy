@@ -1,15 +1,18 @@
 package com.angel.flexbuddy.service;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.awt.image.BufferedImage;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.Year;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,21 +23,26 @@ import com.angel.flexbuddy.exception.InvalidScreenshotException;
 @Service
 public class ShiftImportService {
 
+    private static final int MAX_SIDE = 12_000;
+
     private final ScreenshotTextExtractor textExtractor;
     private final ShiftScreenshotParser screenshotParser;
     private final ImportWarningRules warningRules;
     private final Clock clock;
+    private final long maxPixels;
 
     public ShiftImportService(
             ScreenshotTextExtractor textExtractor,
             ShiftScreenshotParser screenshotParser,
             ImportWarningRules warningRules,
-            Clock clock
+            Clock clock,
+            @Value("${flexbuddy.import.max-pixels:30000000}") long maxPixels
     ) {
         this.textExtractor = textExtractor;
         this.screenshotParser = screenshotParser;
         this.warningRules = warningRules;
         this.clock = clock;
+        this.maxPixels = maxPixels;
     }
 
     public ShiftImportPreviewResponse createPreview(MultipartFile screenshot) {
@@ -52,16 +60,31 @@ public class ShiftImportService {
 
         OcrResult ocrResult;
 
-        try (InputStream inputStream = screenshot.getInputStream()) {
-            BufferedImage image = ImageIO.read(inputStream);
-
-            if (image == null) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(screenshot.getInputStream())) {
+            if (input == null) {
                 throw new InvalidScreenshotException(
                         "The uploaded file is not a readable image."
                 );
             }
 
-            ocrResult = textExtractor.extract(image);
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+
+            if (!readers.hasNext()) {
+                throw new InvalidScreenshotException(
+                        "The uploaded file is not a readable image."
+                );
+            }
+
+            ImageReader reader = readers.next();
+
+            try {
+                reader.setInput(input);
+                BufferedImage image = readWithinLimits(reader);
+                ocrResult = textExtractor.extract(image);
+            }
+            finally {
+                reader.dispose();
+            }
         }
         catch (IOException exception) {
             throw new InvalidScreenshotException(
@@ -101,5 +124,27 @@ public class ShiftImportService {
                 ocrResult.lines(),
                 List.of(candidate)
         );
+    }
+
+    private BufferedImage readWithinLimits(ImageReader reader) throws IOException {
+        int width = reader.getWidth(0);
+        int height = reader.getHeight(0);
+
+        if (width > MAX_SIDE || height > MAX_SIDE || (long) width * height > maxPixels) {
+            throw new InvalidScreenshotException(
+                    "The screenshot is too large. Use an image under "
+                            + Math.max(1, maxPixels / 1_000_000) + " megapixels."
+            );
+        }
+
+        BufferedImage image = reader.read(0);
+
+        if (image == null) {
+            throw new InvalidScreenshotException(
+                    "The uploaded file is not a readable image."
+            );
+        }
+
+        return image;
     }
 }

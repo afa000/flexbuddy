@@ -65,6 +65,12 @@ class ShiftTest {
         assertThat(shift.getHourlyRate()).isEqualByComparingTo("0.00");
     }
 
+    @Test
+    void getTimeWorked_returnsZeroWhenALegacyRowIsMissingATime() {
+        assertThat(shift(null, LocalTime.of(17, 0), "100.00", "0.00").getTimeWorked()).isZero();
+        assertThat(shift(LocalTime.of(9, 0), null, "100.00", "0.00").getTimeWorked()).isZero();
+    }
+
     private Shift shift(LocalTime start, LocalTime end, String base, String tips) {
         return new Shift(1L, "VEA7", LocalDate.of(2026, 9, 6), start, end,
                 new BigDecimal(base), new BigDecimal(tips));

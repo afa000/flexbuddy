@@ -3,6 +3,7 @@ package com.angel.flexbuddy.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -152,15 +153,33 @@ class ShiftServiceTest {
 
     @Test
     void deleteShift_softDeletesAnOwnedShiftAndReturnsItsUndoBatch() {
-        Shift existing = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
-        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(existing));
+        when(shiftRepository.softDelete(eq(OWNER_EMAIL), eq(1L), eq(Instant.parse("2026-09-11T12:00:00Z")),
+                any(String.class))).thenReturn(1);
 
         String batch = shiftService.deleteShift(OWNER_EMAIL, 1L);
 
         assertThat(batch).isNotBlank();
-        assertThat(existing.getDeletedAt()).isEqualTo(Instant.parse("2026-09-11T12:00:00Z"));
-        assertThat(existing.getDeleteBatch()).isEqualTo(batch);
-        verify(shiftRepository).save(existing);
+        verify(shiftRepository).softDelete(OWNER_EMAIL, 1L, Instant.parse("2026-09-11T12:00:00Z"), batch);
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteShift_rejectsAnIdThatMatchesNoLiveShiftForTheOwner() {
+        when(shiftRepository.softDelete(eq(OWNER_EMAIL), eq(999L), any(Instant.class), any(String.class)))
+                .thenReturn(0);
+
+        assertThatThrownBy(() -> shiftService.deleteShift(OWNER_EMAIL, 999L))
+                .isInstanceOf(ShiftNotFoundException.class)
+                .hasMessage("Shift not found with id: 999");
+    }
+
+    @Test
+    void getTrash_purgesOnlyTheCallersExpiredRows() {
+        when(shiftRepository.findTrash(OWNER_EMAIL)).thenReturn(List.of());
+
+        shiftService.getTrash(OWNER_EMAIL);
+
+        verify(shiftRepository).purgeDeletedBefore(OWNER_EMAIL, Instant.parse("2026-08-12T12:00:00Z"));
     }
 
     private CreateShiftRequest request() {

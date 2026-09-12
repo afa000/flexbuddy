@@ -66,11 +66,6 @@ const elements = {
     trashList: document.querySelector('#trashList'),
     trashCount: document.querySelector('#trashCount'),
     emptyTrashButton: document.querySelector('#emptyTrashButton'),
-    successToast: document.querySelector('#successToast'),
-    toastTitle: document.querySelector('#toastTitle'),
-    toastMessage: document.querySelector('#toastMessage'),
-    toastAction: document.querySelector('#toastAction'),
-    toastCountdown: document.querySelector('#toastCountdown'),
     editModal: document.querySelector('#editModal'),
     editForm: document.querySelector('#editForm'),
     editStation: document.querySelector('#editStation'),
@@ -96,14 +91,14 @@ const elements = {
 };
 
 let selectedFileUrl;
-let toastState;
-const toastQueue = [];
 let editingShiftId;
 let editSnapshot;
 let pendingConfirmAction;
 let lastFocusedElement;
 let visibleShiftCount = 25;
 let currentShifts = [];
+let dashboardAbort;
+let reportAbort;
 let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
@@ -117,7 +112,7 @@ const previewFields = {
     tips: elements.tips
 };
 
-async function apiFetch(url, options) {
+async function apiFetch(url, options = {}) {
     const response = await window.fetch(url, options);
     const responsePath = new URL(response.url, window.location.origin).pathname;
     if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
@@ -194,12 +189,6 @@ elements.acceptConfirmButton.addEventListener('click', async () => {
         showToast('Action failed', error.message || 'The action could not be completed.', {alert: true});
     }
 });
-elements.successToast.addEventListener('mouseenter', pauseToast);
-elements.successToast.addEventListener('mouseleave', resumeToast);
-elements.successToast.addEventListener('focusin', pauseToast);
-elements.successToast.addEventListener('focusout', event => {
-    if (!elements.successToast.contains(event.relatedTarget)) resumeToast();
-});
 elements.editModal.addEventListener('click', event => {
     if (event.target === elements.editModal) closeEditModal();
 });
@@ -212,7 +201,6 @@ document.addEventListener('keydown', event => {
         closeEditModal();
         return;
     }
-    if (event.key === 'Escape' && toastState) hideCurrentToast();
     if (event.key === 'Tab' && !elements.confirmModal.classList.contains('is-hidden')) {
         trapFocus(elements.confirmModal, event);
     } else if (event.key === 'Tab' && !elements.editModal.classList.contains('is-hidden')) {
@@ -477,12 +465,19 @@ async function loadDashboard() {
     if (!validateDateRange()) return;
     const query = buildQuery();
     persistFilterState();
-    await Promise.all([loadStatistics(query), loadShifts(query), loadEarningsReport(buildQuery(false))]);
+    dashboardAbort?.abort();
+    dashboardAbort = new AbortController();
+    const signal = dashboardAbort.signal;
+    await Promise.all([
+        loadStatistics(query, signal),
+        loadShifts(query, signal),
+        loadEarningsReport(buildQuery(false))
+    ]);
 }
 
-async function loadStatistics(query) {
+async function loadStatistics(query, signal) {
     try {
-        const response = await apiFetch(`/shifts/statistics?${query}`);
+        const response = await apiFetch(`/shifts/statistics?${query}`, {signal});
         if (!response.ok) throw new Error();
         const statistics = await response.json();
 
@@ -497,7 +492,8 @@ async function loadStatistics(query) {
         elements.baseShareBar.style.width = `${100 - tipShare}%`;
         elements.tipsShareBar.style.width = `${tipShare}%`;
         elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
-    } catch {
+    } catch (error) {
+        if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
             elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
             elements.tipsShare].forEach(element => element.textContent = '—');
@@ -506,14 +502,15 @@ async function loadStatistics(query) {
     }
 }
 
-async function loadShifts(query) {
+async function loadShifts(query, signal) {
     try {
-        const response = await apiFetch(`/shifts?${query}`);
+        const response = await apiFetch(`/shifts?${query}`, {signal});
         if (!response.ok) throw new Error();
         currentShifts = await response.json();
         renderShifts(currentShifts);
         updateResultSummary(currentShifts);
-    } catch {
+    } catch (error) {
+        if (error?.name === 'AbortError') return;
         currentShifts = [];
         elements.historyList.innerHTML = '<div class="history-empty">Shifts could not be loaded.</div>';
         elements.showMoreButton.classList.add('is-hidden');
@@ -527,14 +524,18 @@ async function loadShifts(query) {
 async function loadEarningsReport(query) {
     hideMessage(elements.reportError);
     elements.earningsChartTitle.textContent = `Earnings by ${reportGroupBy}`;
+    reportAbort?.abort();
+    reportAbort = new AbortController();
+    const signal = reportAbort.signal;
     try {
-        const response = await apiFetch(`/shifts/reports/earnings?groupBy=${reportGroupBy}&${query}`);
+        const response = await apiFetch(`/shifts/reports/earnings?groupBy=${reportGroupBy}&${query}`, {signal});
         if (!response.ok) throw new Error(await response.text());
         const report = await response.json();
         window.flexbuddyCharts.renderEarningsChart(elements.earningsChart, report);
         window.flexbuddyCharts.renderDonut(elements.payMixChart, report.totals);
         window.flexbuddyCharts.renderTable(elements.breakdownBody, report, drillIntoBucket);
     } catch (error) {
+        if (error?.name === 'AbortError') return;
         showMessage(elements.reportError, error.message || 'The earnings report could not be loaded.');
         elements.earningsChart.replaceChildren();
         elements.payMixChart.replaceChildren();
@@ -704,7 +705,14 @@ async function undoEdit(id, previous) {
     const response = await apiFetch(`/shifts/${id}`, {
         method: 'PUT',
         headers: csrfHeaders({'Content-Type': 'application/json'}),
-        body: JSON.stringify(previous)
+        body: JSON.stringify({
+            station: previous.station,
+            date: previous.date,
+            startTime: previous.startTime,
+            endTime: previous.endTime,
+            basePay: previous.basePay,
+            tips: previous.tips
+        })
     });
     if (!response.ok) throw new Error(await response.text());
     showToast('Edit undone', 'The previous shift values were restored.');
@@ -799,7 +807,7 @@ function closeConfirm() {
 
 function trapFocus(container, event) {
     const focusable = [...container.querySelectorAll('button, input, select, textarea, a[href]')]
-            .filter(element => !element.disabled && !element.classList.contains('is-hidden'));
+            .filter(element => !element.disabled && element.getClientRects().length > 0);
     if (!focusable.length) return;
     const first = focusable[0];
     const last = focusable.at(-1);
@@ -862,61 +870,16 @@ function hideMessage(element) {
     element.classList.add('is-hidden');
 }
 
+window.flexbuddyToast.init({
+    toast: '#successToast',
+    title: '#toastTitle',
+    message: '#toastMessage',
+    action: '#toastAction',
+    countdown: '#toastCountdown'
+});
+
 function showToast(title, message, options = {}) {
-    toastQueue.push({title, message, duration: options.duration || 3500, ...options});
-    if (!toastState) displayNextToast();
-}
-
-function displayNextToast() {
-    const next = toastQueue.shift();
-    if (!next) return;
-    toastState = {...next, remaining: next.duration, started: Date.now()};
-    elements.toastTitle.textContent = next.title;
-    elements.toastMessage.textContent = next.message;
-    elements.successToast.setAttribute('role', next.alert ? 'alert' : 'status');
-    elements.toastAction.textContent = next.actionLabel || 'Undo';
-    elements.toastAction.classList.toggle('is-hidden', !next.onAction);
-    elements.toastAction.onclick = next.onAction ? async () => {
-        const action = next.onAction;
-        hideCurrentToast();
-        try {
-            await action();
-        } catch (error) {
-            showToast('Undo failed', error.message || 'The action could not be undone.', {alert: true});
-        }
-    } : null;
-    elements.toastCountdown.style.animation = 'none';
-    void elements.toastCountdown.offsetWidth;
-    elements.toastCountdown.style.animation = `toast-countdown ${next.duration}ms linear forwards`;
-    elements.successToast.classList.remove('is-hidden');
-    scheduleToast();
-}
-
-function scheduleToast() {
-    if (!toastState) return;
-    toastState.started = Date.now();
-    toastState.timer = window.setTimeout(hideCurrentToast, toastState.remaining);
-    elements.toastCountdown.style.animationPlayState = 'running';
-}
-
-function pauseToast() {
-    if (!toastState?.timer) return;
-    window.clearTimeout(toastState.timer);
-    toastState.timer = null;
-    toastState.remaining -= Date.now() - toastState.started;
-    elements.toastCountdown.style.animationPlayState = 'paused';
-}
-
-function resumeToast() {
-    if (toastState && !toastState.timer) scheduleToast();
-}
-
-function hideCurrentToast() {
-    if (!toastState) return;
-    window.clearTimeout(toastState.timer);
-    elements.successToast.classList.add('is-hidden');
-    toastState = undefined;
-    window.setTimeout(displayNextToast, 100);
+    window.flexbuddyToast.show(title, message, options);
 }
 
 function trimTime(time) {
@@ -950,6 +913,7 @@ function formatFileSize(bytes) {
 }
 
 function parseLocalDate(value) {
+    if (!value) return new Date();
     const [year, month, day] = value.split('-').map(Number);
     return new Date(year, month - 1, day);
 }

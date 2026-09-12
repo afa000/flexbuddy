@@ -22,13 +22,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
-import org.springframework.data.annotation.CreatedDate;
-import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Entity
 @Table(name = "shift", indexes = @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"))
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners(ShiftTimestampListener.class)
 @SQLRestriction("deleted_at is null")
 @Getter
 @Setter
@@ -46,11 +43,9 @@ public class Shift {
     private BigDecimal basePay;
     private BigDecimal tips;
 
-    @CreatedDate
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
-    @LastModifiedDate
     @Column(nullable = false)
     private Instant updatedAt;
 
@@ -116,6 +111,9 @@ public class Shift {
     }
 
     public int getTimeWorked() {
+        if (startTime == null || endTime == null) {
+            return 0;
+        }
         int totalMinutes = (int) ChronoUnit.MINUTES.between(startTime, endTime);
         return totalMinutes < 0 ? totalMinutes + (24 * 60) : totalMinutes;
     }

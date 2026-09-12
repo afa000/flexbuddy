@@ -54,8 +54,9 @@
                     <h3>Backup preview</h3>
                     <div class="restore-counts">
                         <div><strong id="previewTotal">0</strong><span>Total</span></div>
-                        <div><strong id="previewNew">0</strong><span>New</span></div>
+                        <div><strong id="previewNew">0</strong><span>New</span><small id="previewNewNote"></small></div>
                         <div><strong id="previewExisting">0</strong><span>Existing</span></div>
+                        <div><strong id="previewTrashed">0</strong><span>In Recently deleted</span></div>
                         <div><strong id="previewInvalid">0</strong><span>Invalid</span></div>
                     </div>
                     <p id="previewSource"></p>
@@ -78,6 +79,7 @@
         <button class="toast-action is-hidden" id="accountToastAction" type="button">Undo</button>
     </div>
 </div>
+<script src="/js/toast.js" defer></script>
 <script src="/js/account.js" defer></script>
 </body>
 </html>

@@ -9,6 +9,13 @@ const replaceAckRow = document.querySelector('#replaceAckRow');
 const replaceAck = document.querySelector('#replaceAck');
 let restoreToken;
 
+window.flexbuddyToast.init({
+    toast: '#accountToast',
+    title: '#accountToastTitle',
+    message: '#accountToastMessage',
+    action: '#accountToastAction'
+});
+
 async function apiFetch(url, options) {
     const response = await window.fetch(url, options);
     const responsePath = new URL(response.url, window.location.origin).pathname;
@@ -81,7 +88,8 @@ restoreButton.addEventListener('click', async () => {
         });
         if (!response.ok) throw new Error(await response.text());
         const result = await response.json();
-        showToast('Restore complete', `${result.inserted} shifts restored · ${result.skipped} skipped`, result.batchId);
+        showToast('Restore complete', `${result.inserted} shifts restored · ${result.skipped} skipped`,
+            result.batchId ? {duration: 10000, onAction: () => undoRestore(result.batchId)} : {});
         restorePreview.classList.add('is-hidden');
     } catch (error) {
         showError(error.message || 'The backup could not be restored.');
@@ -95,7 +103,11 @@ function renderPreview(preview, filename) {
     restoreToken = preview.token;
     document.querySelector('#previewTotal').textContent = preview.total;
     document.querySelector('#previewNew').textContent = preview.newShifts;
+    document.querySelector('#previewNewNote').textContent = preview.newDeletedShifts
+        ? `+${preview.newDeletedShifts} if recently deleted are included`
+        : '';
     document.querySelector('#previewExisting').textContent = preview.alreadyPresent;
+    document.querySelector('#previewTrashed').textContent = preview.inRecentlyDeleted;
     document.querySelector('#previewInvalid').textContent = preview.invalid;
     document.querySelector('#previewSource').textContent = `${filename} · ${preview.sameAccount ? 'Same account' : `From ${preview.sourceEmail || 'another account'}`} · ${preview.deletedInBackup} recently deleted`;
     const problems = document.querySelector('#restoreProblems');
@@ -118,20 +130,13 @@ function updateThemeLabel(theme) {
     themeToggleButton.title = label;
 }
 
-function showToast(title, message, batchId) {
-    const toast = document.querySelector('#accountToast');
-    document.querySelector('#accountToastTitle').textContent = title;
-    document.querySelector('#accountToastMessage').textContent = message;
-    const action = document.querySelector('#accountToastAction');
-    action.classList.toggle('is-hidden', !batchId);
-    if (batchId) action.onclick = () => undoRestore(batchId);
-    toast.classList.remove('is-hidden');
-    window.setTimeout(() => toast.classList.add('is-hidden'), batchId ? 10000 : 4500);
+function showToast(title, message, options = {}) {
+    window.flexbuddyToast.show(title, message, {duration: 4500, ...options});
 }
 
 async function undoRestore(batchId) {
     const response = await apiFetch(`/account/restore/${encodeURIComponent(batchId)}/undo`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) return showError(await response.text());
     const result = await response.json();
-    showToast('Restore undone', `${result.restored} original shifts restored`, null);
+    showToast('Restore undone', `${result.restored} original shifts restored`);
 }

@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -26,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.util.SerializationUtils;
 
 import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.BackupAccount;
@@ -36,6 +38,7 @@ import com.angel.flexbuddy.dto.RestoreMode;
 import com.angel.flexbuddy.dto.RestorePreviewResponse;
 import com.angel.flexbuddy.dto.RestoreRequest;
 import com.angel.flexbuddy.dto.RestoreResult;
+import com.angel.flexbuddy.exception.InvalidBackupException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.AppUserRepository;
@@ -73,9 +76,7 @@ class AccountRestoreServiceTest {
                 List.of(existing, fresh, deleted), new BackupCounts(2, 1));
         lenient().when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(backup);
         lenient().when(validator.validate(any(CreateShiftRequest.class))).thenReturn(Collections.emptySet());
-        Shift current = entity("VEA7");
-        lenient().when(shiftRepository.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(EMAIL))
-                .thenReturn(List.of(current));
+        lenient().when(shiftRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of(entity("VEA7")));
         lenient().when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(owner));
     }
 
@@ -89,6 +90,9 @@ class AccountRestoreServiceTest {
 
         assertThat(preview.total()).isEqualTo(3);
         assertThat(preview.alreadyPresent()).isEqualTo(1);
+        assertThat(preview.inRecentlyDeleted()).isZero();
+        assertThat(preview.newShifts()).isEqualTo(1);
+        assertThat(preview.newDeletedShifts()).isEqualTo(1);
         assertThat(result.inserted()).isEqualTo(1);
         assertThat(result.skipped()).isEqualTo(2);
         assertThat(result.batchId()).isNull();
@@ -109,6 +113,8 @@ class AccountRestoreServiceTest {
         assertThat(result.inserted()).isEqualTo(2);
         assertThat(result.batchId()).isNotBlank();
         verify(shiftRepository).softDeleteAll(EMAIL, NOW, result.batchId());
+        assertThat(shifts(result)).allSatisfy(shift ->
+                assertThat(shift.getCreatedAt()).isEqualTo(Instant.parse("2026-09-01T00:00:00Z")));
         ArgumentCaptor<List<Shift>> shifts = listCaptor();
         verify(shiftRepository).saveAll(shifts.capture());
         assertThat(shifts.getValue()).allSatisfy(shift -> {
@@ -122,11 +128,64 @@ class AccountRestoreServiceTest {
     @Test
     void undoReplaceRemovesInsertedRowsThenRestoresTheOriginalBatch() {
         when(shiftRepository.deleteBatch(eq(EMAIL), any(String.class))).thenReturn(2);
-        when(shiftRepository.restoreBatch(EMAIL, "batch", NOW)).thenReturn(4);
+        when(shiftRepository.restoreBatch(EMAIL, "batch")).thenReturn(4);
 
         var result = service.undoReplace(EMAIL, "batch");
 
         assertThat(result).containsEntry("removed", 2).containsEntry("restored", 4);
+    }
+
+    @Test
+    void aBackupRowMatchingATrashedShiftIsReportedSeparatelyAndSkippedByMerge() {
+        Shift trashed = entity("BDL4");
+        trashed.setDeletedAt(Instant.parse("2026-09-09T00:00:00Z"));
+        when(shiftRepository.findAllIncludingDeleted(EMAIL)).thenReturn(List.of(entity("VEA7"), trashed));
+        MockHttpSession session = new MockHttpSession();
+
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+        RestoreResult result = service.restore(EMAIL,
+                new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(preview.alreadyPresent()).isEqualTo(1);
+        assertThat(preview.inRecentlyDeleted()).isEqualTo(1);
+        assertThat(preview.newShifts()).isZero();
+        assertThat(result.inserted()).isZero();
+        verify(shiftRepository).saveAll(List.of());
+    }
+
+    @Test
+    void previewKeepsOneStagedBackupPerSessionAndClearsItAfterARestore() {
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse first = service.preview(EMAIL, upload(), session);
+        RestorePreviewResponse second = service.preview(EMAIL, upload(), session);
+
+        assertThat(Collections.list(session.getAttributeNames())).hasSize(1);
+        assertThatThrownBy(() -> service.restore(EMAIL,
+                new RestoreRequest(first.token(), RestoreMode.MERGE, false, false), session))
+                .isInstanceOf(InvalidBackupException.class)
+                .hasMessageContaining("expired");
+        assertThat(Collections.list(session.getAttributeNames())).hasSize(1);
+
+        service.restore(EMAIL, new RestoreRequest(second.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(Collections.list(session.getAttributeNames())).isEmpty();
+    }
+
+    @Test
+    void theStagedBackupSurvivesSessionSerialisation() {
+        MockHttpSession session = new MockHttpSession();
+        service.preview(EMAIL, upload(), session);
+        Object staged = session.getAttribute(Collections.list(session.getAttributeNames()).getFirst());
+
+        Object copy = SerializationUtils.deserialize(SerializationUtils.serialize(staged));
+
+        assertThat(copy).isEqualTo(staged);
+    }
+
+    private List<Shift> shifts(RestoreResult ignored) {
+        ArgumentCaptor<List<Shift>> captor = listCaptor();
+        verify(shiftRepository).saveAll(captor.capture());
+        return captor.getValue();
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

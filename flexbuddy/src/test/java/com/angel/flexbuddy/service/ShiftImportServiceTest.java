@@ -45,7 +45,8 @@ class ShiftImportServiceTest {
                 textExtractor,
                 new ShiftScreenshotParser(),
                 new ImportWarningRules(),
-                fixedClock
+                fixedClock,
+                30_000_000L
         );
     }
 
@@ -126,6 +127,37 @@ class ShiftImportServiceTest {
         assertThatThrownBy(() -> shiftImportService.createPreview(screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessage("The uploaded file is not a readable image.");
+    }
+
+    @Test
+    void createPreview_rejectsAnImageWithMorePixelsThanTheConfiguredLimit() throws IOException {
+        ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "huge.png", "image/png",
+                createPngBytes(200, 200));
+
+        assertThatThrownBy(() -> limited.createPreview(screenshot))
+                .isInstanceOf(InvalidScreenshotException.class)
+                .hasMessageContaining("too large");
+    }
+
+    @Test
+    void createPreview_stillReadsAnImageInsideTheConfiguredLimit() throws IOException {
+        ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0))));
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "small.png", "image/png",
+                createPngBytes(50, 50));
+
+        assertThat(limited.createPreview(screenshot).shifts()).hasSize(1);
+    }
+
+    private byte[] createPngBytes(int width, int height) throws IOException {
+        BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", output);
+        return output.toByteArray();
     }
 
     private byte[] createPngBytes() throws IOException {

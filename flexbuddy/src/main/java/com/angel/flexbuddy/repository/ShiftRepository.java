@@ -59,7 +59,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = :deletedAt, delete_batch = :batch, updated_at = :deletedAt
+            update shift set deleted_at = :deletedAt, delete_batch = :batch
             where owner_id = (select id from app_users where lower(email) = lower(:email))
               and deleted_at is null
             """, nativeQuery = true)
@@ -68,22 +68,30 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = null, delete_batch = null, updated_at = :restoredAt
+            update shift set deleted_at = :deletedAt, delete_batch = :batch
+            where id = :id
+              and owner_id = (select id from app_users where lower(email) = lower(:email))
+              and deleted_at is null
+            """, nativeQuery = true)
+    int softDelete(@Param("email") String email, @Param("id") Long id,
+            @Param("deletedAt") java.time.Instant deletedAt, @Param("batch") String batch);
+
+    @Modifying
+    @Query(value = """
+            update shift set deleted_at = null, delete_batch = null
             where id = :id
               and owner_id = (select id from app_users where lower(email) = lower(:email))
               and deleted_at is not null
             """, nativeQuery = true)
-    int restoreDeleted(@Param("email") String email, @Param("id") Long id,
-            @Param("restoredAt") java.time.Instant restoredAt);
+    int restoreDeleted(@Param("email") String email, @Param("id") Long id);
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = null, delete_batch = null, updated_at = :restoredAt
+            update shift set deleted_at = null, delete_batch = null
             where owner_id = (select id from app_users where lower(email) = lower(:email))
               and delete_batch = :batch and deleted_at is not null
             """, nativeQuery = true)
-    int restoreBatch(@Param("email") String email, @Param("batch") String batch,
-            @Param("restoredAt") java.time.Instant restoredAt);
+    int restoreBatch(@Param("email") String email, @Param("batch") String batch);
 
     @Modifying
     @Query(value = """
@@ -107,16 +115,14 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     @Modifying
     @Query(value = """
             delete from shift where owner_id = (select id from app_users where lower(email) = lower(:email))
+              and deleted_at < :cutoff
+            """, nativeQuery = true)
+    int purgeDeletedBefore(@Param("email") String email, @Param("cutoff") java.time.Instant cutoff);
+
+    @Modifying
+    @Query(value = """
+            delete from shift where owner_id = (select id from app_users where lower(email) = lower(:email))
               and delete_batch = :batch
             """, nativeQuery = true)
     int deleteBatch(@Param("email") String email, @Param("batch") String batch);
-
-    @Query(value = """
-            select count(*) > 0 from shift
-            where owner_id = (select id from app_users where lower(email) = lower(:email))
-              and deleted_at is null and date = :date and start_time = :startTime
-              and lower(station) = lower(:station)
-            """, nativeQuery = true)
-    boolean existsNaturalKey(@Param("email") String email, @Param("date") LocalDate date,
-            @Param("startTime") java.time.LocalTime startTime, @Param("station") String station);
 }

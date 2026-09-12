@@ -39,7 +39,7 @@ import jakarta.validation.Validator;
 @Service
 public class AccountRestoreService {
 
-    private static final String SESSION_PREFIX = "flexbuddy.restore.";
+    private static final String SESSION_KEY = "flexbuddy.restore.staged";
     private static final int MAX_SHIFTS = 10_000;
     private final ObjectMapper objectMapper;
     private final Validator validator;
@@ -69,37 +69,52 @@ public class AccountRestoreService {
         validateHeader(file);
 
         List<RestoreProblem> problems = validateRows(file.shifts());
-        Set<String> existingKeys = keys(shiftRepository.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(email));
-        Set<String> seen = new HashSet<>(existingKeys);
+        List<Shift> owned = shiftRepository.findAllIncludingDeleted(email);
+        Set<String> liveKeys = keys(owned.stream().filter(shift -> shift.getDeletedAt() == null).toList());
+        Set<String> trashedKeys = keys(owned.stream().filter(shift -> shift.getDeletedAt() != null).toList());
+        Set<String> seen = new HashSet<>(liveKeys);
+        seen.addAll(trashedKeys);
         int alreadyPresent = 0;
+        int inRecentlyDeleted = 0;
         int newShifts = 0;
+        int newDeletedShifts = 0;
         Set<Integer> invalidIndexes = new HashSet<>();
         problems.forEach(problem -> invalidIndexes.add(problem.index()));
         for (int index = 0; index < file.shifts().size(); index++) {
             BackupShift shift = file.shifts().get(index);
             if (invalidIndexes.contains(index)) continue;
-            if (!seen.add(key(shift))) alreadyPresent++; else newShifts++;
+            String key = key(shift);
+            if (!seen.add(key)) {
+                if (liveKeys.contains(key)) alreadyPresent++; else inRecentlyDeleted++;
+            } else if (shift.deletedAt() != null) {
+                newDeletedShifts++;
+            } else {
+                newShifts++;
+            }
         }
 
         String token = UUID.randomUUID().toString();
-        session.setAttribute(SESSION_PREFIX + token,
-                new StagedBackup(email.toLowerCase(Locale.ROOT), file, Instant.now(clock).plus(15, ChronoUnit.MINUTES)));
+        session.setAttribute(SESSION_KEY, new StagedBackup(token, email.toLowerCase(Locale.ROOT), file,
+                Instant.now(clock).plus(15, ChronoUnit.MINUTES)));
         int deleted = (int) file.shifts().stream().filter(shift -> shift != null && shift.deletedAt() != null).count();
         String sourceEmail = file.account() == null ? null : file.account().email();
         return new RestorePreviewResponse(
                 token, file.format(), file.version(), file.exportedAt(), sourceEmail,
                 sourceEmail != null && sourceEmail.equalsIgnoreCase(email), file.shifts().size(), newShifts,
-                alreadyPresent, invalidIndexes.size(), deleted, problems, existingKeys.size()
+                newDeletedShifts, alreadyPresent, inRecentlyDeleted, invalidIndexes.size(), deleted, problems,
+                liveKeys.size()
         );
     }
 
     @Transactional
     public RestoreResult restore(String email, RestoreRequest request, HttpSession session) {
-        Object value = session.getAttribute(SESSION_PREFIX + request.token());
-        if (!(value instanceof StagedBackup staged)
-                || !staged.email().equals(email.toLowerCase(Locale.ROOT))
+        Object value = session.getAttribute(SESSION_KEY);
+        if (!(value instanceof StagedBackup staged) || !staged.token().equals(request.token())) {
+            throw new InvalidBackupException("This restore preview has expired. Upload the backup again.");
+        }
+        if (!staged.email().equals(email.toLowerCase(Locale.ROOT))
                 || !staged.expiresAt().isAfter(Instant.now(clock))) {
-            session.removeAttribute(SESSION_PREFIX + request.token());
+            session.removeAttribute(SESSION_KEY);
             throw new InvalidBackupException("This restore preview has expired. Upload the backup again.");
         }
         if (request.mode() == RestoreMode.REPLACE && !request.acknowledgeReplace()) {
@@ -117,7 +132,7 @@ public class AccountRestoreService {
         Set<Integer> invalidIndexes = new HashSet<>();
         problems.forEach(problem -> invalidIndexes.add(problem.index()));
         Set<String> existing = request.mode() == RestoreMode.MERGE
-                ? keys(shiftRepository.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(email))
+                ? keys(shiftRepository.findAllIncludingDeleted(email))
                 : new HashSet<>();
         String batch = request.mode() == RestoreMode.REPLACE ? UUID.randomUUID().toString() : null;
         String insertedBatch = batch == null ? null : insertedBatch(batch);
@@ -138,14 +153,14 @@ public class AccountRestoreService {
             insert.add(toEntity(source, owner, insertedBatch));
         }
         shiftRepository.saveAll(insert);
-        session.removeAttribute(SESSION_PREFIX + request.token());
+        session.removeAttribute(SESSION_KEY);
         return new RestoreResult(insert.size(), skipped, batch);
     }
 
     @Transactional
     public java.util.Map<String, Integer> undoReplace(String email, String batch) {
         int removed = shiftRepository.deleteBatch(email, insertedBatch(batch));
-        int restored = shiftRepository.restoreBatch(email, batch, Instant.now(clock));
+        int restored = shiftRepository.restoreBatch(email, batch);
         return java.util.Map.of("removed", removed, "restored", restored);
     }
 
@@ -217,6 +232,7 @@ public class AccountRestoreService {
         return date + "|" + start + "|" + (station == null ? "" : station.trim().toLowerCase(Locale.ROOT));
     }
 
-    private record StagedBackup(String email, AccountBackupFile file, Instant expiresAt) implements java.io.Serializable {
+    record StagedBackup(String token, String email, AccountBackupFile file, Instant expiresAt)
+            implements java.io.Serializable {
     }
 }

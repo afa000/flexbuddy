@@ -101,6 +101,28 @@ class AccountControllerTest {
     }
 
     @Test
+    void register_rejectsAnEmailThatWasTakenBetweenTheCheckAndTheInsert() throws Exception {
+        org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
+                .when(accountService).register(any(RegistrationRequest.class));
+
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("displayName", "Angel")
+                        .param("email", "angel@example.com")
+                        .param("password", "password123"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("register"))
+                .andExpect(model().attributeHasFieldErrors("registration", "email"));
+    }
+
+    @Test
+    void errorPageIsReachableWithoutASession() throws Exception {
+        mockMvc.perform(get("/error"))
+                .andExpect(redirectedUrl(null))
+                .andExpect(status().is(org.hamcrest.Matchers.not(org.hamcrest.Matchers.is(302))));
+    }
+
+    @Test
     void downloadBackup_returnsDatedNoStoreJsonWithoutPasswordData() throws Exception {
         Instant now = Instant.parse("2026-09-11T12:00:00Z");
         when(clock.instant()).thenReturn(now);

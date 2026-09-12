@@ -1,4 +1,6 @@
 package com.angel.flexbuddy.dto;
 
-public record BackupCounts(int shifts, int deletedShifts) {
+import java.io.Serializable;
+
+public record BackupCounts(int shifts, int deletedShifts) implements Serializable {
 }

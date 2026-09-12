@@ -89,19 +89,18 @@ public class ShiftService {
         return toResponse(shiftRepository.save(shift));
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public String deleteShift(String email, Long id) {
-        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
-                .orElseThrow(() -> new ShiftNotFoundException(id));
         String batch = UUID.randomUUID().toString();
-        shift.setDeletedAt(Instant.now(clock));
-        shift.setDeleteBatch(batch);
-        shiftRepository.save(shift);
+        if (shiftRepository.softDelete(email, id, Instant.now(clock), batch) == 0) {
+            throw new ShiftNotFoundException(id);
+        }
         return batch;
     }
 
     @org.springframework.transaction.annotation.Transactional
     public ShiftResponse restoreShift(String email, Long id) {
-        int updated = shiftRepository.restoreDeleted(email, id, Instant.now(clock));
+        int updated = shiftRepository.restoreDeleted(email, id);
         if (updated == 0) throw new ShiftNotFoundException(id);
         return shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .map(this::toResponse)
@@ -110,12 +109,12 @@ public class ShiftService {
 
     @org.springframework.transaction.annotation.Transactional
     public int restoreBatch(String email, String batch) {
-        return shiftRepository.restoreBatch(email, batch, Instant.now(clock));
+        return shiftRepository.restoreBatch(email, batch);
     }
 
     @org.springframework.transaction.annotation.Transactional
     public List<ShiftResponse> getTrash(String email) {
-        shiftRepository.purgeDeletedBefore(Instant.now(clock).minus(30, java.time.temporal.ChronoUnit.DAYS));
+        shiftRepository.purgeDeletedBefore(email, Instant.now(clock).minus(30, java.time.temporal.ChronoUnit.DAYS));
         return shiftRepository.findTrash(email).stream().map(this::toResponse).toList();
     }
 

@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.stereotype.Service;
 
@@ -81,8 +82,10 @@ public class ShiftReportService {
     private GroupKey groupKey(Shift shift, GroupBy groupBy) {
         LocalDate date = shift.getDate();
         return switch (groupBy) {
-            case STATION -> new GroupKey(shift.getStation().trim().toLowerCase(Locale.ROOT),
-                    shift.getStation().trim(), null, null);
+            case STATION -> {
+                String station = Objects.requireNonNullElse(shift.getStation(), "").trim();
+                yield new GroupKey(station.toLowerCase(Locale.ROOT), station, null, null);
+            }
             case WEEK -> {
                 LocalDate start = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
                 int weekYear = date.get(IsoFields.WEEK_BASED_YEAR);

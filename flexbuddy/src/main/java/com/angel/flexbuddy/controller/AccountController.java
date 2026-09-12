@@ -4,6 +4,7 @@ import java.security.Principal;
 import java.time.Clock;
 import java.time.LocalDate;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -78,7 +79,13 @@ public class AccountController {
             return "register";
         }
 
-        accountService.register(registration);
+        try {
+            accountService.register(registration);
+        } catch (DataIntegrityViolationException exception) {
+            bindingResult.rejectValue("email", "email.registered", "An account already uses this email.");
+            return "register";
+        }
+
         return "redirect:/login?registered";
     }
 

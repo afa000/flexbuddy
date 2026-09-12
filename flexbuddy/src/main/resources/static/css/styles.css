@@ -1820,10 +1820,11 @@ h1 {
 .compact-drop-zone { min-height: 130px; margin-top: 18px; }
 .restore-preview { margin-top: 20px; }
 .restore-preview h3 { margin: 0 0 12px; }
-.restore-counts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.restore-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px; }
 .restore-counts div { padding: 12px 6px; display: grid; text-align: center; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 6px; }
 .restore-counts strong { color: var(--cyan); font-size: 21px; }
 .restore-counts span { color: var(--muted); font-size: 10px; text-transform: uppercase; }
+.restore-counts small { margin-top: 4px; color: var(--muted); font-size: 10px; }
 .restore-problems { color: var(--error); font-size: 12px; }
 .restore-options { margin: 16px 0; padding: 0; display: grid; gap: 10px; border: 0; }
 .restore-options legend { margin-bottom: 9px; font-weight: 700; }

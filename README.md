@@ -62,3 +62,23 @@ The root [`render.yaml`](render.yaml) defines the Render web service and Postgre
 ## Reporting API
 
 Authenticated requests to `GET /shifts`, `GET /shifts/statistics`, and `GET /shifts/reports/earnings` accept the same optional `from`, `to`, `station`, and `q` filters. Shift history also accepts `sort` and `dir`; reports require `groupBy=station|week|month|year`. `GET /shifts/stations` returns the signed-in user's station choices.
+
+## Export, backup, and recovery
+
+All of these require a signed-in session and only ever touch the caller's own shifts.
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /shifts/export.csv` | Downloads the filtered shift history as CSV. Accepts the same filters as `GET /shifts`. |
+| `GET /account/backup` | Downloads a `flexbuddy-backup` JSON file with the account profile plus active and recently deleted shifts. It never contains the password hash. |
+| `POST /account/restore/preview` | Multipart upload of a backup file (5 MB max). Returns what a restore would do — totals, new, existing, already in Recently deleted, invalid rows — and stages the file against a one-shot token. One staged backup per session; the token expires after 15 minutes. |
+| `POST /account/restore` | Commits the staged restore. Takes the preview `token`, a `mode` of `MERGE` or `REPLACE`, `includeDeleted`, and `acknowledgeReplace`. `REPLACE` moves the current history to Recently deleted first and returns a batch id. |
+| `POST /account/restore/{batchId}/undo` | Reverses a `REPLACE` restore: removes the inserted rows and restores the batch that was moved to Recently deleted. |
+| `GET /shifts/trash` | Lists Recently deleted shifts. |
+| `POST /shifts/{id}/restore` | Restores one shift out of Recently deleted. |
+| `POST /shifts/restore-batch/{batchId}` | Restores every shift deleted in one batch — this backs the Undo action on a delete. |
+| `DELETE /shifts/trash/{id}` | Permanently removes one shift. |
+| `DELETE /shifts/trash` | Permanently removes everything in Recently deleted. |
+
+Deleted shifts stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening the trash listing purges the caller's own expired rows.
+
