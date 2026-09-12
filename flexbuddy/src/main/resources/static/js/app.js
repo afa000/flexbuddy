@@ -4,7 +4,8 @@ const elements = {
     dashboardButton: document.querySelector('#dashboardButton'),
     dashboardNavButton: document.querySelector('#dashboardNavButton'),
     importNavButton: document.querySelector('#importNavButton'),
-    importWorkspace: document.querySelector('#import-workspace'),
+    dashboardScreens: [...document.querySelectorAll('[data-screen="dashboard"]')],
+    importScreen: document.querySelector('#importScreen'),
     dropZone: document.querySelector('#dropZone'),
     fileCard: document.querySelector('#fileCard'),
     imagePreview: document.querySelector('#imagePreview'),
@@ -124,13 +125,9 @@ Object.values(previewFields).forEach(input => input.addEventListener('focus', ()
 }));
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
-elements.importNavButton.addEventListener('click', () => {
-    setActiveNavigation('import');
-    elements.importWorkspace.scrollIntoView({behavior: 'smooth', block: 'start'});
-    openFilePicker();
-});
-elements.dashboardButton.addEventListener('click', showDashboard);
-elements.dashboardNavButton.addEventListener('click', showDashboard);
+elements.importNavButton.addEventListener('click', showImportScreen);
+elements.dashboardButton.addEventListener('click', () => showDashboard());
+elements.dashboardNavButton.addEventListener('click', () => showDashboard());
 elements.dropZone.addEventListener('click', openFilePicker);
 elements.screenshotInput.addEventListener('change', event => {
     const [file] = event.target.files;
@@ -255,14 +252,30 @@ function updateThemeToggle(theme) {
     elements.themeToggleButton.title = label;
 }
 
-function showDashboard() {
+function showDashboard(smooth = true) {
+    elements.dashboardScreens.forEach(section => section.classList.remove('is-hidden'));
+    elements.importScreen.classList.add('is-hidden');
     setActiveNavigation('dashboard');
+    window.scrollTo({top: 0, behavior: smooth ? 'smooth' : 'auto'});
+}
+
+function showImportScreen() {
+    elements.dashboardScreens.forEach(section => section.classList.add('is-hidden'));
+    elements.importScreen.classList.remove('is-hidden');
+    setActiveNavigation('import');
     window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function setActiveNavigation(activeItem) {
     elements.dashboardNavButton.classList.toggle('is-active', activeItem === 'dashboard');
     elements.importNavButton.classList.toggle('is-active', activeItem === 'import');
+    setCurrentPage(elements.dashboardNavButton, activeItem === 'dashboard');
+    setCurrentPage(elements.importNavButton, activeItem === 'import');
+}
+
+function setCurrentPage(button, current) {
+    if (current) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
 }
 
 async function processScreenshot(file) {
@@ -448,6 +461,7 @@ async function saveShift(event) {
         showToast('Shift added', 'Your earnings history is up to date.');
         await loadStations();
         await loadDashboard();
+        showDashboard();
     } catch (error) {
         showMessage(elements.saveError, error.message || 'The shift could not be saved.');
     } finally {
@@ -809,7 +823,6 @@ function resetImport() {
     });
     hideMessage(elements.uploadError);
     hideMessage(elements.saveError);
-    setActiveNavigation('dashboard');
 }
 
 function setProcessing(processing) {
@@ -1148,5 +1161,6 @@ function csrfHeaders(headers = {}) {
 
 updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
+showDashboard(false);
 loadStations();
 loadDashboard();

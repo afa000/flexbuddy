@@ -38,7 +38,7 @@
     </header>
 
     <main>
-        <section class="hero" aria-labelledby="page-title">
+        <section class="hero" data-screen="dashboard" aria-labelledby="page-title">
             <div>
                 <p class="eyebrow">YOUR DASHBOARD</p>
                 <h1 id="page-title">Shift earnings</h1>
@@ -47,12 +47,12 @@
             </div>
         </section>
 
-        <aside class="backup-nudge" th:if="${backupDue}">
+        <aside class="backup-nudge" data-screen="dashboard" th:if="${backupDue}">
             <div><strong>Your shift history is worth keeping.</strong><span>Download a backup so you can recover it if the database is ever lost.</span></div>
             <a class="secondary-button" href="/account">Back up now</a>
         </aside>
 
-        <section class="stats-grid" aria-label="Shift statistics">
+        <section class="stats-grid" data-screen="dashboard" aria-label="Shift statistics">
             <article class="stat-card stat-card-accent">
                 <span>Total earnings</span>
                 <strong id="totalEarnings">$0.00</strong>
@@ -86,7 +86,14 @@
             </article>
         </section>
 
-        <section class="workspace-grid" id="import-workspace">
+        <section class="import-screen is-hidden" id="importScreen" aria-labelledby="import-title">
+            <header class="screen-heading">
+                <p class="eyebrow">IMPORT A SHIFT</p>
+                <h1 id="import-title">Add from screenshot</h1>
+                <p>Upload a screenshot, review what FlexBuddy found, and add the shift to your history.</p>
+            </header>
+
+            <section class="workspace-grid" id="import-workspace">
             <article class="panel import-panel">
                 <div class="panel-heading">
                     <div>
@@ -201,9 +208,10 @@
                     </div>
                 </form>
             </article>
+            </section>
         </section>
 
-        <section class="panel filter-panel" aria-labelledby="filter-title">
+        <section class="panel filter-panel" data-screen="dashboard" aria-labelledby="filter-title">
             <div class="panel-heading filter-heading">
                 <div>
                     <p class="step-label">FILTERS</p>
@@ -238,7 +246,7 @@
             <p class="results-summary" id="resultsSummary">Loading shifts…</p>
         </section>
 
-        <section class="panel reports-panel" aria-labelledby="reports-title">
+        <section class="panel reports-panel" data-screen="dashboard" aria-labelledby="reports-title">
             <div class="panel-heading reports-heading">
                 <div>
                     <p class="step-label">REPORTS</p>
@@ -272,7 +280,7 @@
             </div>
         </section>
 
-        <section class="panel history-panel" aria-labelledby="history-title">
+        <section class="panel history-panel" data-screen="dashboard" aria-labelledby="history-title">
             <div class="panel-heading history-heading">
                 <div>
                     <p class="step-label">HISTORY</p>

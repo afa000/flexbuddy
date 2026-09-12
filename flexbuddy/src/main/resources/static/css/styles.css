@@ -364,6 +364,29 @@ main {
     border-radius: var(--radius);
 }
 
+.import-screen {
+    min-height: calc(100vh - 230px);
+}
+
+.screen-heading {
+    margin-bottom: 18px;
+    padding: 31px 38px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.screen-heading h1 {
+    margin-bottom: 9px;
+}
+
+.screen-heading > p:last-child {
+    max-width: 650px;
+    margin-bottom: 0;
+    color: var(--muted);
+    line-height: 1.55;
+}
+
 .eyebrow,
 .step-label {
     margin: 0 0 10px;
@@ -1506,6 +1529,19 @@ h1 {
         background: var(--page);
         border: 0;
         border-bottom: 8px solid var(--surface);
+        border-radius: 0;
+    }
+
+    .import-screen {
+        min-height: calc(100vh - 200px);
+    }
+
+    .screen-heading {
+        margin-bottom: 0;
+        padding: 31px 24px 28px;
+        background: var(--page);
+        border-width: 0 0 8px;
+        border-color: var(--surface);
         border-radius: 0;
     }
 
