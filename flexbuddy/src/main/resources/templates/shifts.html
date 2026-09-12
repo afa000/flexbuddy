@@ -170,7 +170,7 @@
 
                     <label class="field field-wide">
                         <span>Station</span>
-                        <input id="station" name="station" type="text" placeholder="Example: VEA7" required>
+                        <input id="station" name="station" type="text" maxlength="255" placeholder="Example: VEA7" required>
                     </label>
 
                     <label class="field field-wide">
@@ -232,7 +232,6 @@
                 <label class="filter-field"><span>From</span><input id="filterFrom" type="date"></label>
                 <label class="filter-field"><span>To</span><input id="filterTo" type="date"></label>
                 <label class="filter-field"><span>Station</span><select id="filterStation"><option value="">All stations</option></select></label>
-                <label class="filter-field filter-search"><span>Search</span><input id="filterQuery" type="search" placeholder="Search station"></label>
                 <label class="filter-field"><span>Sort</span><select id="filterSort">
                     <option value="date">Date</option><option value="station">Station</option>
                     <option value="basePay">Base pay</option><option value="tips">Tips</option>
@@ -320,7 +319,7 @@
             <form class="preview-form" id="editForm">
                 <label class="field field-wide">
                     <span>Station</span>
-                    <input id="editStation" type="text" placeholder="Example: VEA7" required>
+                    <input id="editStation" type="text" maxlength="255" placeholder="Example: VEA7" required>
                 </label>
 
                 <label class="field field-wide">

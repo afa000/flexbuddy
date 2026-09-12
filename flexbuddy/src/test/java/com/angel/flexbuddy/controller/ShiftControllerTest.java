@@ -218,6 +218,52 @@ class ShiftControllerTest {
     }
 
     @Test
+    void createShift_returnsBadRequestWhenStationExceedsDatabaseLimit() throws Exception {
+        String invalidRequest = """
+                {
+                  "station": "%s",
+                  "date": "2026-09-06",
+                  "startTime": "09:00",
+                  "endTime": "17:00",
+                  "basePay": 120.00,
+                  "tips": 0.00
+                }
+                """.formatted("A".repeat(256));
+
+        mockMvc.perform(post("/shifts")
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequest))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
+    void updateShift_returnsBadRequestWhenStationExceedsDatabaseLimit() throws Exception {
+        String invalidRequest = """
+                {
+                  "station": "%s",
+                  "date": "2026-09-06",
+                  "startTime": "09:00",
+                  "endTime": "17:00",
+                  "basePay": 120.00,
+                  "tips": 0.00
+                }
+                """.formatted("A".repeat(256));
+
+        mockMvc.perform(put("/shifts/{id}", 1L)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidRequest))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
     void updateShift_returnsNotFoundWhenShiftDoesNotExist() throws Exception {
         Long id = 999L;
         String validRequest = """

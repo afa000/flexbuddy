@@ -46,7 +46,6 @@ const elements = {
     filterFrom: document.querySelector('#filterFrom'),
     filterTo: document.querySelector('#filterTo'),
     filterStation: document.querySelector('#filterStation'),
-    filterQuery: document.querySelector('#filterQuery'),
     filterSort: document.querySelector('#filterSort'),
     sortDirectionButton: document.querySelector('#sortDirectionButton'),
     clearFiltersButton: document.querySelector('#clearFiltersButton'),
@@ -105,7 +104,6 @@ let pendingConfirmAction;
 let lastFocusedElement;
 let visibleShiftCount = 25;
 let currentShifts = [];
-let searchTimer;
 let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
@@ -118,6 +116,16 @@ const previewFields = {
     basePay: elements.basePay,
     tips: elements.tips
 };
+
+async function apiFetch(url, options) {
+    const response = await window.fetch(url, options);
+    const responsePath = new URL(response.url, window.location.origin).pathname;
+    if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
+        window.location.assign('/login?expired');
+        throw new Error('Your session expired. Sign in again.');
+    }
+    return response;
+}
 
 Object.values(previewFields).forEach(input => input.addEventListener('focus', () => {
     const sourceLine = input.dataset.lineIndex;
@@ -154,10 +162,6 @@ elements.filterFrom.addEventListener('change', handleCustomDates);
 elements.filterTo.addEventListener('change', handleCustomDates);
 elements.filterStation.addEventListener('change', () => updateFilter('station', elements.filterStation.value));
 elements.filterSort.addEventListener('change', () => updateFilter('sort', elements.filterSort.value));
-elements.filterQuery.addEventListener('input', () => {
-    window.clearTimeout(searchTimer);
-    searchTimer = window.setTimeout(() => updateFilter('q', elements.filterQuery.value.trim()), 250);
-});
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
 elements.groupButtons.forEach(button => button.addEventListener('click', () => {
     reportGroupBy = button.dataset.group;
@@ -298,7 +302,7 @@ async function processScreenshot(file) {
     formData.append('screenshot', file);
 
     try {
-        const response = await fetch('/shifts/import-preview', {
+        const response = await apiFetch('/shifts/import-preview', {
             method: 'POST',
             headers: csrfHeaders(),
             body: formData
@@ -446,7 +450,7 @@ async function saveShift(event) {
     setSaving(true);
 
     try {
-        const response = await fetch('/shifts', {
+        const response = await apiFetch('/shifts', {
             method: 'POST',
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
@@ -478,7 +482,7 @@ async function loadDashboard() {
 
 async function loadStatistics(query) {
     try {
-        const response = await fetch(`/shifts/statistics?${query}`);
+        const response = await apiFetch(`/shifts/statistics?${query}`);
         if (!response.ok) throw new Error();
         const statistics = await response.json();
 
@@ -495,20 +499,28 @@ async function loadStatistics(query) {
         elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
     } catch {
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
-            elements.averageHourly, elements.baseTipsTotal].forEach(element => element.textContent = '—');
+            elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
+            elements.tipsShare].forEach(element => element.textContent = '—');
+        elements.baseShareBar.style.width = '0%';
+        elements.tipsShareBar.style.width = '0%';
     }
 }
 
 async function loadShifts(query) {
     try {
-        const response = await fetch(`/shifts?${query}`);
+        const response = await apiFetch(`/shifts?${query}`);
         if (!response.ok) throw new Error();
         currentShifts = await response.json();
         renderShifts(currentShifts);
         updateResultSummary(currentShifts);
     } catch {
+        currentShifts = [];
         elements.historyList.innerHTML = '<div class="history-empty">Shifts could not be loaded.</div>';
+        elements.showMoreButton.classList.add('is-hidden');
         elements.resultsSummary.textContent = 'Shift results unavailable.';
+        elements.exportCsvButton.classList.add('is-disabled');
+        elements.exportCsvButton.setAttribute('aria-disabled', 'true');
+        elements.exportCsvButton.title = 'Shift results are unavailable';
     }
 }
 
@@ -516,7 +528,7 @@ async function loadEarningsReport(query) {
     hideMessage(elements.reportError);
     elements.earningsChartTitle.textContent = `Earnings by ${reportGroupBy}`;
     try {
-        const response = await fetch(`/shifts/reports/earnings?groupBy=${reportGroupBy}&${query}`);
+        const response = await apiFetch(`/shifts/reports/earnings?groupBy=${reportGroupBy}&${query}`);
         if (!response.ok) throw new Error(await response.text());
         const report = await response.json();
         window.flexbuddyCharts.renderEarningsChart(elements.earningsChart, report);
@@ -625,7 +637,7 @@ async function saveEditedShift(event) {
     setEditSaving(true);
 
     try {
-        const response = await fetch(`/shifts/${shiftId}`, {
+        const response = await apiFetch(`/shifts/${shiftId}`, {
             method: 'PUT',
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
@@ -668,7 +680,7 @@ async function deleteEditedShift() {
     if (id === undefined) return;
     elements.confirmDeleteButton.disabled = true;
     try {
-        const response = await fetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
+        const response = await apiFetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
         if (!response.ok) throw new Error(await response.text());
         const batch = response.headers.get('X-Delete-Batch');
         closeEditModal();
@@ -689,7 +701,7 @@ async function deleteEditedShift() {
 
 async function undoEdit(id, previous) {
     if (!previous) return;
-    const response = await fetch(`/shifts/${id}`, {
+    const response = await apiFetch(`/shifts/${id}`, {
         method: 'PUT',
         headers: csrfHeaders({'Content-Type': 'application/json'}),
         body: JSON.stringify(previous)
@@ -701,7 +713,7 @@ async function undoEdit(id, previous) {
 
 async function restoreBatch(batch) {
     if (!batch) return;
-    const response = await fetch(`/shifts/restore-batch/${encodeURIComponent(batch)}`, {
+    const response = await apiFetch(`/shifts/restore-batch/${encodeURIComponent(batch)}`, {
         method: 'POST', headers: csrfHeaders()
     });
     if (!response.ok) throw new Error(await response.text());
@@ -714,7 +726,7 @@ async function restoreBatch(batch) {
 async function loadTrash() {
     elements.trashList.innerHTML = '<p>Loading recently deleted shifts…</p>';
     try {
-        const response = await fetch('/shifts/trash');
+        const response = await apiFetch('/shifts/trash');
         if (!response.ok) throw new Error(await response.text());
         renderTrash(await response.json());
     } catch (error) {
@@ -745,7 +757,7 @@ function renderTrash(shifts) {
 }
 
 async function restoreTrashShift(id) {
-    const response = await fetch(`/shifts/${id}/restore`, {method: 'POST', headers: csrfHeaders()});
+    const response = await apiFetch(`/shifts/${id}/restore`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
     showToast('Shift restored', 'The shift is back in your history.');
     await loadTrash();
@@ -754,14 +766,14 @@ async function restoreTrashShift(id) {
 }
 
 async function permanentlyDeleteShift(id) {
-    const response = await fetch(`/shifts/trash/${id}`, {method: 'DELETE', headers: csrfHeaders()});
+    const response = await apiFetch(`/shifts/trash/${id}`, {method: 'DELETE', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
     showToast('Shift permanently deleted', 'The shift can no longer be restored.', {alert: true});
     await loadTrash();
 }
 
 async function emptyTrash() {
-    const response = await fetch('/shifts/trash', {method: 'DELETE', headers: csrfHeaders()});
+    const response = await apiFetch('/shifts/trash', {method: 'DELETE', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
     const result = await response.json();
     showToast('Recently deleted emptied', `${result.deleted} shifts were permanently removed.`, {alert: true});
@@ -955,7 +967,6 @@ function readFilterState() {
         from: params.get('from') || '',
         to: params.get('to') || '',
         station: params.get('station') || '',
-        q: params.get('q') || '',
         sort: params.get('sort') || 'date',
         dir: params.get('dir') === 'asc' ? 'asc' : 'desc'
     };
@@ -973,7 +984,6 @@ function syncFilterControls() {
     elements.filterFrom.value = filterState.from;
     elements.filterTo.value = filterState.to;
     elements.filterStation.value = filterState.station;
-    elements.filterQuery.value = filterState.q;
     elements.filterSort.value = filterState.sort;
     const custom = filterState.preset === 'custom';
     elements.filterFrom.disabled = !custom;
@@ -1039,7 +1049,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-    filterState = {preset: 'all', from: '', to: '', station: '', q: '', sort: 'date', dir: 'desc'};
+    filterState = {preset: 'all', from: '', to: '', station: '', sort: 'date', dir: 'desc'};
     visibleShiftCount = 25;
     syncFilterControls();
     loadDashboard();
@@ -1056,7 +1066,7 @@ function validateDateRange() {
 
 function buildQuery(includeSort = true) {
     const params = new URLSearchParams();
-    for (const key of ['from', 'to', 'station', 'q']) {
+    for (const key of ['from', 'to', 'station']) {
         if (filterState[key]) params.set(key, filterState[key]);
     }
     if (includeSort) {
@@ -1075,7 +1085,7 @@ function persistFilterState() {
 
 async function loadStations() {
     try {
-        const response = await fetch('/shifts/stations');
+        const response = await apiFetch('/shifts/stations');
         if (!response.ok) throw new Error();
         const stations = await response.json();
         elements.filterStation.replaceChildren(new Option('All stations', ''));

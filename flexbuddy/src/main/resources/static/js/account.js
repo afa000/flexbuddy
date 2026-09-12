@@ -9,6 +9,16 @@ const replaceAckRow = document.querySelector('#replaceAckRow');
 const replaceAck = document.querySelector('#replaceAck');
 let restoreToken;
 
+async function apiFetch(url, options) {
+    const response = await window.fetch(url, options);
+    const responsePath = new URL(response.url, window.location.origin).pathname;
+    if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
+        window.location.assign('/login?expired');
+        throw new Error('Your session expired. Sign in again.');
+    }
+    return response;
+}
+
 const themeToggleButton = document.querySelector('#themeToggleButton');
 themeToggleButton.addEventListener('click', () => {
     const theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
@@ -32,7 +42,7 @@ backupInput.addEventListener('change', async () => {
     const form = new FormData();
     form.append('backup', file);
     try {
-        const response = await fetch('/account/restore/preview', {method: 'POST', headers: csrfHeaders(), body: form});
+        const response = await apiFetch('/account/restore/preview', {method: 'POST', headers: csrfHeaders(), body: form});
         if (!response.ok) throw new Error(await response.text());
         renderPreview(await response.json(), file.name);
     } catch (error) {
@@ -59,7 +69,7 @@ restoreButton.addEventListener('click', async () => {
     restoreButton.disabled = true;
     restoreButton.textContent = 'Restoring…';
     try {
-        const response = await fetch('/account/restore', {
+        const response = await apiFetch('/account/restore', {
             method: 'POST',
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({
@@ -120,7 +130,7 @@ function showToast(title, message, batchId) {
 }
 
 async function undoRestore(batchId) {
-    const response = await fetch(`/account/restore/${encodeURIComponent(batchId)}/undo`, {method: 'POST', headers: csrfHeaders()});
+    const response = await apiFetch(`/account/restore/${encodeURIComponent(batchId)}/undo`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) return showError(await response.text());
     const result = await response.json();
     showToast('Restore undone', `${result.restored} original shifts restored`, null);

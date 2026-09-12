@@ -29,6 +29,9 @@
         <div class="notice error-notice auth-notice" th:if="${param.error}">
             The email or password was incorrect.
         </div>
+        <div class="notice error-notice auth-notice" th:if="${param.expired}">
+            Your session expired. Sign in again.
+        </div>
         <div class="notice success-notice" th:if="${param.logout}">
             You have signed out.
         </div>

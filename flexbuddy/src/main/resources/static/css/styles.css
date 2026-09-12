@@ -581,7 +581,7 @@ h1 {
 
 .filter-row {
     display: grid;
-    grid-template-columns: repeat(2, minmax(130px, .75fr)) minmax(150px, 1fr) minmax(180px, 1.3fr) minmax(145px, 1fr) auto;
+    grid-template-columns: repeat(2, minmax(130px, .85fr)) minmax(180px, 1.2fr) minmax(160px, 1fr) auto;
     gap: 11px;
     align-items: end;
 }
@@ -1444,7 +1444,58 @@ h1 {
 }
 
 .mobile-nav {
-    display: none;
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    z-index: 30;
+    width: 330px;
+    height: 70px;
+    padding: 6px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    transform: translateX(-50%);
+    background: var(--mobile-shell);
+    border: 1px solid var(--mobile-shell-border);
+    border-radius: 999px;
+    box-shadow: var(--toast-shadow);
+}
+
+.mobile-nav::before {
+    content: none;
+}
+
+.mobile-nav-item {
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 4px;
+    color: var(--text);
+    background: transparent;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.mobile-nav-item.is-active {
+    color: var(--cyan);
+    background: var(--mobile-active);
+}
+
+.mobile-nav-item svg {
+    width: 25px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.9;
+}
+
+.toast {
+    bottom: 105px;
 }
 
 .is-hidden {
@@ -1686,13 +1737,18 @@ h1 {
         bottom: 0;
         left: 0;
         z-index: 30;
+        width: auto;
         height: 92px;
         padding: 10px max(58px, calc((100vw - 340px) / 2));
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 0;
+        transform: none;
         background: var(--mobile-nav);
+        border: 0;
         border-top: 1px solid var(--mobile-nav-border);
+        border-radius: 0;
+        box-shadow: none;
     }
 
     .mobile-nav::before {
@@ -1735,7 +1791,7 @@ h1 {
         stroke-width: 1.9;
     }
 
-    .toast {
+.toast {
         right: 14px;
         bottom: 103px;
         left: 14px;
