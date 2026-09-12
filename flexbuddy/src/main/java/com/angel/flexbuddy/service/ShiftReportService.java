@@ -51,6 +51,7 @@ public class ShiftReportService {
     @Transactional(readOnly = true)
     public ShiftStatisticsResponse statistics(String email, ShiftFilter filter) {
         List<Shift> shifts = shiftService.findFiltered(email, filter);
+        int rollingSevenDayMinutes = rollingSevenDayMinutes(email);
         List<Expense> expenses = reportExpenses(email, filter);
         AccountSettingsResponse settings = settingsService.get(email);
         NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
@@ -64,7 +65,16 @@ public class ShiftReportService {
                 count == 0 ? 0 : Math.round((float) net.minutesWorked() / count), net.miles(), net.mileageCost(),
                 net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
                 net.earningsPerMile(), net.netMargin(), net.expenseTotals(), net.vehicleCost(),
-                net.outOfPocketExpenses(), net.netPerShift(), settings.vehicleCostMethod(), settings.mileageRate());
+                net.outOfPocketExpenses(), net.netPerShift(), settings.vehicleCostMethod(), settings.mileageRate(),
+                rollingSevenDayMinutes);
+    }
+
+    private int rollingSevenDayMinutes(String email) {
+        LocalDate today = LocalDate.now();
+        ShiftFilter rollingWindow = ShiftFilter.report(today.minusDays(6), today, null, null);
+        return shiftService.findFiltered(email, rollingWindow).stream()
+                .mapToInt(Shift::getTimeWorked)
+                .sum();
     }
 
     @Transactional(readOnly = true)

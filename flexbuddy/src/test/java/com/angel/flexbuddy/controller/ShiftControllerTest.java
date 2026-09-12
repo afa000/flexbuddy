@@ -155,7 +155,8 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.totalEarnings").value(245.50))
                 .andExpect(jsonPath("$.averagePayPerShift").value(122.75))
                 .andExpect(jsonPath("$.totalTimeWorked").value(750))
-                .andExpect(jsonPath("$.averageHourlyEarnings").value(19.64));
+                .andExpect(jsonPath("$.averageHourlyEarnings").value(19.64))
+                .andExpect(jsonPath("$.rollingSevenDayMinutes").value(0));
     }
 
     @Test

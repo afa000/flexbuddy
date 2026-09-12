@@ -42,6 +42,7 @@ public class ShiftStatisticsResponse {
     private BigDecimal netPerShift;
     private VehicleCostMethod vehicleCostMethod;
     private BigDecimal mileageRate;
+    private int rollingSevenDayMinutes;
 
     public ShiftStatisticsResponse(int totalShifts, BigDecimal totalBasePay, BigDecimal totalTips,
             BigDecimal totalEarnings, BigDecimal averagePayPerShift, int totalTimeWorked,
@@ -53,6 +54,6 @@ public class ShiftStatisticsResponse {
                 averageTipsPerShift, tipsShareOfEarnings, averageShiftMinutes, BigDecimal.ZERO,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, totalEarnings, averageHourlyEarnings,
                 null, BigDecimal.ZERO, Map.of(), BigDecimal.ZERO, BigDecimal.ZERO, averagePayPerShift,
-                VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO);
+                VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO, 0);
     }
 }

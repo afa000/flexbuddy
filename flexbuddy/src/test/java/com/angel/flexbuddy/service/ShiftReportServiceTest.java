@@ -73,6 +73,22 @@ class ShiftReportServiceTest {
     }
 
     @Test
+    void statistics_calculatesHoursForTodayAndPreviousSixDaysIndependentlyOfDashboardFilters() {
+        LocalDate today = LocalDate.now();
+        ShiftFilter dashboardFilter = ShiftFilter.report(null, null, "VEA7", null);
+        ShiftFilter rollingWindow = ShiftFilter.report(today.minusDays(6), today, null, null);
+        when(shiftService.findFiltered(EMAIL, dashboardFilter)).thenReturn(List.of());
+        when(shiftService.findFiltered(EMAIL, rollingWindow)).thenReturn(List.of(
+                shift("VEA7", today.minusDays(6), "100", "0", 180),
+                shift("BDL4", today, "100", "0", 270)
+        ));
+
+        ShiftStatisticsResponse result = reportService.statistics(EMAIL, dashboardFilter);
+
+        assertThat(result.getRollingSevenDayMinutes()).isEqualTo(450);
+    }
+
+    @Test
     void stationReport_groupsCaseInsensitivelyAndOrdersByEarnings() {
         when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(
                 shift("VEA7", LocalDate.of(2026, 9, 1), "50", "0", 120),

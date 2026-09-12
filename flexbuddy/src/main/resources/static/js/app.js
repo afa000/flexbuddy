@@ -38,6 +38,7 @@ const elements = {
     totalEarnings: document.querySelector('#totalEarnings'),
     totalShifts: document.querySelector('#totalShifts'),
     totalTime: document.querySelector('#totalTime'),
+    rollingSevenDayTime: document.querySelector('#rollingSevenDayTime'),
     averagePay: document.querySelector('#averagePay'),
     averageHourly: document.querySelector('#averageHourly'),
     hourlyBreakdown: document.querySelector('#hourlyBreakdown'),
@@ -537,6 +538,7 @@ async function loadStatistics(query, signal) {
         elements.totalEarnings.textContent = formatMoney(statistics.totalEarnings);
         elements.totalShifts.textContent = statistics.totalShifts ?? 0;
         elements.totalTime.textContent = formatMinutes(statistics.totalTimeWorked);
+        elements.rollingSevenDayTime.textContent = formatMinutes(statistics.rollingSevenDayMinutes);
         elements.averagePay.textContent = formatMoney(statistics.averagePayPerShift);
         elements.averageHourly.textContent = formatMoney(statistics.averageHourlyEarnings);
         elements.hourlyBreakdown.textContent = `${formatMoney(statistics.averageHourlyBasePay)} base · ${formatMoney(statistics.averageHourlyTips)} tips`;
@@ -553,7 +555,7 @@ async function loadStatistics(query, signal) {
         elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
     } catch (error) {
         if (error?.name === 'AbortError') return;
-        [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
+        [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.rollingSevenDayTime, elements.averagePay,
             elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
             elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
             elements.expenseTotal, elements.totalMiles, elements.mileageCost].forEach(element => element.textContent = '—');
