@@ -44,6 +44,8 @@ public class SecurityConfig {
                                 "/css/**",
                                 "/js/**",
                                 "/icons/**",
+                                "/screenshots/**",
+                                "/.well-known/**",
                                 "/manifest.webmanifest",
                                 "/sw.js",
                                 "/offline.html",

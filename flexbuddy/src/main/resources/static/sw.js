@@ -10,10 +10,12 @@ const VERSIONED_ASSETS = [
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [
     '/manifest.webmanifest', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png',
-    '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png'
+    '/icons/icon-maskable-512.png', '/icons/apple-touch-icon.png',
+    '/screenshots/dashboard-narrow.png', '/screenshots/dashboard-wide.png'
 ];
 const SHELL_PAGES = new Set(['/', '/account']);
-const STATIC_PATHS = [/^\/css\//, /^\/js\//, /^\/icons\//, /^\/manifest\.webmanifest$/, /^\/offline\.html$/];
+const STATIC_PATHS = [/^\/css\//, /^\/js\//, /^\/icons\//, /^\/screenshots\//,
+    /^\/manifest\.webmanifest$/, /^\/offline\.html$/];
 const DATA_PATHS = [/^\/shifts(\/|$)/, /^\/expenses(\/|$)/, /^\/account\/settings$/];
 const NETWORK_ONLY = [/\.csv$/, /\.ics$/, /^\/shifts\/import-preview$/, /^\/account\/backup$/, /^\/push\//];
 
@@ -34,6 +36,9 @@ self.addEventListener('activate', event => {
 self.addEventListener('message', event => {
     if (event.data?.type === 'skip-waiting') self.skipWaiting();
     if (event.data?.type === 'clear-data') event.waitUntil(clearUserData());
+    if (event.data?.type === 'cache-shell') {
+        event.waitUntil(cacheShell(event.data.path).then(cached => event.ports[0]?.postMessage({cached})));
+    }
 });
 
 // Writes, logins, downloads, and uploads are never intercepted: only GET requests on this origin are handled.
@@ -55,6 +60,15 @@ self.addEventListener('fetch', event => {
     if (DATA_PATHS.some(pattern => pattern.test(path))) event.respondWith(networkFirstData(request));
 });
 
+async function cacheShell(path) {
+    const url = new URL(path || '/', self.location.origin);
+    if (url.origin !== self.location.origin || !SHELL_PAGES.has(url.pathname)) return false;
+    const response = await fetch(url.pathname, {credentials: 'include', cache: 'no-store'});
+    if (!response.ok || response.redirected || response.type !== 'basic') return false;
+    const cache = await caches.open(PAGES_CACHE);
+    await cache.put(url.pathname, response.clone());
+    return true;
+}
 async function cacheFirst(request) {
     const cache = await caches.open(STATIC_CACHE);
     const cached = await cache.match(request);

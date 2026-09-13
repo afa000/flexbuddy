@@ -9,22 +9,77 @@
   "background_color": "#02080b",
   "theme_color": "#075c76",
   "icons": [
-    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/dashboard-narrow.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "FlexBuddy earnings dashboard on a phone"
+    },
+    {
+      "src": "/screenshots/dashboard-wide.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "FlexBuddy earnings dashboard on a wide screen"
+    }
   ],
   "shortcuts": [
     {
       "name": "Import a shift",
       "short_name": "Import",
       "url": "/?screen=import",
-      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Expenses",
+      "short_name": "Expenses",
+      "url": "/?screen=expenses",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     },
     {
       "name": "Schedule",
       "short_name": "Schedule",
       "url": "/?screen=schedule",
-      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
     }
   ]
 }

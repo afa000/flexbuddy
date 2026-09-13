@@ -149,6 +149,21 @@
         });
     }
 
+    async function cacheCurrentShell(registration) {
+        if (!['/', '/account'].includes(window.location.pathname) || !registration.active) return;
+        await new Promise(resolve => {
+            const channel = new MessageChannel();
+            const timeout = window.setTimeout(resolve, 3000);
+            channel.port1.onmessage = () => {
+                window.clearTimeout(timeout);
+                resolve();
+            };
+            registration.active.postMessage(
+                {type: 'cache-shell', path: window.location.pathname},
+                [channel.port2]
+            );
+        });
+    }
     async function registerServiceWorker() {
         if (!('serviceWorker' in navigator)) return;
         navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -158,6 +173,9 @@
         });
         try {
             const registration = await navigator.serviceWorker.register('/sw.js');
+            await navigator.serviceWorker.ready;
+            await cacheCurrentShell(registration);
+            document.dispatchEvent(new CustomEvent('flexbuddy:cache-ready'));
             if (registration.waiting && navigator.serviceWorker.controller) promptUpdate(registration.waiting);
             registration.addEventListener('updatefound', () => {
                 const worker = registration.installing;

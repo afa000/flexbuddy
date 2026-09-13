@@ -1655,6 +1655,10 @@ function setupInstallBanner() {
     });
 }
 
+document.addEventListener('flexbuddy:cache-ready', () => {
+    loadStations();
+    loadDashboard();
+});
 updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
 openInitialScreen();
