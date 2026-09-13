@@ -93,7 +93,7 @@ class AccountControllerTest {
                 .andExpect(view().name("privacy"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("How FlexBuddy handles your data")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Screenshots you select")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("aflo692@wgu.edu")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("flexbuddysupport@gmail.com")));
 
         mockMvc.perform(get("/terms"))
                 .andExpect(status().isOk())
