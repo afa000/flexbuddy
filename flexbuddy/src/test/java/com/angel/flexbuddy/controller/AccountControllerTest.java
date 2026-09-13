@@ -104,7 +104,8 @@ class AccountControllerTest {
         mockMvc.perform(get("/register"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/privacy\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("adults age 18 and over")));
     }
 
     @Test
@@ -161,10 +162,31 @@ class AccountControllerTest {
     }
 
     @Test
-    void errorPageIsReachableWithoutASession() throws Exception {
-        mockMvc.perform(get("/error"))
-                .andExpect(redirectedUrl(null))
-                .andExpect(status().is(org.hamcrest.Matchers.not(org.hamcrest.Matchers.is(302))));
+    void errorPageRendersABranded404WithoutASession() throws Exception {
+        mockMvc.perform(get("/error")
+                        .accept(MediaType.TEXT_HTML)
+                        .requestAttr(jakarta.servlet.RequestDispatcher.ERROR_STATUS_CODE, 404)
+                        .requestAttr(jakarta.servlet.RequestDispatcher.ERROR_REQUEST_URI, "/missing-page"))
+                .andExpect(status().isNotFound())
+                .andExpect(view().name("error"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Page not found")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("FlexBuddy")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Whitelabel Error Page"))));
+    }
+
+    @Test
+    void errorPageRendersABrandedServerErrorWithoutASession() throws Exception {
+        mockMvc.perform(get("/error")
+                        .accept(MediaType.TEXT_HTML)
+                        .requestAttr(jakarta.servlet.RequestDispatcher.ERROR_STATUS_CODE, 500)
+                        .requestAttr(jakarta.servlet.RequestDispatcher.ERROR_REQUEST_URI, "/failed-page"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(view().name("error"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Something went wrong")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("flexbuddysupport@gmail.com")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Whitelabel Error Page"))));
     }
 
     @Test

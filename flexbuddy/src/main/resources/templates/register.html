@@ -52,6 +52,7 @@
                 <small class="field-hint">Use at least 8 characters.</small>
                 <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
             </label>
+            <p class="audience-note"><strong>Age requirement:</strong> FlexBuddy is intended for adults age 18 and over.</p>
             <p class="legal-consent">By creating an account, you agree to the <a href="/terms">Terms of Use</a> and acknowledge the <a href="/privacy">Privacy Policy</a>.</p>
             <button class="primary-button auth-submit" type="submit">Create account</button>
         </form>
