@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -33,6 +34,7 @@ import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.model.VehicleCostMethod;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -218,6 +220,11 @@ public class AccountRestoreService {
             try {
                 owner.setVehicleCostMethod(VehicleCostMethod.valueOf(file.settings().vehicleCostMethod()));
                 owner.setMileageRate(file.settings().mileageRate() == null ? null : new BigDecimal(file.settings().mileageRate()));
+                if (file.version() >= 3) {
+                    if (file.settings().timeZone() != null) owner.setTimeZone(file.settings().timeZone());
+                    owner.setRemindBeforeMinutes(file.settings().remindBeforeMinutes());
+                    owner.setRemindConfirm(Boolean.TRUE.equals(file.settings().remindConfirm()));
+                }
                 userRepository.save(owner);
             } catch (RuntimeException exception) {
                 throw new InvalidBackupException("The backup contains invalid expense settings.", exception);
@@ -247,6 +254,9 @@ public class AccountRestoreService {
         shift.setBasePay(new BigDecimal(source.basePay()));
         shift.setTips(new BigDecimal(source.tips()));
         shift.setMiles(source.miles() == null || source.miles().isBlank() ? null : new BigDecimal(source.miles()));
+        shift.setStatus(source.status() == null || source.status().isBlank()
+                ? ShiftStatus.COMPLETED : ShiftStatus.valueOf(source.status()));
+        shift.setStatusChangedAt(source.statusChangedAt());
         Instant now = Instant.now(clock);
         shift.setCreatedAt(source.createdAt() == null ? now : source.createdAt());
         shift.setUpdatedAt(source.updatedAt() == null ? shift.getCreatedAt() : source.updatedAt());
@@ -278,7 +288,7 @@ public class AccountRestoreService {
     private void validateHeader(AccountBackupFile file) {
         if (file == null) throw new InvalidBackupException("This file is not a readable FlexBuddy backup.");
         if (!"flexbuddy-backup".equals(file.format())) throw new InvalidBackupException("This is not a FlexBuddy backup file.");
-        if (file.version() > 2) throw new InvalidBackupException("This backup was created by a newer FlexBuddy version.");
+        if (file.version() > 3) throw new InvalidBackupException("This backup was created by a newer FlexBuddy version.");
         if (file.version() < 1) throw new InvalidBackupException("This backup version is not supported.");
         if (file.shifts().size() > MAX_SHIFTS) throw new InvalidBackupException("A backup can contain at most 10,000 shifts.");
         if (file.shifts().size() + file.expenses().size() > MAX_RECORDS) {
@@ -320,6 +330,14 @@ public class AccountRestoreService {
                         throw new IllegalArgumentException();
                     }
                 }
+                if (file.settings().timeZone() != null
+                        && !ZoneId.getAvailableZoneIds().contains(file.settings().timeZone())) {
+                    throw new IllegalArgumentException();
+                }
+                if (file.settings().remindBeforeMinutes() != null
+                        && !AppUser.REMINDER_LEAD_MINUTES.contains(file.settings().remindBeforeMinutes())) {
+                    throw new IllegalArgumentException();
+                }
             } catch (RuntimeException exception) {
                 problems.add(new RestoreProblem(file.shifts().size() + file.expenses().size(),
                         "settings", "vehicle cost settings are invalid"));
@@ -344,8 +362,24 @@ public class AccountRestoreService {
             for (ConstraintViolation<CreateShiftRequest> violation : validator.validate(request)) {
                 problems.add(new RestoreProblem(index, violation.getPropertyPath().toString(), violation.getMessage()));
             }
+            ShiftStatus status = parseStatus(shift.status(), index, problems);
+            if (status != null && basePay != null && tips != null) {
+                String statusProblem = status.validate(basePay, tips, miles);
+                if (statusProblem != null) problems.add(new RestoreProblem(index, "status", statusProblem));
+            }
         }
         return problems;
+    }
+
+    /** Version 1 and 2 backups have no status; every shift in them was worked. */
+    private ShiftStatus parseStatus(String value, int index, List<RestoreProblem> problems) {
+        if (value == null || value.isBlank()) return ShiftStatus.COMPLETED;
+        try {
+            return ShiftStatus.valueOf(value);
+        } catch (IllegalArgumentException exception) {
+            problems.add(new RestoreProblem(index, "status", "must be SCHEDULED, COMPLETED, CANCELLED, or FORFEITED"));
+            return null;
+        }
     }
 
     private BigDecimal parseMoney(String value, int index, String field, List<RestoreProblem> problems) {

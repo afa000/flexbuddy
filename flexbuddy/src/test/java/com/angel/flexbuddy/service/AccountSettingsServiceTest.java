@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.AccountSettingsRequest;
+import com.angel.flexbuddy.dto.ReminderSettingsRequest;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.VehicleCostMethod;
 import com.angel.flexbuddy.repository.AppUserRepository;
@@ -65,5 +66,28 @@ class AccountSettingsServiceTest {
 
         assertThat(user.getMileageRate()).isNull();
         assertThat(settings.mileageRate()).isEqualByComparingTo("0.700");
+    }
+
+    @Test
+    void updateRemindersStoresTheZoneLeadTimeAndConfirmationNudge() {
+        when(userRepository.save(user)).thenReturn(user);
+
+        var settings = service.updateReminders(EMAIL, new ReminderSettingsRequest("America/Chicago", 120, true));
+
+        assertThat(settings.timeZone()).isEqualTo("America/Chicago");
+        assertThat(settings.remindBeforeMinutes()).isEqualTo(120);
+        assertThat(settings.remindConfirm()).isTrue();
+    }
+
+    @Test
+    void regeneratingTheCalendarTokenReplacesTheFeedLink() {
+        when(userRepository.save(user)).thenReturn(user);
+
+        String first = service.regenerateCalendarToken(EMAIL).calendarFeedPath();
+        String second = service.regenerateCalendarToken(EMAIL).calendarFeedPath();
+
+        assertThat(first).matches("/calendar/[A-Za-z0-9_-]{43}\\.ics");
+        assertThat(second).matches("/calendar/[A-Za-z0-9_-]{43}\\.ics").isNotEqualTo(first);
+        assertThat(second).isEqualTo("/calendar/" + user.getCalendarToken() + ".ics");
     }
 }

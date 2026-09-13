@@ -2,13 +2,25 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#abdff8" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <meta name="description" content="Back up and restore your FlexBuddy account data.">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
     <title>Account data | FlexBuddy</title>
     <script>document.documentElement.dataset.theme = localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';</script>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+    <script>
+        document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.setAttribute('content',
+            document.documentElement.dataset.theme === 'light' ? '#abdff8' : '#075c76'));
+    </script>
 </head>
 <body>
 <div class="app-shell">
@@ -25,6 +37,8 @@
             </button>
         </div>
     </header>
+
+    <div class="offline-banner is-hidden" id="offlineBanner" role="status" aria-live="polite"></div>
 
     <main class="account-main">
         <section class="hero account-hero">
@@ -44,6 +58,46 @@
                     <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
                 </form>
             </article>
+            <article class="panel data-card reminders-card">
+                <p class="step-label">REMINDERS</p>
+                <h2>Shift reminders</h2>
+                <p>Your phone's calendar can remind you before every block. Push reminders are an optional extra.</p>
+                <form class="settings-form" id="reminderSettingsForm">
+                    <label class="field"><span>Time zone</span><select id="timeZoneSelect"></select></label>
+                    <label class="field"><span>Remind me before a block</span><select id="remindBefore">
+                        <option value="">Off</option>
+                        <option value="30">30 minutes before</option>
+                        <option value="60">1 hour before</option>
+                        <option value="120">2 hours before</option>
+                        <option value="720">The night before (12 hours)</option>
+                    </select></label>
+                    <label class="checkbox-row"><input id="remindConfirm" type="checkbox"> Nudge me to confirm blocks after they end</label>
+                    <div class="notice error-notice is-hidden" id="reminderError" role="alert"></div>
+                    <div class="form-actions"><button class="primary-button" id="saveRemindersButton" type="submit">Save reminders</button></div>
+                </form>
+                <section class="reminder-section">
+                    <h3>Calendar feed</h3>
+                    <p>Subscribe once in Google Calendar or iOS Calendar and your blocks appear with an alarm at your lead time. Anyone with this link can see your schedule, so keep it private.</p>
+                    <div class="feed-url-row">
+                        <input id="calendarFeedUrl" type="text" readonly placeholder="No link yet" aria-label="Calendar feed link">
+                        <button class="secondary-button compact-button" id="copyFeedButton" type="button" disabled>Copy</button>
+                    </div>
+                    <button class="text-button" id="regenerateFeedButton" type="button" data-online-only>Create calendar link</button>
+                    <small class="field-hint">Each block on the Schedule screen also has an Add to calendar button that downloads a single .ics file.</small>
+                </section>
+                <section class="reminder-section">
+                    <h3>Push reminders</h3>
+                    <p id="pushStatus">Checking push support…</p>
+                    <small class="field-hint">On iPhone, install FlexBuddy to your home screen first (iOS 16.4 or later). Push is best-effort and can arrive late if the server was asleep.</small>
+                    <button class="secondary-button compact-button" id="pushToggleButton" type="button" disabled>Turn on push on this device</button>
+                </section>
+                <section class="reminder-section is-hidden" id="installSection">
+                    <h3>Install the app</h3>
+                    <p id="installHelp"></p>
+                    <button class="primary-button compact-button is-hidden" id="installAppButton" type="button">Install FlexBuddy</button>
+                </section>
+            </article>
+
             <article class="panel data-card">
                 <p class="step-label">BACKUP</p>
                 <h2>Download all account data</h2>
@@ -93,7 +147,8 @@
         <button class="toast-action is-hidden" id="accountToastAction" type="button">Undo</button>
     </div>
 </div>
-<script src="/js/toast.js" defer></script>
-<script src="/js/account.js" defer></script>
+<script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/account.js(v=${buildId})}" defer></script>
 </body>
 </html>

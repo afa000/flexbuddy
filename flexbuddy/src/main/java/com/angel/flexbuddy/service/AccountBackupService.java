@@ -54,13 +54,14 @@ public class AccountBackupService {
         int deleted = (int) shifts.stream().filter(shift -> shift.getDeletedAt() != null).count();
         int deletedExpenses = (int) expenses.stream().filter(expense -> expense.getDeletedAt() != null).count();
         return new AccountBackupFile(
-                "flexbuddy-backup", 2, exportedAt, appVersion,
+                "flexbuddy-backup", 3, exportedAt, appVersion,
                 new BackupAccount(user.getDisplayName(), user.getEmail(), user.getCreatedAt()),
                 shifts.stream().map(this::toBackupShift).toList(),
                 expenses.stream().map(this::toBackupExpense).toList(),
                 new BackupSettings((user.getVehicleCostMethod() == null
                         ? com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod()).name(),
-                        user.getMileageRate() == null ? null : user.getMileageRate().toPlainString()),
+                        user.getMileageRate() == null ? null : user.getMileageRate().toPlainString(),
+                        user.getTimeZone(), user.getRemindBeforeMinutes(), user.isRemindConfirm()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
         );
     }
@@ -69,7 +70,7 @@ public class AccountBackupService {
         return new BackupShift(
                 shift.getId(), shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 money(shift.getBasePay()), money(shift.getTips()), decimal(shift.getMiles()), shift.getCreatedAt(), shift.getUpdatedAt(),
-                shift.getDeletedAt()
+                shift.getDeletedAt(), shift.getStatus().name(), shift.getStatusChangedAt()
         );
     }
 

@@ -1,10 +1,12 @@
 package com.angel.flexbuddy.repository;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDate;
 
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -24,6 +26,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             where lower(s.owner.email) = lower(:email)
               and s.date >= :fromDate
               and s.date <= :toDate
+              and s.status in :statuses
               and (:station = '' or lower(s.station) = lower(:station))
               and (:query = '' or lower(s.station) like lower(concat('%', :query, '%')))
             order by s.date desc, s.startTime desc
@@ -33,8 +36,30 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             @Param("fromDate") LocalDate from,
             @Param("toDate") LocalDate to,
             @Param("station") String station,
-            @Param("query") String query
+            @Param("query") String query,
+            @Param("statuses") Collection<ShiftStatus> statuses
     );
+
+    List<Shift> findByOwnerEmailIgnoreCaseAndStatusAndDateBetweenOrderByDateAscStartTimeAsc(
+            String email, ShiftStatus status, LocalDate from, LocalDate to);
+
+    @Query("""
+            select s from Shift s join fetch s.owner o
+            where s.status = com.angel.flexbuddy.model.ShiftStatus.SCHEDULED
+              and s.date between :fromDate and :toDate
+              and o.remindBeforeMinutes is not null
+              and exists (select p.id from PushSubscription p where p.owner = o)
+            """)
+    List<Shift> findScheduledWithLeadTime(@Param("fromDate") LocalDate from, @Param("toDate") LocalDate to);
+
+    @Query("""
+            select s from Shift s join fetch s.owner o
+            where s.status = com.angel.flexbuddy.model.ShiftStatus.SCHEDULED
+              and s.date between :fromDate and :toDate
+              and o.remindConfirm = true
+              and exists (select p.id from PushSubscription p where p.owner = o)
+            """)
+    List<Shift> findScheduledWithConfirmNudges(@Param("fromDate") LocalDate from, @Param("toDate") LocalDate to);
 
     @Query("""
             select distinct s.station from Shift s

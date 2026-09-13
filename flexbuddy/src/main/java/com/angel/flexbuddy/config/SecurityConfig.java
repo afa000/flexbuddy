@@ -43,6 +43,11 @@ public class SecurityConfig {
                                 "/error",
                                 "/css/**",
                                 "/js/**",
+                                "/icons/**",
+                                "/manifest.webmanifest",
+                                "/sw.js",
+                                "/offline.html",
+                                "/calendar/*.ics",
                                 "/actuator/health"
                         ).permitAll()
                         .anyRequest().authenticated()

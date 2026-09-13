@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -26,6 +27,7 @@ import java.time.LocalTime;
 import java.time.Clock;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,6 +46,10 @@ import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
+import com.angel.flexbuddy.dto.ShiftResponse;
+import com.angel.flexbuddy.dto.ShiftStatusRequest;
+import com.angel.flexbuddy.exception.InvalidShiftException;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.exception.GlobalExceptionHandler;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
@@ -124,7 +130,8 @@ class ShiftControllerTest {
                 filter.from().equals(LocalDate.of(2026, 9, 1))
                         && filter.to().equals(LocalDate.of(2026, 9, 30))
                         && filter.station().equals("VEA7")
-                        && filter.query().equals("north")));
+                        && filter.query().equals("north")
+                        && filter.statuses().equals(ShiftStatus.EARNINGS)));
     }
 
     @Test
@@ -325,7 +332,7 @@ class ShiftControllerTest {
                 ))
         );
 
-        when(shiftImportService.createPreview(any())).thenReturn(response);
+        when(shiftImportService.createPreview(any(), any())).thenReturn(response);
 
         mockMvc.perform(multipart("/shifts/import-preview")
                         .file(screenshot)
@@ -357,7 +364,7 @@ class ShiftControllerTest {
                 "not an image".getBytes()
         );
 
-        when(shiftImportService.createPreview(any()))
+        when(shiftImportService.createPreview(any(), any()))
                 .thenThrow(new InvalidScreenshotException("Unsupported screenshot type."));
 
         mockMvc.perform(multipart("/shifts/import-preview")
@@ -366,5 +373,61 @@ class ShiftControllerTest {
                         .with(csrf()))
                 .andExpect(status().isBadRequest())
                 .andExpect(content().string("Unsupported screenshot type."));
+    }
+
+    @Test
+    void changeStatus_sendsTheNewStatusAndPayToTheService() throws Exception {
+        ShiftResponse cancelled = new ShiftResponse();
+        cancelled.setId(5L);
+        cancelled.setStatus(ShiftStatus.CANCELLED);
+        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class))).thenReturn(cancelled);
+
+        mockMvc.perform(patch("/shifts/{id}/status", 5L)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\",\"basePay\":18.00}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELLED"));
+
+        verify(shiftService).changeStatus(eq("angel@example.com"), eq(5L), org.mockito.ArgumentMatchers.argThat(request ->
+                request.status() == ShiftStatus.CANCELLED && request.basePay().compareTo(new BigDecimal("18.00")) == 0));
+    }
+
+    @Test
+    void changeStatus_returnsTheRuleThatWasBroken() throws Exception {
+        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class)))
+                .thenThrow(new InvalidShiftException("A completed shift cannot be moved back to scheduled. Delete it and add the block again."));
+
+        mockMvc.perform(patch("/shifts/{id}/status", 5L)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SCHEDULED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("A completed shift cannot be moved back to scheduled. Delete it and add the block again."));
+    }
+
+    @Test
+    void changeStatus_requiresAStatus() throws Exception {
+        mockMvc.perform(patch("/shifts/{id}/status", 5L)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
+    void getShifts_acceptsACommaSeparatedStatusList() throws Exception {
+        when(shiftService.getShifts(eq("angel@example.com"), any(ShiftFilter.class))).thenReturn(List.of());
+
+        mockMvc.perform(get("/shifts").with(user("angel@example.com")).param("status", "scheduled,completed"))
+                .andExpect(status().isOk());
+
+        verify(shiftService).getShifts(eq("angel@example.com"), org.mockito.ArgumentMatchers.argThat(filter ->
+                filter.statuses().equals(Set.of(ShiftStatus.SCHEDULED, ShiftStatus.COMPLETED))));
     }
 }

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -29,7 +30,9 @@ import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftResponse;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
+import com.angel.flexbuddy.dto.ShiftStatusRequest;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.service.ShiftService;
@@ -68,8 +71,10 @@ public class ShiftController {
             @RequestParam(required = false) String station,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(required = false) String sort,
-            @RequestParam(name = "dir", required = false) String direction) {
-        return shiftService.getShifts(principal.getName(), ShiftFilter.of(from, to, station, query, sort, direction));
+            @RequestParam(name = "dir", required = false) String direction,
+            @RequestParam(required = false) String status) {
+        return shiftService.getShifts(principal.getName(),
+                ShiftFilter.of(from, to, station, query, sort, direction, status));
     }
 
     @GetMapping("/statistics")
@@ -77,8 +82,9 @@ public class ShiftController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String station,
-            @RequestParam(name = "q", required = false) String query) {
-        return reportService.statistics(principal.getName(), ShiftFilter.report(from, to, station, query));
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(required = false) String status) {
+        return reportService.statistics(principal.getName(), ShiftFilter.report(from, to, station, query, status));
     }
 
     @GetMapping("/stations")
@@ -97,8 +103,10 @@ public class ShiftController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
             @RequestParam(required = false) String station,
-            @RequestParam(name = "q", required = false) String query) {
-        return reportService.earnings(principal.getName(), ShiftFilter.report(from, to, station, query), GroupBy.parse(groupBy));
+            @RequestParam(name = "q", required = false) String query,
+            @RequestParam(required = false) String status) {
+        return reportService.earnings(principal.getName(), ShiftFilter.report(from, to, station, query, status),
+                GroupBy.parse(groupBy));
     }
 
     @PostMapping
@@ -107,14 +115,21 @@ public class ShiftController {
     }
 
     @PostMapping(value = "/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ShiftImportPreviewResponse importPreview(@RequestParam("screenshot") MultipartFile screenshot) {
-        return shiftImportService.createPreview(screenshot);
+    public ShiftImportPreviewResponse importPreview(Principal principal,
+            @RequestParam("screenshot") MultipartFile screenshot) {
+        return shiftImportService.createPreview(principal.getName(), screenshot);
     }
 
     @PutMapping("/{id}")
     public ShiftResponse updateShift(Principal principal, @PathVariable Long id,
             @Valid @RequestBody UpdateShiftRequest request) {
         return shiftService.updateShift(principal.getName(), id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ShiftResponse changeStatus(Principal principal, @PathVariable Long id,
+            @Valid @RequestBody ShiftStatusRequest request) {
+        return shiftService.changeStatus(principal.getName(), id, request);
     }
 
     @DeleteMapping("/{id}")
@@ -156,8 +171,10 @@ public class ShiftController {
             @RequestParam(required = false) String station,
             @RequestParam(name = "q", required = false) String query,
             @RequestParam(required = false) String sort,
-            @RequestParam(name = "dir", required = false) String direction) {
-        ShiftFilter filter = ShiftFilter.of(from, to, station, query, sort, direction);
+            @RequestParam(name = "dir", required = false) String direction,
+            @RequestParam(required = false) String status) {
+        ShiftFilter filter = ShiftFilter.of(from, to, station, query, sort, direction)
+                .withStatuses(ShiftStatus.parseSet(status, ShiftStatus.EARNINGS));
         List<ShiftResponse> shifts = shiftService.getShifts(principal.getName(), filter);
         StreamingResponseBody body = output -> csvWriter.write(shifts, output);
         return ResponseEntity.ok()

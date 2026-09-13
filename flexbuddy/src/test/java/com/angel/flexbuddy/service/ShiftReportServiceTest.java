@@ -4,7 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.Set;
 import java.time.LocalTime;
 import java.util.List;
 
@@ -20,22 +26,28 @@ import com.angel.flexbuddy.dto.EarningsReportResponse;
 import com.angel.flexbuddy.dto.GroupBy;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
+import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
+import com.angel.flexbuddy.repository.AppUserRepository;
 
 @ExtendWith(MockitoExtension.class)
 class ShiftReportServiceTest {
 
     private static final String EMAIL = "angel@example.com";
     private static final ShiftFilter ALL = ShiftFilter.report(null, null, null, null);
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 9, 12, 12, 0);
 
     @Mock ShiftService shiftService;
     @Mock ExpenseService expenseService;
     @Mock AccountSettingsService settingsService;
+    @Mock UserTimeService userTime;
     @Spy NetEarningsCalculator calculator = new NetEarningsCalculator();
     @InjectMocks ShiftReportService reportService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(userTime.now(EMAIL)).thenReturn(NOW);
         org.mockito.Mockito.lenient().when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
         org.mockito.Mockito.lenient().when(settingsService.get(EMAIL)).thenReturn(
@@ -74,7 +86,7 @@ class ShiftReportServiceTest {
 
     @Test
     void statistics_calculatesHoursForTodayAndPreviousSixDaysIndependentlyOfDashboardFilters() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = NOW.toLocalDate();
         ShiftFilter dashboardFilter = ShiftFilter.report(null, null, "VEA7", null);
         ShiftFilter rollingWindow = ShiftFilter.report(today.minusDays(6), today, null, null);
         when(shiftService.findFiltered(EMAIL, dashboardFilter)).thenReturn(List.of());
@@ -156,5 +168,68 @@ class ShiftReportServiceTest {
         LocalTime end = start.plusMinutes(minutes);
         return new Shift(1L, station, date, start, end, new BigDecimal(base),
                 tips == null ? null : new BigDecimal(tips));
+    }
+
+    @Test
+    void statistics_leaveScheduledBlocksOutAndCountCancellationPayWithoutHours() {
+        Shift completed = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "20.00", 240);
+        Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 9, 7), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
+        Shift scheduled = withStatus(shift("VEA7", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(completed, cancelled, scheduled));
+
+        ShiftStatisticsResponse result = reportService.statistics(EMAIL, ALL);
+
+        assertThat(result.getTotalEarnings()).isEqualByComparingTo("138.00");
+        assertThat(result.getTotalBasePay()).isEqualByComparingTo("118.00");
+        assertThat(result.getTotalTips()).isEqualByComparingTo("20.00");
+        assertThat(result.getTotalTimeWorked()).isEqualTo(240);
+        assertThat(result.getAverageShiftMinutes()).isEqualTo(240);
+    }
+
+    @Test
+    void statistics_countCancellationsAndForfeitsInTheRangeAndThisMonth() {
+        Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 8, 7), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
+        Shift forfeited = withStatus(shift("VEA7", LocalDate.of(2026, 8, 9), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
+        Shift forfeitedThisMonth = withStatus(shift("VEA7", LocalDate.of(2026, 9, 9), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
+        org.mockito.Mockito.lenient().when(shiftService.findFiltered(EMAIL, ALL.withStatuses(Set.of(ShiftStatus.CANCELLED, ShiftStatus.FORFEITED))))
+                .thenReturn(List.of(cancelled, forfeited, forfeitedThisMonth));
+        org.mockito.Mockito.lenient().when(shiftService.findFiltered(EMAIL, ShiftFilter.report(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), null, null)
+                .withStatuses(Set.of(ShiftStatus.FORFEITED)))).thenReturn(List.of(forfeitedThisMonth));
+
+        ShiftStatisticsResponse result = reportService.statistics(EMAIL, ALL);
+
+        assertThat(result.getCancelledShifts()).isEqualTo(1);
+        assertThat(result.getForfeitedShifts()).isEqualTo(2);
+        assertThat(result.getForfeitedThisMonth()).isEqualTo(1);
+    }
+
+    @Test
+    void statistics_planTheNextSevenDaysInTheDriversTimeZone() {
+        // 03:00 UTC on Sep 12 is still 20:00 on Sep 11 in Los Angeles.
+        AppUserRepository users = org.mockito.Mockito.mock(AppUserRepository.class);
+        AppUser driver = new AppUser("Angel", EMAIL, "hash");
+        driver.setTimeZone("America/Los_Angeles");
+        when(users.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(driver));
+        ShiftReportService service = new ShiftReportService(shiftService, expenseService, settingsService, calculator,
+                new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)));
+        Shift missed = withStatus(shift("VEA7", LocalDate.of(2026, 9, 11), "70.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        Shift tonight = withStatus(new Shift(2L, "VEA7", LocalDate.of(2026, 9, 11), LocalTime.of(21, 0),
+                LocalTime.of(0, 0), new BigDecimal("60.00"), BigDecimal.ZERO), ShiftStatus.SCHEDULED);
+        Shift nextWeek = withStatus(shift("VEA7", LocalDate.of(2026, 9, 17), "80.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findScheduled(EMAIL, LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 17)))
+                .thenReturn(List.of(missed, tonight, nextWeek));
+        when(shiftService.findScheduled(EMAIL, null, LocalDate.of(2026, 9, 11))).thenReturn(List.of(missed, tonight));
+
+        ShiftStatisticsResponse result = service.statistics(EMAIL, ALL);
+
+        assertThat(result.getScheduledShifts()).isEqualTo(2);
+        assertThat(result.getScheduledMinutes()).isEqualTo(420);
+        assertThat(result.getExpectedPay()).isEqualByComparingTo("140.00");
+        assertThat(result.getNeedsConfirmation()).isEqualTo(1);
+    }
+
+    private Shift withStatus(Shift shift, ShiftStatus status) {
+        shift.setStatus(status);
+        return shift;
     }
 }

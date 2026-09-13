@@ -113,7 +113,29 @@ const elements = {
     expenseRoad: document.querySelector('#expenseRoad'), exportExpensesButton: document.querySelector('#exportExpensesButton'),
     expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
     expenseTrashSection: document.querySelector('#expenseTrashSection'), expenseTrashList: document.querySelector('#expenseTrashList'),
-    expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton')
+    expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton'),
+    scheduleNavButton: document.querySelector('#scheduleNavButton'),
+    scheduleScreen: document.querySelector('#scheduleScreen'),
+    nextShiftLink: document.querySelector('#nextShiftLink'),
+    plannedWeek: document.querySelector('#plannedWeek'),
+    plannedWeekDetail: document.querySelector('#plannedWeekDetail'),
+    forfeitsMonth: document.querySelector('#forfeitsMonth'),
+    forfeitsDetail: document.querySelector('#forfeitsDetail'),
+    importStatus: document.querySelector('#importStatus'),
+    scheduleMatchNotice: document.querySelector('#scheduleMatchNotice'),
+    scheduleMatchMessage: document.querySelector('#scheduleMatchMessage'),
+    completeScheduledButton: document.querySelector('#completeScheduledButton'),
+    editDialogTitle: document.querySelector('#editDialogTitle'),
+    editDialogDescription: document.querySelector('#editDialogDescription'),
+    editStatus: document.querySelector('#editStatus'),
+    editStatusHint: document.querySelector('#editStatusHint'),
+    editBasePayLabel: document.querySelector('#editBasePayLabel'),
+    linkedExpensesSection: document.querySelector('#linkedExpensesSection'),
+    logoutForm: document.querySelector('#logoutForm'),
+    installBanner: document.querySelector('#installBanner'),
+    installBannerText: document.querySelector('#installBannerText'),
+    installBannerButton: document.querySelector('#installBannerButton'),
+    dismissInstallBanner: document.querySelector('#dismissInstallBanner')
 };
 
 let selectedFileUrl;
@@ -128,6 +150,10 @@ let reportAbort;
 let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
 let editingExpenseId;
+let editMode = 'edit';
+let editOriginalStatus;
+let importCandidate;
+let importWarnings = [];
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 const previewFields = {
@@ -140,7 +166,18 @@ const previewFields = {
 };
 
 async function apiFetch(url, options = {}) {
-    const response = await window.fetch(url, options);
+    let response;
+    try {
+        response = await window.fetch(url, options);
+    } catch (error) {
+        // Being offline is not an expired session, so a failed request never bounces to the login page.
+        if (error?.name !== 'AbortError' && !navigator.onLine) {
+            window.flexbuddyPwa?.noteNetworkFailure();
+            throw new Error('You are offline. Try again when your connection returns.');
+        }
+        throw error;
+    }
+    window.flexbuddyPwa?.noteResponse(response);
     const responsePath = new URL(response.url, window.location.origin).pathname;
     if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
         window.location.assign('/login?expired');
@@ -156,6 +193,15 @@ Object.values(previewFields).forEach(input => input.addEventListener('focus', ()
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
 elements.importNavButton.addEventListener('click', showImportScreen);
+elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
+elements.nextShiftLink.addEventListener('click', event => {
+    event.preventDefault();
+    showScheduleScreen();
+});
+elements.importStatus.addEventListener('change', applyImportStatusRules);
+elements.completeScheduledButton.addEventListener('click', completeScheduledShift);
+elements.editStatus.addEventListener('change', () => applyEditStatusRules(true));
+elements.logoutForm.addEventListener('submit', signOut);
 elements.expensesNavButton.addEventListener('click', showExpensesScreen);
 elements.dashboardButton.addEventListener('click', () => showDashboard());
 elements.dashboardNavButton.addEventListener('click', () => showDashboard());
@@ -275,6 +321,7 @@ function toggleTheme() {
     document.documentElement.dataset.theme = nextTheme;
     localStorage.setItem('flexbuddy-theme', nextTheme);
     updateThemeToggle(nextTheme);
+    window.flexbuddyPwa?.applyThemeColor(nextTheme);
 }
 
 function updateThemeToggle(theme) {
@@ -283,39 +330,40 @@ function updateThemeToggle(theme) {
     elements.themeToggleButton.title = label;
 }
 
-function showDashboard(smooth = true) {
-    elements.dashboardScreens.forEach(section => section.classList.remove('is-hidden'));
-    elements.importScreen.classList.add('is-hidden');
-    elements.expensesScreen.classList.add('is-hidden');
-    setActiveNavigation('dashboard');
+function showScreen(name, smooth = true) {
+    elements.dashboardScreens.forEach(section => section.classList.toggle('is-hidden', name !== 'dashboard'));
+    elements.scheduleScreen.classList.toggle('is-hidden', name !== 'schedule');
+    elements.importScreen.classList.toggle('is-hidden', name !== 'import');
+    elements.expensesScreen.classList.toggle('is-hidden', name !== 'expenses');
+    setActiveNavigation(name);
     window.scrollTo({top: 0, behavior: smooth ? 'smooth' : 'auto'});
 }
 
-function showImportScreen() {
-    elements.dashboardScreens.forEach(section => section.classList.add('is-hidden'));
-    elements.importScreen.classList.remove('is-hidden');
-    elements.expensesScreen.classList.add('is-hidden');
-    setActiveNavigation('import');
-    window.scrollTo({top: 0, behavior: 'smooth'});
+function showDashboard(smooth = true) {
+    showScreen('dashboard', smooth);
 }
 
-function showExpensesScreen() {
-    elements.dashboardScreens.forEach(section => section.classList.add('is-hidden'));
-    elements.importScreen.classList.add('is-hidden');
-    elements.expensesScreen.classList.remove('is-hidden');
-    setActiveNavigation('expenses');
+function showScheduleScreen(smooth = true) {
+    showScreen('schedule', smooth);
+    window.flexbuddySchedule.show();
+}
+
+function showImportScreen(smooth = true) {
+    showScreen('import', smooth);
+}
+
+function showExpensesScreen(smooth = true) {
+    showScreen('expenses', smooth);
     if (!elements.expenseDate.value) elements.expenseDate.value = toIsoDate(new Date());
     loadExpenses();
-    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function setActiveNavigation(activeItem) {
-    elements.dashboardNavButton.classList.toggle('is-active', activeItem === 'dashboard');
-    elements.importNavButton.classList.toggle('is-active', activeItem === 'import');
-    elements.expensesNavButton.classList.toggle('is-active', activeItem === 'expenses');
-    setCurrentPage(elements.dashboardNavButton, activeItem === 'dashboard');
-    setCurrentPage(elements.importNavButton, activeItem === 'import');
-    setCurrentPage(elements.expensesNavButton, activeItem === 'expenses');
+    [['dashboard', elements.dashboardNavButton], ['schedule', elements.scheduleNavButton],
+        ['import', elements.importNavButton], ['expenses', elements.expensesNavButton]].forEach(([name, button]) => {
+        button.classList.toggle('is-active', activeItem === name);
+        setCurrentPage(button, activeItem === name);
+    });
 }
 
 function setCurrentPage(button, current) {
@@ -384,13 +432,13 @@ function populatePreview(preview) {
     setPreviewField('endTime', candidate.endTime, trimTime);
     setPreviewField('basePay', candidate.basePay);
     setPreviewField('tips', candidate.tips, value => value ?? 0);
+    importCandidate = candidate;
+    elements.importStatus.value = candidate.suggestedStatus === 'SCHEDULED' ? 'SCHEDULED' : 'COMPLETED';
     renderRawText(preview.lines, preview.rawText);
     renderReadQuality(preview.meanConfidence);
 
-    const warnings = candidate.warnings ?? [];
-    renderWarnings(warnings);
-
-    elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
+    importWarnings = candidate.warnings ?? [];
+    applyImportStatusRules();
     elements.ocrDetails.classList.remove('is-hidden');
     elements.emptyPreview.classList.add('is-hidden');
     elements.previewForm.classList.remove('is-hidden');
@@ -398,6 +446,64 @@ function populatePreview(preview) {
     const missingField = Object.entries(previewFields)
             .find(([name]) => candidate[name]?.level === 'MISSING');
     if (missingField) missingField[1].focus();
+}
+
+function applyImportStatusRules() {
+    const scheduled = elements.importStatus.value === 'SCHEDULED';
+    elements.tips.disabled = scheduled;
+    elements.miles.disabled = scheduled;
+    if (scheduled) {
+        elements.tips.value = 0;
+        elements.miles.value = '';
+    }
+    elements.saveButton.querySelector('span').textContent = scheduled ? 'Add scheduled shift' : 'Add shift';
+    // A future date is expected for a scheduled block and suspicious for a completed one.
+    const warnings = importWarnings.map(warning => warning.code !== 'FUTURE_DATE' ? warning : {
+        ...warning,
+        severity: scheduled ? 'INFO' : 'WARNING',
+        message: scheduled ? 'This scheduled block is more than two weeks away.' : 'This date is more than two weeks in the future.'
+    });
+    renderWarnings(warnings);
+    elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
+    renderScheduleMatch();
+}
+
+function renderScheduleMatch() {
+    const match = elements.importStatus.value === 'COMPLETED'
+        ? importCandidate?.duplicates?.find(duplicate => duplicate.kind === 'SCHEDULED_MATCH')
+        : undefined;
+    elements.scheduleMatchNotice.classList.toggle('is-hidden', !match);
+    elements.scheduleMatchNotice.dataset.shiftId = match ? match.shiftId : '';
+    elements.scheduleMatchMessage.textContent = match ? match.message : '';
+}
+
+async function completeScheduledShift() {
+    hideMessage(elements.saveError);
+    const shiftId = elements.scheduleMatchNotice.dataset.shiftId;
+    if (!shiftId || !elements.previewForm.reportValidity()) return;
+    elements.completeScheduledButton.disabled = true;
+    try {
+        const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}/status`, {
+            method: 'PATCH',
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({
+                status: 'COMPLETED',
+                basePay: Number(elements.basePay.value),
+                tips: Number(elements.tips.value),
+                miles: elements.miles.value === '' ? null : Number(elements.miles.value)
+            })
+        });
+        if (!response.ok) throw new Error(await response.text() || 'The scheduled shift could not be completed.');
+        resetImport();
+        showToast('Scheduled shift completed', 'Your earnings and hours now include this block.');
+        await loadStations();
+        await loadDashboard();
+        showDashboard();
+    } catch (error) {
+        showMessage(elements.saveError, error.message || 'The scheduled shift could not be completed.');
+    } finally {
+        elements.completeScheduledButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
+    }
 }
 
 function setPreviewField(name, parsedField, transform = value => value ?? '') {
@@ -486,7 +592,8 @@ async function saveShift(event) {
         endTime: elements.endTime.value,
         basePay: Number(elements.basePay.value),
         tips: Number(elements.tips.value),
-        miles: elements.miles.value === '' ? null : Number(elements.miles.value)
+        miles: elements.miles.value === '' ? null : Number(elements.miles.value),
+        status: elements.importStatus.value
     };
 
     setSaving(true);
@@ -503,11 +610,14 @@ async function saveShift(event) {
             throw new Error(message || 'The shift could not be saved. Check each field and try again.');
         }
 
+        const scheduled = shift.status === 'SCHEDULED';
         resetImport();
-        showToast('Shift added', 'Your earnings history is up to date.');
+        showToast(scheduled ? 'Shift scheduled' : 'Shift added',
+            scheduled ? 'It is on your schedule and calendar feed.' : 'Your earnings history is up to date.');
         await loadStations();
         await loadDashboard();
-        showDashboard();
+        if (scheduled) showScheduleScreen();
+        else showDashboard();
     } catch (error) {
         showMessage(elements.saveError, error.message || 'The shift could not be saved.');
     } finally {
@@ -527,6 +637,7 @@ async function loadDashboard() {
         loadShifts(query, signal),
         loadEarningsReport(buildQuery(false))
     ]);
+    window.flexbuddySchedule?.refresh();
 }
 
 async function loadStatistics(query, signal) {
@@ -553,12 +664,20 @@ async function loadStatistics(query, signal) {
         elements.expenseTotal.textContent = `${formatMoney(statistics.totalExpenses)} cash expenses`;
         elements.totalMiles.textContent = `${Number(statistics.totalMiles || 0).toFixed(1)} mi`;
         elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
+        const planned = statistics.scheduledShifts ?? 0;
+        elements.plannedWeek.textContent = formatMinutes(statistics.scheduledMinutes);
+        elements.plannedWeekDetail.textContent = `${formatMoney(statistics.expectedPay)} expected · ${planned} ${planned === 1 ? 'block' : 'blocks'}`;
+        elements.forfeitsMonth.textContent = statistics.forfeitedThisMonth ?? 0;
+        elements.forfeitsDetail.textContent = statistics.needsConfirmation
+            ? `${statistics.needsConfirmation} ${statistics.needsConfirmation === 1 ? 'block' : 'blocks'} to confirm`
+            : `${statistics.cancelledShifts ?? 0} cancelled in this view`;
     } catch (error) {
         if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.rollingSevenDayTime, elements.averagePay,
             elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
             elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
-            elements.expenseTotal, elements.totalMiles, elements.mileageCost].forEach(element => element.textContent = '—');
+            elements.expenseTotal, elements.totalMiles, elements.mileageCost, elements.plannedWeek,
+            elements.plannedWeekDetail, elements.forfeitsMonth, elements.forfeitsDetail].forEach(element => element.textContent = '—');
         elements.baseShareBar.style.width = '0%';
         elements.tipsShareBar.style.width = '0%';
     }
@@ -631,15 +750,20 @@ function renderShifts(shifts) {
         const month = date.toLocaleDateString(undefined, {month: 'short'});
         const day = date.getDate();
         const weekday = date.toLocaleDateString(undefined, {weekday: 'short'});
-        const total = shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
+        const total = shift.earnedPay ?? shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
+        const worked = !shift.status || shift.status === 'COMPLETED';
+        const statusBadge = worked ? ''
+            : `<small class="status-badge status-${shift.status.toLowerCase()}">${shift.status === 'CANCELLED' ? 'Cancelled' : 'Forfeited'}</small>`;
+        const workSummary = worked ? `${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross`
+            : shift.status === 'CANCELLED' ? 'Cancellation pay · no hours' : 'Not worked · no pay';
         const edited = shift.createdAt && shift.updatedAt
                 && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
 
         row.innerHTML = `
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
-            <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}</strong><span>${escapeHtml(weekday)} shift</span></div>
+            <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}${statusBadge}</strong><span>${escapeHtml(weekday)} shift</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span></div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span></div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -653,8 +777,10 @@ function renderShifts(shifts) {
     elements.showMoreButton.classList.toggle('is-hidden', visibleShiftCount >= shifts.length);
 }
 
-function openEditModal(shift, trigger) {
-    editingShiftId = shift.id;
+function openEditModal(shift, trigger, options = {}) {
+    editMode = shift.id == null ? 'new' : 'edit';
+    editingShiftId = shift.id ?? undefined;
+    editOriginalStatus = shift.status || 'COMPLETED';
     lastFocusedElement = trigger;
     editSnapshot = {...shift};
     elements.editStation.value = shift.station ?? '';
@@ -664,14 +790,64 @@ function openEditModal(shift, trigger) {
     elements.editBasePay.value = shift.basePay ?? '';
     elements.editTips.value = shift.tips ?? 0;
     elements.editMiles.value = shift.miles ?? '';
-    loadLinkedExpenses(shift.id);
-    elements.editTimestamps.textContent = timestampSummary(shift);
-    elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
+    elements.editStatus.value = options.status || editOriginalStatus;
+    // A block that already happened cannot go back to scheduled; delete it and add it again instead.
+    [...elements.editStatus.options].forEach(option => {
+        option.disabled = option.value === 'SCHEDULED' && editMode === 'edit' && editOriginalStatus !== 'SCHEDULED';
+    });
+    const isNew = editMode === 'new';
+    elements.editDialogTitle.textContent = isNew ? 'Add scheduled shift' : 'Edit shift';
+    elements.editDialogDescription.textContent = isNew
+        ? 'Enter a block you accepted. It will not count toward earnings or hours until you confirm it.'
+        : 'Update the values and save your changes.';
+    elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
+    elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
+    elements.editTimestamps.classList.toggle('is-hidden', isNew);
+    if (!isNew) {
+        loadLinkedExpenses(shift.id);
+        elements.editTimestamps.textContent = timestampSummary(shift);
+        elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
+    }
+    applyEditStatusRules(Boolean(options.status) && options.status !== editOriginalStatus);
     hideDeleteConfirmation();
     hideMessage(elements.editError);
     elements.editModal.classList.remove('is-hidden');
     document.body.classList.add('modal-open');
-    elements.editStation.focus();
+    if (options.focusPay) {
+        elements.editBasePay.focus();
+        elements.editBasePay.select();
+    } else {
+        elements.editStation.focus();
+    }
+}
+
+function applyEditStatusRules(statusChanged = false) {
+    const status = elements.editStatus.value;
+    const hints = {
+        SCHEDULED: 'Offered pay only. It does not count toward earnings or hours until you confirm it.',
+        COMPLETED: 'Worked and paid. Counts toward earnings, hours, and miles.',
+        CANCELLED: 'Amazon cancelled the block. Enter cancellation pay if you received any; miles still count.',
+        FORFEITED: 'You dropped or missed the block. It earns nothing; miles still count.'
+    };
+    elements.editStatusHint.textContent = hints[status];
+    elements.editBasePayLabel.textContent = status === 'SCHEDULED' ? 'Offered pay'
+        : status === 'CANCELLED' ? 'Cancellation pay' : 'Base pay';
+    elements.editBasePay.min = status === 'COMPLETED' || status === 'SCHEDULED' ? '0.01' : '0';
+    const tipsAllowed = status === 'COMPLETED';
+    elements.editTips.disabled = !tipsAllowed;
+    if (!tipsAllowed) elements.editTips.value = 0;
+    elements.editMiles.disabled = status === 'SCHEDULED';
+    if (status === 'SCHEDULED') elements.editMiles.value = '';
+    // The offered amount is never earned by a cancelled or forfeited block unless the driver enters it.
+    if (statusChanged && (status === 'CANCELLED' || status === 'FORFEITED')) elements.editBasePay.value = 0;
+    elements.saveEditButton.querySelector('span').textContent = saveEditLabel();
+}
+
+function saveEditLabel() {
+    if (editMode === 'new') return 'Add scheduled shift';
+    const status = elements.editStatus.value;
+    if (status === editOriginalStatus) return 'Save changes';
+    return {COMPLETED: 'Mark completed', CANCELLED: 'Mark cancelled', FORFEITED: 'Mark forfeited'}[status] || 'Save changes';
 }
 
 function closeEditModal() {
@@ -681,6 +857,10 @@ function closeEditModal() {
     hideMessage(elements.editError);
     editingShiftId = undefined;
     editSnapshot = undefined;
+    editMode = 'edit';
+    editOriginalStatus = undefined;
+    elements.editTips.disabled = false;
+    elements.editMiles.disabled = false;
 
     if (lastFocusedElement?.isConnected) lastFocusedElement.focus();
     lastFocusedElement = undefined;
@@ -690,9 +870,11 @@ async function saveEditedShift(event) {
     event.preventDefault();
     hideMessage(elements.editError);
 
-    if (!elements.editForm.reportValidity() || editingShiftId === undefined) return;
+    if (!elements.editForm.reportValidity() || (editMode === 'edit' && editingShiftId === undefined)) return;
 
     const shiftId = editingShiftId;
+    const creating = editMode === 'new';
+    const statusChanged = !creating && elements.editStatus.value !== editOriginalStatus;
     const shift = {
         station: elements.editStation.value.trim(),
         date: elements.editDate.value,
@@ -700,14 +882,15 @@ async function saveEditedShift(event) {
         endTime: elements.editEndTime.value,
         basePay: Number(elements.editBasePay.value),
         tips: Number(elements.editTips.value),
-        miles: elements.editMiles.value === '' ? null : Number(elements.editMiles.value)
+        miles: elements.editMiles.value === '' ? null : Number(elements.editMiles.value),
+        status: elements.editStatus.value
     };
 
     setEditSaving(true);
 
     try {
-        const response = await apiFetch(`/shifts/${shiftId}`, {
-            method: 'PUT',
+        const response = await apiFetch(creating ? '/shifts' : `/shifts/${shiftId}`, {
+            method: creating ? 'POST' : 'PUT',
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
@@ -719,11 +902,17 @@ async function saveEditedShift(event) {
 
         const previous = editSnapshot;
         closeEditModal();
-        showToast('Shift updated', 'Your changes have been saved.', {
-            actionLabel: 'Undo',
-            duration: 8000,
-            onAction: () => undoEdit(shiftId, previous)
-        });
+        if (creating) {
+            showToast('Shift scheduled', 'It is on your schedule and calendar feed.');
+        } else if (statusChanged) {
+            showToast('Shift updated', `Marked ${shift.status.toLowerCase()}. Earnings and hours are up to date.`);
+        } else {
+            showToast('Shift updated', 'Your changes have been saved.', {
+                actionLabel: 'Undo',
+                duration: 8000,
+                onAction: () => undoEdit(shiftId, previous)
+            });
+        }
         await loadStations();
         await loadDashboard();
     } catch (error) {
@@ -857,11 +1046,12 @@ async function emptyTrash() {
     await loadTrash();
 }
 
-function openConfirm(title, message, action) {
+function openConfirm(title, message, action, acceptLabel = 'Delete permanently') {
     pendingConfirmAction = action;
     lastFocusedElement = document.activeElement;
     elements.confirmTitle.textContent = title;
     elements.confirmMessage.textContent = message;
+    elements.acceptConfirmButton.textContent = acceptLabel;
     elements.confirmModal.classList.remove('is-hidden');
     document.body.classList.add('modal-open');
     elements.cancelConfirmButton.focus();
@@ -912,6 +1102,13 @@ function resetImport() {
     });
     hideMessage(elements.uploadError);
     hideMessage(elements.saveError);
+    importCandidate = undefined;
+    importWarnings = [];
+    elements.importStatus.value = 'COMPLETED';
+    elements.tips.disabled = false;
+    elements.miles.disabled = false;
+    elements.scheduleMatchNotice.classList.add('is-hidden');
+    setSaving(false);
 }
 
 function setProcessing(processing) {
@@ -921,12 +1118,13 @@ function setProcessing(processing) {
 
 function setSaving(saving) {
     elements.saveButton.disabled = saving;
-    elements.saveButton.querySelector('span').textContent = saving ? 'Adding shift…' : 'Add shift';
+    elements.saveButton.querySelector('span').textContent = saving ? 'Adding shift…'
+        : elements.importStatus.value === 'SCHEDULED' ? 'Add scheduled shift' : 'Add shift';
 }
 
 function setEditSaving(saving) {
     elements.saveEditButton.disabled = saving;
-    elements.saveEditButton.querySelector('span').textContent = saving ? 'Saving changes…' : 'Save changes';
+    elements.saveEditButton.querySelector('span').textContent = saving ? 'Saving…' : saveEditLabel();
 }
 
 function showMessage(element, message) {
@@ -1376,8 +1574,91 @@ async function loadLinkedExpenses(shiftId) {
     } catch { elements.linkedExpensesList.innerHTML = '<small>Linked expenses could not be loaded.</small>'; }
 }
 
+function openInitialScreen() {
+    const screen = new URLSearchParams(window.location.search).get('screen');
+    if (screen === 'schedule') showScheduleScreen(false);
+    else if (screen === 'import') showImportScreen(false);
+    else if (screen === 'expenses') showExpensesScreen(false);
+    else showDashboard(false);
+}
+
+async function signOut(event) {
+    event.preventDefault();
+    try {
+        // The next person to sign in on this device must never see this driver's cached data.
+        await window.flexbuddyPwa?.clearUserData();
+    } finally {
+        elements.logoutForm.submit();
+    }
+}
+
+/** Saves the browser's time zone when it differs, so "today", Upcoming, and reminders match the driver's clock. */
+async function reportTimeZone() {
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!zone || !navigator.onLine) return;
+    try {
+        if (sessionStorage.getItem('flexbuddy-zone-reported') === zone) return;
+    } catch {
+        // Storage can be unavailable; reporting again is harmless.
+    }
+    try {
+        const response = await apiFetch('/account/settings');
+        if (!response.ok) return;
+        const settings = await response.json();
+        if (settings.timeZone !== zone) {
+            const saved = await apiFetch('/account/time-zone', {
+                method: 'PUT',
+                headers: csrfHeaders({'Content-Type': 'application/json'}),
+                body: JSON.stringify({timeZone: zone})
+            });
+            if (!saved.ok) return;
+            showToast('Time zone updated', `Time zone set to ${zone}`);
+            await loadDashboard();
+        }
+        try {
+            sessionStorage.setItem('flexbuddy-zone-reported', zone);
+        } catch {
+            // Ignore unavailable storage.
+        }
+    } catch {
+        // Offline or signed out; try again on the next load.
+    }
+}
+
+function setupInstallBanner() {
+    let visits = 0;
+    let dismissed = false;
+    try {
+        visits = Number(localStorage.getItem('flexbuddy-visits') || 0) + 1;
+        localStorage.setItem('flexbuddy-visits', String(visits));
+        dismissed = localStorage.getItem('flexbuddy-install-dismissed') === 'true';
+    } catch {
+        return;
+    }
+    elements.installBannerButton.addEventListener('click', () => window.flexbuddyPwa.promptInstall());
+    elements.dismissInstallBanner.addEventListener('click', () => {
+        dismissed = true;
+        elements.installBanner.classList.remove('is-available');
+        try {
+            localStorage.setItem('flexbuddy-install-dismissed', 'true');
+        } catch {
+            // Ignore unavailable storage.
+        }
+    });
+    window.flexbuddyPwa?.onInstallChange(state => {
+        const available = visits >= 3 && !dismissed && (state === 'prompt' || state === 'ios');
+        elements.installBanner.classList.toggle('is-available', available);
+        elements.installBannerButton.classList.toggle('is-hidden', state !== 'prompt');
+        elements.installBannerText.textContent = state === 'ios'
+            ? 'In Safari, tap Share, then Add to Home Screen, to open FlexBuddy like an app.'
+            : 'Open it from your home screen like an app, with your last synced data available offline.';
+    });
+}
+
 updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
-showDashboard(false);
+openInitialScreen();
 loadStations();
 loadDashboard();
+reportTimeZone();
+setupInstallBanner();

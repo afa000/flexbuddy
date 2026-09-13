@@ -32,6 +32,8 @@ import com.angel.flexbuddy.service.AccountRestoreService;
 import com.angel.flexbuddy.service.AccountSettingsService;
 import com.angel.flexbuddy.dto.AccountSettingsRequest;
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
+import com.angel.flexbuddy.dto.ReminderSettingsRequest;
+import com.angel.flexbuddy.dto.TimeZoneRequest;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -114,6 +116,25 @@ public class AccountController {
     public AccountSettingsResponse updateSettings(Principal principal,
             @Valid @RequestBody AccountSettingsRequest request) {
         return settingsService.update(principal.getName(), request);
+    }
+
+    @PutMapping("/account/reminders")
+    @ResponseBody
+    public AccountSettingsResponse updateReminders(Principal principal,
+            @Valid @RequestBody ReminderSettingsRequest request) {
+        return settingsService.updateReminders(principal.getName(), request);
+    }
+
+    @PutMapping("/account/time-zone")
+    @ResponseBody
+    public AccountSettingsResponse updateTimeZone(Principal principal, @Valid @RequestBody TimeZoneRequest request) {
+        return settingsService.updateTimeZone(principal.getName(), request);
+    }
+
+    @PostMapping("/account/calendar-token")
+    @ResponseBody
+    public AccountSettingsResponse regenerateCalendarToken(Principal principal) {
+        return settingsService.regenerateCalendarToken(principal.getName());
     }
 
     @GetMapping("/account/backup")

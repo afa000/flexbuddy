@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.Clock;
@@ -17,12 +18,14 @@ import org.springframework.stereotype.Service;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftResponse;
-import com.angel.flexbuddy.dto.ShiftSort;
+import com.angel.flexbuddy.dto.ShiftStatusRequest;
 import com.angel.flexbuddy.dto.SortDirection;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
+import com.angel.flexbuddy.exception.InvalidShiftException;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
 import com.angel.flexbuddy.dto.NetEarningsResult;
@@ -58,13 +61,17 @@ public class ShiftService {
 
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ShiftResponse> getShifts(String email, ShiftFilter filter) {
-        List<Shift> shifts = findFiltered(email, filter);
+        return toResponses(email, findFiltered(email, filter)).stream().sorted(responseComparator(filter)).toList();
+    }
+
+    /** Maps shifts to responses in their original order, loading settings and linked expenses once. */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<ShiftResponse> toResponses(String email, List<Shift> shifts) {
         AccountSettingsResponse settings = settingsService.get(email);
         Map<Long, List<Expense>> expenses = expenseService.findForShifts(email, shifts).stream()
                 .collect(Collectors.groupingBy(expense -> expense.getShift().getId()));
-        List<ShiftResponse> responses = shifts.stream().map(shift -> toResponse(shift,
+        return shifts.stream().map(shift -> toResponse(shift,
                 expenses.getOrDefault(shift.getId(), List.of()), settings)).toList();
-        return responses.stream().sorted(responseComparator(filter)).toList();
     }
 
     public List<String> getStations(String email) {
@@ -82,8 +89,15 @@ public class ShiftService {
                 filter.from() == null ? EARLIEST_DATE : filter.from(),
                 filter.to() == null ? LATEST_DATE : filter.to(),
                 filter.station() == null ? "" : filter.station(),
-                filter.query() == null ? "" : filter.query()
+                filter.query() == null ? "" : filter.query(),
+                filter.statuses()
         );
+    }
+
+    /** Scheduled shifts dated between the bounds, oldest first. A null bound is open-ended. */
+    public List<Shift> findScheduled(String email, LocalDate from, LocalDate to) {
+        return shiftRepository.findByOwnerEmailIgnoreCaseAndStatusAndDateBetweenOrderByDateAscStartTimeAsc(
+                email, ShiftStatus.SCHEDULED, from == null ? EARLIEST_DATE : from, to == null ? LATEST_DATE : to);
     }
 
     public ShiftResponse createShift(String email, CreateShiftRequest request) {
@@ -91,8 +105,9 @@ public class ShiftService {
                 .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
 
         Shift shift = new Shift();
-        applyRequest(shift, request.getStation(), request.getDate(), request.getStartTime(), request.getEndTime(),
-                request.getBasePay(), request.getTips(), request.getMiles());
+        ShiftStatus status = request.getStatus() == null ? ShiftStatus.COMPLETED : request.getStatus();
+        applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
+                request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
         shift.setOwner(owner);
         return toResponse(shiftRepository.save(shift), List.of(), settingsService.get(email));
     }
@@ -100,8 +115,32 @@ public class ShiftService {
     public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
-        applyRequest(shift, request.getStation(), request.getDate(), request.getStartTime(), request.getEndTime(),
-                request.getBasePay(), request.getTips(), request.getMiles());
+        ShiftStatus status = request.getStatus() == null ? shift.getStatus() : request.getStatus();
+        applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
+                request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
+        Shift saved = shiftRepository.save(shift);
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
+    }
+
+    /**
+     * Moves a shift to another status, keeping its id and linked expenses. Pay fields that are not supplied fall
+     * back to what makes sense for the target: a completed block keeps its offered pay, while cancelled and
+     * forfeited blocks start at zero so the offer is never counted as earned.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public ShiftResponse changeStatus(String email, Long id, ShiftStatusRequest request) {
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+        ShiftStatus target = request.status();
+        boolean unchanged = target == shift.getStatus();
+        BigDecimal basePay = request.basePay() != null ? request.basePay()
+                : unchanged || target == ShiftStatus.COMPLETED ? shift.getBasePay() : BigDecimal.ZERO;
+        BigDecimal tips = request.tips() != null ? request.tips()
+                : target == ShiftStatus.COMPLETED ? shift.getTips() : BigDecimal.ZERO;
+        BigDecimal miles = request.miles() != null ? request.miles()
+                : target == ShiftStatus.SCHEDULED ? null : shift.getMiles();
+        applyRequest(shift, target, shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
+                basePay, tips, miles);
         Shift saved = shiftRepository.save(shift);
         return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
     }
@@ -146,8 +185,18 @@ public class ShiftService {
         return shiftRepository.emptyTrash(email);
     }
 
-    private void applyRequest(Shift shift, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
-            BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
+    private void applyRequest(Shift shift, ShiftStatus status, String station, LocalDate date, LocalTime startTime,
+            LocalTime endTime, BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
+        ShiftStatus current = shift.getStatus() == null ? ShiftStatus.COMPLETED : shift.getStatus();
+        boolean existing = shift.getId() != null;
+        if (existing && status == ShiftStatus.SCHEDULED && current != ShiftStatus.SCHEDULED) {
+            throw new InvalidShiftException("A " + current.label()
+                    + " shift cannot be moved back to scheduled. Delete it and add the block again.");
+        }
+        String problem = status.validate(basePay, tips, miles);
+        if (problem != null) throw new InvalidShiftException(problem);
+        if (existing && current != status) shift.setStatusChangedAt(Instant.now(clock));
+        shift.setStatus(status);
         shift.setStation(station.trim());
         shift.setDate(date);
         shift.setStartTime(startTime);
@@ -165,7 +214,8 @@ public class ShiftService {
                 shift.getBasePay(), shift.getTips(), shift.getTotalPay(), shift.getTimeWorked(), shift.getHourlyRate(),
                 shift.getMiles(), shift.getMileageCost(settings.mileageRate()), shift.getEarningsPerMile(),
                 net.cashSpent(), net.netEarnings(), net.netHourlyRate(),
-                shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt()
+                shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt(),
+                shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP)
         );
     }
 

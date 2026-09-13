@@ -3,10 +3,12 @@ package com.angel.flexbuddy.dto;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
+
+import com.angel.flexbuddy.model.ShiftStatus;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Digits;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
@@ -28,11 +30,12 @@ public class UpdateShiftRequest {
     @NotNull
     private LocalTime startTime;
 
-    @NotNull    
+    @NotNull
     private LocalTime endTime;
 
+    /** Zero is allowed because cancelled and forfeited blocks may pay nothing; ShiftStatus enforces the per-status rule. */
     @NotNull
-    @Positive
+    @PositiveOrZero
     private BigDecimal basePay;
 
     @NotNull
@@ -43,6 +46,9 @@ public class UpdateShiftRequest {
     @Digits(integer = 7, fraction = 1)
     private BigDecimal miles;
 
+    /** Optional; when absent the shift keeps its current status. */
+    private ShiftStatus status;
+
     public UpdateShiftRequest(String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips) {
         this(station, date, startTime, endTime, basePay, tips, null);
@@ -50,6 +56,11 @@ public class UpdateShiftRequest {
 
     public UpdateShiftRequest(String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
+        this(station, date, startTime, endTime, basePay, tips, miles, null);
+    }
+
+    public UpdateShiftRequest(String station, LocalDate date, LocalTime startTime, LocalTime endTime,
+            BigDecimal basePay, BigDecimal tips, BigDecimal miles, ShiftStatus status) {
         this.station = station;
         this.date = date;
         this.startTime = startTime;
@@ -57,5 +68,6 @@ public class UpdateShiftRequest {
         this.basePay = basePay;
         this.tips = tips;
         this.miles = miles;
+        this.status = status;
     }
 }

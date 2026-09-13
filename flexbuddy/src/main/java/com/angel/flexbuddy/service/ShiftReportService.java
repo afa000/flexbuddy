@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.IsoFields;
@@ -14,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +31,7 @@ import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 
 @Service
 public class ShiftReportService {
@@ -39,42 +41,69 @@ public class ShiftReportService {
     private final ExpenseService expenseService;
     private final AccountSettingsService settingsService;
     private final NetEarningsCalculator calculator;
+    private final UserTimeService userTime;
 
     public ShiftReportService(ShiftService shiftService, ExpenseService expenseService,
-            AccountSettingsService settingsService, NetEarningsCalculator calculator) {
+            AccountSettingsService settingsService, NetEarningsCalculator calculator, UserTimeService userTime) {
         this.shiftService = shiftService;
         this.expenseService = expenseService;
         this.settingsService = settingsService;
         this.calculator = calculator;
+        this.userTime = userTime;
     }
 
     @Transactional(readOnly = true)
     public ShiftStatisticsResponse statistics(String email, ShiftFilter filter) {
         List<Shift> shifts = shiftService.findFiltered(email, filter);
-        int rollingSevenDayMinutes = rollingSevenDayMinutes(email);
+        LocalDateTime now = userTime.now(email);
+        int rollingSevenDayMinutes = rollingSevenDayMinutes(email, now.toLocalDate());
         List<Expense> expenses = reportExpenses(email, filter);
         AccountSettingsResponse settings = settingsService.get(email);
         NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
         BigDecimal base = sum(shifts, true);
         BigDecimal tips = sum(shifts, false);
         int count = shifts.size();
+        int workedShifts = (int) shifts.stream().filter(Shift::countsTowardHours).count();
+        ScheduleSnapshot schedule = scheduleSnapshot(email, filter, now);
         return new ShiftStatisticsResponse(count, money(base), money(tips), net.grossEarnings(),
                 divide(net.grossEarnings(), count), net.minutesWorked(), net.grossHourlyRate(),
                 hourly(base, net.minutesWorked()), hourly(tips, net.minutesWorked()), divide(base, count),
                 divide(tips, count), percentage(tips, net.grossEarnings()),
-                count == 0 ? 0 : Math.round((float) net.minutesWorked() / count), net.miles(), net.mileageCost(),
-                net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
+                workedShifts == 0 ? 0 : Math.round((float) net.minutesWorked() / workedShifts), net.miles(),
+                net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
                 net.earningsPerMile(), net.netMargin(), net.expenseTotals(), net.vehicleCost(),
                 net.outOfPocketExpenses(), net.netPerShift(), settings.vehicleCostMethod(), settings.mileageRate(),
-                rollingSevenDayMinutes);
+                rollingSevenDayMinutes, schedule.plannedShifts(), schedule.plannedMinutes(), schedule.expectedPay(),
+                schedule.needsConfirmation(), schedule.cancelled(), schedule.forfeited(),
+                schedule.forfeitedThisMonth());
     }
 
-    private int rollingSevenDayMinutes(String email) {
-        LocalDate today = LocalDate.now();
+    private int rollingSevenDayMinutes(String email, LocalDate today) {
         ShiftFilter rollingWindow = ShiftFilter.report(today.minusDays(6), today, null, null);
         return shiftService.findFiltered(email, rollingWindow).stream()
-                .mapToInt(Shift::getTimeWorked)
+                .mapToInt(Shift::getWorkedMinutes)
                 .sum();
+    }
+
+    /** Planned work for the next seven days in the driver's zone, plus unworked blocks for the dashboard tiles. */
+    private ScheduleSnapshot scheduleSnapshot(String email, ShiftFilter filter, LocalDateTime now) {
+        LocalDate today = now.toLocalDate();
+        List<Shift> planned = shiftService.findScheduled(email, today, today.plusDays(6)).stream()
+                .filter(shift -> shift.getEndDateTime().isAfter(now))
+                .toList();
+        int needsConfirmation = (int) shiftService.findScheduled(email, null, today).stream()
+                .filter(shift -> !shift.getEndDateTime().isAfter(now))
+                .count();
+        List<Shift> unworked = shiftService.findFiltered(email,
+                filter.withStatuses(Set.of(ShiftStatus.CANCELLED, ShiftStatus.FORFEITED)));
+        YearMonth month = YearMonth.from(today);
+        int forfeitedThisMonth = shiftService.findFiltered(email,
+                ShiftFilter.report(month.atDay(1), month.atEndOfMonth(), null, null)
+                        .withStatuses(Set.of(ShiftStatus.FORFEITED))).size();
+        return new ScheduleSnapshot(planned.size(), planned.stream().mapToInt(Shift::getTimeWorked).sum(),
+                money(planned.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                needsConfirmation, count(unworked, ShiftStatus.CANCELLED), count(unworked, ShiftStatus.FORFEITED),
+                forfeitedThisMonth);
     }
 
     @Transactional(readOnly = true)
@@ -108,9 +137,12 @@ public class ShiftReportService {
         groups.computeIfAbsent(key.key(), ignored -> new GroupAccumulator(key)).expenses.add(expense);
     }
 
+    /** Expenses linked to a block that has not happened yet are not counted. */
     private List<Expense> reportExpenses(String email, ShiftFilter filter) {
         return expenseService.findFiltered(email, new ExpenseFilter(filter.from(), filter.to(), filter.station(),
-                filter.query(), null, null));
+                filter.query(), null, null)).stream()
+                .filter(expense -> expense.getShift() == null || expense.getShift().getStatus() != ShiftStatus.SCHEDULED)
+                .toList();
     }
 
     private GroupKey groupKey(LocalDate date, String station, GroupBy groupBy) {
@@ -136,14 +168,17 @@ public class ShiftReportService {
     }
 
     private BigDecimal sum(List<Shift> shifts, boolean base) {
-        return shifts.stream().map(shift -> base ? shift.getBasePay() : shift.getTips()).filter(Objects::nonNull)
+        return shifts.stream().map(shift -> base ? shift.getEarnedBasePay() : shift.getEarnedTips())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+    private int count(List<Shift> shifts, ShiftStatus status) { return (int) shifts.stream().filter(shift -> shift.getStatus() == status).count(); }
     private BigDecimal money(BigDecimal value) { return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP); }
     private BigDecimal divide(BigDecimal value, int divisor) { return divisor == 0 ? BigDecimal.ZERO.setScale(2) : value.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP); }
     private BigDecimal hourly(BigDecimal value, int minutes) { return minutes == 0 ? BigDecimal.ZERO.setScale(2) : value.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(minutes), 2, RoundingMode.HALF_UP); }
     private BigDecimal percentage(BigDecimal part, BigDecimal whole) { return whole.signum() == 0 ? BigDecimal.ZERO.setScale(1) : part.multiply(BigDecimal.valueOf(100)).divide(whole, 1, RoundingMode.HALF_UP); }
 
+    private record ScheduleSnapshot(int plannedShifts, int plannedMinutes, BigDecimal expectedPay,
+            int needsConfirmation, int cancelled, int forfeited, int forfeitedThisMonth) {}
     private record GroupKey(String key, String label, LocalDate start, LocalDate end) {}
     private final class GroupAccumulator {
         private final GroupKey key;

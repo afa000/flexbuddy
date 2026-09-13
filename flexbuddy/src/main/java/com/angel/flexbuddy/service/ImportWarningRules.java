@@ -14,6 +14,12 @@ import org.springframework.stereotype.Component;
 public class ImportWarningRules {
 
     public ParsedShiftData apply(ParsedShiftData shift, int meanConfidence, ParseContext context) {
+        return apply(shift, meanConfidence, context, false);
+    }
+
+    /** A future date is expected for a scheduled block, so FUTURE_DATE is informational there. */
+    public ParsedShiftData apply(ParsedShiftData shift, int meanConfidence, ParseContext context,
+            boolean scheduled) {
         List<ImportWarning> warnings = new ArrayList<>(shift.warnings());
         checkField("station", "Station", shift.station(), warnings);
         checkField("date", "Date", shift.date(), warnings);
@@ -24,7 +30,7 @@ public class ImportWarningRules {
             warnings.add(warning("POOR_IMAGE", WarningSeverity.WARNING, null,
                     "The screenshot was difficult to read. Check all imported values."));
         }
-        checkDate(shift, context, warnings);
+        checkDate(shift, context, scheduled, warnings);
         checkTimeAndPay(shift, warnings);
         if (shift.basePay().value() != null && shift.tips().value() != null
                 && shift.tips().value().compareTo(shift.basePay().value()) > 0) {
@@ -47,11 +53,15 @@ public class ImportWarningRules {
         }
     }
 
-    private void checkDate(ParsedShiftData shift, ParseContext context, List<ImportWarning> warnings) {
+    private void checkDate(ParsedShiftData shift, ParseContext context, boolean scheduled,
+            List<ImportWarning> warnings) {
         if (shift.date().value() == null) return;
         if (shift.date().value().isAfter(context.today().plusDays(14))) {
-            warnings.add(warning("FUTURE_DATE", WarningSeverity.WARNING, "date",
-                    "This date is more than two weeks in the future."));
+            warnings.add(scheduled
+                    ? warning("FUTURE_DATE", WarningSeverity.INFO, "date",
+                            "This scheduled block is more than two weeks away.")
+                    : warning("FUTURE_DATE", WarningSeverity.WARNING, "date",
+                            "This date is more than two weeks in the future."));
         }
         if (shift.date().value().isBefore(context.today().minusDays(400))) {
             warnings.add(warning("OLD_DATE", WarningSeverity.WARNING, "date",

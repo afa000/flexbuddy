@@ -2,7 +2,15 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#abdff8" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <meta name="description" content="Import, review, and track delivery shifts.">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
@@ -11,7 +19,11 @@
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
     </script>
-    <link rel="stylesheet" href="/css/styles.css">
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+    <script>
+        document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.setAttribute('content',
+            document.documentElement.dataset.theme === 'light' ? '#abdff8' : '#075c76'));
+    </script>
 </head>
 <body>
 <div class="app-shell">
@@ -25,7 +37,7 @@
         </a>
         <div class="header-actions">
             <a class="account-name account-name-link" href="/account" th:text="${currentUser != null ? currentUser.displayName : ''}">Account</a>
-            <form th:action="@{/logout}" method="post">
+            <form id="logoutForm" th:action="@{/logout}" method="post">
                 <button class="round-header-button" type="submit" aria-label="Sign out" title="Sign out">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5M14 8l4 4-4 4m4-4H9"/></svg>
                 </button>
@@ -37,6 +49,8 @@
         </div>
     </header>
 
+    <div class="offline-banner is-hidden" id="offlineBanner" role="status" aria-live="polite"></div>
+
     <main>
         <section class="hero" data-screen="dashboard" aria-labelledby="page-title">
             <div>
@@ -44,8 +58,17 @@
                 <h1 id="page-title">Shift earnings</h1>
                 <p class="hero-copy">Track every block, hour, and dollar in one place.</p>
                 <p class="filter-summary" id="activeFilterSummary">Showing: All shifts</p>
+                <a class="next-shift-link is-hidden" id="nextShiftLink" href="/?screen=schedule">Next block</a>
             </div>
         </section>
+
+        <aside class="install-banner" id="installBanner" data-screen="dashboard" aria-label="Install FlexBuddy">
+            <div><strong>Install FlexBuddy</strong><span id="installBannerText">Open it from your home screen like an app.</span></div>
+            <div class="install-actions">
+                <button class="primary-button compact-button" id="installBannerButton" type="button">Install</button>
+                <button class="text-button" id="dismissInstallBanner" type="button">Not now</button>
+            </div>
+        </aside>
 
         <aside class="backup-nudge" data-screen="dashboard" th:if="${backupDue}">
             <div><strong>Your shift history is worth keeping.</strong><span>Download a backup so you can recover it if the database is ever lost.</span></div>
@@ -72,6 +95,16 @@
                 <span>Rolling 7-day hours</span>
                 <strong id="rollingSevenDayTime">0h 0m</strong>
                 <small>Today and previous 6 days</small>
+            </article>
+            <article class="stat-card">
+                <span>Planned · next 7 days</span>
+                <strong id="plannedWeek">0h 0m</strong>
+                <small id="plannedWeekDetail">$0.00 expected · 0 blocks</small>
+            </article>
+            <article class="stat-card">
+                <span>Forfeits this month</span>
+                <strong id="forfeitsMonth">0</strong>
+                <small id="forfeitsDetail">0 cancelled in this view</small>
             </article>
             <article class="stat-card">
                 <span>Average shift</span>
@@ -104,6 +137,52 @@
                 <strong id="totalMiles">0.0 mi</strong>
                 <small id="mileageCost">$0.00 mileage cost</small>
             </article>
+        </section>
+
+        <section class="schedule-screen is-hidden" id="scheduleScreen" aria-labelledby="schedule-title">
+            <header class="screen-heading schedule-heading">
+                <div>
+                    <p class="eyebrow">YOUR SCHEDULE</p>
+                    <h1 id="schedule-title">Schedule</h1>
+                    <p>Plan upcoming blocks, confirm the ones you finished, and add them to your phone's calendar.</p>
+                </div>
+                <button class="primary-button" id="addScheduledShiftButton" type="button" data-online-only>Add scheduled shift</button>
+            </header>
+            <div class="notice error-notice is-hidden" id="scheduleError" role="alert"></div>
+
+            <section class="panel confirm-strip is-hidden" id="confirmStrip" aria-labelledby="confirm-title">
+                <div class="panel-heading"><div><p class="step-label">NEEDS CONFIRMATION</p><h2 id="confirm-title">Did you work these blocks?</h2></div></div>
+                <div class="confirm-list" id="confirmList"></div>
+            </section>
+
+            <article class="panel next-up" id="nextUpCard" aria-live="polite"></article>
+
+            <div class="schedule-layout">
+                <article class="panel upcoming-panel" aria-labelledby="upcoming-title">
+                    <div class="panel-heading"><div><p class="step-label">NEXT 14 DAYS</p><h2 id="upcoming-title">Upcoming blocks</h2></div></div>
+                    <div class="upcoming-list" id="upcomingList"><p class="history-empty">Loading your schedule…</p></div>
+                </article>
+
+                <article class="panel calendar-panel" aria-labelledby="calendarMonthLabel">
+                    <div class="panel-heading calendar-heading">
+                        <div><p class="step-label">CALENDAR</p><h2 id="calendarMonthLabel">This month</h2></div>
+                        <div class="calendar-nav">
+                            <button class="icon-button" id="prevMonthButton" type="button" aria-label="Previous month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></button>
+                            <button class="text-button" id="todayMonthButton" type="button">Today</button>
+                            <button class="icon-button" id="nextMonthButton" type="button" aria-label="Next month"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+                        </div>
+                    </div>
+                    <div class="week-strip" id="weekStrip" aria-label="This week"></div>
+                    <div class="calendar-grid" id="calendarGrid" role="grid" aria-labelledby="calendarMonthLabel"></div>
+                    <p class="calendar-legend" aria-hidden="true">
+                        <span><i class="status-dot status-dot-scheduled"></i>Scheduled</span>
+                        <span><i class="status-dot status-dot-completed"></i>Completed</span>
+                        <span><i class="status-dot status-dot-cancelled"></i>Cancelled</span>
+                        <span><i class="status-dot status-dot-forfeited"></i>Forfeited</span>
+                    </p>
+                    <section class="day-panel" id="dayPanel" aria-live="polite"><p class="day-panel-empty">Choose a day to see its shifts.</p></section>
+                </article>
+            </div>
         </section>
 
         <section class="import-screen is-hidden" id="importScreen" aria-labelledby="import-title">
@@ -187,6 +266,19 @@
                         <strong>Please review</strong>
                         <ul id="warningList"></ul>
                     </div>
+
+                    <div class="notice schedule-match-notice is-hidden field-wide" id="scheduleMatchNotice" role="status">
+                        <span id="scheduleMatchMessage"></span>
+                        <button class="secondary-button compact-button" id="completeScheduledButton" type="button" data-online-only>Complete this scheduled shift</button>
+                    </div>
+
+                    <label class="field field-wide">
+                        <span>Status</span>
+                        <select id="importStatus" name="status">
+                            <option value="COMPLETED">Completed · worked and paid</option>
+                            <option value="SCHEDULED">Scheduled · an upcoming block</option>
+                        </select>
+                    </label>
 
                     <label class="field field-wide">
                         <span>Station</span>
@@ -380,7 +472,7 @@
                 <div>
                     <p class="step-label">SHIFT DETAILS</p>
                     <h2 id="editDialogTitle">Edit shift</h2>
-                    <p>Update the values and save your changes.</p>
+                    <p id="editDialogDescription">Update the values and save your changes.</p>
                 </div>
                 <button class="icon-button dialog-close-button" id="closeEditButton" type="button" aria-label="Close edit shift">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
@@ -388,6 +480,17 @@
             </div>
 
             <form class="preview-form" id="editForm">
+                <label class="field field-wide">
+                    <span>Status</span>
+                    <select id="editStatus">
+                        <option value="SCHEDULED">Scheduled</option>
+                        <option value="COMPLETED">Completed</option>
+                        <option value="CANCELLED">Cancelled by Amazon</option>
+                        <option value="FORFEITED">Forfeited</option>
+                    </select>
+                    <small class="field-hint" id="editStatusHint"></small>
+                </label>
+
                 <label class="field field-wide">
                     <span>Station</span>
                     <input id="editStation" type="text" maxlength="255" placeholder="Example: VEA7" required>
@@ -409,7 +512,7 @@
                 </label>
 
                 <label class="field money-field">
-                    <span>Base pay</span>
+                    <span id="editBasePayLabel">Base pay</span>
                     <span class="input-with-prefix"><b>$</b><input id="editBasePay" type="number" min="0.01" step="0.01" inputmode="decimal" required></span>
                 </label>
 
@@ -423,7 +526,7 @@
                     <input id="editMiles" type="number" min="0" step="0.1" inputmode="decimal">
                 </label>
 
-                <section class="linked-expenses field-wide"><strong>Linked expenses</strong><div id="linkedExpensesList"><small>Loading…</small></div></section>
+                <section class="linked-expenses field-wide" id="linkedExpensesSection"><strong>Linked expenses</strong><div id="linkedExpensesList"><small>Loading…</small></div></section>
 
                 <div class="notice error-notice is-hidden field-wide" id="editError" role="alert"></div>
                 <p class="shift-timestamps field-wide" id="editTimestamps"></p>
@@ -449,6 +552,11 @@
         <button class="mobile-nav-item is-active" id="dashboardNavButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg>
             <span>Dashboard</span>
+        </button>
+        <button class="mobile-nav-item" id="scheduleNavButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm3 8h3m2 0h3m-8 4h3"/></svg>
+            <span>Schedule</span>
+            <b class="nav-badge is-hidden" id="scheduleBadge"></b>
         </button>
         <button class="mobile-nav-item" id="importNavButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
@@ -476,8 +584,11 @@
     </div>
 </div>
 
-<script src="/js/toast.js" defer></script>
-<script src="/js/charts.js" defer></script>
-<script src="/js/app.js" defer></script>
+<script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/charts.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/calendar.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
 </html>

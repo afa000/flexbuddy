@@ -31,6 +31,8 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
+import com.angel.flexbuddy.model.PushSubscription;
+import com.angel.flexbuddy.model.ReminderLog;
 
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "FLEXBUDDY_TEST_POSTGRES_URL", matches = "jdbc:postgresql://.+")
@@ -41,7 +43,7 @@ class PostgresMigrationTest {
     private static final String PASSWORD = environmentOrDefault("FLEXBUDDY_TEST_POSTGRES_PASSWORD", "postgres");
 
     @Test
-    void v5AddsDriverExpensesWithoutBreakingExistingShiftData() throws Exception {
+    void laterMigrationsKeepExistingShiftDataAndMatchTheEntities() throws Exception {
         String schema = "flexbuddy_migration_test_" + UUID.randomUUID().toString().replace("-", "");
         Flyway throughV3 = flyway(schema, MigrationVersion.fromVersion("3"));
         Flyway latest = flyway(schema, MigrationVersion.LATEST);
@@ -50,10 +52,11 @@ class PostgresMigrationTest {
             throughV3.migrate();
             insertLegacyRow(schema);
 
-            assertThat(latest.migrate().migrationsExecuted).isEqualTo(2);
+            assertThat(latest.migrate().migrationsExecuted).isEqualTo(4);
             assertBackfilledValues(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
+            assertScheduleAndReminderSchema(schema);
             assertHibernateMappingsMatch(schema);
         } finally {
             latest.clean();
@@ -159,7 +162,7 @@ class PostgresMigrationTest {
         StandardServiceRegistry registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {
             Metadata metadata = new MetadataSources(registry)
-                    .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class)
+                    .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }
@@ -181,5 +184,31 @@ class PostgresMigrationTest {
     private static String environmentOrDefault(String name, String fallback) {
         String value = System.getenv(name);
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private void assertScheduleAndReminderSchema(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery("""
+                    select s.status, s.status_changed_at, u.time_zone, u.calendar_token,
+                           u.remind_before_minutes, u.remind_confirm
+                    from shift s join app_users u on u.id = s.owner_id
+                    """)) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("status")).isEqualTo("COMPLETED");
+                assertThat(result.getObject("status_changed_at")).isNull();
+                assertThat(result.getString("time_zone")).isEqualTo("America/New_York");
+                assertThat(result.getObject("calendar_token")).isNull();
+                assertThat(result.getObject("remind_before_minutes")).isNull();
+                assertThat(result.getBoolean("remind_confirm")).isFalse();
+            }
+            try (ResultSet result = statement.executeQuery("""
+                    select count(*) from information_schema.tables
+                    where table_schema = current_schema() and table_name in ('push_subscription', 'reminder_log')
+                    """)) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isEqualTo(2);
+            }
+        }
     }
 }

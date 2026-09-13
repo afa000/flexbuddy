@@ -2,6 +2,7 @@ package com.angel.flexbuddy.model;
 
 import java.time.Instant;
 import java.math.BigDecimal;
+import java.util.Set;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +26,9 @@ import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 @Setter
 @NoArgsConstructor
 public class AppUser {
+
+    public static final String DEFAULT_TIME_ZONE = "America/New_York";
+    public static final Set<Integer> REMINDER_LEAD_MINUTES = Set.of(30, 60, 120, 720);
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -51,6 +55,17 @@ public class AppUser {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private VehicleCostMethod vehicleCostMethod = VehicleCostMethod.STANDARD_MILEAGE;
+
+    @Column(nullable = false, length = 64)
+    private String timeZone = DEFAULT_TIME_ZONE;
+
+    @Column(length = 64, unique = true)
+    private String calendarToken;
+
+    private Integer remindBeforeMinutes;
+
+    @Column(nullable = false)
+    private boolean remindConfirm;
 
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;

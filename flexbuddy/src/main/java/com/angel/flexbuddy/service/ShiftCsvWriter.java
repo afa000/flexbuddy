@@ -24,7 +24,8 @@ public class ShiftCsvWriter {
     private static final String[] HEADERS = {
             "id", "date", "station", "start_time", "end_time", "minutes_worked", "hours_worked",
             "base_pay", "tips", "total_pay", "hourly_rate", "miles", "mileage_cost",
-            "expenses", "net_pay", "net_hourly_rate", "earnings_per_mile", "created_at", "updated_at"
+            "expenses", "net_pay", "net_hourly_rate", "earnings_per_mile", "created_at", "updated_at",
+            "status"
     };
 
     public void write(List<ShiftResponse> shifts, OutputStream output) throws IOException {
@@ -39,7 +40,8 @@ public class ShiftCsvWriter {
                     money(shift.getBasePay()), money(shift.getTips()), money(shift.getTotalPay()),
                     money(shift.getHourlyRate()), decimal(shift.getMiles()), money(shift.getMileageCost()),
                     money(shift.getLinkedExpenses()), money(shift.getNetPay()), money(shift.getNetHourlyRate()),
-                    decimal(shift.getEarningsPerMile()), instant(shift.getCreatedAt()), instant(shift.getUpdatedAt())
+                    decimal(shift.getEarningsPerMile()), instant(shift.getCreatedAt()), instant(shift.getUpdatedAt()),
+                    shift.getStatus() == null ? "" : shift.getStatus().name()
             ));
         }
         writer.flush();

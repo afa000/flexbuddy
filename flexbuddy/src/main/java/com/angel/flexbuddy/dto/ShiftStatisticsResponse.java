@@ -43,6 +43,13 @@ public class ShiftStatisticsResponse {
     private VehicleCostMethod vehicleCostMethod;
     private BigDecimal mileageRate;
     private int rollingSevenDayMinutes;
+    private int scheduledShifts;
+    private int scheduledMinutes;
+    private BigDecimal expectedPay;
+    private int needsConfirmation;
+    private int cancelledShifts;
+    private int forfeitedShifts;
+    private int forfeitedThisMonth;
 
     public ShiftStatisticsResponse(int totalShifts, BigDecimal totalBasePay, BigDecimal totalTips,
             BigDecimal totalEarnings, BigDecimal averagePayPerShift, int totalTimeWorked,
@@ -54,6 +61,7 @@ public class ShiftStatisticsResponse {
                 averageTipsPerShift, tipsShareOfEarnings, averageShiftMinutes, BigDecimal.ZERO,
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, totalEarnings, averageHourlyEarnings,
                 null, BigDecimal.ZERO, Map.of(), BigDecimal.ZERO, BigDecimal.ZERO, averagePayPerShift,
-                VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO, 0);
+                VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO, 0,
+                0, 0, BigDecimal.ZERO, 0, 0, 0, 0);
     }
 }

@@ -3,11 +3,14 @@ package com.angel.flexbuddy.model;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.time.Instant;
 
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -24,7 +27,10 @@ import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
 @Entity
-@Table(name = "shift", indexes = @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"))
+@Table(name = "shift", indexes = {
+        @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"),
+        @Index(name = "idx_shift_owner_status_date", columnList = "owner_id,status,date")
+})
 @EntityListeners(TimestampListener.class)
 @SQLRestriction("deleted_at is null")
 @Getter
@@ -56,6 +62,12 @@ public class Shift implements Timestamped {
 
     @Column(precision = 8, scale = 1)
     private BigDecimal miles;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ShiftStatus status = ShiftStatus.COMPLETED;
+
+    private Instant statusChangedAt;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -108,7 +120,7 @@ public class Shift implements Timestamped {
         BigDecimal base;
         if (basePay != null) {
             base = basePay;
-        } 
+        }
         else {
             base = BigDecimal.ZERO;
         }
@@ -116,7 +128,7 @@ public class Shift implements Timestamped {
         BigDecimal tip;
         if (tips != null) {
             tip = tips;
-        } 
+        }
         else {
             tip = BigDecimal.ZERO;
         }
@@ -150,6 +162,54 @@ public class Shift implements Timestamped {
     public BigDecimal getEarningsPerMile() {
         if (miles == null || miles.signum() == 0) return null;
         return getTotalPay().divide(miles, 2, RoundingMode.HALF_UP);
+    }
+
+    /** Completed shifts, and cancelled blocks that paid cancellation pay, earn money. Scheduled and forfeited ones do not. */
+    public boolean countsTowardEarnings() {
+        return effectiveStatus() == ShiftStatus.COMPLETED || effectiveStatus() == ShiftStatus.CANCELLED;
+    }
+
+    /** Only a worked block adds hours. */
+    public boolean countsTowardHours() {
+        return effectiveStatus() == ShiftStatus.COMPLETED;
+    }
+
+    /** The drive to the station happened for every block except one that is still scheduled. */
+    public boolean countsTowardMiles() {
+        return effectiveStatus() != ShiftStatus.SCHEDULED;
+    }
+
+    public BigDecimal getEarnedBasePay() {
+        return countsTowardEarnings() && basePay != null ? basePay : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getEarnedTips() {
+        return effectiveStatus() == ShiftStatus.COMPLETED && tips != null ? tips : BigDecimal.ZERO;
+    }
+
+    public BigDecimal getEarnedPay() {
+        return getEarnedBasePay().add(getEarnedTips());
+    }
+
+    public int getWorkedMinutes() {
+        return countsTowardHours() ? getTimeWorked() : 0;
+    }
+
+    public BigDecimal getCountedMiles() {
+        return countsTowardMiles() ? miles : null;
+    }
+
+    public LocalDateTime getStartDateTime() {
+        return date == null || startTime == null ? null : LocalDateTime.of(date, startTime);
+    }
+
+    public LocalDateTime getEndDateTime() {
+        LocalDateTime start = getStartDateTime();
+        return start == null || endTime == null ? null : start.plusMinutes(getTimeWorked());
+    }
+
+    private ShiftStatus effectiveStatus() {
+        return status == null ? ShiftStatus.COMPLETED : status;
     }
 
 }

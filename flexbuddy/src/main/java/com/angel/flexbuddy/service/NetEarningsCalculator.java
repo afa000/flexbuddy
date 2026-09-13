@@ -18,9 +18,9 @@ import com.angel.flexbuddy.model.VehicleCostMethod;
 public class NetEarningsCalculator {
     public NetEarningsResult calculate(List<Shift> shifts, List<Expense> expenses,
             VehicleCostMethod method, BigDecimal mileageRate) {
-        BigDecimal gross = money(shifts.stream().map(Shift::getTotalPay).reduce(BigDecimal.ZERO, BigDecimal::add));
-        int minutes = shifts.stream().mapToInt(Shift::getTimeWorked).sum();
-        BigDecimal miles = shifts.stream().map(Shift::getMiles).filter(v -> v != null)
+        BigDecimal gross = money(shifts.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add));
+        int minutes = shifts.stream().mapToInt(Shift::getWorkedMinutes).sum();
+        BigDecimal miles = shifts.stream().map(Shift::getCountedMiles).filter(v -> v != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(1, RoundingMode.HALF_UP);
         BigDecimal mileageCost = money(miles.multiply(mileageRate == null ? BigDecimal.ZERO : mileageRate));
         EnumMap<ExpenseCategory, BigDecimal> categories = new EnumMap<>(ExpenseCategory.class);

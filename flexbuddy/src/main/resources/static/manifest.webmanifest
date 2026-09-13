@@ -1,0 +1,30 @@
+{
+  "id": "/",
+  "name": "FlexBuddy",
+  "short_name": "FlexBuddy",
+  "description": "Plan, confirm, and track your delivery blocks and earnings.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#02080b",
+  "theme_color": "#075c76",
+  "icons": [
+    {"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ],
+  "shortcuts": [
+    {
+      "name": "Import a shift",
+      "short_name": "Import",
+      "url": "/?screen=import",
+      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    },
+    {
+      "name": "Schedule",
+      "short_name": "Schedule",
+      "url": "/?screen=schedule",
+      "icons": [{"src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png"}]
+    }
+  ]
+}

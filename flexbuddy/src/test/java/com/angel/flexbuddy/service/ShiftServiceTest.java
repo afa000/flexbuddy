@@ -35,6 +35,9 @@ import com.angel.flexbuddy.exception.InvalidFilterException;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
+import com.angel.flexbuddy.dto.ShiftStatusRequest;
+import com.angel.flexbuddy.exception.InvalidShiftException;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -83,13 +86,13 @@ class ShiftServiceTest {
 
     @Test
     void getAllShifts_usesTheOwnerScopedFilteredQuery() {
-        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", ""))
+        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", "", ShiftStatus.EARNINGS))
                 .thenReturn(List.of(shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "10")));
 
         List<ShiftResponse> result = shiftService.getAllShifts(OWNER_EMAIL);
 
         assertThat(result).extracting(ShiftResponse::getId).containsExactly(1L);
-        verify(shiftRepository).findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", "");
+        verify(shiftRepository).findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", "", ShiftStatus.EARNINGS);
         verify(shiftRepository, never()).findAll();
     }
 
@@ -99,7 +102,7 @@ class ShiftServiceTest {
         Shift high = shift(2L, "VEA6", LocalDate.of(2026, 9, 7), "160", "0");
         ShiftFilter filter = ShiftFilter.of(LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30),
                 " VEA7 ", " vea ", "hourlyRate", "desc");
-        when(shiftRepository.findFiltered(OWNER_EMAIL, filter.from(), filter.to(), "VEA7", "vea"))
+        when(shiftRepository.findFiltered(OWNER_EMAIL, filter.from(), filter.to(), "VEA7", "vea", ShiftStatus.HISTORY))
                 .thenReturn(List.of(low, high));
 
         List<ShiftResponse> result = shiftService.getShifts(OWNER_EMAIL, filter);
@@ -113,7 +116,7 @@ class ShiftServiceTest {
         Shift bdl = shift(2L, "BDL4", LocalDate.of(2026, 9, 6), "100", "0");
         Shift newerVea = shift(3L, "vea7", LocalDate.of(2026, 9, 8), "100", "0");
         ShiftFilter filter = ShiftFilter.of(null, null, null, null, "station", "asc");
-        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", ""))
+        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", "", ShiftStatus.HISTORY))
                 .thenReturn(List.of(olderVea, bdl, newerVea));
 
         List<ShiftResponse> result = shiftService.getShifts(OWNER_EMAIL, filter);
@@ -204,5 +207,103 @@ class ShiftServiceTest {
     private Shift shift(Long id, String station, LocalDate date, String base, String tips) {
         return new Shift(id, station, date, LocalTime.of(9, 0), LocalTime.of(17, 0),
                 new BigDecimal(base), new BigDecimal(tips), owner);
+    }
+
+    @Test
+    void createShift_savesAScheduledBlockWithoutCountingItsOfferedPay() {
+        when(userRepository.findByEmailIgnoreCase(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.createShift(OWNER_EMAIL, new CreateShiftRequest("VEA7",
+                LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15), new BigDecimal("84.00"),
+                BigDecimal.ZERO, null, ShiftStatus.SCHEDULED));
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("0.00");
+        assertThat(result.getNetPay()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void createShift_rejectsTipsOnAScheduledBlockWithAMessageNamingTheStatus() {
+        when(userRepository.findByEmailIgnoreCase(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+
+        assertThatThrownBy(() -> shiftService.createShift(OWNER_EMAIL, new CreateShiftRequest("VEA7",
+                LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15), new BigDecimal("84.00"),
+                new BigDecimal("5.00"), null, ShiftStatus.SCHEDULED)))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("A scheduled shift cannot have tips yet.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void changeStatus_completesAScheduledShiftInPlace() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(
+                ShiftStatus.COMPLETED, new BigDecimal("86.50"), new BigDecimal("12.00"), new BigDecimal("31.5")));
+
+        assertThat(result.getId()).isEqualTo(7L);
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.COMPLETED);
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("98.50");
+        assertThat(result.getMiles()).isEqualByComparingTo("31.5");
+        assertThat(scheduled.getStatusChangedAt()).isEqualTo(Instant.parse("2026-09-11T12:00:00Z"));
+    }
+
+    @Test
+    void changeStatus_cancelledWithoutPayDropsTheOfferedAmount() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.CANCELLED));
+
+        assertThat(result.getBasePay()).isEqualByComparingTo("0");
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void changeStatus_countsCancellationPayButNoHours() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L,
+                new ShiftStatusRequest(ShiftStatus.CANCELLED, new BigDecimal("18.00"), null, null));
+
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("18.00");
+        assertThat(result.getNetPay()).isEqualByComparingTo("18.00");
+        assertThat(result.getNetHourlyRate()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void changeStatus_refusesToMoveAWorkedShiftBackToScheduled() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "10");
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+
+        assertThatThrownBy(() -> shiftService.changeStatus(OWNER_EMAIL, 1L, new ShiftStatusRequest(ShiftStatus.SCHEDULED)))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("A completed shift cannot be moved back to scheduled. Delete it and add the block again.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void updateShift_keepsTheCurrentStatusWhenTheRequestOmitsIt() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.updateShift(OWNER_EMAIL, 7L, updateRequest());
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(scheduled.getStatusChangedAt()).isNull();
+    }
+
+    private Shift scheduled(Long id) {
+        Shift shift = new Shift(id, "VEA7", LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15),
+                new BigDecimal("84.00"), BigDecimal.ZERO, owner);
+        shift.setStatus(ShiftStatus.SCHEDULED);
+        return shift;
     }
 }

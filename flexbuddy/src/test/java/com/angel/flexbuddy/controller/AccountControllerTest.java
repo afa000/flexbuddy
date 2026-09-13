@@ -7,6 +7,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
@@ -19,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
+import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -146,5 +148,59 @@ class AccountControllerTest {
                 .andExpect(jsonPath("$.version").value(1))
                 .andExpect(content().string(org.hamcrest.Matchers.not(
                         org.hamcrest.Matchers.containsString("password"))));
+    }
+
+    @Test
+    void updateReminders_rejectsAnUnknownTimeZone() throws Exception {
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"Mars/Olympus_Mons\",\"remindBeforeMinutes\":60,\"remindConfirm\":true}"))
+                .andExpect(status().isBadRequest());
+
+        verify(settingsService, never()).updateReminders(any(), any());
+    }
+
+    @Test
+    void updateReminders_rejectsAnUnsupportedLeadTime() throws Exception {
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"America/Chicago\",\"remindBeforeMinutes\":45,\"remindConfirm\":false}"))
+                .andExpect(status().isBadRequest());
+
+        verify(settingsService, never()).updateReminders(any(), any());
+    }
+
+    @Test
+    void updateReminders_savesValidSettings() throws Exception {
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"America/Chicago\",\"remindBeforeMinutes\":720,\"remindConfirm\":true}"))
+                .andExpect(status().isOk());
+
+        verify(settingsService).updateReminders(org.mockito.ArgumentMatchers.eq("angel@example.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> request.timeZone().equals("America/Chicago")
+                        && request.remindBeforeMinutes() == 720 && request.remindConfirm()));
+    }
+
+    @Test
+    void updateTimeZone_validatesTheZone() throws Exception {
+        mockMvc.perform(put("/account/time-zone").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"timeZone\":\"Nowhere\"}"))
+                .andExpect(status().isBadRequest());
+        mockMvc.perform(put("/account/time-zone").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"timeZone\":\"America/Los_Angeles\"}"))
+                .andExpect(status().isOk());
+
+        verify(settingsService).updateTimeZone(org.mockito.ArgumentMatchers.eq("angel@example.com"), any());
+    }
+
+    @Test
+    void regeneratingTheCalendarLinkRequiresCsrf() throws Exception {
+        mockMvc.perform(post("/account/calendar-token").with(user("angel@example.com")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/account/calendar-token").with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk());
+
+        verify(settingsService).regenerateCalendarToken("angel@example.com");
     }
 }

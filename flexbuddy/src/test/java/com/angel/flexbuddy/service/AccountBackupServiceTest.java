@@ -66,7 +66,7 @@ class AccountBackupServiceTest {
         AccountBackupFile backup = service.create("angel@example.com");
 
         assertThat(backup.format()).isEqualTo("flexbuddy-backup");
-        assertThat(backup.version()).isEqualTo(2);
+        assertThat(backup.version()).isEqualTo(3);
         assertThat(backup.exportedAt()).isEqualTo(now);
         assertThat(backup.account().email()).isEqualTo("angel@example.com");
         assertThat(backup.counts().shifts()).isEqualTo(1);

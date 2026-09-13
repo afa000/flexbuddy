@@ -2,5 +2,6 @@ package com.angel.flexbuddy.dto;
 
 public enum DuplicateKind {
     EXACT,
-    LIKELY
+    LIKELY,
+    SCHEDULED_MATCH
 }

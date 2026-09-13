@@ -22,7 +22,9 @@ import org.springframework.context.annotation.Import;
 
 import com.angel.flexbuddy.config.JpaAuditingConfig;
 import com.angel.flexbuddy.model.AppUser;
+import com.angel.flexbuddy.model.PushSubscription;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.model.TimestampListener;
 
 import jakarta.persistence.EntityManager;
@@ -37,6 +39,7 @@ class ShiftRepositoryTest {
     @Autowired ShiftRepository shiftRepository;
     @Autowired AppUserRepository userRepository;
     @Autowired EntityManager entityManager;
+    @Autowired PushSubscriptionRepository pushSubscriptionRepository;
     @MockitoBean Clock clock;
 
     @BeforeEach
@@ -155,7 +158,7 @@ class ShiftRepositoryTest {
         save(other, "VEA7", LocalDate.of(2026, 9, 6));
 
         List<Shift> result = shiftRepository.findFiltered("ANGEL@example.com",
-                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), "vea7", "VEA");
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30), "vea7", "VEA", ShiftStatus.HISTORY);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().getDate()).isEqualTo(LocalDate.of(2026, 9, 5));
@@ -196,5 +199,71 @@ class ShiftRepositoryTest {
     private Shift shift(AppUser owner, String station, LocalDate date) {
         return new Shift(null, station, date, LocalTime.of(9, 0), LocalTime.of(13, 0),
                 new BigDecimal("100.00"), BigDecimal.ZERO, owner);
+    }
+
+    @Test
+    void findFiltered_returnsOnlyTheRequestedStatuses() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        saveWithStatus(angel, LocalDate.of(2026, 9, 5), ShiftStatus.COMPLETED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 6), ShiftStatus.CANCELLED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 7), ShiftStatus.FORFEITED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 20), ShiftStatus.SCHEDULED);
+        LocalDate from = LocalDate.of(2026, 9, 1);
+        LocalDate to = LocalDate.of(2026, 9, 30);
+
+        assertThat(shiftRepository.findFiltered("angel@example.com", from, to, "", "", ShiftStatus.HISTORY))
+                .extracting(Shift::getStatus)
+                .containsExactlyInAnyOrder(ShiftStatus.COMPLETED, ShiftStatus.CANCELLED, ShiftStatus.FORFEITED);
+        assertThat(shiftRepository.findFiltered("angel@example.com", from, to, "", "", ShiftStatus.EARNINGS))
+                .extracting(Shift::getStatus)
+                .containsExactlyInAnyOrder(ShiftStatus.COMPLETED, ShiftStatus.CANCELLED);
+        assertThat(shiftRepository.findFiltered("angel@example.com", from, to, "", "", ShiftStatus.ALL)).hasSize(4);
+    }
+
+    @Test
+    void scheduledLookupIsOwnerScopedAndOrderedByDate() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        AppUser other = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        saveWithStatus(angel, LocalDate.of(2026, 9, 14), ShiftStatus.SCHEDULED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 13), ShiftStatus.SCHEDULED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 13), ShiftStatus.COMPLETED);
+        saveWithStatus(other, LocalDate.of(2026, 9, 13), ShiftStatus.SCHEDULED);
+
+        assertThat(shiftRepository.findByOwnerEmailIgnoreCaseAndStatusAndDateBetweenOrderByDateAscStartTimeAsc(
+                "ANGEL@example.com", ShiftStatus.SCHEDULED, LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 14)))
+                .extracting(Shift::getDate)
+                .containsExactly(LocalDate.of(2026, 9, 13), LocalDate.of(2026, 9, 14));
+    }
+
+    @Test
+    void reminderCandidatesNeedALeadTimeAndAPushSubscription() {
+        AppUser subscribed = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        subscribed.setRemindBeforeMinutes(60);
+        AppUser withoutPush = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        withoutPush.setRemindBeforeMinutes(60);
+        PushSubscription subscription = new PushSubscription();
+        subscription.setOwner(subscribed);
+        subscription.setEndpoint("https://fcm.googleapis.com/fcm/send/abc");
+        subscription.setP256dh("key");
+        subscription.setAuth("auth");
+        subscription.setCreatedAt(NOW);
+        pushSubscriptionRepository.save(subscription);
+        saveWithStatus(subscribed, LocalDate.of(2026, 9, 12), ShiftStatus.SCHEDULED);
+        saveWithStatus(subscribed, LocalDate.of(2026, 9, 12), ShiftStatus.COMPLETED);
+        saveWithStatus(withoutPush, LocalDate.of(2026, 9, 12), ShiftStatus.SCHEDULED);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(shiftRepository.findScheduledWithLeadTime(LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 13)))
+                .extracting(shift -> shift.getOwner().getEmail())
+                .containsExactly("angel@example.com");
+        assertThat(shiftRepository.findScheduledWithConfirmNudges(LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 13)))
+                .isEmpty();
+    }
+
+    private void saveWithStatus(AppUser owner, LocalDate date, ShiftStatus status) {
+        Shift shift = shift(owner, "VEA7", date);
+        shift.setStatus(status);
+        shiftRepository.save(shift);
     }
 }

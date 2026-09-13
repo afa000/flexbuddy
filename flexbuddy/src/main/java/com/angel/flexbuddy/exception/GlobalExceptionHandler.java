@@ -38,4 +38,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<String> handleInvalidBackupException(InvalidBackupException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
+
+    @ExceptionHandler(InvalidShiftException.class)
+    public ResponseEntity<String> handleInvalidShiftException(InvalidShiftException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidPushSubscriptionException.class)
+    public ResponseEntity<String> handleInvalidPushSubscription(InvalidPushSubscriptionException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(CalendarFeedNotFoundException.class)
+    public ResponseEntity<String> handleCalendarFeedNotFound(CalendarFeedNotFoundException exception) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(exception.getMessage());
+    }
 }

@@ -3,6 +3,8 @@ package com.angel.flexbuddy.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.awt.image.BufferedImage;
@@ -24,7 +26,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
+import com.angel.flexbuddy.dto.DuplicateKind;
+import com.angel.flexbuddy.dto.DuplicateMatch;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
 
 @ExtendWith(MockitoExtension.class)
@@ -33,10 +38,19 @@ class ShiftImportServiceTest {
     @Mock
     private ScreenshotTextExtractor textExtractor;
 
+    @Mock
+    private ScheduledShiftMatcher scheduledShiftMatcher;
+
+    @Mock
+    private UserTimeService userTime;
+
+    private static final String EMAIL = "angel@example.com";
+
     private ShiftImportService shiftImportService;
 
     @BeforeEach
     void setUp() {
+        lenient().when(userTime.zone(EMAIL)).thenReturn(ZoneOffset.UTC);
         Clock fixedClock = Clock.fixed(
                 Instant.parse("2026-09-07T12:00:00Z"),
                 ZoneOffset.UTC
@@ -45,6 +59,8 @@ class ShiftImportServiceTest {
                 textExtractor,
                 new ShiftScreenshotParser(),
                 new ImportWarningRules(),
+                scheduledShiftMatcher,
+                userTime,
                 fixedClock,
                 30_000_000L
         );
@@ -67,7 +83,7 @@ class ShiftImportServiceTest {
                         line("$124.50", 86, 3)
                 )));
 
-        ShiftImportPreviewResponse result = shiftImportService.createPreview(screenshot);
+        ShiftImportPreviewResponse result = shiftImportService.createPreview(EMAIL, screenshot);
 
         assertThat(result.originalFilename()).isEqualTo("shift.png");
         assertThat(result.contentType()).isEqualTo("image/png");
@@ -96,7 +112,7 @@ class ShiftImportServiceTest {
                 new byte[0]
         );
 
-        assertThatThrownBy(() -> shiftImportService.createPreview(screenshot))
+        assertThatThrownBy(() -> shiftImportService.createPreview(EMAIL, screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessage("A screenshot must be provided.");
     }
@@ -110,7 +126,7 @@ class ShiftImportServiceTest {
                 "not an image".getBytes()
         );
 
-        assertThatThrownBy(() -> shiftImportService.createPreview(screenshot))
+        assertThatThrownBy(() -> shiftImportService.createPreview(EMAIL, screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessage("Unsupported screenshot type.");
     }
@@ -124,7 +140,7 @@ class ShiftImportServiceTest {
                 "not really a PNG".getBytes()
         );
 
-        assertThatThrownBy(() -> shiftImportService.createPreview(screenshot))
+        assertThatThrownBy(() -> shiftImportService.createPreview(EMAIL, screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessage("The uploaded file is not a readable image.");
     }
@@ -132,11 +148,11 @@ class ShiftImportServiceTest {
     @Test
     void createPreview_rejectsAnImageWithMorePixelsThanTheConfiguredLimit() throws IOException {
         ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
-                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
+                new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
         MockMultipartFile screenshot = new MockMultipartFile("screenshot", "huge.png", "image/png",
                 createPngBytes(200, 200));
 
-        assertThatThrownBy(() -> limited.createPreview(screenshot))
+        assertThatThrownBy(() -> limited.createPreview(EMAIL, screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessageContaining("too large");
     }
@@ -144,12 +160,12 @@ class ShiftImportServiceTest {
     @Test
     void createPreview_rejectsAnExtremeAspectRatioOnTheSideCap() throws IOException {
         ShiftImportService service = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
-                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC),
+                new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC),
                 30_000_000L);
         MockMultipartFile screenshot = new MockMultipartFile("screenshot", "wide.png", "image/png",
                 createPngBytes(12_001, 2));
 
-        assertThatThrownBy(() -> service.createPreview(screenshot))
+        assertThatThrownBy(() -> service.createPreview(EMAIL, screenshot))
                 .isInstanceOf(InvalidScreenshotException.class)
                 .hasMessageContaining("Neither side may be over 12000 pixels");
     }
@@ -157,13 +173,13 @@ class ShiftImportServiceTest {
     @Test
     void createPreview_stillReadsAnImageInsideTheConfiguredLimit() throws IOException {
         ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
-                new ImportWarningRules(), Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
+                new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
         when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
                 line("Windsor (DCY1) - Amazon.com", 92, 0))));
         MockMultipartFile screenshot = new MockMultipartFile("screenshot", "small.png", "image/png",
                 createPngBytes(50, 50));
 
-        assertThat(limited.createPreview(screenshot).shifts()).hasSize(1);
+        assertThat(limited.createPreview(EMAIL, screenshot).shifts()).hasSize(1);
     }
 
     private byte[] createPngBytes(int width, int height) throws IOException {
@@ -182,5 +198,44 @@ class ShiftImportServiceTest {
 
     private OcrLine line(String text, int confidence, int index) {
         return new OcrLine(text, confidence, 0, index * 20, 200, 18, index);
+    }
+
+    @Test
+    void createPreview_suggestsScheduledForABlockThatHasNotStartedYet() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0),
+                line("Sunday, 9/27", 90, 1),
+                line("04:00 - 07:30 (3 hr 30 min)", 88, 2),
+                line("$124.50", 86, 3))));
+
+        var candidate = shiftImportService.createPreview(EMAIL, png()).shifts().getFirst();
+
+        assertThat(candidate.suggestedStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(candidate.warnings()).filteredOn(warning -> warning.code().equals("FUTURE_DATE"))
+                .singleElement()
+                .satisfies(warning -> assertThat(warning.severity()).isEqualTo(WarningSeverity.INFO));
+        verifyNoInteractions(scheduledShiftMatcher);
+    }
+
+    @Test
+    void createPreview_offersToCompleteAMatchingScheduledBlock() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0),
+                line("Sunday, 9/6", 90, 1),
+                line("04:00 - 07:30 (3 hr 30 min)", 88, 2),
+                line("$124.50", 86, 3))));
+        DuplicateMatch match = new DuplicateMatch(41L, DuplicateKind.SCHEDULED_MATCH,
+                "This looks like your scheduled DCY1 block on Sun Sep 6. Complete it?");
+        when(scheduledShiftMatcher.match(EMAIL, LocalDate.of(2026, 9, 6), LocalTime.of(4, 0), LocalTime.of(7, 30), "DCY1"))
+                .thenReturn(java.util.List.of(match));
+
+        var candidate = shiftImportService.createPreview(EMAIL, png()).shifts().getFirst();
+
+        assertThat(candidate.suggestedStatus()).isEqualTo(ShiftStatus.COMPLETED);
+        assertThat(candidate.duplicates()).containsExactly(match);
+    }
+
+    private MockMultipartFile png() throws IOException {
+        return new MockMultipartFile("screenshot", "shift.png", "image/png", createPngBytes());
     }
 }
