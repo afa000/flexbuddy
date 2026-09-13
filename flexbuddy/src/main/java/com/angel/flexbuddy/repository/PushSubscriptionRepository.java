@@ -14,4 +14,6 @@ public interface PushSubscriptionRepository extends JpaRepository<PushSubscripti
     List<PushSubscription> findAllByOwnerId(Long ownerId);
 
     long deleteByEndpointAndOwnerEmailIgnoreCase(String endpoint, String email);
+
+    long deleteAllByOwnerId(Long ownerId);
 }

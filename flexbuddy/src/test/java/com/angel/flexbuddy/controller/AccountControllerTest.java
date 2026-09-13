@@ -1,5 +1,6 @@
 package com.angel.flexbuddy.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -24,9 +25,12 @@ import org.springframework.http.MediaType;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockHttpSession;
 
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.RegistrationRequest;
+import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
+import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.service.AccountService;
 import com.angel.flexbuddy.service.AccountBackupService;
@@ -36,6 +40,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.BackupAccount;
 import com.angel.flexbuddy.dto.BackupCounts;
@@ -75,6 +80,10 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(view().name("register"))
                 .andExpect(model().attributeExists("registration"));
+        mockMvc.perform(get("/delete-account"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("delete-account"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("What FlexBuddy deletes")));
     }
 
     @Test
@@ -137,6 +146,82 @@ class AccountControllerTest {
                 .andExpect(status().is(org.hamcrest.Matchers.not(org.hamcrest.Matchers.is(302))));
     }
 
+    @Test
+    void accountPageShowsTheDeletionRequirements() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("angel@example.com"))
+                .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
+
+        mockMvc.perform(get("/account").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeExists("deletion"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Delete account permanently")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_method\" value=\"delete\"")));
+    }
+
+    @Test
+    void deleteAccount_requiresCsrf() throws Exception {
+        mockMvc.perform(post("/account")
+                        .with(user("angel@example.com"))
+                        .param("_method", "delete")
+                        .param("password", "correct-password")
+                        .param("confirmation", "delete"))
+                .andExpect(status().isForbidden());
+
+        verify(accountService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void deleteAccount_requiresTheExactTypedConfirmation() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("angel@example.com"))
+                .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
+
+        mockMvc.perform(post("/account")
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("password", "correct-password")
+                        .param("confirmation", "DELETE"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("account"))
+                .andExpect(model().attributeHasFieldErrors("deletion", "confirmation"));
+
+        verify(accountService, never()).deleteAccount(any(), any());
+    }
+    @Test
+    void deleteAccount_rejectsTheWrongPassword() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("angel@example.com"))
+                .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
+        org.mockito.Mockito.doThrow(new InvalidAccountPasswordException())
+                .when(accountService).deleteAccount("angel@example.com", "wrong-password");
+
+        mockMvc.perform(post("/account")
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("password", "wrong-password")
+                        .param("confirmation", "delete"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("account"))
+                .andExpect(model().attributeHasFieldErrors("deletion", "password"));
+    }
+
+    @Test
+    void deleteAccount_removesTheAccountInvalidatesTheSessionAndRedirects() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+
+        mockMvc.perform(post("/account")
+                        .session(session)
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("password", "correct-password")
+                        .param("confirmation", "delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?deleted"));
+
+        verify(accountService).deleteAccount("angel@example.com", "correct-password");
+        assertThat(session.isInvalid()).isTrue();
+    }
     @Test
     void downloadBackup_returnsDatedNoStoreJsonWithoutPasswordData() throws Exception {
         Instant now = Instant.parse("2026-09-11T12:00:00Z");

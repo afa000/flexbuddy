@@ -58,6 +58,9 @@
         <div class="notice success-notice" th:if="${param.everywhere}">
             You have been signed out on every device.
         </div>
+        <div class="notice success-notice" th:if="${param.deleted}">
+            Your FlexBuddy account and its data have been deleted.
+        </div>
 
         <form class="auth-form" th:action="@{/login}" method="post">
             <label class="field">

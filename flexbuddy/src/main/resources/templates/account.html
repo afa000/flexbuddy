@@ -148,6 +148,33 @@
                     <button class="danger-button" type="submit">Sign out everywhere</button>
                 </form>
             </article>
+            <article class="panel data-card delete-account-card">
+                <p class="step-label">DELETE ACCOUNT</p>
+                <h2>Permanently delete your account</h2>
+                <p>This immediately removes your FlexBuddy account and cannot be undone. <a href="/delete-account">Read how account deletion works</a>.</p>
+                <ul class="deletion-list">
+                    <li>Every shift, including Recently deleted shifts</li>
+                    <li>Every expense, including Recently deleted expenses</li>
+                    <li>Driver settings, reminders, calendar links, and push subscriptions</li>
+                    <li>Persistent sign-ins and your account</li>
+                </ul>
+                <p><strong>Download a backup first if you want to keep a copy.</strong></p>
+                <a class="secondary-button download-button" href="/account/backup" download>Download backup</a>
+                <form class="settings-form deletion-form" th:action="@{/account}" th:object="${deletion}" method="post">
+                    <input type="hidden" name="_method" value="delete">
+                    <label class="field">
+                        <span>Current password</span>
+                        <input th:field="*{password}" type="password" autocomplete="current-password" maxlength="72" required>
+                        <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
+                    </label>
+                    <label class="field">
+                        <span>Type <strong>delete</strong> to confirm</span>
+                        <input th:field="*{confirmation}" type="text" autocomplete="off" maxlength="6" required>
+                        <small class="field-error" th:if="${#fields.hasErrors('confirmation')}" th:errors="*{confirmation}"></small>
+                    </label>
+                    <button class="danger-button" type="submit">Delete account permanently</button>
+                </form>
+            </article>
         </section>
     </main>
 

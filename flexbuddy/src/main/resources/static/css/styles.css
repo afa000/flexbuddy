@@ -333,6 +333,19 @@ button {
     color: var(--cyan);
     font-weight: 750;
 }
+.info-card { width: min(680px, 100%); }
+.info-card h2 { margin: 26px 0 10px; font-size: 20px; }
+.info-action { display: flex; justify-content: center; margin-top: 28px; }
+.info-note { margin-top: 24px; padding: 14px; color: var(--muted); background: var(--surface-deep); border: 1px solid var(--line); border-radius: 6px; line-height: 1.55; }
+.deletion-steps,
+.deletion-list { margin: 10px 0 0; padding-left: 22px; color: var(--muted); line-height: 1.65; }
+.deletion-steps li + li,
+.deletion-list li + li { margin-top: 5px; }
+.delete-account-card { grid-column: 1 / -1; border-color: var(--error-border); }
+.delete-account-card > p a { color: var(--cyan); font-weight: 750; }
+.delete-account-card > .secondary-button { width: fit-content; margin-top: 2px; }
+.deletion-form { max-width: 520px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--error-border); }
+.deletion-form .danger-button { width: fit-content; }
 
 .round-header-button:last-child {
     justify-self: end;

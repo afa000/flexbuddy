@@ -102,4 +102,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
               and delete_batch=:batch
             """, nativeQuery = true)
     int deleteBatch(@Param("email") String email, @Param("batch") String batch);
+
+    @Modifying
+    @Query(value = "delete from expense where owner_id = :ownerId", nativeQuery = true)
+    int deleteAllByOwnerIdIncludingTrash(@Param("ownerId") Long ownerId);
 }

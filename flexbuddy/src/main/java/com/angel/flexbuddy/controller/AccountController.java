@@ -14,6 +14,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,6 +25,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.angel.flexbuddy.dto.AccountDeletionRequest;
 import com.angel.flexbuddy.dto.RegistrationRequest;
 import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.RestorePreviewResponse;
@@ -37,6 +39,7 @@ import com.angel.flexbuddy.dto.AccountSettingsRequest;
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
 import com.angel.flexbuddy.dto.ReminderSettingsRequest;
 import com.angel.flexbuddy.dto.TimeZoneRequest;
+import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import tools.jackson.databind.ObjectMapper;
 
@@ -106,11 +109,39 @@ public class AccountController {
         return "redirect:/login?registered";
     }
 
+    @GetMapping("/delete-account")
+    public String deletionInfoPage() {
+        return "delete-account";
+    }
+
     @GetMapping("/account")
     public String accountPage(Principal principal, Model model) {
-        userRepository.findByEmailIgnoreCase(principal.getName())
-                .ifPresent(user -> model.addAttribute("currentUser", user));
+        addAccountPageModel(principal.getName(), model);
         return "account";
+    }
+
+    @DeleteMapping("/account")
+    public String deleteAccount(Authentication authentication,
+            @Valid @ModelAttribute("deletion") AccountDeletionRequest deletion,
+            BindingResult bindingResult, Model model, HttpServletRequest request,
+            HttpServletResponse response) {
+        if (bindingResult.hasErrors()) {
+            addAccountPageModel(authentication.getName(), model);
+            return "account";
+        }
+
+        try {
+            accountService.deleteAccount(authentication.getName(), deletion.getPassword());
+        } catch (InvalidAccountPasswordException exception) {
+            bindingResult.rejectValue("password", "password.incorrect", exception.getMessage());
+            deletion.setPassword(null);
+            addAccountPageModel(authentication.getName(), model);
+            return "account";
+        }
+
+        rememberMeServices.logout(request, response, authentication);
+        new SecurityContextLogoutHandler().logout(request, response, authentication);
+        return "redirect:/login?deleted";
     }
 
     @PostMapping("/account/sign-out-everywhere")
@@ -181,5 +212,13 @@ public class AccountController {
     public ResponseEntity<java.util.Map<String, Integer>> undoRestore(Principal principal,
             @PathVariable String batchId) {
         return ResponseEntity.ok(restoreService.undoReplace(principal.getName(), batchId));
+    }
+
+    private void addAccountPageModel(String email, Model model) {
+        userRepository.findByEmailIgnoreCase(email)
+                .ifPresent(user -> model.addAttribute("currentUser", user));
+        if (!model.containsAttribute("deletion")) {
+            model.addAttribute("deletion", new AccountDeletionRequest());
+        }
     }
 }
