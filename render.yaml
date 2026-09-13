@@ -2,7 +2,7 @@ services:
   - type: web
     name: flexbuddy
     runtime: docker
-    plan: free
+    plan: starter
     region: ohio
     dockerfilePath: ./flexbuddy/Dockerfile
     dockerContext: ./flexbuddy
@@ -29,7 +29,7 @@ services:
 
 databases:
   - name: flexbuddy-postgres
-    plan: free
+    plan: basic-256mb
     region: ohio
     databaseName: flexbuddy
     user: flexbuddy
