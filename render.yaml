@@ -24,6 +24,8 @@ services:
         fromDatabase:
           name: flexbuddy-postgres
           property: password
+      - key: FLEXBUDDY_REMEMBER_ME_KEY
+        generateValue: true
 
 databases:
   - name: flexbuddy-postgres

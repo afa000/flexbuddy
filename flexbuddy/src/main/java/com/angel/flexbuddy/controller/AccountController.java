@@ -6,6 +6,9 @@ import java.time.LocalDate;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
+import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +40,8 @@ import com.angel.flexbuddy.dto.TimeZoneRequest;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import tools.jackson.databind.ObjectMapper;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
 import jakarta.validation.Valid;
@@ -51,10 +56,12 @@ public class AccountController {
     private final ObjectMapper objectMapper;
     private final Clock clock;
     private final AccountSettingsService settingsService;
+    private final PersistentTokenBasedRememberMeServices rememberMeServices;
 
     public AccountController(AccountService accountService, AccountBackupService backupService,
             AccountRestoreService restoreService, AppUserRepository userRepository, ObjectMapper objectMapper,
-            Clock clock, AccountSettingsService settingsService) {
+            Clock clock, AccountSettingsService settingsService,
+            PersistentTokenBasedRememberMeServices rememberMeServices) {
         this.accountService = accountService;
         this.backupService = backupService;
         this.restoreService = restoreService;
@@ -62,6 +69,7 @@ public class AccountController {
         this.objectMapper = objectMapper;
         this.clock = clock;
         this.settingsService = settingsService;
+        this.rememberMeServices = rememberMeServices;
     }
 
     @GetMapping("/login")
@@ -103,6 +111,14 @@ public class AccountController {
         userRepository.findByEmailIgnoreCase(principal.getName())
                 .ifPresent(user -> model.addAttribute("currentUser", user));
         return "account";
+    }
+
+    @PostMapping("/account/sign-out-everywhere")
+    public String signOutEverywhere(Authentication authentication, HttpServletRequest request,
+            HttpServletResponse response) {
+        rememberMeServices.logout(request, response, authentication);
+        new SecurityContextLogoutHandler().logout(request, response, authentication);
+        return "redirect:/login?everywhere";
     }
 
     @GetMapping("/account/settings")

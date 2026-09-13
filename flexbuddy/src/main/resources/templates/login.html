@@ -55,6 +55,9 @@
         <div class="notice success-notice" th:if="${param.logout}">
             You have signed out.
         </div>
+        <div class="notice success-notice" th:if="${param.everywhere}">
+            You have been signed out on every device.
+        </div>
 
         <form class="auth-form" th:action="@{/login}" method="post">
             <label class="field">
@@ -65,11 +68,24 @@
                 <span>Password</span>
                 <input name="password" type="password" autocomplete="current-password" required>
             </label>
+            <label class="remember-me-row">
+                <input id="rememberMe" name="remember-me" type="checkbox">
+                <span><strong>Keep me signed in</strong><small>Stay signed in on this device for 30 days.</small></span>
+            </label>
+            <input id="appDisplayMode" name="app-display-mode" type="hidden" value="browser">
             <button class="primary-button auth-submit" type="submit">Sign in</button>
         </form>
 
         <p class="auth-switch">New to FlexBuddy? <a href="/register">Create an account</a></p>
     </section>
 </main>
+<script>
+    (() => {
+        const standalone = window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        document.querySelector('#appDisplayMode').value = standalone ? 'standalone' : 'browser';
+        if (standalone) document.querySelector('#rememberMe').checked = true;
+    })();
+</script>
 </body>
 </html>

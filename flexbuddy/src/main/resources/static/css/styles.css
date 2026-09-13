@@ -286,6 +286,18 @@ button {
     margin-top: 4px;
 }
 
+.remember-me-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    color: var(--text);
+    cursor: pointer;
+}
+
+.remember-me-row input { margin-top: 3px; }
+.remember-me-row span { display: grid; gap: 3px; }
+.remember-me-row small { color: var(--muted); line-height: 1.4; }
+
 .auth-notice,
 .success-notice {
     margin: 0 0 20px;

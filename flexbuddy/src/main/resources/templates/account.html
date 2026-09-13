@@ -139,6 +139,15 @@
                     <button class="primary-button" id="restoreButton" type="button">Restore account data</button>
                 </section>
             </article>
+
+            <article class="panel data-card security-card">
+                <p class="step-label">SECURITY</p>
+                <h2>Signed-in devices</h2>
+                <p>Remove every persistent sign-in for your account, including this device. You will need your password the next time you open FlexBuddy.</p>
+                <form th:action="@{/account/sign-out-everywhere}" method="post">
+                    <button class="danger-button" type="submit">Sign out everywhere</button>
+                </form>
+            </article>
         </section>
     </main>
 

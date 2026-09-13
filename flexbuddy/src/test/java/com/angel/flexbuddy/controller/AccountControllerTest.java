@@ -78,6 +78,15 @@ class AccountControllerTest {
     }
 
     @Test
+    void loginPageOffersPersistentSignInForStandaloneMode() throws Exception {
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"remember-me\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Keep me signed in")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("display-mode: standalone")));
+    }
+
+    @Test
     void register_createsAccountAndRedirectsToLogin() throws Exception {
         mockMvc.perform(post("/register")
                         .with(csrf())

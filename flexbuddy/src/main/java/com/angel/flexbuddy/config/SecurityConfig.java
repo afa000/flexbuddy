@@ -1,5 +1,9 @@
 package com.angel.flexbuddy.config;
 
+import javax.sql.DataSource;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -9,12 +13,19 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
+import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
+import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
+import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
 
 import com.angel.flexbuddy.repository.AppUserRepository;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    public static final String REMEMBER_ME_COOKIE = "FLEXBUDDY_REMEMBER_ME";
+    public static final int REMEMBER_ME_VALIDITY_SECONDS = 30 * 24 * 60 * 60;
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -34,7 +45,38 @@ public class SecurityConfig {
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    PersistentTokenRepository persistentTokenRepository(ObjectProvider<DataSource> dataSourceProvider) {
+        DataSource dataSource = dataSourceProvider.getIfAvailable();
+        if (dataSource == null) {
+            return new InMemoryTokenRepositoryImpl();
+        }
+        JdbcTokenRepositoryImpl repository = new JdbcTokenRepositoryImpl();
+        repository.setDataSource(dataSource);
+        return repository;
+    }
+
+    @Bean
+    PersistentTokenBasedRememberMeServices rememberMeServices(
+            @Value("${flexbuddy.security.remember-me-key}") String key,
+            UserDetailsService userDetailsService,
+            PersistentTokenRepository tokenRepository) {
+        PersistentTokenBasedRememberMeServices services = new PersistentTokenBasedRememberMeServices(
+                key, userDetailsService, tokenRepository);
+        services.setParameter("remember-me");
+        services.setCookieName(REMEMBER_ME_COOKIE);
+        services.setTokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS);
+        services.setUseSecureCookie(true);
+        services.setCookieCustomizer(cookie -> {
+            cookie.setHttpOnly(true);
+            cookie.setSecure(true);
+            cookie.setAttribute("SameSite", "Lax");
+        });
+        return services;
+    }
+
+    @Bean
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+            PersistentTokenBasedRememberMeServices rememberMeServices) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
@@ -58,6 +100,9 @@ public class SecurityConfig {
                         .loginPage("/login")
                         .defaultSuccessUrl("/", true)
                         .permitAll()
+                )
+                .rememberMe(remember -> remember
+                        .rememberMeServices(rememberMeServices)
                 )
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")

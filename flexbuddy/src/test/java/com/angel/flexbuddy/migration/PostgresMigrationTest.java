@@ -52,11 +52,12 @@ class PostgresMigrationTest {
             throughV3.migrate();
             insertLegacyRow(schema);
 
-            assertThat(latest.migrate().migrationsExecuted).isEqualTo(4);
+            assertThat(latest.migrate().migrationsExecuted).isEqualTo(5);
             assertBackfilledValues(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
+            assertPersistentLoginSchema(schema);
             assertHibernateMappingsMatch(schema);
         } finally {
             latest.clean();
@@ -174,6 +175,20 @@ class PostgresMigrationTest {
                     .doValidation(metadata, options, ContributableMatcher.ALL);
         } finally {
             StandardServiceRegistryBuilder.destroy(registry);
+        }
+    }
+
+    private void assertPersistentLoginSchema(String schema) throws Exception {
+        try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("""
+                select count(*) from information_schema.columns
+                where table_schema = ? and table_name = 'persistent_logins'
+                  and column_name in ('username', 'series', 'token', 'last_used')
+                """)) {
+            statement.setString(1, schema);
+            try (ResultSet result = statement.executeQuery()) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isEqualTo(4);
+            }
         }
     }
 
