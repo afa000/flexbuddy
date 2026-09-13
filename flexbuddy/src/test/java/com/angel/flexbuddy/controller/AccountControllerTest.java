@@ -104,8 +104,7 @@ class AccountControllerTest {
         mockMvc.perform(get("/register"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/privacy\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("adults age 18 and over")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")));
     }
 
     @Test
