@@ -109,6 +109,16 @@ public class AccountController {
         return "redirect:/login?registered";
     }
 
+    @GetMapping("/privacy")
+    public String privacyPage() {
+        return "privacy";
+    }
+
+    @GetMapping("/terms")
+    public String termsPage() {
+        return "terms";
+    }
+
     @GetMapping("/delete-account")
     public String deletionInfoPage() {
         return "delete-account";

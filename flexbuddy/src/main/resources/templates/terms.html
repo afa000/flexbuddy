@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#abdff8" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="description" content="Read the terms that apply when using FlexBuddy to track shifts, mileage, earnings, and expenses.">
+    <title>Terms of use | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+    <script>
+        document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.setAttribute('content',
+            document.documentElement.dataset.theme === 'light' ? '#abdff8' : '#075c76'));
+    </script>
+</head>
+<body class="auth-page">
+<main class="auth-layout legal-layout">
+    <article class="auth-card info-card legal-card" aria-labelledby="terms-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Terms</small></div>
+        </div>
+
+        <p class="eyebrow">TERMS OF USE</p>
+        <h1 id="terms-title">Using FlexBuddy</h1>
+        <p class="legal-meta">Effective September 13, 2026</p>
+        <p class="auth-copy">These terms apply when you create an account or use FlexBuddy. By using the app, you agree to them.</p>
+
+        <h2>What the service does</h2>
+        <p>FlexBuddy helps delivery drivers organize shifts, earnings, mileage, expenses, reminders, and reports. The app may extract proposed shift details from screenshots for you to review before saving.</p>
+
+        <h2>Your account</h2>
+        <p>You are responsible for providing accurate account information, protecting your password and calendar links, and for activity performed through your account. Tell us promptly if you believe someone has accessed your account without permission.</p>
+
+        <h2>Your information</h2>
+        <p>You keep ownership of the information and screenshots you submit. You give FlexBuddy permission to process that content only as needed to provide, secure, and maintain the service. You must have the right to upload any content you submit.</p>
+        <p>How personal information is handled is described in the <a href="/privacy">Privacy Policy</a>.</p>
+
+        <h2>Accuracy and financial decisions</h2>
+        <p>Review imported details and calculations before relying on them. OCR, mileage estimates, totals, hourly rates, and reports can be incomplete or incorrect.</p>
+        <p>FlexBuddy is a record-keeping tool. It does not provide tax, accounting, legal, investment, lending, payment, or other professional financial advice. Keep source records and consult a qualified professional when needed.</p>
+
+        <h2>Acceptable use</h2>
+        <p>Do not misuse the service, interfere with its operation, attempt unauthorized access, upload malicious content, violate another person's rights, or use FlexBuddy in violation of applicable law.</p>
+
+        <h2>Third-party services and affiliation</h2>
+        <p>FlexBuddy relies on services such as Render for hosting and browser services for optional notifications. Their availability can affect the app.</p>
+        <p>FlexBuddy is an independent tool and is not affiliated with, endorsed by, or sponsored by Amazon or any delivery platform. Company names that appear in user-entered data belong to their respective owners.</p>
+
+        <h2>Availability and changes</h2>
+        <p>The service may change, experience interruptions, or stop being offered. Reasonable efforts will be made to keep it available and protect stored data, but uninterrupted or error-free operation is not guaranteed.</p>
+
+        <h2>Ending use</h2>
+        <p>You may stop using FlexBuddy at any time and permanently delete your account from the Account screen. Access may be limited or ended if these terms are violated or if doing so is necessary to protect the service or other users.</p>
+
+        <h2>Warranty and responsibility</h2>
+        <p>FlexBuddy is provided as available. To the extent permitted by law, the developer is not responsible for indirect or consequential losses arising from use of the service, missed shifts, inaccurate imports or calculations, lost data, or reliance on reports. Nothing in these terms removes rights that cannot legally be excluded.</p>
+
+        <h2>Changes to these terms</h2>
+        <p>If these terms change, the effective date above will be updated. Continuing to use the service after a change means the revised terms apply.</p>
+
+        <h2>Contact</h2>
+        <p>Questions about these terms can be sent to <a href="mailto:aflo692@wgu.edu">aflo692@wgu.edu</a>.</p>
+
+        <nav class="legal-links" aria-label="Legal pages">
+            <a href="/privacy">Privacy Policy</a>
+            <a href="/login">Sign in</a>
+        </nav>
+    </article>
+</main>
+</body>
+</html>

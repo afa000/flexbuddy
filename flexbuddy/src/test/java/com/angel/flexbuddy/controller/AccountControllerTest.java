@@ -87,6 +87,27 @@ class AccountControllerTest {
     }
 
     @Test
+    void privacyAndTermsPagesArePublicAndLinkedFromRegistration() throws Exception {
+        mockMvc.perform(get("/privacy"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("privacy"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("How FlexBuddy handles your data")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Screenshots you select")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("aflo692@wgu.edu")));
+
+        mockMvc.perform(get("/terms"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("terms"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Using FlexBuddy")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("not affiliated with")));
+
+        mockMvc.perform(get("/register"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/privacy\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")));
+    }
+
+    @Test
     void loginPageOffersPersistentSignInForStandaloneMode() throws Exception {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
@@ -155,7 +176,9 @@ class AccountControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(model().attributeExists("deletion"))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Delete account permanently")))
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_method\" value=\"delete\"")));
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("name=\"_method\" value=\"delete\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/privacy\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/terms\"")));
     }
 
     @Test

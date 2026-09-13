@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#abdff8" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="description" content="Read the FlexBuddy privacy policy and learn how account, shift, expense, and screenshot data is handled.">
+    <title>Privacy policy | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+    <script>
+        document.querySelectorAll('meta[name="theme-color"]').forEach(meta => meta.setAttribute('content',
+            document.documentElement.dataset.theme === 'light' ? '#abdff8' : '#075c76'));
+    </script>
+</head>
+<body class="auth-page">
+<main class="auth-layout legal-layout">
+    <article class="auth-card info-card legal-card" aria-labelledby="privacy-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Privacy</small></div>
+        </div>
+
+        <p class="eyebrow">PRIVACY POLICY</p>
+        <h1 id="privacy-title">How FlexBuddy handles your data</h1>
+        <p class="legal-meta">Effective September 13, 2026</p>
+        <p class="auth-copy">FlexBuddy is a shift, mileage, and expense tracker for delivery drivers. This policy explains what the app collects, why it is used, and how you can remove it.</p>
+
+        <h2>Information you provide</h2>
+        <ul class="legal-list">
+            <li><strong>Account information:</strong> your display name, email address, and a one-way password hash. FlexBuddy never stores your plain-text password.</li>
+            <li><strong>Shift information:</strong> dates, times, stations, status, base pay, tips, mileage, and related timestamps.</li>
+            <li><strong>Expense information:</strong> dates, categories, amounts, notes, and any shift you choose to associate with an expense.</li>
+            <li><strong>Settings:</strong> time zone, reminder choices, vehicle-cost method, mileage rate, calendar token, and backup date.</li>
+            <li><strong>Device features:</strong> if you enable push reminders, the app stores the browser push endpoint and encryption keys needed to send them, along with basic browser information and delivery timestamps.</li>
+        </ul>
+
+        <h2>Screenshot imports</h2>
+        <p>Screenshots you select are sent to the FlexBuddy server for OCR processing in memory. The original image is not saved. Only shift details that you review and choose to import are stored with your account.</p>
+
+        <h2>How the information is used</h2>
+        <p>FlexBuddy uses this information to authenticate you, display and calculate your shift history, earnings, mileage, expenses, reports, reminders, calendar feeds, backups, and restores. It is also used to protect the service and diagnose operational problems.</p>
+
+        <h2>Hosting and sharing</h2>
+        <p>The application and its PostgreSQL database are hosted by Render in Ohio, United States. Render processes data as the infrastructure provider needed to operate FlexBuddy.</p>
+        <p>FlexBuddy does not sell your personal information, share it with advertisers, display ads, or use analytics services. Information is disclosed only when needed to operate the service, comply with law, or protect the service and its users.</p>
+
+        <h2>Storage and security</h2>
+        <p>FlexBuddy uses HTTPS in production, hashes passwords, and limits account data to the signed-in user. No internet service can guarantee absolute security, so download backups only to devices and locations you trust.</p>
+        <p>Backup files you download are not stored by FlexBuddy. They remain on your device or wherever you choose to save them.</p>
+
+        <h2>Your choices and deletion</h2>
+        <p>You can edit or remove individual shifts and expenses in the app, disable reminders, regenerate a calendar link, sign out other devices, or download a copy of your account data.</p>
+        <p>You can permanently delete your account from the Account screen. This immediately removes your account and associated app data. See the <a href="/delete-account">account deletion instructions</a> for details.</p>
+
+        <h2>Changes to this policy</h2>
+        <p>If this policy changes, the effective date above will be updated. Material changes will be communicated in the app when appropriate.</p>
+
+        <h2>Contact</h2>
+        <p>Questions about privacy or your data can be sent to <a href="mailto:aflo692@wgu.edu">aflo692@wgu.edu</a>.</p>
+
+        <nav class="legal-links" aria-label="Legal pages">
+            <a href="/terms">Terms of use</a>
+            <a href="/login">Sign in</a>
+        </nav>
+    </article>
+</main>
+</body>
+</html>
