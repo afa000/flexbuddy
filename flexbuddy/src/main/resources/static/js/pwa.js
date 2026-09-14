@@ -1,5 +1,5 @@
 (() => {
-    const THEME_COLORS = {dark: '#075c76', light: '#abdff8'};
+    const THEME_COLORS = {dark: '#075c76', light: '#075c76'};
     const USER_CACHE_PREFIXES = ['flexbuddy-data', 'flexbuddy-pages-'];
     const shellFromCache = Boolean(document.querySelector('meta[name="flexbuddy-shell"]'));
     const installListeners = [];
