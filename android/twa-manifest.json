@@ -1,0 +1,71 @@
+{
+  "packageId": "com.angel.flexbuddy",
+  "host": "flexbuddy.onrender.com",
+  "name": "FlexBuddy",
+  "launcherName": "FlexBuddy",
+  "display": "standalone",
+  "themeColor": "#075C76",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#02080B",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://flexbuddy.onrender.com/icons/icon-512.png",
+  "maskableIconUrl": "https://flexbuddy.onrender.com/icons/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "upload-key.keystore",
+    "alias": "flexbuddy-upload"
+  },
+  "appVersionName": "1",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Import a shift",
+      "shortName": "Import",
+      "url": "https://flexbuddy.onrender.com/?screen=import",
+      "chosenIconUrl": "https://flexbuddy.onrender.com/icons/icon-192.png"
+    },
+    {
+      "name": "Expenses",
+      "shortName": "Expenses",
+      "url": "https://flexbuddy.onrender.com/?screen=expenses",
+      "chosenIconUrl": "https://flexbuddy.onrender.com/icons/icon-192.png"
+    },
+    {
+      "name": "Schedule",
+      "shortName": "Schedule",
+      "url": "https://flexbuddy.onrender.com/?screen=schedule",
+      "chosenIconUrl": "https://flexbuddy.onrender.com/icons/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://flexbuddy.onrender.com/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://flexbuddy.onrender.com/",
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [
+    {
+      "name": "Upload key",
+      "value": "A3:EC:82:A5:7E:FD:B3:07:93:B0:C6:88:E2:32:B1:E9:4B:49:53:69:70:46:54:EC:24:29:AB:6A:84:BF:FE:37"
+    }
+  ],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": "",
+  "displayOverride": [],
+  "appVersion": "1"
+}

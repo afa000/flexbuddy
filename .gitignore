@@ -1,0 +1,22 @@
+# Android signing material must never be committed.
+*.keystore
+*.jks
+*.p12
+
+# Android and Gradle build output.
+android/.gradle/
+android/.idea/
+android/.cxx/
+android/local.properties
+android/app/build/
+android/build/
+android/*.apk
+android/*.aab
+android/*.idsig
+
+# Root-level output produced if Bubblewrap is run from the wrong directory.
+/.gradle/
+/app/
+/build/
+/app-release-*.apk
+/app-release-*.aab
