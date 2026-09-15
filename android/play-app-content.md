@@ -63,7 +63,13 @@ reads an advertising ID.
 | Allows purchases of digital goods | No |
 | Is a web browser or search engine | No: the app opens only `flexbuddy.onrender.com` |
 
-Expected result: the lowest age rating in each region (for example ESRB Everyone, PEGI 3).
+The questionnaire as submitted on September 14, 2026 also asked, and was answered **No** to: content
+that isn't part of the initial download but can be accessed from the app (FlexBuddy shows only each
+user's own records, not a content catalog), promoting or selling age-restricted products, cash
+rewards or transferable digital assets, and being primarily a news or educational product.
+
+Ratings received: ESRB Everyone, PEGI 3, USK All ages, ClassInd All ages, IARC Generic 3+, and
+Google Play 3+ for Russia and South Korea, with no content descriptors.
 
 ## Target audience and content
 
