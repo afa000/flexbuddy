@@ -67,16 +67,36 @@ or any delivery platform.
 
 | Asset | File | Required size | Status |
 |---|---|---|---|
-| App icon | `android/store_icon.png` | 512 × 512 PNG | Full-bleed, opaque; Play applies its own corner mask |
-| Feature graphic | `android/feature_graphic.png` | 1024 × 500 PNG/JPEG | Original FlexBuddy branding only |
-| Phone screenshots | Capture from the Play-installed build | 4–8, 16:9 or 9:16, 320–3840 px sides | To do after Stage 6 |
+| App icon | `android/store_icon.png` | 512 × 512 PNG | The F-and-outline mark redrawn from the provided icon sheet; full-bleed, opaque; Play applies its own corner mask |
+| Feature graphic | `android/feature_graphic.png` | 1024 × 500 PNG/JPEG | Original FlexBuddy branding with the new app icon |
+| Phone screenshots | `android/store-screenshots/*.png` | 2–8, 16:9 or 9:16, 320–3840 px sides | 1242 × 2208 (exactly 9:16), 24-bit PNG |
+| 7-inch tablet screenshots | `android/store-screenshots/tablet-7/*.png` | Up to 8, 16:9 or 9:16, 320–3840 px sides | 1224 × 2176 (exactly 9:16), 24-bit PNG |
+| 10-inch tablet screenshots | `android/store-screenshots/tablet-10/*.png` | Up to 8, 16:9 or 9:16, 1080–7680 px sides | 1080 × 1920 (exactly 9:16), 24-bit PNG |
 
-Recommended screenshots, all captured from the reviewer account's sample data:
+The icon was redrawn as vector shapes from the provided icon sheet on September 14, 2026, so every
+size (Play, web app manifest, maskable, Android launcher, splash, and notification) is sharp and
+consistent. The Android launcher, splash, and notification icons only reach devices in a new app
+bundle (version code 2); the web icons update with the next deploy.
 
-1. Dashboard with earnings, hours, and net totals.
-2. Screenshot import review showing the parsed fields.
-3. Schedule with upcoming blocks and the calendar.
-4. Expenses with category totals.
-5. Earnings report (optional).
+Tablet screenshots use the same capture as the phone set: a 612 × 1088 viewport at 2x for 7-inch
+tablets and an 810 × 1440 viewport at 1.33x for 10-inch tablets, both in portrait so the app's
+tablet layout fills the frame.
+
+The screenshots were captured on September 14, 2026 from the Play-installed build signed in to the
+reviewer account with its sample data. They show the app's web content at a 414 × 736 phone viewport
+through Chrome DevTools, without the Android status bar. The update toast and backup reminder were
+hidden because they are transient prompts.
+
+Suggested upload order:
+
+1. `01-dashboard.png`: earnings, shifts, hours, and the next scheduled block.
+2. `03-schedule.png`: the next block with its countdown, offered pay, and actions.
+3. `06-history.png`: shift history with pay, hours, miles, and a forfeited block.
+4. `04-expenses.png`: expense totals and the vehicle cost method.
+5. `02-earnings-report.png`: the weekly earnings breakdown.
+6. `05-import.png`: the screenshot import step (optional).
+
+A screenshot of the import review with parsed fields is not included: it would need a sample
+screenshot image, and it must not show another app's screen.
 
 Do not show third-party logos, other apps' screens, or real personal data in any screenshot.
