@@ -94,6 +94,22 @@ class PersistentSignInIntegrationTest {
     }
 
     @Test
+    void concurrentRequestsWithTheSameRememberMeCookieKeepTheUserSignedIn() throws Exception {
+        MvcResult login = login(true);
+        Cookie cookie = login.getResponse().getCookie(SecurityConfig.REMEMBER_ME_COOKIE);
+
+        // An app launch sends the page and service worker requests together, before either sees a rotated cookie.
+        mockMvc.perform(get("/").secure(true).cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(EMAIL));
+        mockMvc.perform(get("/account").secure(true).cookie(cookie))
+                .andExpect(status().isOk())
+                .andExpect(authenticated().withUsername(EMAIL));
+
+        assertThat(tokenCount()).isOne();
+    }
+
+    @Test
     void logoutRevokesCurrentPersistentToken() throws Exception {
         MvcResult login = login(true);
         Cookie cookie = login.getResponse().getCookie(SecurityConfig.REMEMBER_ME_COOKIE);

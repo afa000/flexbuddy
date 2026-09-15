@@ -1,5 +1,7 @@
 package com.angel.flexbuddy.config;
 
+import java.time.Clock;
+
 import javax.sql.DataSource;
 
 import org.springframework.beans.factory.ObjectProvider;
@@ -59,9 +61,10 @@ public class SecurityConfig {
     PersistentTokenBasedRememberMeServices rememberMeServices(
             @Value("${flexbuddy.security.remember-me-key}") String key,
             UserDetailsService userDetailsService,
-            PersistentTokenRepository tokenRepository) {
-        PersistentTokenBasedRememberMeServices services = new PersistentTokenBasedRememberMeServices(
-                key, userDetailsService, tokenRepository);
+            PersistentTokenRepository tokenRepository,
+            Clock clock) {
+        PersistentTokenBasedRememberMeServices services = new RotationTolerantRememberMeServices(
+                key, userDetailsService, tokenRepository, clock);
         services.setParameter("remember-me");
         services.setCookieName(REMEMBER_ME_COOKIE);
         services.setTokenValiditySeconds(REMEMBER_ME_VALIDITY_SECONDS);
