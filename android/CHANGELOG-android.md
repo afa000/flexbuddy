@@ -13,8 +13,11 @@
 - No other shell changes. The white flash between the splash screen and the first page no
   longer occurs: on September 26, 2026, four cold launches on the emulator sampled every
   100–220 ms went straight from the dark splash to the page
-- Built unsigned with Bubblewrap on September 26, 2026; to be signed interactively with the
-  upload key and uploaded to Closed testing - Alpha
+- Built unsigned with Bubblewrap on September 26, 2026, signed interactively with the upload key,
+  and tested on the emulator: sharing an image from Google Photos opened the import screen with
+  it read
+- Uploaded to Closed testing - Alpha on September 26, 2026 as `2 (share-to-import and new icon)`
+  (version 1 not carried over) and sent to Google for review
 
 ## Version code 1 — initial internal-test build
 
