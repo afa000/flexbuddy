@@ -3,6 +3,9 @@ const BUILD_ID = '@buildId@';
 const STATIC_CACHE = `flexbuddy-static-${BUILD_ID}`;
 const PAGES_CACHE = `flexbuddy-pages-${BUILD_ID}`;
 const DATA_CACHE = 'flexbuddy-data';
+// Screenshots shared from another app wait here until the import screen reads them.
+const SHARE_CACHE = 'flexbuddy-share-inbox';
+const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const VERSIONED_ASSETS = [
     '/css/styles.css', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/calendar.js',
@@ -25,10 +28,11 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
     event.waitUntil((async () => {
-        const keep = new Set([STATIC_CACHE, PAGES_CACHE, DATA_CACHE]);
+        const keep = new Set([STATIC_CACHE, PAGES_CACHE, DATA_CACHE, SHARE_CACHE]);
         const keys = await caches.keys();
         await Promise.all(keys.filter(key => key.startsWith('flexbuddy-') && !keep.has(key))
             .map(key => caches.delete(key)));
+        await removeStaleShares();
         await self.clients.claim();
     })());
 });
@@ -41,12 +45,17 @@ self.addEventListener('message', event => {
     }
 });
 
-// Writes, logins, downloads, and uploads are never intercepted: only GET requests on this origin are handled.
+// Writes, logins, downloads, and uploads are never intercepted: only GET requests on this origin are handled,
+// plus the share-target POST, which never leaves the device.
 self.addEventListener('fetch', event => {
     const request = event.request;
-    if (request.method !== 'GET') return;
     const url = new URL(request.url);
     if (url.origin !== self.location.origin) return;
+    if (request.method === 'POST' && url.pathname === '/share-import') {
+        event.respondWith(receiveSharedScreenshot(request));
+        return;
+    }
+    if (request.method !== 'GET') return;
     const path = url.pathname;
     if (NETWORK_ONLY.some(pattern => pattern.test(path))) return;
     if (request.mode === 'navigate') {
@@ -59,6 +68,37 @@ self.addEventListener('fetch', event => {
     }
     if (DATA_PATHS.some(pattern => pattern.test(path))) event.respondWith(networkFirstData(request));
 });
+
+/** Keeps the shared image on the device and opens the import screen, which reads and deletes it. */
+async function receiveSharedScreenshot(request) {
+    const importUrl = shared => new URL(`/?screen=import&shared=${shared}`, self.location.origin).href;
+    try {
+        const form = await request.formData();
+        const file = form.getAll('screenshot').find(item => item instanceof File);
+        if (!file) return Response.redirect(importUrl('unavailable'), 303);
+        const id = crypto.randomUUID();
+        const cache = await caches.open(SHARE_CACHE);
+        await cache.put(`/share-inbox/${id}`, new Response(file, {
+            headers: {
+                'Content-Type': file.type || 'application/octet-stream',
+                'X-File-Name': encodeURIComponent(file.name || 'shared-screenshot'),
+                'X-Shared-At': String(Date.now())
+            }
+        }));
+        return Response.redirect(importUrl(id), 303);
+    } catch (error) {
+        return Response.redirect(importUrl('unavailable'), 303);
+    }
+}
+
+async function removeStaleShares() {
+    const cache = await caches.open(SHARE_CACHE);
+    const cutoff = Date.now() - SHARE_MAX_AGE_MS;
+    for (const request of await cache.keys()) {
+        const response = await cache.match(request);
+        if (!response || Number(response.headers.get('X-Shared-At') || 0) < cutoff) await cache.delete(request);
+    }
+}
 
 async function cacheShell(path) {
     const url = new URL(path || '/', self.location.origin);
@@ -123,7 +163,7 @@ async function networkFirstData(request) {
 
 async function clearUserData() {
     const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key === DATA_CACHE || key.startsWith('flexbuddy-pages-'))
+    await Promise.all(keys.filter(key => key === DATA_CACHE || key === SHARE_CACHE || key.startsWith('flexbuddy-pages-'))
         .map(key => caches.delete(key)));
 }
 

@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -36,5 +37,16 @@ public class PageController {
                     model.addAttribute("backupDue", backupDue);
                 });
         return "shifts";
+    }
+
+    /**
+     * Android shares a screenshot here as a multipart POST. The service worker normally answers
+     * it on the device; this runs only when no worker controls the page, so the file is ignored
+     * and the import screen asks the driver to choose it again. It changes nothing, so it is
+     * exempt from CSRF checks, which a share from another app cannot pass.
+     */
+    @PostMapping("/share-import")
+    public String sharedScreenshotWithoutServiceWorker() {
+        return "redirect:/?screen=import&shared=unavailable";
     }
 }

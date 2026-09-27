@@ -1,6 +1,6 @@
 (() => {
     const THEME_COLORS = {dark: '#075c76', light: '#075c76'};
-    const USER_CACHE_PREFIXES = ['flexbuddy-data', 'flexbuddy-pages-'];
+    const USER_CACHE_PREFIXES = ['flexbuddy-data', 'flexbuddy-pages-', 'flexbuddy-share-inbox'];
     const shellFromCache = Boolean(document.querySelector('meta[name="flexbuddy-shell"]'));
     const installListeners = [];
     const disabledByOffline = new Set();

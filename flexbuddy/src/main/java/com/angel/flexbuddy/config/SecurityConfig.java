@@ -107,6 +107,8 @@ public class SecurityConfig {
                         .defaultSuccessUrl("/", true)
                         .permitAll()
                 )
+                // Shares arrive from another app without a token; the endpoint only redirects.
+                .csrf(csrf -> csrf.ignoringRequestMatchers("/share-import"))
                 .rememberMe(remember -> remember
                         .rememberMeServices(rememberMeServices)
                 )

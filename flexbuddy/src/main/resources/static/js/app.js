@@ -1582,6 +1582,40 @@ function openInitialScreen() {
     else showDashboard(false);
 }
 
+const SHARE_INBOX = 'flexbuddy-share-inbox';
+const SHARED_UNAVAILABLE = 'The shared screenshot is no longer available. Choose it again.';
+
+/** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
+async function importSharedScreenshot() {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('shared');
+    if (!id) return;
+    // Removed first so a reload or the back button never imports the same share twice.
+    params.delete('shared');
+    const query = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+
+    const file = await takeSharedFile(id);
+    if (file) processScreenshot(file);
+    else showMessage(elements.uploadError, SHARED_UNAVAILABLE);
+}
+
+async function takeSharedFile(id) {
+    if (!/^[0-9a-f-]{36}$/i.test(id) || !('caches' in window)) return null;
+    try {
+        const cache = await caches.open(SHARE_INBOX);
+        const key = `/share-inbox/${id}`;
+        const response = await cache.match(key);
+        if (!response) return null;
+        await cache.delete(key);
+        const blob = await response.blob();
+        const name = decodeURIComponent(response.headers.get('X-File-Name') || 'shared-screenshot');
+        return new File([blob], name, {type: blob.type || response.headers.get('Content-Type') || ''});
+    } catch {
+        return null;
+    }
+}
+
 async function signOut(event) {
     event.preventDefault();
     try {
@@ -1662,6 +1696,7 @@ document.addEventListener('flexbuddy:cache-ready', () => {
 updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
 openInitialScreen();
+importSharedScreenshot();
 loadStations();
 loadDashboard();
 reportTimeZone();
