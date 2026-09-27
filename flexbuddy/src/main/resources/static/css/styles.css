@@ -2064,3 +2064,66 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .error-actions { display: grid; gap: 12px; }
 .error-actions .info-action { margin-top: 0; }
 .error-support-link { display: flex; justify-content: center; }
+
+/* Block value calculator */
+.evaluate-panel { margin-top: 18px; padding: 0; }
+.evaluate-summary { padding: 20px 29px; display: flex; align-items: center; justify-content: space-between; gap: 8px 18px; flex-wrap: wrap; list-style: none; cursor: pointer; }
+.evaluate-summary::-webkit-details-marker { display: none; }
+.evaluate-summary::after { content: ""; width: 9px; height: 9px; flex: none; border: solid var(--muted); border-width: 0 2px 2px 0; transform: rotate(45deg); transition: transform .15s ease; }
+.evaluate-panel[open] > .evaluate-summary::after { transform: rotate(-135deg); }
+.evaluate-summary:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; border-radius: var(--radius); }
+.evaluate-title { display: grid; gap: 2px; }
+.evaluate-title .step-label { margin: 0; }
+.evaluate-title strong { font-size: 20px; }
+.evaluate-summary-result { margin-left: auto; color: var(--muted); font-size: 13px; font-weight: 700; }
+.evaluate-summary-result.has-result { color: var(--cyan); }
+.evaluate-panel[open] .evaluate-summary-result { display: none; }
+.evaluate-form { padding: 4px 29px 0; display: grid; grid-template-columns: minmax(150px, 1fr) minmax(0, 2.2fr) minmax(120px, .9fr) minmax(120px, .9fr); gap: 14px; align-items: end; }
+.evaluate-form .field > span:first-child small { color: var(--faint); font-weight: 600; text-transform: none; letter-spacing: 0; }
+.hour-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.hour-choices button { min-width: 44px; height: 47px; padding: 0 10px; color: var(--text); background: var(--surface-deep); border: 1px solid var(--line); border-radius: 5px; font-weight: 750; cursor: pointer; }
+.hour-choices button:hover, .hour-choices button.is-active { color: var(--primary-text); background: var(--cyan); border-color: var(--cyan); }
+.hour-choices button:focus-visible { border-color: var(--cyan); box-shadow: 0 0 0 3px var(--focus-ring); outline: none; }
+.evaluate-form .hour-choices input { width: 76px; flex: 1 1 76px; }
+.evaluate-result { margin: 18px 29px 26px; padding: 18px 20px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 8px; transition: opacity .15s ease; }
+.evaluate-result.is-loading { opacity: .6; }
+.evaluate-empty { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.evaluate-error { color: var(--error); }
+.evaluate-headline { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; }
+.evaluate-figure { display: flex; align-items: baseline; gap: 8px; }
+.evaluate-figure strong { font-size: 40px; line-height: 1; letter-spacing: -.02em; }
+.evaluate-figure span { color: var(--muted); font-size: 13px; font-weight: 700; }
+.verdict-pill { padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.verdict-above { color: var(--primary-text); background: var(--cyan); border: 1px solid var(--cyan); }
+.verdict-about { color: var(--text); background: var(--surface-raised); border: 1px solid var(--line); }
+.verdict-below { color: var(--error); background: var(--error-surface); border: 1px solid var(--error-border); }
+.evaluate-breakdown { margin: 16px 0 0; display: grid; gap: 7px; }
+.evaluate-breakdown div { display: flex; justify-content: space-between; gap: 14px; font-size: 13px; }
+.evaluate-breakdown dt { color: var(--muted); }
+.evaluate-breakdown dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.evaluate-breakdown .evaluate-total { padding-top: 8px; border-top: 1px solid var(--line-soft); font-weight: 800; }
+.evaluate-breakdown .evaluate-total dt { color: var(--text); }
+.evaluate-basis { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.evaluate-basis strong { color: var(--text); }
+
+@media (max-width: 900px) {
+    .evaluate-form { grid-template-columns: 1fr 1fr; }
+    .evaluate-form > .field:first-child, .evaluate-hours { grid-column: 1 / -1; }
+    /* Pay comes first, right under the live answer in the header, so both stay in view while typing. */
+    .evaluate-form .money-field { order: -1; }
+}
+
+@media (max-width: 620px) {
+    .evaluate-panel { margin-top: 0; border-width: 0 0 8px; border-color: var(--surface-raised); border-radius: 0; }
+    .evaluate-summary { padding: 16px 18px; }
+    .evaluate-title strong { font-size: 18px; }
+    /* Stays visible while the card is open, so the answer shows above the form with the keyboard up. */
+    .evaluate-summary-result, .evaluate-panel[open] .evaluate-summary-result { width: 100%; margin-left: 0; display: block; order: 1; font-size: 12px; }
+    .evaluate-panel[open] .evaluate-summary-result:not(.has-result) { display: none; }
+    .evaluate-form { padding: 0 18px; gap: 12px; }
+    .hour-choices { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .hour-choices button { min-width: 0; padding: 0; }
+    .evaluate-form .hour-choices input { width: 100%; grid-column: span 2; }
+    .evaluate-result { margin: 14px 18px 18px; padding: 16px; }
+    .evaluate-figure strong { font-size: 34px; }
+}

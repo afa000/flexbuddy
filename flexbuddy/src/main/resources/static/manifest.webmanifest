@@ -59,6 +59,18 @@
   ],
   "shortcuts": [
     {
+      "name": "Evaluate a block",
+      "short_name": "Evaluate",
+      "url": "/?screen=evaluate",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
       "name": "Import a shift",
       "short_name": "Import",
       "url": "/?screen=import",

@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.angel.flexbuddy.dto.BlockEvaluationRequest;
+import com.angel.flexbuddy.dto.BlockEvaluationResponse;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.EarningsReportResponse;
 import com.angel.flexbuddy.dto.GroupBy;
@@ -33,6 +35,7 @@ import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.dto.ShiftStatusRequest;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.model.ShiftStatus;
+import com.angel.flexbuddy.service.BlockEvaluator;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftReportService;
 import com.angel.flexbuddy.service.ShiftService;
@@ -52,16 +55,18 @@ public class ShiftController {
     private final ShiftCsvWriter csvWriter;
     private final Clock clock;
     private final ExpenseService expenseService;
+    private final BlockEvaluator blockEvaluator;
 
     public ShiftController(ShiftService shiftService, ShiftReportService reportService,
             ShiftImportService shiftImportService, ShiftCsvWriter csvWriter, Clock clock,
-            ExpenseService expenseService) {
+            ExpenseService expenseService, BlockEvaluator blockEvaluator) {
         this.shiftService = shiftService;
         this.reportService = reportService;
         this.shiftImportService = shiftImportService;
         this.csvWriter = csvWriter;
         this.clock = clock;
         this.expenseService = expenseService;
+        this.blockEvaluator = blockEvaluator;
     }
 
     @GetMapping
@@ -112,6 +117,11 @@ public class ShiftController {
     @PostMapping
     public ShiftResponse createShift(Principal principal, @Valid @RequestBody CreateShiftRequest request) {
         return shiftService.createShift(principal.getName(), request);
+    }
+
+    @PostMapping("/evaluate")
+    public BlockEvaluationResponse evaluate(Principal principal, @Valid @RequestBody BlockEvaluationRequest request) {
+        return blockEvaluator.evaluate(principal.getName(), request);
     }
 
     @PostMapping(value = "/import-preview", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

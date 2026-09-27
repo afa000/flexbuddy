@@ -41,6 +41,8 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithAnonymousUser;
 
 import com.angel.flexbuddy.config.SecurityConfig;
+import com.angel.flexbuddy.dto.BlockEvaluationRequest;
+import com.angel.flexbuddy.dto.BlockEvaluationResponse;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
@@ -53,6 +55,7 @@ import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.exception.GlobalExceptionHandler;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
+import com.angel.flexbuddy.service.BlockEvaluator;
 import com.angel.flexbuddy.service.ShiftImportService;
 import com.angel.flexbuddy.service.ShiftService;
 import com.angel.flexbuddy.service.ShiftReportService;
@@ -90,12 +93,64 @@ class ShiftControllerTest {
     @MockitoBean
     private AppUserRepository userRepository;
 
+    @MockitoBean
+    private BlockEvaluator blockEvaluator;
+
     @Test
     @WithAnonymousUser
     void shiftsRequireAuthentication() throws Exception {
         mockMvc.perform(get("/shifts"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void evaluateRequiresAuthentication() throws Exception {
+        mockMvc.perform(post("/shifts/evaluate").with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"station\":\"VEA7\",\"hours\":4,\"offeredPay\":84}"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+        verifyNoInteractions(blockEvaluator);
+    }
+
+    @Test
+    void evaluate_returnsTheEstimateForTheSignedInDriver() throws Exception {
+        when(blockEvaluator.evaluate(eq("angel@example.com"), any(BlockEvaluationRequest.class))).thenReturn(
+                new BlockEvaluationResponse(BlockEvaluationResponse.Basis.STATION_90_DAYS, 12, "VEA7",
+                        new BigDecimal("21.00"), new BigDecimal("22.50"), new BigDecimal("6.00"), new BigDecimal("22.0"),
+                        new BigDecimal("15.40"), new BigDecimal("0.33"), new BigDecimal("74.27"), new BigDecimal("18.57"),
+                        new BigDecimal("18.57"), new BigDecimal("22.50"), BlockEvaluationResponse.Verdict.ABOUT_USUAL,
+                        new BigDecimal("0.0")));
+
+        mockMvc.perform(post("/shifts/evaluate").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"station\":\"VEA7\",\"hours\":4,\"offeredPay\":84.00,\"expectedTips\":6}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.basis").value("STATION_90_DAYS"))
+                .andExpect(jsonPath("$.sampleSize").value(12))
+                .andExpect(jsonPath("$.estimatedNetHourly").value(18.57))
+                .andExpect(jsonPath("$.verdict").value("ABOUT_USUAL"));
+
+        verify(blockEvaluator).evaluate("angel@example.com", new BlockEvaluationRequest(
+                "VEA7", new BigDecimal("4"), new BigDecimal("84.00"), new BigDecimal("6")));
+    }
+
+    @Test
+    void evaluate_rejectsIncompleteOrOutOfRangeOffers() throws Exception {
+        for (String body : List.of(
+                "{\"station\":\" \",\"hours\":4,\"offeredPay\":84}",
+                "{\"station\":\"VEA7\",\"hours\":0.25,\"offeredPay\":84}",
+                "{\"station\":\"VEA7\",\"hours\":12.5,\"offeredPay\":84}",
+                "{\"station\":\"VEA7\",\"offeredPay\":84}",
+                "{\"station\":\"VEA7\",\"hours\":4,\"offeredPay\":0}",
+                "{\"station\":\"VEA7\",\"hours\":4,\"offeredPay\":84,\"expectedTips\":-1}")) {
+            mockMvc.perform(post("/shifts/evaluate").with(user("angel@example.com")).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verifyNoInteractions(blockEvaluator);
     }
 
     @Test

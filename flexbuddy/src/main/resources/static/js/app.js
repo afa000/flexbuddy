@@ -1321,6 +1321,7 @@ async function loadStations() {
         const stations = await response.json();
         elements.filterStation.replaceChildren(new Option('All stations', ''));
         stations.forEach(station => elements.filterStation.add(new Option(station, station)));
+        window.flexbuddyEvaluate?.setStations(stations);
         if (filterState.station && !stations.some(station => station.toLowerCase() === filterState.station.toLowerCase())) {
             elements.filterStation.add(new Option(filterState.station, filterState.station));
         }
@@ -1579,6 +1580,10 @@ function openInitialScreen() {
     if (screen === 'schedule') showScheduleScreen(false);
     else if (screen === 'import') showImportScreen(false);
     else if (screen === 'expenses') showExpensesScreen(false);
+    else if (screen === 'evaluate') {
+        showDashboard(false);
+        window.flexbuddyEvaluate?.open();
+    }
     else showDashboard(false);
 }
 

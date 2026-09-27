@@ -75,6 +75,34 @@
             <a class="secondary-button" href="/account">Back up now</a>
         </aside>
 
+        <details class="panel evaluate-panel" id="evaluatePanel" data-screen="dashboard">
+            <summary class="evaluate-summary">
+                <span class="evaluate-title"><span class="step-label">BEFORE YOU ACCEPT</span><strong>Evaluate a block</strong></span>
+                <span class="evaluate-summary-result" id="evaluateSummary">What it nets you per hour</span>
+            </summary>
+            <form class="evaluate-form" id="evaluateForm" novalidate>
+                <label class="field"><span>Station</span><input id="evaluateStation" list="evaluateStations" autocomplete="off" autocapitalize="characters" maxlength="255" enterkeyhint="next"></label>
+                <datalist id="evaluateStations"></datalist>
+                <div class="field evaluate-hours" role="group" aria-labelledby="evaluateHoursLabel">
+                    <span id="evaluateHoursLabel">Hours</span>
+                    <div class="hour-choices" id="evaluateHourChoices">
+                        <button type="button" data-hours="2">2</button>
+                        <button type="button" data-hours="3">3</button>
+                        <button type="button" data-hours="3.5">3.5</button>
+                        <button type="button" data-hours="4">4</button>
+                        <button type="button" data-hours="4.5">4.5</button>
+                        <button type="button" data-hours="5">5</button>
+                        <input id="evaluateHours" type="number" min="0.5" max="12" step="0.25" inputmode="decimal" placeholder="Other" aria-label="Hours">
+                    </div>
+                </div>
+                <label class="field money-field"><span>Offered pay</span><span class="input-with-prefix"><b>$</b><input id="evaluatePay" type="number" min="0.01" step="0.01" inputmode="decimal" enterkeyhint="next"></span></label>
+                <label class="field money-field"><span>Tips <small>(optional)</small></span><span class="input-with-prefix"><b>$</b><input id="evaluateTips" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Your average" enterkeyhint="done"></span></label>
+            </form>
+            <div class="evaluate-result" id="evaluateResult" aria-live="polite">
+                <p class="evaluate-empty">Enter the station, hours, and pay from the offer to see what it nets you.</p>
+            </div>
+        </details>
+
         <section class="stats-grid" data-screen="dashboard" aria-label="Shift statistics">
             <article class="stat-card stat-card-accent">
                 <span>Total earnings</span>
@@ -589,6 +617,7 @@
 <script th:src="@{/js/charts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/calendar.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
 </html>
