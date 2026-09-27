@@ -76,6 +76,8 @@ async function receiveSharedScreenshot(request) {
         const form = await request.formData();
         const file = form.getAll('screenshot').find(item => item instanceof File);
         if (!file) return Response.redirect(importUrl('unavailable'), 303);
+        // Shares that were never read, such as one made while signed out, are dropped here too.
+        await removeStaleShares().catch(() => {});
         const id = crypto.randomUUID();
         const cache = await caches.open(SHARE_CACHE);
         await cache.put(`/share-inbox/${id}`, new Response(file, {
