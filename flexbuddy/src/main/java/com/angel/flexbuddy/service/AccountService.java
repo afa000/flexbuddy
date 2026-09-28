@@ -15,6 +15,7 @@ import com.angel.flexbuddy.repository.ExpenseRepository;
 import com.angel.flexbuddy.repository.PushSubscriptionRepository;
 import com.angel.flexbuddy.repository.ReminderLogRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
+import com.angel.flexbuddy.repository.TaxPaymentRepository;
 
 @Service
 public class AccountService {
@@ -26,11 +27,12 @@ public class AccountService {
     private final ShiftRepository shiftRepository;
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PersistentTokenRepository persistentTokenRepository;
+    private final TaxPaymentRepository taxPaymentRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
             ShiftRepository shiftRepository, PushSubscriptionRepository pushSubscriptionRepository,
-            PersistentTokenRepository persistentTokenRepository) {
+            PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -38,6 +40,7 @@ public class AccountService {
         this.shiftRepository = shiftRepository;
         this.pushSubscriptionRepository = pushSubscriptionRepository;
         this.persistentTokenRepository = persistentTokenRepository;
+        this.taxPaymentRepository = taxPaymentRepository;
     }
 
     public boolean emailIsRegistered(String email) {
@@ -65,6 +68,7 @@ public class AccountService {
 
         Long ownerId = user.getId();
         expenseRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
+        taxPaymentRepository.deleteAllByOwnerId(ownerId);
         reminderLogRepository.deleteAllByOwnerId(ownerId);
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);

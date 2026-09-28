@@ -389,7 +389,7 @@ class ShiftReportServiceTest {
         return new com.angel.flexbuddy.dto.AccountSettingsResponse(com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
                 new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45,
                 weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis,
-                List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null);
+                List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null);
     }
 
     @Test

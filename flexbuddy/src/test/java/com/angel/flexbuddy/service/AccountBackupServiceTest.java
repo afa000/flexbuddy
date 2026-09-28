@@ -34,6 +34,7 @@ class AccountBackupServiceTest {
     @Mock AppUserRepository userRepository;
     @Mock ShiftRepository shiftRepository;
     @Mock ExpenseRepository expenseRepository;
+    @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
 
     @Test
     void createsVersionedBackupWithActiveAndDeletedCountsAndRecordsBackupTime() {
@@ -61,7 +62,8 @@ class AccountBackupServiceTest {
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(user));
         when(shiftRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(active, deleted));
         when(expenseRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(expense));
-        AccountBackupService service = new AccountBackupService(userRepository, shiftRepository, expenseRepository, clock, "1.2.3");
+        AccountBackupService service = new AccountBackupService(userRepository, shiftRepository, expenseRepository,
+                taxPaymentRepository, clock, "1.2.3");
 
         AccountBackupFile backup = service.create("angel@example.com");
 

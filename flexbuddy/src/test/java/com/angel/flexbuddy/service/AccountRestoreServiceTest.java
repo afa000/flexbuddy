@@ -63,6 +63,7 @@ class AccountRestoreServiceTest {
     @Mock ShiftRepository shiftRepository;
     @Mock AppUserRepository userRepository;
     @Mock ExpenseRepository expenseRepository;
+    @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
 
     private AccountRestoreService service;
     private AppUser owner;
@@ -71,7 +72,7 @@ class AccountRestoreServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new AccountRestoreService(objectMapper, validator, shiftRepository, userRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository);
+                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository, taxPaymentRepository);
         owner = new AppUser("Angel", EMAIL, "hash");
         owner.setId(1L);
         BackupShift existing = backupShift("VEA7", null);

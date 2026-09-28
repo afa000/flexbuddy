@@ -138,6 +138,8 @@ const elements = {
     forfeitsMonth: document.querySelector('#forfeitsMonth'),
     goalCard: document.querySelector('#goalCard'),
     nextPayoutAmount: document.querySelector('#nextPayoutAmount'),
+    taxWeekAmount: document.querySelector('#taxWeekAmount'),
+    taxWeekDetail: document.querySelector('#taxWeekDetail'),
     nextPayoutDetail: document.querySelector('#nextPayoutDetail'),
     goalRingFill: document.querySelector('#goalRingFill'),
     goalProgress: document.querySelector('#goalProgress'),
@@ -683,6 +685,28 @@ async function loadDashboard() {
     window.flexbuddyFinish?.loadMissing();
     loadGoals();
     loadPayPeriods();
+    loadTaxTile();
+}
+
+/** "Set aside this week": the driver's own percentage of this week's estimated net, once they choose one. */
+async function loadTaxTile() {
+    let summary;
+    try {
+        const response = await apiFetch('/tax/summary');
+        if (!response.ok) throw new Error();
+        summary = await response.json();
+    } catch {
+        elements.taxWeekAmount.textContent = '—';
+        return;
+    }
+    if (summary.percent == null) {
+        elements.taxWeekAmount.textContent = 'Not set up';
+        elements.taxWeekDetail.innerHTML = '<a class="text-link" href="/account#taxes">Set up a tax reserve</a>';
+        return;
+    }
+    elements.taxWeekAmount.textContent = formatMoney(summary.thisWeekSetAside);
+    elements.taxWeekDetail.textContent = `${Number(summary.percent)}% of ${formatMoney(summary.thisWeekNet)} net`
+        + ` · ${formatMoney(summary.remaining)} still to set aside this year`;
 }
 
 // Which of the server's pay periods each preset shows: the one covering today, and the one before it.

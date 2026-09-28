@@ -14,6 +14,7 @@ import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.BackupAccount;
 import com.angel.flexbuddy.dto.BackupCounts;
 import com.angel.flexbuddy.dto.BackupShift;
+import com.angel.flexbuddy.dto.BackupTaxPayment;
 import com.angel.flexbuddy.dto.BackupExpense;
 import com.angel.flexbuddy.dto.BackupSettings;
 import com.angel.flexbuddy.model.Expense;
@@ -22,6 +23,7 @@ import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
+import com.angel.flexbuddy.repository.TaxPaymentRepository;
 
 @Service
 public class AccountBackupService {
@@ -29,15 +31,17 @@ public class AccountBackupService {
     private final AppUserRepository userRepository;
     private final ShiftRepository shiftRepository;
     private final ExpenseRepository expenseRepository;
+    private final TaxPaymentRepository taxPaymentRepository;
     private final Clock clock;
     private final String appVersion;
 
     public AccountBackupService(AppUserRepository userRepository, ShiftRepository shiftRepository,
-            ExpenseRepository expenseRepository, Clock clock,
+            ExpenseRepository expenseRepository, TaxPaymentRepository taxPaymentRepository, Clock clock,
             @Value("${spring.application.version:0.0.1-SNAPSHOT}") String appVersion) {
         this.userRepository = userRepository;
         this.shiftRepository = shiftRepository;
         this.expenseRepository = expenseRepository;
+        this.taxPaymentRepository = taxPaymentRepository;
         this.clock = clock;
         this.appVersion = appVersion;
     }
@@ -66,8 +70,13 @@ public class AccountBackupService {
                         user.getWeeklyGoal() == null ? null : user.getWeeklyGoal().toPlainString(),
                         user.getMonthlyGoal() == null ? null : user.getMonthlyGoal().toPlainString(),
                         user.getGoalBasis() == null ? null : user.getGoalBasis().name(), user.getPayoutDays(),
-                        user.getPayoutLagDays()),
-                new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
+                        user.getPayoutLagDays(),
+                        user.getTaxSetAsidePercent() == null ? null : user.getTaxSetAsidePercent().toPlainString()),
+                new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses),
+                taxPaymentRepository.findByOwnerEmailIgnoreCaseOrderByPaidOnAscIdAsc(email).stream()
+                        .map(payment -> new BackupTaxPayment(payment.getTaxYear(), payment.getQuarter(), payment.getPaidOn(),
+                                money(payment.getAmount()), payment.getNote()))
+                        .toList()
         );
     }
 

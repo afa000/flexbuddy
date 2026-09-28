@@ -9,7 +9,7 @@ const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const VERSIONED_ASSETS = [
     '/css/styles.css', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/calendar.js',
-    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/swipe.js', '/js/app.js', '/js/account.js'
+    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/swipe.js', '/js/app.js', '/js/account.js', '/js/tax.js'
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [
     '/manifest.webmanifest', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png',
@@ -19,7 +19,7 @@ const STATIC_ASSETS = [
 const SHELL_PAGES = new Set(['/', '/account']);
 const STATIC_PATHS = [/^\/css\//, /^\/js\//, /^\/icons\//, /^\/screenshots\//,
     /^\/manifest\.webmanifest$/, /^\/offline\.html$/];
-const DATA_PATHS = [/^\/shifts(\/|$)/, /^\/expenses(\/|$)/, /^\/account\/settings$/];
+const DATA_PATHS = [/^\/shifts(\/|$)/, /^\/expenses(\/|$)/, /^\/account\/settings$/, /^\/tax\/summary$/];
 const NETWORK_ONLY = [/\.csv$/, /\.ics$/, /^\/shifts\/import-preview$/, /^\/account\/backup$/, /^\/push\//];
 
 self.addEventListener('install', event => {

@@ -587,7 +587,7 @@ class ShiftServiceTest {
                 com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
                 new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null, null,
                 com.angel.flexbuddy.model.GoalBasis.GROSS,
-                java.util.List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null));
+                java.util.List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null));
         ShiftResponse edited = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));
 
         assertThat(edited.isLateForfeit()).isFalse();

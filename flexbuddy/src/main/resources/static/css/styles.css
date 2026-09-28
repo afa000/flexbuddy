@@ -2234,6 +2234,24 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .payout-days { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0 12px; border: 0; }
 .payout-days legend { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
 
+/* Tax set-aside */
+.tax-card { grid-column: 1 / -1; }
+/* Cards may shrink below their widest content, such as the quarter table, which scrolls inside its own box. */
+.account-grid > * { min-width: 0; }
+.tax-year-row { margin: 22px 0 6px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
+.tax-year-row .field { min-width: 140px; }
+.tax-figures { margin: 12px 0 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.tax-figures div { padding: 12px 14px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 8px; }
+.tax-figures dt { color: var(--muted); font-size: 12px; }
+.tax-figures dd { margin: 4px 0 0; font-size: 18px; font-weight: 750; font-variant-numeric: tabular-nums; }
+.tax-subheading { margin: 22px 0 10px; font-size: 15px; }
+.tax-payments { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.tax-payments li { padding: 6px 12px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 6px; }
+.tax-payments li span { margin-right: auto; font-weight: 700; }
+.tax-payments li small { color: var(--muted); }
+.tax-payment-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.tax-payment-form .notice, .tax-payment-form .form-actions { grid-column: 1 / -1; }
+
 /* Checked on a phone after the touch target change */
 .text-link { color: var(--cyan); font-weight: 750; text-decoration: none; }
 .text-link:hover { color: var(--action-hover); }

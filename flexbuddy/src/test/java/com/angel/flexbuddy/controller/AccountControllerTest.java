@@ -309,6 +309,22 @@ class AccountControllerTest {
     }
 
     @Test
+    void updateTax_acceptsOneToSixtyPercentOrOff() throws Exception {
+        for (String body : new String[] {"{\"taxSetAsidePercent\":0}", "{\"taxSetAsidePercent\":61}"}) {
+            mockMvc.perform(put("/account/tax").with(user("angel@example.com")).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(settingsService, never()).updateTax(any(), any());
+
+        for (String body : new String[] {"{\"taxSetAsidePercent\":25}", "{\"taxSetAsidePercent\":null}"}) {
+            mockMvc.perform(put("/account/tax").with(user("angel@example.com")).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isOk());
+        }
+    }
+
+    @Test
     void updatePayouts_needsADayAndALagOfUpToTwoWeeks() throws Exception {
         for (String body : new String[] {
                 "{\"payoutDays\":[],\"payoutLagDays\":1}",

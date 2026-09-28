@@ -22,6 +22,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.BackupShift;
+import com.angel.flexbuddy.dto.BackupTaxPayment;
+import com.angel.flexbuddy.model.TaxPayment;
+import com.angel.flexbuddy.repository.TaxPaymentRepository;
 import com.angel.flexbuddy.dto.BackupExpense;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.RestoreMode;
@@ -57,15 +60,18 @@ public class AccountRestoreService {
     private final AppUserRepository userRepository;
     private final Clock clock;
     private final ExpenseRepository expenseRepository;
+    private final TaxPaymentRepository taxPaymentRepository;
 
     public AccountRestoreService(ObjectMapper objectMapper, Validator validator, ShiftRepository shiftRepository,
-            AppUserRepository userRepository, Clock clock, ExpenseRepository expenseRepository) {
+            AppUserRepository userRepository, Clock clock, ExpenseRepository expenseRepository,
+            TaxPaymentRepository taxPaymentRepository) {
         this.objectMapper = objectMapper;
         this.validator = validator;
         this.shiftRepository = shiftRepository;
         this.userRepository = userRepository;
         this.clock = clock;
         this.expenseRepository = expenseRepository;
+        this.taxPaymentRepository = taxPaymentRepository;
     }
 
     public RestorePreviewResponse preview(String email, MultipartFile backup, HttpSession session) {
@@ -239,6 +245,7 @@ public class AccountRestoreService {
                                     PayPeriodCalculator.parseDays(file.settings().payoutDays())));
                         }
                         if (file.settings().payoutLagDays() != null) owner.setPayoutLagDays(file.settings().payoutLagDays());
+                        owner.setTaxSetAsidePercent(decimalOrNull(file.settings().taxSetAsidePercent()));
                     }
                 }
                 userRepository.save(owner);
@@ -247,6 +254,7 @@ public class AccountRestoreService {
             }
         }
         session.removeAttribute(SESSION_KEY);
+        restoreTaxPayments(file, owner);
         return new RestoreResult(insert.size(), skipped, expenseInsert.size(), expensesSkipped, batch);
     }
 
@@ -366,6 +374,10 @@ public class AccountRestoreService {
                     if (goal != null && new BigDecimal(goal).signum() <= 0) throw new IllegalArgumentException();
                 }
                 if (file.settings().goalBasis() != null) com.angel.flexbuddy.model.GoalBasis.valueOf(file.settings().goalBasis());
+                BigDecimal taxPercent = decimalOrNull(file.settings().taxSetAsidePercent());
+                if (taxPercent != null && (taxPercent.signum() <= 0 || taxPercent.compareTo(BigDecimal.valueOf(60)) > 0)) {
+                    throw new IllegalArgumentException();
+                }
                 Integer lag = file.settings().payoutLagDays();
                 if (lag != null && (lag < 0 || lag > AppUser.MAX_PAYOUT_LAG_DAYS)) throw new IllegalArgumentException();
                 Integer cutoff = file.settings().forfeitCutoffMinutes();
@@ -445,6 +457,44 @@ public class AccountRestoreService {
             problems.add(new RestoreProblem(index, field, "must be a valid amount"));
             return null;
         }
+    }
+
+    /**
+     * Adds the backup's tax payments that are not already recorded, in either mode, since they are a short list the
+     * driver typed in and Replace has no undo for them. Payments with impossible values are skipped.
+     */
+    private void restoreTaxPayments(AccountBackupFile file, AppUser owner) {
+        Set<String> recorded = new HashSet<>();
+        taxPaymentRepository.findByOwnerEmailIgnoreCaseOrderByPaidOnAscIdAsc(owner.getEmail())
+                .forEach(payment -> recorded.add(taxKey(payment.getTaxYear(), payment.getPaidOn(), payment.getAmount())));
+        List<TaxPayment> insert = new ArrayList<>();
+        for (BackupTaxPayment source : file.taxPayments()) {
+            BigDecimal amount;
+            try {
+                amount = source == null || source.amount() == null ? null : new BigDecimal(source.amount());
+            } catch (NumberFormatException exception) {
+                amount = null;
+            }
+            boolean valid = amount != null && amount.signum() > 0 && source.paidOn() != null
+                    && source.taxYear() >= 2000 && source.taxYear() <= 2100
+                    && (source.quarter() == null || (source.quarter() >= 1 && source.quarter() <= 4));
+            if (!valid || !recorded.add(taxKey(source.taxYear(), source.paidOn(), amount))) continue;
+            TaxPayment payment = new TaxPayment();
+            payment.setOwner(owner);
+            payment.setTaxYear(source.taxYear());
+            payment.setQuarter(source.quarter());
+            payment.setPaidOn(source.paidOn());
+            payment.setAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
+            payment.setNote(source.note() == null || source.note().isBlank() ? null
+                    : source.note().trim().substring(0, Math.min(255, source.note().trim().length())));
+            payment.setCreatedAt(Instant.now(clock));
+            insert.add(payment);
+        }
+        taxPaymentRepository.saveAll(insert);
+    }
+
+    private static String taxKey(int year, java.time.LocalDate paidOn, BigDecimal amount) {
+        return year + "|" + paidOn + "|" + amount.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
     }
 
     private static BigDecimal decimalOrNull(String value) {

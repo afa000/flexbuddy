@@ -182,6 +182,13 @@ public class AccountController {
         return settingsService.updateReminders(principal.getName(), request);
     }
 
+    @PutMapping("/account/tax")
+    @ResponseBody
+    public AccountSettingsResponse updateTax(Principal principal,
+            @Valid @RequestBody com.angel.flexbuddy.dto.TaxSettingsRequest request) {
+        return settingsService.updateTax(principal.getName(), request);
+    }
+
     @PutMapping("/account/payouts")
     @ResponseBody
     public AccountSettingsResponse updatePayouts(Principal principal,

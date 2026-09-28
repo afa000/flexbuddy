@@ -66,6 +66,13 @@ public class AccountSettingsService {
     }
 
     @Transactional
+    public AccountSettingsResponse updateTax(String email, com.angel.flexbuddy.dto.TaxSettingsRequest request) {
+        AppUser user = user(email);
+        user.setTaxSetAsidePercent(request.taxSetAsidePercent());
+        return response(userRepository.save(user));
+    }
+
+    @Transactional
     public AccountSettingsResponse updatePayouts(String email, com.angel.flexbuddy.dto.PayoutSettingsRequest request) {
         AppUser user = user(email);
         user.setPayoutDays(PayPeriodCalculator.formatDays(request.payoutDays()));
@@ -107,6 +114,7 @@ public class AccountSettingsService {
                 user.getWeeklyGoal(), user.getMonthlyGoal(),
                 user.getGoalBasis() == null ? com.angel.flexbuddy.model.GoalBasis.GROSS : user.getGoalBasis(),
                 java.util.List.copyOf(PayPeriodCalculator.parseDays(user.getPayoutDays())), user.getPayoutLagDays(),
+                user.getTaxSetAsidePercent(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics");
     }
 

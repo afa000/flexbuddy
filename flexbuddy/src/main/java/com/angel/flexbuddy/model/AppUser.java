@@ -98,6 +98,10 @@ public class AppUser {
     @Column(nullable = false)
     private int payoutLagDays = DEFAULT_PAYOUT_LAG_DAYS;
 
+    /** The share of net earnings the driver chose to put aside for taxes; null until they choose one. */
+    @Column(precision = 5, scale = 2)
+    private java.math.BigDecimal taxSetAsidePercent;
+
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;
         this.email = email;
