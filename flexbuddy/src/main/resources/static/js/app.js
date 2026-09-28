@@ -65,6 +65,11 @@ const elements = {
     groupButtons: [...document.querySelectorAll('[data-group]')],
     earningsChartTitle: document.querySelector('#earningsChartTitle'),
     earningsChart: document.querySelector('#earningsChart'),
+    heatmapCard: document.querySelector('#heatmapCard'),
+    heatmapSummary: document.querySelector('#heatmapSummary'),
+    heatmapMetric: document.querySelector('#heatmapMetric'),
+    heatmapTable: document.querySelector('#heatmapTable'),
+    heatmapLegend: document.querySelector('#heatmapLegend'),
     payMixChart: document.querySelector('#payMixChart'),
     hourlyChart: document.querySelector('#hourlyChart'),
     breakdownBody: document.querySelector('#breakdownBody'),
@@ -258,6 +263,9 @@ elements.filterTo.addEventListener('change', handleCustomDates);
 elements.filterStation.addEventListener('change', () => updateFilter('station', elements.filterStation.value));
 elements.filterSort.addEventListener('change', () => updateFilter('sort', elements.filterSort.value));
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
+elements.heatmapMetric.addEventListener('change', loadHeatmap);
+// The grid needs width, so it starts open on wider screens and folded on a phone.
+elements.heatmapCard.open = window.matchMedia('(min-width: 621px)').matches;
 elements.groupButtons.forEach(button => button.addEventListener('click', () => {
     reportGroupBy = button.dataset.group;
     syncFilterControls();
@@ -679,7 +687,8 @@ async function loadDashboard() {
     await Promise.all([
         loadStatistics(query, signal),
         loadShifts(query, signal),
-        loadEarningsReport(buildQuery(false))
+        loadEarningsReport(buildQuery(false)),
+        loadHeatmap()
     ]);
     window.flexbuddySchedule?.refresh();
     window.flexbuddyFinish?.loadMissing();
@@ -869,6 +878,37 @@ async function loadShifts(query, signal) {
         elements.exportCsvButton.classList.add('is-disabled');
         elements.exportCsvButton.setAttribute('aria-disabled', 'true');
         elements.exportCsvButton.title = 'Shift results are unavailable';
+    }
+}
+
+// Fewer blocks than this make any pattern chance, so the heatmap says so instead of ranking slots.
+const HEATMAP_MIN_TOTAL = 10;
+
+/** Best times to work, for the same filters as the rest of the dashboard. */
+async function loadHeatmap() {
+    const metric = elements.heatmapMetric.value;
+    try {
+        const response = await apiFetch(`/shifts/reports/heatmap?metric=${metric}&${buildQuery(false)}`);
+        if (!response.ok) throw new Error();
+        const heatmap = await response.json();
+        window.flexbuddyCharts.renderHeatmap(elements.heatmapTable, elements.heatmapLegend, heatmap);
+        const best = heatmap.best;
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const label = elements.heatmapMetric.selectedOptions[0].textContent.toLowerCase();
+        if (heatmap.totalShifts < HEATMAP_MIN_TOTAL) {
+            elements.heatmapSummary.textContent = `Not enough blocks yet to see a pattern (${heatmap.totalShifts} so far).`;
+        } else if (!best) {
+            elements.heatmapSummary.textContent = 'No time slot has two blocks yet.';
+        } else {
+            const value = metric === 'SHIFTS' ? `${best.value} blocks`
+                : metric === 'AVERAGE_PAY' ? `${formatMoney(best.value)} ${label}` : `${formatMoney(best.value)}/hr ${label.replace(' per hour', '')}`;
+            elements.heatmapSummary.textContent = `Best: ${days[best.weekday - 1]} ${heatmap.bands[best.band]} · ${value}`
+                + ` from ${best.shifts} ${best.shifts === 1 ? 'block' : 'blocks'}.`;
+        }
+    } catch {
+        elements.heatmapSummary.textContent = 'The best times could not be loaded.';
+        elements.heatmapTable.replaceChildren();
+        elements.heatmapLegend.textContent = '';
     }
 }
 

@@ -459,6 +459,17 @@
                     <div class="chart donut-chart" id="payMixChart"></div>
                 </article>
             </div>
+            <details class="chart-card heatmap-card" id="heatmapCard">
+                <summary><span class="heatmap-title">Best times to work</span><small id="heatmapSummary">Loading…</small></summary>
+                <label class="filter-field heatmap-metric"><span>Show</span><select id="heatmapMetric">
+                    <option value="NET_HOURLY">Estimated net per hour</option>
+                    <option value="GROSS_HOURLY">Gross per hour</option>
+                    <option value="AVERAGE_PAY">Average pay per block</option>
+                    <option value="SHIFTS">Blocks worked</option>
+                </select></label>
+                <div class="chart-scroll"><table class="heatmap" id="heatmapTable"></table></div>
+                <p class="heatmap-legend" id="heatmapLegend"></p>
+            </details>
             <div class="breakdown-scroll">
                 <table class="breakdown-table">
                     <caption class="sr-only">Filtered earnings grouped for reporting</caption>

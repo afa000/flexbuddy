@@ -57,6 +57,73 @@ public class ShiftReportService {
         this.payPeriods = payPeriods;
     }
 
+    /** Start-time bands for the heatmap: before 8, 8 to 11, 11 to 2, 2 to 5, and 5 onward, by the block's start hour. */
+    static final int[] HEATMAP_BAND_STARTS = {0, 8, 11, 14, 17};
+    static final List<String> HEATMAP_BANDS = List.of("Before 8 am", "8–11 am", "11 am–2 pm", "2–5 pm", "After 5 pm");
+    static final int HEATMAP_MIN_SHIFTS = 2;
+
+    /**
+     * Which weekday and time of day pays best. Only worked blocks count, and a cell's net uses its blocks' own miles
+     * and linked expenses, since fuel bought separately cannot be tied to a time of day.
+     */
+    @Transactional(readOnly = true)
+    public com.angel.flexbuddy.dto.HeatmapResponse heatmap(String email, ShiftFilter filter,
+            com.angel.flexbuddy.dto.HeatmapMetric metric) {
+        List<Shift> shifts = shiftService.findFiltered(email, filter.withStatuses(Set.of(ShiftStatus.COMPLETED)));
+        AccountSettingsResponse settings = settingsService.get(email);
+        Map<Long, List<Expense>> linked = new java.util.HashMap<>();
+        expenseService.findForShifts(email, shifts)
+                .forEach(expense -> linked.computeIfAbsent(expense.getShift().getId(), ignored -> new ArrayList<>()).add(expense));
+        Map<String, List<Shift>> groups = new java.util.TreeMap<>();
+        for (Shift shift : shifts) {
+            groups.computeIfAbsent(shift.getDate().getDayOfWeek().getValue() + ":" + band(shift.getStartTime().getHour()),
+                    ignored -> new ArrayList<>()).add(shift);
+        }
+        List<com.angel.flexbuddy.dto.HeatmapCell> cells = new ArrayList<>();
+        for (Map.Entry<String, List<Shift>> group : groups.entrySet()) {
+            String[] key = group.getKey().split(":");
+            List<Shift> cellShifts = group.getValue();
+            List<Expense> cellExpenses = cellShifts.stream()
+                    .flatMap(shift -> linked.getOrDefault(shift.getId(), List.of()).stream()).toList();
+            NetEarningsResult net = calculator.calculate(cellShifts, cellExpenses, settings.vehicleCostMethod(), settings.mileageRate());
+            BigDecimal value = switch (metric) {
+                case NET_HOURLY -> net.netHourlyRate();
+                case GROSS_HOURLY -> net.grossHourlyRate();
+                case SHIFTS -> BigDecimal.valueOf(cellShifts.size());
+                case AVERAGE_PAY -> divide(net.grossEarnings(), cellShifts.size());
+            };
+            cells.add(new com.angel.flexbuddy.dto.HeatmapCell(Integer.parseInt(key[0]), Integer.parseInt(key[1]),
+                    cellShifts.size(), net.minutesWorked(), value, cellShifts.size() < HEATMAP_MIN_SHIFTS));
+        }
+        List<BigDecimal> values = cells.stream().filter(cell -> !cell.sparse()).map(com.angel.flexbuddy.dto.HeatmapCell::value)
+                .sorted().toList();
+        com.angel.flexbuddy.dto.HeatmapCell best = cells.stream().filter(cell -> !cell.sparse())
+                .max(Comparator.comparing(com.angel.flexbuddy.dto.HeatmapCell::value)
+                        .thenComparingInt(com.angel.flexbuddy.dto.HeatmapCell::shifts))
+                .orElse(null);
+        return new com.angel.flexbuddy.dto.HeatmapResponse(metric, HEATMAP_BANDS, cells, best, scale(values), shifts.size());
+    }
+
+    private static int band(int hour) {
+        int band = 0;
+        for (int index = 0; index < HEATMAP_BAND_STARTS.length; index++) {
+            if (hour >= HEATMAP_BAND_STARTS[index]) band = index;
+        }
+        return band;
+    }
+
+    /** Upper bounds of up to five equal-count colour steps, so a single outlier does not flatten the rest. */
+    private static List<BigDecimal> scale(List<BigDecimal> sorted) {
+        if (sorted.isEmpty()) return List.of();
+        List<BigDecimal> bounds = new ArrayList<>();
+        int steps = Math.min(5, sorted.size());
+        for (int step = 1; step <= steps; step++) {
+            BigDecimal bound = sorted.get((int) Math.ceil(step * sorted.size() / (double) steps) - 1);
+            if (bounds.isEmpty() || bound.compareTo(bounds.getLast()) > 0) bounds.add(bound);
+        }
+        return bounds;
+    }
+
     static final int MAX_PAY_PERIODS = 26;
 
     /** The pay period covering today and the {@code count - 1} before it, newest first, and the next payout. */

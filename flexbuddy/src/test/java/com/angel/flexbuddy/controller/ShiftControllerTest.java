@@ -583,4 +583,18 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.periods[0].from").value("2026-09-11"))
                 .andExpect(jsonPath("$.periods[0].earned").value(108.00));
     }
+
+    @Test
+    void heatmap_rejectsAnUnknownMetric() throws Exception {
+        mockMvc.perform(get("/shifts/reports/heatmap").param("metric", "luck").with(user("angel@example.com")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void heatmap_requiresSignIn() throws Exception {
+        mockMvc.perform(get("/shifts/reports/heatmap"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login"));
+    }
 }

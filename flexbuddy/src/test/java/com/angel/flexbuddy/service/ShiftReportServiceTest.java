@@ -438,4 +438,50 @@ class ShiftReportServiceTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> reportService.payPeriods(EMAIL, 27))
                 .isInstanceOf(com.angel.flexbuddy.exception.InvalidFilterException.class);
     }
+
+    @Test
+    void heatmap_groupsWorkedBlocksByWeekdayAndStartBandAndNamesTheBestFullCell() {
+        List<Shift> blocks = new java.util.ArrayList<>();
+        // Three Saturday 3 pm blocks at $96 for 4 hours, and two Monday 7 am blocks at $72.
+        for (int week = 0; week < 3; week++) {
+            Shift saturday = new Shift((long) blocks.size() + 1, "VEA7", LocalDate.of(2026, 8, 29).plusWeeks(week),
+                    LocalTime.of(15, 0), LocalTime.of(19, 0), new BigDecimal("96.00"), BigDecimal.ZERO);
+            blocks.add(saturday);
+        }
+        for (int week = 0; week < 2; week++) {
+            blocks.add(new Shift((long) blocks.size() + 1, "VEA7", LocalDate.of(2026, 8, 31).plusWeeks(week),
+                    LocalTime.of(7, 59), LocalTime.of(11, 59), new BigDecimal("72.00"), BigDecimal.ZERO));
+        }
+        // One lucky Sunday evening block pays far more but stays sparse.
+        blocks.add(new Shift(99L, "VEA7", LocalDate.of(2026, 9, 6), LocalTime.of(18, 0), LocalTime.of(20, 0),
+                new BigDecimal("150.00"), BigDecimal.ZERO));
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(blocks);
+        when(expenseService.findForShifts(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+
+        com.angel.flexbuddy.dto.HeatmapResponse heatmap = reportService.heatmap(EMAIL, ALL,
+                com.angel.flexbuddy.dto.HeatmapMetric.GROSS_HOURLY);
+
+        assertThat(heatmap.totalShifts()).isEqualTo(6);
+        assertThat(heatmap.cells()).extracting(cell -> cell.weekday() + "/" + cell.band() + "/" + cell.shifts() + "/" + cell.sparse())
+                .containsExactlyInAnyOrder("1/0/2/false", "6/3/3/false", "7/4/1/true");
+        assertThat(heatmap.best().weekday()).isEqualTo(6);
+        assertThat(heatmap.best().value()).isEqualByComparingTo("24.00");
+        assertThat(heatmap.scale()).extracting(BigDecimal::toPlainString).containsExactly("18.00", "24.00");
+    }
+
+    @Test
+    void heatmap_withNoBlocksHasNoBestAndNoScale() {
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of());
+
+        com.angel.flexbuddy.dto.HeatmapResponse heatmap = reportService.heatmap(EMAIL, ALL,
+                com.angel.flexbuddy.dto.HeatmapMetric.NET_HOURLY);
+
+        assertThat(heatmap.cells()).isEmpty();
+        assertThat(heatmap.best()).isNull();
+        assertThat(heatmap.scale()).isEmpty();
+        assertThat(heatmap.bands()).hasSize(5);
+    }
 }

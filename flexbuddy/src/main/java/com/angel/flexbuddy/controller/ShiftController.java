@@ -103,6 +103,17 @@ public class ShiftController {
         return expenseService.getForShift(principal.getName(), id);
     }
 
+    @GetMapping("/reports/heatmap")
+    public com.angel.flexbuddy.dto.HeatmapResponse getHeatmap(Principal principal,
+            @RequestParam(required = false) String metric,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) String station,
+            @RequestParam(name = "q", required = false) String query) {
+        return reportService.heatmap(principal.getName(), ShiftFilter.report(from, to, station, query),
+                com.angel.flexbuddy.dto.HeatmapMetric.parse(metric));
+    }
+
     @GetMapping("/reports/earnings")
     public EarningsReportResponse getEarningsReport(Principal principal,
             @RequestParam String groupBy,

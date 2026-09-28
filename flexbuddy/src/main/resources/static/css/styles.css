@@ -2252,6 +2252,29 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .tax-payment-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .tax-payment-form .notice, .tax-payment-form .form-actions { grid-column: 1 / -1; }
 
+/* Best times heatmap */
+.heatmap-card { margin-top: 16px; }
+.heatmap-card > summary { min-height: 44px; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 14px; cursor: pointer; }
+.heatmap-title { font-size: 14px; font-weight: 750; }
+.heatmap-card > summary small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.heatmap-metric { max-width: 260px; margin: 12px 0; }
+.heatmap { border-collapse: separate; border-spacing: 4px; font-size: 12px; }
+.heatmap th { padding: 4px 6px; color: var(--muted); font-weight: 700; white-space: nowrap; }
+.heatmap tbody th { position: sticky; left: 0; z-index: 1; background: var(--surface-deep); text-align: left; }
+.heatmap td { min-width: 84px; height: 44px; padding: 0 6px; color: var(--text); background: var(--surface-raised); border-radius: 6px; text-align: center; font-variant-numeric: tabular-nums; }
+.heatmap td.heatmap-empty { background: transparent; border: 1px dashed var(--line-soft); }
+.heatmap td.heatmap-sparse { color: var(--muted); background: repeating-linear-gradient(135deg, var(--surface-raised) 0 6px, var(--line-soft) 6px 8px); }
+.heatmap td[data-level="1"] { background: color-mix(in srgb, var(--cyan) 18%, var(--surface-raised)); }
+.heatmap td[data-level="2"] { background: color-mix(in srgb, var(--cyan) 36%, var(--surface-raised)); }
+.heatmap td[data-level="3"] { background: color-mix(in srgb, var(--cyan) 54%, var(--surface-raised)); }
+.heatmap td[data-level="4"] { color: var(--primary-text); background: color-mix(in srgb, var(--cyan) 74%, var(--surface-raised)); }
+.heatmap td[data-level="5"] { color: var(--primary-text); background: var(--cyan); font-weight: 800; }
+/* With fewer steps the top step is still the strongest colour. */
+.heatmap td[data-steps="1"][data-level="1"], .heatmap td[data-steps="2"][data-level="2"],
+.heatmap td[data-steps="3"][data-level="3"], .heatmap td[data-steps="4"][data-level="4"] { color: var(--primary-text); background: var(--cyan); font-weight: 800; }
+.heatmap td.is-best { outline: 2px solid var(--text); outline-offset: -2px; }
+.heatmap-legend { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+
 /* Checked on a phone after the touch target change */
 .text-link { color: var(--cyan); font-weight: 750; text-decoration: none; }
 .text-link:hover { color: var(--action-hover); }

@@ -243,5 +243,69 @@
         container.append(list);
     }
 
-    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart};
+    const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    function heatmapValue(value, metric) {
+        if (metric === 'SHIFTS') return String(Number(value));
+        return metric === 'AVERAGE_PAY' ? money(value) : `${fullMoney(value)}/hr`;
+    }
+
+    /**
+     * Weekdays down the side and start-time bands across, each cell shaded by which colour step its value falls in.
+     * A table rather than a drawing, so screen readers read it as one; cells with a single block are hatched.
+     */
+    function renderHeatmap(table, legend, response) {
+        const cells = new Map(response.cells.map(cell => [`${cell.weekday}:${cell.band}`, cell]));
+        const head = document.createElement('thead');
+        const headRow = document.createElement('tr');
+        const corner = document.createElement('th');
+        corner.scope = 'col';
+        corner.innerHTML = '<span class="sr-only">Weekday</span>';
+        headRow.append(corner, ...response.bands.map(label => {
+            const th = document.createElement('th');
+            th.scope = 'col';
+            th.textContent = label;
+            return th;
+        }));
+        head.append(headRow);
+        const body = document.createElement('tbody');
+        WEEKDAYS.forEach((name, index) => {
+            const row = document.createElement('tr');
+            const label = document.createElement('th');
+            label.scope = 'row';
+            label.textContent = name.slice(0, 3);
+            label.title = name;
+            row.append(label);
+            response.bands.forEach((band, bandIndex) => {
+                const cell = cells.get(`${index + 1}:${bandIndex}`);
+                const td = document.createElement('td');
+                if (!cell) {
+                    td.className = 'heatmap-empty';
+                    td.innerHTML = '<span class="sr-only">No blocks</span>';
+                } else {
+                    const blocks = `${cell.shifts} ${cell.shifts === 1 ? 'block' : 'blocks'}`;
+                    td.textContent = heatmapValue(cell.value, response.metric);
+                    td.title = `${name} ${band}: ${heatmapValue(cell.value, response.metric)} from ${blocks}`;
+                    if (cell.sparse) {
+                        td.className = 'heatmap-sparse';
+                    } else {
+                        const step = response.scale.findIndex(bound => Number(cell.value) <= Number(bound));
+                        td.dataset.level = String(step === -1 ? response.scale.length : step + 1);
+                        td.dataset.steps = String(response.scale.length);
+                    }
+                    if (response.best && cell.weekday === response.best.weekday && cell.band === response.best.band) {
+                        td.classList.add('is-best');
+                    }
+                }
+                row.append(td);
+            });
+            body.append(row);
+        });
+        table.replaceChildren(head, body);
+        legend.textContent = response.scale.length
+            ? `Darker is higher. Steps up to ${response.scale.map(bound => heatmapValue(bound, response.metric)).join(', ')}. Hatched slots have only one block and are not ranked.`
+            : 'Slots need at least two blocks to be ranked.';
+    }
+
+    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart, renderHeatmap};
 })();
