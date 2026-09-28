@@ -67,6 +67,10 @@ public class AppUser {
     @Column(nullable = false)
     private boolean remindConfirm;
 
+    /** Push a reminder to log miles shortly after a block ends without any. */
+    @Column(nullable = false)
+    private boolean remindMiles;
+
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;
         this.email = email;

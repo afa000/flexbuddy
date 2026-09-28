@@ -223,6 +223,7 @@ function renderReminders(settings) {
     fillTimeZones(settings.timeZone);
     document.querySelector('#remindBefore').value = settings.remindBeforeMinutes ?? '';
     document.querySelector('#remindConfirm').checked = Boolean(settings.remindConfirm);
+    document.querySelector('#remindMiles').checked = Boolean(settings.remindMiles);
     const hasFeed = Boolean(settings.calendarFeedPath);
     calendarFeedUrl.value = hasFeed ? new URL(settings.calendarFeedPath, window.location.origin).href : '';
     document.querySelector('#copyFeedButton').disabled = !hasFeed;
@@ -258,7 +259,8 @@ reminderForm.addEventListener('submit', async event => {
             body: JSON.stringify({
                 timeZone: timeZoneSelect.value,
                 remindBeforeMinutes: lead === '' ? null : Number(lead),
-                remindConfirm: document.querySelector('#remindConfirm').checked
+                remindConfirm: document.querySelector('#remindConfirm').checked,
+                remindMiles: document.querySelector('#remindMiles').checked
             })
         });
         if (!response.ok) throw await responseError(response, 'Choose a valid time zone and reminder time.');

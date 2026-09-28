@@ -568,4 +568,24 @@ class ShiftServiceTest {
             Integer returns) {
         return new BlockDetailsRequest(start, end, null, null, stops, packages, returns);
     }
+
+    @Test
+    void missingMilesListsRecentCompletedBlocksWithoutMilesNewestFirstUpToTen() {
+        when(userTime.today(OWNER_EMAIL)).thenReturn(LocalDate.of(2026, 9, 13));
+        List<Shift> recent = new java.util.ArrayList<>();
+        for (int day = 0; day < 12; day++) {
+            recent.add(shift(100L + day, "VEA7", LocalDate.of(2026, 9, 13).minusDays(day % 7), "120", "0"));
+        }
+        Shift logged = shift(1L, "VEA7", LocalDate.of(2026, 9, 13), "120", "0");
+        logged.setMiles(BigDecimal.ZERO);
+        recent.add(0, logged);
+        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 13), "", "",
+                java.util.Set.of(ShiftStatus.COMPLETED))).thenReturn(recent);
+
+        List<ShiftResponse> missing = shiftService.missingMiles(OWNER_EMAIL, 7);
+
+        assertThat(missing).hasSize(10).extracting(ShiftResponse::getId).doesNotContain(1L).startsWith(100L, 101L);
+        assertThatThrownBy(() -> shiftService.missingMiles(OWNER_EMAIL, 0))
+                .isInstanceOf(com.angel.flexbuddy.exception.InvalidFilterException.class);
+    }
 }

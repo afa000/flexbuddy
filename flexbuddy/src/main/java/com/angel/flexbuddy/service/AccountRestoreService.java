@@ -224,6 +224,7 @@ public class AccountRestoreService {
                     if (file.settings().timeZone() != null) owner.setTimeZone(file.settings().timeZone());
                     owner.setRemindBeforeMinutes(file.settings().remindBeforeMinutes());
                     owner.setRemindConfirm(Boolean.TRUE.equals(file.settings().remindConfirm()));
+                    owner.setRemindMiles(Boolean.TRUE.equals(file.settings().remindMiles()));
                 }
                 userRepository.save(owner);
             } catch (RuntimeException exception) {

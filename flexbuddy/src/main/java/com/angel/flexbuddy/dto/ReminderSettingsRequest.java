@@ -9,7 +9,9 @@ import jakarta.validation.constraints.NotBlank;
 public record ReminderSettingsRequest(
         @NotBlank @ValidTimeZone String timeZone,
         Integer remindBeforeMinutes,
-        boolean remindConfirm
+        boolean remindConfirm,
+        /** Optional; when absent the saved choice is kept. */
+        Boolean remindMiles
 ) {
     @AssertTrue(message = "Reminder lead time must be 30, 60, 120, or 720 minutes.")
     public boolean isRemindBeforeMinutesSupported() {

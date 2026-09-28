@@ -122,6 +122,7 @@ class ReminderJobTest {
 
         assertThat(job.sendShiftReminders()).isZero();
         assertThat(job.sendConfirmationNudges()).isZero();
+        assertThat(job.sendMilesNudges()).isZero();
         verifyNoInteractions(shiftRepository, reminderLogRepository);
     }
 
@@ -129,5 +130,22 @@ class ReminderJobTest {
         Clock clock = Clock.fixed(Instant.parse(instant), ZoneOffset.UTC);
         return new ReminderJob(shiftRepository, reminderLogRepository, pushService,
                 new UserTimeService(userRepository, clock), clock);
+    }
+
+    @Test
+    void asksForMilesAboutTwentyMinutesAfterTheBlockEndsOnlyOnce() {
+        owner.setRemindMiles(true);
+        when(pushService.isConfigured()).thenReturn(true);
+        when(shiftRepository.findMissingMilesWithNudges(LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of(shift));
+        when(reminderLogRepository.existsById(new ReminderLog.Key(7L, ReminderKind.MILES))).thenReturn(false, true);
+
+        // The block ends at 00:15 UTC; the nudge is due at 00:35.
+        assertThat(job("2026-09-13T00:34:00Z").sendMilesNudges()).isZero();
+        assertThat(job("2026-09-13T00:40:00Z").sendMilesNudges()).isEqualTo(1);
+        assertThat(job("2026-09-13T00:41:00Z").sendMilesNudges()).isZero();
+
+        verify(pushService, times(1)).send(owner, new PushMessage("How many miles for your VEA7 block?",
+                "Log them now while you remember.", "/?finish=7", "shift-7-miles"));
     }
 }

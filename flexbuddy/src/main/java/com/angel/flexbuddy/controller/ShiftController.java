@@ -149,6 +149,16 @@ public class ShiftController {
         return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
     }
 
+    @GetMapping("/missing-miles")
+    public List<ShiftResponse> missingMiles(Principal principal, @RequestParam(defaultValue = "7") int days) {
+        return shiftService.missingMiles(principal.getName(), days);
+    }
+
+    @GetMapping("/{id:\\d+}")
+    public ShiftResponse getShift(Principal principal, @PathVariable Long id) {
+        return shiftService.getShift(principal.getName(), id);
+    }
+
     @GetMapping("/odometer/latest")
     public ResponseEntity<OdometerReadingResponse> latestOdometer(Principal principal,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime before) {

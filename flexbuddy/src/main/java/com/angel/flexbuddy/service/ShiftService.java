@@ -170,6 +170,27 @@ public class ShiftService {
                 .map(shift -> new OdometerReadingResponse(shift.getOdometerEnd(), shift.getDate(), shift.getStation()));
     }
 
+    static final int MISSING_MILES_LIMIT = 10;
+
+    /** Completed blocks from the last few days, newest first, that still have no miles logged. */
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public List<ShiftResponse> missingMiles(String email, int days) {
+        if (days < 1 || days > 31) throw new com.angel.flexbuddy.exception.InvalidFilterException("days must be between 1 and 31.");
+        LocalDate today = userTime.today(email);
+        List<Shift> missing = findFiltered(email, ShiftFilter.report(today.minusDays(days - 1L), today, null, null)
+                .withStatuses(java.util.Set.of(ShiftStatus.COMPLETED))).stream()
+                .filter(shift -> shift.getMiles() == null)
+                .limit(MISSING_MILES_LIMIT)
+                .toList();
+        return toResponses(email, missing);
+    }
+
+    public ShiftResponse getShift(String email, Long id) {
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+        return toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email));
+    }
+
     /** Records that a scheduled block has started now, in the driver's time zone. */
     @org.springframework.transaction.annotation.Transactional
     public ShiftResponse startShift(String email, Long id) {

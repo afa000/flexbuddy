@@ -522,4 +522,32 @@ class ShiftControllerTest {
         mockMvc.perform(get("/shifts/odometer/latest").with(user("angel@example.com")))
                 .andExpect(status().isNoContent());
     }
+
+    @Test
+    void missingMiles_usesAWeekByDefaultAndRejectsABadWindow() throws Exception {
+        when(shiftService.missingMiles("angel@example.com", 7)).thenReturn(List.of());
+        when(shiftService.missingMiles("angel@example.com", 40))
+                .thenThrow(new com.angel.flexbuddy.exception.InvalidFilterException("days must be between 1 and 31."));
+
+        mockMvc.perform(get("/shifts/missing-miles").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(content().json("[]"));
+        mockMvc.perform(get("/shifts/missing-miles").param("days", "40").with(user("angel@example.com")))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void getShift_returnsOneOfTheDriversShifts() throws Exception {
+        ShiftResponse shift = new ShiftResponse();
+        shift.setId(7L);
+        shift.setStation("VEA7");
+        when(shiftService.getShift("angel@example.com", 7L)).thenReturn(shift);
+        when(shiftService.getShift("angel@example.com", 99L)).thenThrow(new ShiftNotFoundException(99L));
+
+        mockMvc.perform(get("/shifts/7").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.station").value("VEA7"));
+        mockMvc.perform(get("/shifts/99").with(user("angel@example.com")))
+                .andExpect(status().isNotFound());
+    }
 }

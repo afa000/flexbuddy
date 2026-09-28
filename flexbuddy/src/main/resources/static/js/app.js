@@ -668,6 +668,7 @@ async function loadDashboard() {
         loadEarningsReport(buildQuery(false))
     ]);
     window.flexbuddySchedule?.refresh();
+    window.flexbuddyFinish?.loadMissing();
 }
 
 async function loadStatistics(query, signal) {
@@ -1727,7 +1728,14 @@ async function loadLinkedExpenses(shiftId) {
 }
 
 function openInitialScreen() {
-    const screen = new URLSearchParams(window.location.search).get('screen');
+    const params = new URLSearchParams(window.location.search);
+    const finish = params.get('finish');
+    if (finish) {
+        showDashboard(false);
+        window.flexbuddyFinish?.openById(finish);
+        return;
+    }
+    const screen = params.get('screen');
     if (screen === 'schedule') showScheduleScreen(false);
     else if (screen === 'import') showImportScreen(false);
     else if (screen === 'expenses') showExpensesScreen(false);

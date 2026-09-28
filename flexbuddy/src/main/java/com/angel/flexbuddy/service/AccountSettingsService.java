@@ -51,6 +51,7 @@ public class AccountSettingsService {
         user.setTimeZone(request.timeZone());
         user.setRemindBeforeMinutes(request.remindBeforeMinutes());
         user.setRemindConfirm(request.remindConfirm());
+        if (request.remindMiles() != null) user.setRemindMiles(request.remindMiles());
         return response(userRepository.save(user));
     }
 
@@ -84,7 +85,7 @@ public class AccountSettingsService {
                 ? VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod();
         return new AccountSettingsResponse(method, effectiveMileageRate(user), defaultMileageRate, mileageRateYear,
                 user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone(),
-                user.getRemindBeforeMinutes(), user.isRemindConfirm(),
+                user.getRemindBeforeMinutes(), user.isRemindConfirm(), user.isRemindMiles(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics");
     }
 

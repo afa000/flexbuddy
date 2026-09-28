@@ -73,6 +73,17 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     List<Shift> findWithOdometerBefore(@Param("email") String email, @Param("date") LocalDate date,
             @Param("time") java.time.LocalTime time, org.springframework.data.domain.Pageable page);
 
+    /** Blocks that have happened or are due to end without miles, for owners who want a push to log them. */
+    @Query("""
+            select s from Shift s join fetch s.owner o
+            where s.status in (com.angel.flexbuddy.model.ShiftStatus.SCHEDULED, com.angel.flexbuddy.model.ShiftStatus.COMPLETED)
+              and s.miles is null
+              and s.date between :fromDate and :toDate
+              and o.remindMiles = true
+              and exists (select p.id from PushSubscription p where p.owner = o)
+            """)
+    List<Shift> findMissingMilesWithNudges(@Param("fromDate") LocalDate from, @Param("toDate") LocalDate to);
+
     @Query("""
             select distinct s.station from Shift s
             where lower(s.owner.email) = lower(:email)

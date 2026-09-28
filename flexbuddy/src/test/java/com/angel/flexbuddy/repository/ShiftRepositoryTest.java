@@ -293,4 +293,33 @@ class ShiftRepositoryTest {
         shift.setOdometerEnd(new BigDecimal(end));
         return shift;
     }
+
+    @Test
+    void milesNudgeCandidatesHaveNoMilesAndAnOwnerWhoAskedForPush() {
+        AppUser subscribed = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        subscribed.setRemindMiles(true);
+        AppUser optedOut = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        for (AppUser owner : List.of(subscribed, optedOut)) {
+            PushSubscription subscription = new PushSubscription();
+            subscription.setOwner(owner);
+            subscription.setEndpoint("https://fcm.googleapis.com/fcm/send/" + owner.getEmail());
+            subscription.setP256dh("key");
+            subscription.setAuth("auth");
+            subscription.setCreatedAt(NOW);
+            pushSubscriptionRepository.save(subscription);
+        }
+        saveWithStatus(subscribed, LocalDate.of(2026, 9, 12), ShiftStatus.COMPLETED);
+        saveWithStatus(subscribed, LocalDate.of(2026, 9, 12), ShiftStatus.SCHEDULED);
+        saveWithStatus(subscribed, LocalDate.of(2026, 9, 12), ShiftStatus.CANCELLED);
+        Shift logged = shift(subscribed, "LOGGED", LocalDate.of(2026, 9, 12));
+        logged.setMiles(BigDecimal.ZERO);
+        shiftRepository.save(logged);
+        saveWithStatus(optedOut, LocalDate.of(2026, 9, 12), ShiftStatus.COMPLETED);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(shiftRepository.findMissingMilesWithNudges(LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 13)))
+                .extracting(shift -> shift.getOwner().getEmail() + " " + shift.getStatus())
+                .containsExactlyInAnyOrder("angel@example.com COMPLETED", "angel@example.com SCHEDULED");
+    }
 }

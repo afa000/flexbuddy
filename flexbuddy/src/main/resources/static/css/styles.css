@@ -2140,3 +2140,20 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .finish-pair .field-hint { grid-column: 1 / -1; margin-top: -4px; }
 .finish-mode-button { justify-self: start; margin-top: -8px; }
 .route-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+
+/* Blocks without miles */
+.missing-miles { margin-top: 18px; padding: 20px 29px; border-left: 5px solid var(--cyan); }
+.missing-miles[hidden] { display: none; }
+.missing-miles-heading { margin-bottom: 14px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
+.missing-miles-heading h2 { margin: 0; font-size: 20px; }
+.missing-miles-heading .step-label { margin-bottom: 4px; }
+.missing-miles-heading small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.missing-miles-list { display: grid; gap: 8px; }
+.missing-row { padding: 12px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 18px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 6px; }
+.missing-row p { margin: 0; display: grid; gap: 3px; }
+.missing-row span { color: var(--muted); font-size: 12px; }
+
+@media (max-width: 620px) {
+    .missing-miles { margin-top: 0; padding: 18px; border-width: 0 0 8px; border-color: var(--surface-raised); border-radius: 0; }
+    .missing-row .confirm-actions { width: 100%; }
+}

@@ -61,7 +61,8 @@ public class AccountBackupService {
                 new BackupSettings((user.getVehicleCostMethod() == null
                         ? com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod()).name(),
                         user.getMileageRate() == null ? null : user.getMileageRate().toPlainString(),
-                        user.getTimeZone(), user.getRemindBeforeMinutes(), user.isRemindConfirm()),
+                        user.getTimeZone(), user.getRemindBeforeMinutes(), user.isRemindConfirm(),
+                        user.isRemindMiles()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
         );
     }

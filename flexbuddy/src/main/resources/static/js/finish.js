@@ -3,6 +3,8 @@
 // loadDashboard, ...) at call time.
 (() => {
     const LATE_FINISH_MINUTES = 180;
+    const SNOOZE_KEY = 'flexbuddy-miles-snoozed';
+    const SNOOZE_MS = 24 * 60 * 60000;
     let el;
     let shift;
     let trigger;
@@ -229,5 +231,92 @@
         }
     }
 
-    window.flexbuddyFinish = {open};
+    /** Opens the sheet for a shift named in a link, such as the one in the log-your-miles push notification. */
+    async function openById(id, from) {
+        try {
+            const response = await apiFetch(`/shifts/${encodeURIComponent(id)}`);
+            if (!response.ok) throw new Error();
+            const target = await response.json();
+            if (target.status === 'SCHEDULED' || target.status === 'COMPLETED') await open(target, from);
+        } catch {
+            showToast('Block not found', 'That block could not be opened. It may have been deleted.', {alert: true});
+        }
+    }
+
+    function snoozed() {
+        try {
+            const saved = JSON.parse(localStorage.getItem(SNOOZE_KEY) || '{}');
+            const now = Date.now();
+            return Object.fromEntries(Object.entries(saved).filter(([, until]) => until > now));
+        } catch {
+            return {};
+        }
+    }
+
+    function snooze(id) {
+        try {
+            localStorage.setItem(SNOOZE_KEY, JSON.stringify({...snoozed(), [id]: Date.now() + SNOOZE_MS}));
+        } catch {
+            // Without storage the entry simply comes back on the next load.
+        }
+    }
+
+    /** The dashboard strip of recent completed blocks with no miles, minus any the driver put off for a day. */
+    async function loadMissing() {
+        const section = document.querySelector('#missingMiles');
+        if (!section) return;
+        let shifts = [];
+        try {
+            const response = await apiFetch('/shifts/missing-miles?days=7');
+            if (response.ok) shifts = await response.json();
+        } catch {
+            // The strip is a reminder only; when it cannot load it stays hidden.
+        }
+        const skipped = snoozed();
+        const visible = shifts.filter(shift => !skipped[shift.id]);
+        section.hidden = visible.length === 0;
+        document.querySelector('#missingMilesCount').textContent =
+            `${visible.length} ${visible.length === 1 ? 'block' : 'blocks'} this week`;
+        const offline = window.flexbuddyPwa?.isOffline() ?? false;
+        document.querySelector('#missingMilesList').replaceChildren(...visible.map(shift => {
+            const row = document.createElement('article');
+            row.className = 'missing-row';
+            row.innerHTML = `
+                <p><strong>${escapeHtml(formatDate(shift.date))} · ${escapeHtml(shift.station)}</strong>
+                    <span>${escapeHtml(formatTime(shift.startTime))}–${escapeHtml(formatTime(shift.endTime))}</span></p>
+                <div class="confirm-actions">
+                    <button class="primary-button compact-button" type="button" data-action="add" data-online-only>Add miles</button>
+                    <button class="secondary-button compact-button" type="button" data-action="none" data-online-only>No miles</button>
+                    <button class="text-button" type="button" data-action="later">Not now</button>
+                </div>`;
+            row.querySelectorAll('[data-online-only]').forEach(button => button.disabled = offline);
+            row.querySelector('[data-action="add"]').addEventListener('click', event => open(shift, event.currentTarget));
+            row.querySelector('[data-action="none"]').addEventListener('click', event => noMiles(shift, event.currentTarget));
+            row.querySelector('[data-action="later"]').addEventListener('click', () => {
+                snooze(shift.id);
+                loadMissing();
+            });
+            return row;
+        }));
+    }
+
+    /** Records that the block had no driving to log, which also stops the reminders for it. */
+    async function noMiles(target, button) {
+        button.disabled = true;
+        try {
+            const response = await apiFetch(`/shifts/${target.id}/status`, {
+                method: 'PATCH',
+                headers: csrfHeaders({'Content-Type': 'application/json'}),
+                body: JSON.stringify({status: 'COMPLETED', miles: 0})
+            });
+            if (!response.ok) throw new Error(await response.text() || 'The block could not be updated.');
+            showToast('Saved as no miles', `${target.station} on ${formatDate(target.date)} will not ask again.`);
+            await loadDashboard();
+        } catch (error) {
+            showToast('Not saved', error.message || 'The block could not be updated.', {alert: true});
+            button.disabled = false;
+        }
+    }
+
+    window.flexbuddyFinish = {open, openById, loadMissing};
 })();

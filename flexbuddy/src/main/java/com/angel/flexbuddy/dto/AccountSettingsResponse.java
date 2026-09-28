@@ -7,11 +7,11 @@ import com.angel.flexbuddy.model.VehicleCostMethod;
 
 public record AccountSettingsResponse(VehicleCostMethod vehicleCostMethod, BigDecimal mileageRate,
         BigDecimal defaultMileageRate, int mileageRateYear, String timeZone, Integer remindBeforeMinutes,
-        boolean remindConfirm, String calendarFeedPath) {
+        boolean remindConfirm, boolean remindMiles, String calendarFeedPath) {
 
     public AccountSettingsResponse(VehicleCostMethod vehicleCostMethod, BigDecimal mileageRate,
             BigDecimal defaultMileageRate, int mileageRateYear) {
         this(vehicleCostMethod, mileageRate, defaultMileageRate, mileageRateYear, AppUser.DEFAULT_TIME_ZONE,
-                null, false, null);
+                null, false, false, null);
     }
 }

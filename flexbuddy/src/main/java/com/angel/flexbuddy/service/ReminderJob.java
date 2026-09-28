@@ -32,6 +32,7 @@ public class ReminderJob {
     static final Duration REMINDER_WINDOW = Duration.ofMinutes(15);
     static final Duration CONFIRM_AFTER = Duration.ofHours(1);
     static final Duration CONFIRM_UNTIL = Duration.ofHours(24);
+    static final Duration MILES_AFTER = Duration.ofMinutes(20);
     private static final String SCHEDULE_URL = "/?screen=schedule";
     private static final DateTimeFormatter START_TIME = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
     private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE MMM d", Locale.ENGLISH);
@@ -91,6 +92,27 @@ public class ReminderJob {
                             + CLOCK_TIME.format(shift.getStartTime()) + "–" + CLOCK_TIME.format(shift.getEndTime())
                             + ". Confirm it in FlexBuddy.",
                     SCHEDULE_URL, "shift-" + shift.getId() + "-confirm"));
+            sent++;
+        }
+        return sent;
+    }
+
+    /** Asks for the miles about 20 minutes after a block's scheduled end, once per block, while none are logged. */
+    @Scheduled(fixedDelayString = "${flexbuddy.push.reminder-delay-ms:60000}",
+            initialDelayString = "${flexbuddy.push.reminder-delay-ms:60000}")
+    @Transactional
+    public int sendMilesNudges() {
+        if (!pushService.isConfigured()) return 0;
+        Instant now = Instant.now(clock);
+        LocalDate today = LocalDate.ofInstant(now, ZoneOffset.UTC);
+        int sent = 0;
+        for (Shift shift : shiftRepository.findMissingMilesWithNudges(today.minusDays(2), today.plusDays(1))) {
+            AppUser owner = shift.getOwner();
+            Instant end = shift.getEndDateTime().atZone(userTime.zone(owner)).toInstant();
+            if (!isDue(end.plus(MILES_AFTER), now) || !claim(shift, ReminderKind.MILES, now)) continue;
+            pushService.send(owner, new PushMessage("How many miles for your " + shift.getStation() + " block?",
+                    "Log them now while you remember.", "/?finish=" + shift.getId(),
+                    "shift-" + shift.getId() + "-miles"));
             sent++;
         }
         return sent;
