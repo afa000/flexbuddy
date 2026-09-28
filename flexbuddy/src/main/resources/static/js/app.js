@@ -108,6 +108,7 @@ const elements = {
     saveEditButton: document.querySelector('#saveEditButton'),
     editTimestamps: document.querySelector('#editTimestamps'),
     deleteShiftButton: document.querySelector('#deleteShiftButton'),
+    duplicateShiftButton: document.querySelector('#duplicateShiftButton'),
     deleteConfirm: document.querySelector('#deleteConfirm'),
     cancelDeleteButton: document.querySelector('#cancelDeleteButton'),
     confirmDeleteButton: document.querySelector('#confirmDeleteButton'),
@@ -278,6 +279,9 @@ elements.sameAsScheduledButton.addEventListener('click', () => {
 elements.closeEditButton.addEventListener('click', closeEditModal);
 elements.cancelEditButton.addEventListener('click', closeEditModal);
 elements.deleteShiftButton.addEventListener('click', showDeleteConfirmation);
+elements.duplicateShiftButton.addEventListener('click', () => {
+    if (editSnapshot) duplicateShift(editSnapshot, lastFocusedElement);
+});
 elements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
 elements.confirmDeleteButton.addEventListener('click', deleteEditedShift);
 elements.trashSection.addEventListener('toggle', () => {
@@ -879,7 +883,12 @@ function renderShifts(shifts) {
         const editButton = row.querySelector('.edit-shift-button');
         editButton.setAttribute('aria-label', `Edit ${shift.station} shift on ${shift.date}`);
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
-        elements.historyList.append(row);
+        elements.historyList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
+            onEdit: () => openEditModal(shift, editButton),
+            onDelete: () => deleteShiftFromList(shift),
+            onDuplicate: () => duplicateShift(shift, editButton),
+            deleteQuestion: `Delete ${shift.station} on ${formatDate(shift.date)}?`
+        }) : row);
     }
     elements.showMoreButton.classList.toggle('is-hidden', visibleShiftCount >= shifts.length);
 }
@@ -921,6 +930,7 @@ function openEditModal(shift, trigger, options = {}) {
         ? 'Enter a block you accepted. It will not count toward earnings or hours until you confirm it.'
         : 'Update the values and save your changes.';
     elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
+    elements.duplicateShiftButton.classList.toggle('is-hidden', isNew);
     elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
     elements.editTimestamps.classList.toggle('is-hidden', isNew);
     if (!isNew) {
@@ -1139,23 +1149,58 @@ async function deleteEditedShift() {
     if (id === undefined) return;
     elements.confirmDeleteButton.disabled = true;
     try {
-        const response = await apiFetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
-        if (!response.ok) throw new Error(await response.text());
-        const batch = response.headers.get('X-Delete-Batch');
+        const batch = await deleteShift(id);
         closeEditModal();
-        showToast('Shift deleted', 'It is available in Recently deleted for 30 days.', {
-            actionLabel: 'Undo',
-            duration: 8000,
-            alert: true,
-            onAction: () => restoreBatch(batch)
-        });
-        await loadStations();
-        await loadDashboard();
+        await afterShiftDeleted(batch);
     } catch (error) {
         showMessage(elements.editError, error.message || 'The shift could not be deleted.');
     } finally {
         elements.confirmDeleteButton.disabled = false;
     }
+}
+
+/** Deletes a shift confirmed from a swiped history row. */
+async function deleteShiftFromList(shift) {
+    try {
+        await afterShiftDeleted(await deleteShift(shift.id));
+    } catch (error) {
+        showToast('Not deleted', error.message || 'The shift could not be deleted.', {alert: true});
+        await loadDashboard();
+    }
+}
+
+async function deleteShift(id) {
+    const response = await apiFetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
+    if (!response.ok) throw new Error(await response.text() || 'The shift could not be deleted.');
+    return response.headers.get('X-Delete-Batch');
+}
+
+async function afterShiftDeleted(batch) {
+    showToast('Shift deleted', 'It is available in Recently deleted for 30 days.', {
+        actionLabel: 'Undo',
+        duration: 8000,
+        alert: true,
+        onAction: () => restoreBatch(batch)
+    });
+    await loadStations();
+    await loadDashboard();
+}
+
+/** Starts a new scheduled block like this one, on the same weekday in the coming week. */
+function duplicateShift(shift, trigger) {
+    closeEditModal();
+    const source = parseLocalDate(shift.date);
+    const date = new Date();
+    date.setHours(0, 0, 0, 0);
+    do {
+        date.setDate(date.getDate() + 1);
+    } while (date.getDay() !== source.getDay());
+    openEditModal({id: null, station: shift.station, date: toIsoDate(date), startTime: shift.startTime,
+        endTime: shift.endTime, basePay: shift.status === 'COMPLETED' ? shift.basePay : '', tips: 0, miles: null,
+        status: 'SCHEDULED'},
+        trigger, {status: 'SCHEDULED'});
+    elements.editDialogDescription.textContent =
+        `A copy of ${shift.station} on ${formatDate(shift.date)}. Check the date and pay, then add it.`;
 }
 
 async function undoEdit(id, previous) {
@@ -1699,7 +1744,11 @@ function renderExpenses(expenses) {
         row.innerHTML = `<div class="expense-category-icon">${escapeHtml(expense.category.slice(0, 1))}</div><div class="expense-main"><strong>${escapeHtml(expense.category.replace('_', ' '))}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || 'No note')}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">Edit</button><button class="danger-text-button delete-expense" type="button">Delete</button></div>`;
         row.querySelector('.edit-expense').addEventListener('click', () => editExpense(expense));
         row.querySelector('.delete-expense').addEventListener('click', () => deleteExpense(expense));
-        elements.expenseList.append(row);
+        elements.expenseList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
+            onEdit: () => editExpense(expense),
+            onDelete: () => deleteExpense(expense),
+            deleteQuestion: `Delete this ${formatMoney(expense.amount)} ${expense.category.toLowerCase()} expense?`
+        }) : row);
     });
 }
 

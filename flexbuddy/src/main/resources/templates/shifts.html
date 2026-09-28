@@ -612,6 +612,7 @@
                 <p class="shift-timestamps field-wide" id="editTimestamps"></p>
                 <div class="form-actions field-wide">
                     <button class="danger-text-button delete-shift-button" id="deleteShiftButton" type="button">Delete shift</button>
+                    <button class="text-button" id="duplicateShiftButton" type="button">Duplicate</button>
                     <span class="action-spacer"></span>
                     <button class="secondary-button" id="cancelEditButton" type="button">Cancel</button>
                     <button class="primary-button" id="saveEditButton" type="submit">
@@ -724,6 +725,7 @@
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
 </html>
