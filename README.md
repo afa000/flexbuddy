@@ -185,3 +185,7 @@ All of these require a signed-in session and only ever touch the caller's own da
 Version 1 and 2 backups remain restorable, and their shifts restore as completed. Version 2 and later restores remap expense-to-shift links and deduplicates both record types. Replace and Undo operate on shifts and expenses together.
 
 Deleted shifts and expenses stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening either trash listing purges expired rows.
+
+## Built alongside
+
+[**GitDigest**](https://github.com/afa000/gitdigest) is the other half of this pair: a Java command-line tool for Git analytics, changelogs, and release notes, where FlexBuddy is a web app that serves its own APIs. GitDigest uses FlexBuddy's commit history as one of its real-world test subjects.
