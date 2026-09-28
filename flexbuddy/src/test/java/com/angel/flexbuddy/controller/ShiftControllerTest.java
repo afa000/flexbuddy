@@ -491,7 +491,7 @@ class ShiftControllerTest {
         ShiftResponse started = new ShiftResponse();
         started.setId(7L);
         started.setStatus(ShiftStatus.SCHEDULED);
-        started.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(15, 3), null, null, null, null));
+        started.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(15, 3), null, null, null, null, null, null));
         when(shiftService.startShift("angel@example.com", 7L)).thenReturn(started);
 
         mockMvc.perform(post("/shifts/7/start").with(user("angel@example.com")).with(csrf()))
@@ -505,5 +505,21 @@ class ShiftControllerTest {
 
         mockMvc.perform(post("/shifts/99/start").with(user("angel@example.com")).with(csrf()))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void latestOdometer_returnsTheReadingOrNoContent() throws Exception {
+        when(shiftService.latestOdometer("angel@example.com", java.time.LocalDateTime.of(2026, 9, 13, 15, 15)))
+                .thenReturn(java.util.Optional.of(new com.angel.flexbuddy.dto.OdometerReadingResponse(
+                        new BigDecimal("45210.4"), LocalDate.of(2026, 9, 6), "VEA7")));
+        when(shiftService.latestOdometer("angel@example.com", null)).thenReturn(java.util.Optional.empty());
+
+        mockMvc.perform(get("/shifts/odometer/latest").param("before", "2026-09-13T15:15")
+                        .with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reading").value(45210.4))
+                .andExpect(jsonPath("$.station").value("VEA7"));
+        mockMvc.perform(get("/shifts/odometer/latest").with(user("angel@example.com")))
+                .andExpect(status().isNoContent());
     }
 }

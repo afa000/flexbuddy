@@ -28,6 +28,7 @@ import com.angel.flexbuddy.dto.BlockEvaluationResponse;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.EarningsReportResponse;
 import com.angel.flexbuddy.dto.GroupBy;
+import com.angel.flexbuddy.dto.OdometerReadingResponse;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftResponse;
@@ -146,6 +147,14 @@ public class ShiftController {
     public ResponseEntity<Void> deleteShift(Principal principal, @PathVariable Long id) {
         String batch = shiftService.deleteShift(principal.getName(), id);
         return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
+    }
+
+    @GetMapping("/odometer/latest")
+    public ResponseEntity<OdometerReadingResponse> latestOdometer(Principal principal,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) java.time.LocalDateTime before) {
+        return shiftService.latestOdometer(principal.getName(), before)
+                .map(ResponseEntity::ok)
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @PostMapping("/{id}/start")

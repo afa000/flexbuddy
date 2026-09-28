@@ -438,6 +438,67 @@ class ShiftServiceTest {
     }
 
     private static BlockDetailsRequest times(LocalTime start, LocalTime end) {
-        return new BlockDetailsRequest(start, end);
+        return new BlockDetailsRequest(start, end, null, null);
+    }
+
+    @Test
+    void odometerReadingsFillInMilesWhenNoneAreTyped() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                null, null, null, odometer("45210.4", "45233.8")));
+
+        assertThat(result.getMiles()).isEqualByComparingTo("23.4");
+        assertThat(result.getDetails().odometerStart()).isEqualByComparingTo("45210.4");
+        assertThat(result.getDetails().odometerEnd()).isEqualByComparingTo("45233.8");
+    }
+
+    @Test
+    void typedMilesWinOverTheOdometerAndKeepTheReadings() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        UpdateShiftRequest request = new UpdateShiftRequest("VEA7", LocalDate.of(2026, 9, 6), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("120.00"), BigDecimal.ZERO, new BigDecimal("20.0"));
+        request.setDetails(odometer("45210.4", "45233.8"));
+
+        ShiftResponse result = shiftService.updateShift(OWNER_EMAIL, 1L, request);
+
+        assertThat(result.getMiles()).isEqualByComparingTo("20.0");
+        assertThat(completed.getOdometerStart()).isEqualByComparingTo("45210.4");
+        assertThat(completed.getOdometerEnd()).isEqualByComparingTo("45233.8");
+    }
+
+    @Test
+    void odometerReadingsMustNotRunBackwardsOrBeRecordedBeforeTheBlock() {
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL))
+                .thenReturn(Optional.of(shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0")));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled(7L)));
+
+        assertDetailsRejected(1L, odometer("45233.8", "45210.4"),
+                "The odometer end reading must be at least the start reading.");
+        assertDetailsRejected(7L, odometer("45210.4", null), "Record the odometer when the block is finished.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void latestOdometerLooksBeforeTheGivenMomentOrNow() {
+        Shift previous = shift(3L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        previous.setOdometerEnd(new BigDecimal("45210.4"));
+        when(shiftRepository.findWithOdometerBefore(eq(OWNER_EMAIL), eq(LocalDate.of(2026, 9, 13)),
+                eq(LocalTime.of(15, 15)), any())).thenReturn(List.of(previous));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 15, 15));
+
+        assertThat(shiftService.latestOdometer(OWNER_EMAIL, null)).get()
+                .satisfies(latest -> assertThat(latest.reading()).isEqualByComparingTo("45210.4"))
+                .satisfies(latest -> assertThat(latest.station()).isEqualTo("VEA7"));
+        assertThat(shiftService.latestOdometer(OWNER_EMAIL, LocalDateTime.of(2026, 9, 1, 8, 0))).isEmpty();
+    }
+
+    private static BlockDetailsRequest odometer(String start, String end) {
+        return new BlockDetailsRequest(null, null, start == null ? null : new BigDecimal(start),
+                end == null ? null : new BigDecimal(end));
     }
 }

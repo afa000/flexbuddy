@@ -554,6 +554,14 @@
                     <input id="editMiles" type="number" min="0" step="0.1" inputmode="decimal">
                 </label>
 
+                <details class="block-details field-wide" id="editOdometer">
+                    <summary>Odometer <small id="editOdometerSummary">Optional</small></summary>
+                    <div class="finish-pair">
+                        <label class="field"><span>Start reading</span><input id="editOdometerStart" type="number" min="0" step="0.1" inputmode="decimal"></label>
+                        <label class="field"><span>End reading</span><input id="editOdometerEnd" type="number" min="0" step="0.1" inputmode="decimal"></label>
+                    </div>
+                </details>
+
                 <details class="block-details field-wide" id="editActualTimes">
                     <summary>Actual times <small id="editActualSummary">Optional</small></summary>
                     <div class="finish-pair">
@@ -603,6 +611,16 @@
                     <label class="field"><span>Started</span><input id="finishStart" type="time"></label>
                     <label class="field"><span>Finished</span><input id="finishEnd" type="time"></label>
                 </div>
+                <div class="finish-pair field-wide" id="finishOdometer">
+                    <label class="field"><span>Odometer start</span><input id="finishOdometerStart" type="number" min="0" step="0.1" inputmode="decimal"></label>
+                    <label class="field"><span>Odometer end</span><input id="finishOdometerEnd" type="number" min="0" step="0.1" inputmode="decimal" enterkeyhint="done"></label>
+                    <small class="field-hint" id="finishOdometerHint"></small>
+                </div>
+                <label class="field field-wide is-hidden" id="finishMilesField">
+                    <span>Miles</span>
+                    <input id="finishMiles" type="number" min="0" step="0.1" inputmode="decimal" enterkeyhint="done">
+                </label>
+                <button class="text-button finish-mode-button field-wide" id="finishModeButton" type="button">Enter miles instead</button>
                 <p class="finish-summary field-wide" id="finishSummary" aria-live="polite"></p>
                 <label class="field money-field field-wide" id="finishPayField">
                     <span>Base pay</span>

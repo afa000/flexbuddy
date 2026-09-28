@@ -1,10 +1,13 @@
-// Finish block sheet: records when a block started and finished, and marks a scheduled block completed, in one save.
-// Loaded before app.js and uses its shared helpers (apiFetch, csrfHeaders, showToast, loadDashboard, ...) at call time.
+// Finish block sheet: records when a block started and finished and how far it went, and marks a scheduled block
+// completed, in one save. Loaded before app.js and uses its shared helpers (apiFetch, csrfHeaders, showToast,
+// loadDashboard, ...) at call time.
 (() => {
     const LATE_FINISH_MINUTES = 180;
     let el;
     let shift;
     let trigger;
+    let latest;
+    let useOdometer = true;
 
     function init() {
         if (el) return;
@@ -16,6 +19,13 @@
             form: document.querySelector('#finishForm'),
             start: document.querySelector('#finishStart'),
             end: document.querySelector('#finishEnd'),
+            odometer: document.querySelector('#finishOdometer'),
+            odometerStart: document.querySelector('#finishOdometerStart'),
+            odometerEnd: document.querySelector('#finishOdometerEnd'),
+            odometerHint: document.querySelector('#finishOdometerHint'),
+            milesField: document.querySelector('#finishMilesField'),
+            miles: document.querySelector('#finishMiles'),
+            mode: document.querySelector('#finishModeButton'),
             summary: document.querySelector('#finishSummary'),
             payField: document.querySelector('#finishPayField'),
             pay: document.querySelector('#finishPay'),
@@ -35,7 +45,12 @@
                 trapFocus(el.modal, event);
             }
         });
-        [el.start, el.end].forEach(input => input.addEventListener('input', updateSummary));
+        [el.start, el.end, el.odometerStart, el.odometerEnd, el.miles]
+            .forEach(input => input.addEventListener('input', updateSummary));
+        el.mode.addEventListener('click', () => {
+            setMode(!useOdometer);
+            (useOdometer ? el.odometerEnd : el.miles).focus();
+        });
         el.form.addEventListener('submit', save);
     }
 
@@ -44,15 +59,22 @@
     }
 
     /** Opens the sheet for a scheduled block being finished, or for a completed block's details. */
-    function open(target, from) {
+    async function open(target, from) {
         init();
         shift = target;
         trigger = from;
+        latest = await latestReading();
         el.label.textContent = completing() ? 'FINISH BLOCK' : 'BLOCK DETAILS';
         el.title.textContent = shift.station;
         el.description.textContent = `${formatDate(shift.date)} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)} scheduled`;
         el.start.value = trimTime(shift.details?.actualStart) || trimTime(shift.startTime);
         el.end.value = trimTime(shift.details?.actualEnd) || defaultEnd();
+        const details = shift.details ?? {};
+        el.odometerStart.value = details.odometerStart ?? latest?.reading ?? '';
+        el.odometerEnd.value = details.odometerEnd ?? '';
+        el.miles.value = shift.miles ?? '';
+        // Drivers who log readings keep getting the odometer; everyone else starts with a plain miles field.
+        setMode(details.odometerStart != null || details.odometerEnd != null || (latest != null && shift.miles == null));
         el.payField.classList.toggle('is-hidden', !completing());
         el.pay.value = shift.basePay ?? '';
         el.save.querySelector('span').textContent = completing() ? 'Finish block' : 'Save details';
@@ -61,7 +83,7 @@
         updateSummary();
         el.modal.classList.remove('is-hidden');
         document.body.classList.add('modal-open');
-        el.end.focus();
+        (useOdometer ? el.odometerEnd : el.miles).focus();
     }
 
     function close() {
@@ -70,6 +92,25 @@
         shift = undefined;
         if (trigger?.isConnected) trigger.focus();
         trigger = undefined;
+    }
+
+    /** The last reading from a block before this one, or null when there is none or it cannot be loaded. */
+    async function latestReading() {
+        try {
+            const before = `${shift.date}T${trimTime(shift.startTime)}`;
+            const response = await apiFetch(`/shifts/odometer/latest?before=${encodeURIComponent(before)}`);
+            return response.status === 200 ? await response.json() : null;
+        } catch {
+            return null;
+        }
+    }
+
+    function setMode(odometer) {
+        useOdometer = odometer;
+        el.odometer.classList.toggle('is-hidden', !odometer);
+        el.milesField.classList.toggle('is-hidden', odometer);
+        el.mode.textContent = odometer ? 'Enter miles instead' : 'Use the odometer';
+        updateSummary();
     }
 
     /** The current time while the block could still be running, otherwise its scheduled end. */
@@ -85,28 +126,44 @@
         return trimTime(shift.endTime);
     }
 
-    function clockedMinutes() {
-        if (!el.start.value || !el.end.value) return null;
-        const [startHours, startMinutes] = el.start.value.split(':').map(Number);
-        const [endHours, endMinutes] = el.end.value.split(':').map(Number);
-        const minutes = (endHours * 60 + endMinutes) - (startHours * 60 + startMinutes);
-        return minutes < 0 ? minutes + 1440 : minutes;
+    function odometerMiles() {
+        if (el.odometerStart.value === '' || el.odometerEnd.value === '') return null;
+        return Number(el.odometerEnd.value) - Number(el.odometerStart.value);
     }
 
     function updateSummary() {
-        const minutes = clockedMinutes();
-        if (minutes === null || minutes === 0) {
-            el.summary.textContent = 'Enter both times to see how long the block took.';
+        if (!shift) return;
+        const parts = [];
+        const minutes = minutesBetween(el.start.value, el.end.value);
+        if (minutes) {
+            const early = shift.timeWorked - minutes;
+            const pace = early > 0 ? `${formatMinutes(early)} early` : early < 0 ? `${formatMinutes(-early)} over` : 'right on schedule';
+            parts.push(`${formatMinutes(minutes)} on the clock · ${pace}`);
+        }
+        const miles = useOdometer ? odometerMiles() : (el.miles.value === '' ? null : Number(el.miles.value));
+        if (miles !== null && miles >= 0) parts.push(`${miles.toFixed(1)} mi`);
+        el.summary.textContent = parts.join(' · ') || 'Enter both times to see how long the block took.';
+        updateOdometerHint();
+    }
+
+    function updateOdometerHint() {
+        if (!latest) {
+            el.odometerHint.textContent = '';
             return;
         }
-        const early = shift.timeWorked - minutes;
-        const pace = early > 0 ? `${formatMinutes(early)} early` : early < 0 ? `${formatMinutes(-early)} over` : 'right on schedule';
-        el.summary.textContent = `${formatMinutes(minutes)} on the clock · ${pace}`;
+        const from = `${formatDate(latest.date)} · ${latest.station}`;
+        const start = el.odometerStart.value === '' ? null : Number(el.odometerStart.value);
+        el.odometerHint.textContent = start !== null && start < Number(latest.reading)
+            ? `Lower than your last reading, ${latest.reading} on ${from}. Different car?`
+            : `Last reading ${latest.reading}, from ${from}.`;
     }
 
     function problem() {
         if (el.end.value && !el.start.value) return 'Enter when the block started.';
         if (el.start.value && el.start.value === el.end.value) return 'The finish time must be after the start time.';
+        if (useOdometer && odometerMiles() !== null && odometerMiles() < 0) {
+            return 'The odometer end reading must be at least the start reading.';
+        }
         if (completing() && !(Number(el.pay.value) > 0)) return 'Enter the base pay for this block.';
         return null;
     }
@@ -119,10 +176,18 @@
             return;
         }
         hideMessage(el.error);
+        const reading = input => useOdometer && input.value !== '' ? Number(input.value) : null;
         const body = {
             status: 'COMPLETED',
-            details: {actualStart: el.start.value || null, actualEnd: el.end.value || null}
+            details: {
+                actualStart: el.start.value || null,
+                actualEnd: el.end.value || null,
+                odometerStart: reading(el.odometerStart),
+                odometerEnd: reading(el.odometerEnd)
+            }
         };
+        // With both readings the server works out the miles; a typed miles value is sent as is.
+        if (!useOdometer && el.miles.value !== '') body.miles = Number(el.miles.value);
         if (completing()) body.basePay = Number(el.pay.value);
         const finished = shift;
         el.save.disabled = true;

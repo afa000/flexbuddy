@@ -68,6 +68,13 @@ public class Shift implements Timestamped {
 
     private LocalTime actualEnd;
 
+    /** Dashboard readings at the start and end of the block; their difference fills in miles when none are typed. */
+    @Column(precision = 9, scale = 1)
+    private BigDecimal odometerStart;
+
+    @Column(precision = 9, scale = 1)
+    private BigDecimal odometerEnd;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.COMPLETED;

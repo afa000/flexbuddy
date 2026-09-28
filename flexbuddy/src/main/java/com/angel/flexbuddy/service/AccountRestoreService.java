@@ -259,6 +259,8 @@ public class AccountRestoreService {
         shift.setStatusChangedAt(source.statusChangedAt());
         shift.setActualStart(source.actualStart());
         shift.setActualEnd(source.actualEnd());
+        shift.setOdometerStart(decimalOrNull(source.odometerStart()));
+        shift.setOdometerEnd(decimalOrNull(source.odometerEnd()));
         Instant now = Instant.now(clock);
         shift.setCreatedAt(source.createdAt() == null ? now : source.createdAt());
         shift.setUpdatedAt(source.updatedAt() == null ? shift.getCreatedAt() : source.updatedAt());
@@ -369,6 +371,13 @@ public class AccountRestoreService {
                 String statusProblem = status.validate(basePay, tips, miles);
                 if (statusProblem != null) problems.add(new RestoreProblem(index, "status", statusProblem));
             }
+            BigDecimal odometerStart = parseOptionalDecimal(shift.odometerStart(), index, "odometerStart", problems);
+            BigDecimal odometerEnd = parseOptionalDecimal(shift.odometerEnd(), index, "odometerEnd", problems);
+            if ((odometerStart != null && odometerStart.signum() < 0) || (odometerEnd != null && odometerEnd.signum() < 0)) {
+                problems.add(new RestoreProblem(index, "odometerStart", "readings cannot be negative"));
+            } else if (odometerStart != null && odometerEnd != null && odometerEnd.compareTo(odometerStart) < 0) {
+                problems.add(new RestoreProblem(index, "odometerEnd", "must be at least the start reading"));
+            }
             if (shift.actualEnd() != null && shift.actualStart() == null) {
                 problems.add(new RestoreProblem(index, "actualStart", "is required when actualEnd is set"));
             }
@@ -397,6 +406,10 @@ public class AccountRestoreService {
             problems.add(new RestoreProblem(index, field, "must be a valid amount"));
             return null;
         }
+    }
+
+    private static BigDecimal decimalOrNull(String value) {
+        return value == null || value.isBlank() ? null : new BigDecimal(value);
     }
 
     private BigDecimal parseOptionalDecimal(String value, int index, String field, List<RestoreProblem> problems) {

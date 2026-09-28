@@ -266,4 +266,31 @@ class ShiftRepositoryTest {
         shift.setStatus(status);
         shiftRepository.save(shift);
     }
+
+    @Test
+    void latestOdometerSkipsScheduledDeletedAndLaterBlocks() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        Shift older = withOdometer(shift(angel, "VEA7", LocalDate.of(2026, 9, 3)), "45100.0");
+        Shift latest = withOdometer(shift(angel, "DAX5", LocalDate.of(2026, 9, 5)), "45210.4");
+        Shift deleted = withOdometer(shift(angel, "VEA7", LocalDate.of(2026, 9, 6)), "45300.0");
+        deleted.setDeletedAt(Instant.parse("2026-09-10T12:00:00Z"));
+        Shift scheduled = withOdometer(shift(angel, "VEA7", LocalDate.of(2026, 9, 7)), "45400.0");
+        scheduled.setStatus(ShiftStatus.SCHEDULED);
+        Shift later = withOdometer(shift(angel, "VEA7", LocalDate.of(2026, 9, 9)), "45500.0");
+        shiftRepository.saveAllAndFlush(List.of(older, latest, deleted, scheduled, later));
+        entityManager.clear();
+
+        List<Shift> found = shiftRepository.findWithOdometerBefore("angel@example.com", LocalDate.of(2026, 9, 9),
+                LocalTime.of(9, 0), org.springframework.data.domain.PageRequest.of(0, 1));
+
+        assertThat(found).singleElement().satisfies(shift -> {
+            assertThat(shift.getStation()).isEqualTo("DAX5");
+            assertThat(shift.getOdometerEnd()).isEqualByComparingTo("45210.4");
+        });
+    }
+
+    private static Shift withOdometer(Shift shift, String end) {
+        shift.setOdometerEnd(new BigDecimal(end));
+        return shift;
+    }
 }

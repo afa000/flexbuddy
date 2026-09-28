@@ -88,6 +88,10 @@ const elements = {
     editMiles: document.querySelector('#editMiles'),
     timeWorkedDetail: document.querySelector('#timeWorkedDetail'),
     editActualTimes: document.querySelector('#editActualTimes'),
+    editOdometer: document.querySelector('#editOdometer'),
+    editOdometerSummary: document.querySelector('#editOdometerSummary'),
+    editOdometerStart: document.querySelector('#editOdometerStart'),
+    editOdometerEnd: document.querySelector('#editOdometerEnd'),
     editActualSummary: document.querySelector('#editActualSummary'),
     editActualStart: document.querySelector('#editActualStart'),
     editActualEnd: document.querySelector('#editActualEnd'),
@@ -247,6 +251,12 @@ elements.groupButtons.forEach(button => button.addEventListener('click', () => {
 elements.editForm.addEventListener('submit', saveEditedShift);
 [elements.editActualStart, elements.editActualEnd, elements.editStartTime, elements.editEndTime]
     .forEach(input => input.addEventListener('input', updateActualSummary));
+// Readings fill in the miles as they are typed; a miles value typed afterwards still wins.
+[elements.editOdometerStart, elements.editOdometerEnd].forEach(input => input.addEventListener('input', () => {
+    const miles = odometerMiles();
+    if (miles !== null && miles >= 0) elements.editMiles.value = miles.toFixed(1);
+    updateOdometerSummary();
+}));
 elements.sameAsScheduledButton.addEventListener('click', () => {
     elements.editActualStart.value = elements.editStartTime.value;
     elements.editActualEnd.value = elements.editEndTime.value;
@@ -816,6 +826,10 @@ function openEditModal(shift, trigger, options = {}) {
     elements.editActualEnd.value = trimTime(shift.details?.actualEnd);
     elements.editActualTimes.open = Boolean(shift.details?.actualStart);
     updateActualSummary();
+    elements.editOdometerStart.value = shift.details?.odometerStart ?? '';
+    elements.editOdometerEnd.value = shift.details?.odometerEnd ?? '';
+    elements.editOdometer.open = shift.details?.odometerStart != null || shift.details?.odometerEnd != null;
+    updateOdometerSummary();
     elements.editStatus.value = options.status || editOriginalStatus;
     // A block that already happened cannot go back to scheduled; delete it and add it again instead.
     [...elements.editStatus.options].forEach(option => {
@@ -866,6 +880,7 @@ function applyEditStatusRules(statusChanged = false) {
     if (status === 'SCHEDULED') elements.editMiles.value = '';
     // Only a worked block has actual times; a scheduled one gets its start from the Start block button.
     elements.editActualTimes.classList.toggle('is-hidden', status !== 'COMPLETED');
+    elements.editOdometer.classList.toggle('is-hidden', status === 'SCHEDULED');
     // The offered amount is never earned by a cancelled or forfeited block unless the driver enters it.
     if (statusChanged && (status === 'CANCELLED' || status === 'FORFEITED')) elements.editBasePay.value = 0;
     elements.saveEditButton.querySelector('span').textContent = saveEditLabel();
@@ -877,6 +892,17 @@ function minutesBetween(start, end) {
     const toMinutes = value => value.split(':').map(Number).reduce((hours, minutes) => hours * 60 + minutes);
     const minutes = toMinutes(end) - toMinutes(start);
     return minutes < 0 ? minutes + 1440 : minutes;
+}
+
+function odometerMiles() {
+    if (elements.editOdometerStart.value === '' || elements.editOdometerEnd.value === '') return null;
+    return Number(elements.editOdometerEnd.value) - Number(elements.editOdometerStart.value);
+}
+
+function updateOdometerSummary() {
+    const miles = odometerMiles();
+    elements.editOdometerSummary.textContent = miles === null ? 'Optional'
+        : miles < 0 ? 'End is below start' : `${miles.toFixed(1)} mi`;
 }
 
 function updateActualSummary() {
@@ -933,15 +959,24 @@ async function saveEditedShift(event) {
         miles: elements.editMiles.value === '' ? null : Number(elements.editMiles.value),
         status: elements.editStatus.value
     };
-    // A worked block always sends its details so a cleared time is saved; other statuses leave them to the server.
-    if (shift.status === 'COMPLETED') {
-        if (elements.editActualEnd.value && !elements.editActualStart.value) {
+    // A block that happened always sends its details so a cleared value is saved. Only a worked block has actual
+    // times, and a scheduled one leaves its details to the server.
+    if (shift.status !== 'SCHEDULED') {
+        const worked = shift.status === 'COMPLETED';
+        if (worked && elements.editActualEnd.value && !elements.editActualStart.value) {
             showMessage(elements.editError, 'Enter when the block started.');
             return;
         }
+        if (odometerMiles() !== null && odometerMiles() < 0) {
+            showMessage(elements.editError, 'The odometer end reading must be at least the start reading.');
+            return;
+        }
+        const reading = input => input.value === '' ? null : Number(input.value);
         shift.details = {
-            actualStart: elements.editActualStart.value || null,
-            actualEnd: elements.editActualEnd.value || null
+            actualStart: worked ? elements.editActualStart.value || null : null,
+            actualEnd: worked ? elements.editActualEnd.value || null : null,
+            odometerStart: reading(elements.editOdometerStart),
+            odometerEnd: reading(elements.editOdometerEnd)
         };
     }
 
@@ -1029,9 +1064,11 @@ async function undoEdit(id, previous) {
             basePay: previous.basePay,
             tips: previous.tips,
             miles: previous.miles,
-            details: previous.details && previous.status === 'COMPLETED' ? {
-                actualStart: previous.details.actualStart,
-                actualEnd: previous.details.actualEnd
+            details: previous.details && previous.status !== 'SCHEDULED' ? {
+                actualStart: previous.status === 'COMPLETED' ? previous.details.actualStart : null,
+                actualEnd: previous.status === 'COMPLETED' ? previous.details.actualEnd : null,
+                odometerStart: previous.details.odometerStart,
+                odometerEnd: previous.details.odometerEnd
             } : undefined
         })
     });

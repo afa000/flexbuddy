@@ -12,6 +12,9 @@ public record BlockDetailsResponse(
         LocalTime actualEnd,
         Integer actualMinutes,
         BigDecimal actualHourlyRate,
-        Integer finishedEarlyMinutes
+        Integer finishedEarlyMinutes,
+        BigDecimal odometerStart,
+        BigDecimal odometerEnd
 ) {
+    public static final BlockDetailsResponse NONE = new BlockDetailsResponse(null, null, null, null, null, null, null);
 }

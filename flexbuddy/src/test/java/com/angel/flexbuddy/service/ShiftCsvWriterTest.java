@@ -33,7 +33,7 @@ class ShiftCsvWriterTest {
         assertThat(bytes).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
         String csv = new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
         assertThat(csv).startsWith("id,date,station,start_time,end_time,minutes_worked,hours_worked,");
-        assertThat(csv).contains(",status,actual_start,actual_end,actual_minutes,actual_hourly_rate\r\n");
+        assertThat(csv).contains(",status,actual_start,actual_end,actual_minutes,actual_hourly_rate,odometer_start,odometer_end\r\n");
         assertThat(csv).contains("\"VEA7, \"\"North\"\"\"");
         assertThat(csv).contains(",04:00,07:30,210,3.50,124.50,0.00,124.50,35.57,");
         assertThat(csv.replace("\r\n", "")).doesNotContain("\n", "\r");
@@ -70,11 +70,11 @@ class ShiftCsvWriterTest {
         ShiftResponse shift = response("VEA7");
         shift.setStatus(com.angel.flexbuddy.model.ShiftStatus.COMPLETED);
         shift.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(9, 20), LocalTime.of(12, 42),
-                202, new BigDecimal("29.70"), 38));
+                202, new BigDecimal("29.70"), 38, new BigDecimal("45210.4"), new BigDecimal("45233.8")));
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
         writer.write(List.of(shift), output);
 
-        assertThat(output.toString(StandardCharsets.UTF_8)).contains(",COMPLETED,09:20,12:42,202,29.70\r\n");
+        assertThat(output.toString(StandardCharsets.UTF_8)).contains(",COMPLETED,09:20,12:42,202,29.70,45210.4,45233.8\r\n");
     }
 }

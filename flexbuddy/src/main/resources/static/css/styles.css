@@ -2136,3 +2136,6 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .block-details > summary small { color: var(--muted); font-weight: 650; }
 .block-details[open] > summary { margin-bottom: 12px; }
 .block-details .text-button { margin-top: 8px; }
+.block-details + .block-details { margin-top: -6px; }
+.finish-pair .field-hint { grid-column: 1 / -1; margin-top: -4px; }
+.finish-mode-button { justify-self: start; margin-top: -8px; }

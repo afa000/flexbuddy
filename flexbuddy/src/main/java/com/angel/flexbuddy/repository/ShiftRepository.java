@@ -61,6 +61,18 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             """)
     List<Shift> findScheduledWithConfirmNudges(@Param("fromDate") LocalDate from, @Param("toDate") LocalDate to);
 
+    /** Shifts with an end reading that started before the given moment, newest first; scheduled ones are skipped. */
+    @Query("""
+            select s from Shift s
+            where lower(s.owner.email) = lower(:email)
+              and s.odometerEnd is not null
+              and s.status <> com.angel.flexbuddy.model.ShiftStatus.SCHEDULED
+              and (s.date < :date or (s.date = :date and s.startTime < :time))
+            order by s.date desc, s.startTime desc
+            """)
+    List<Shift> findWithOdometerBefore(@Param("email") String email, @Param("date") LocalDate date,
+            @Param("time") java.time.LocalTime time, org.springframework.data.domain.Pageable page);
+
     @Query("""
             select distinct s.station from Shift s
             where lower(s.owner.email) = lower(:email)

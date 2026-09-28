@@ -48,6 +48,6 @@ public class ShiftResponse {
         this(id, station, date, startTime, endTime, basePay, tips, totalPay, timeWorked, hourlyRate,
                 null, BigDecimal.ZERO.setScale(2), null, BigDecimal.ZERO.setScale(2), totalPay, hourlyRate,
                 createdAt, updatedAt, deletedAt, ShiftStatus.COMPLETED, null, totalPay,
-                new BlockDetailsResponse(null, null, null, null, null));
+                BlockDetailsResponse.NONE);
     }
 }
