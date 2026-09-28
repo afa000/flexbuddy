@@ -22,6 +22,7 @@ import com.angel.flexbuddy.dto.OdometerReadingResponse;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftResponse;
 import com.angel.flexbuddy.dto.ShiftStatusRequest;
+import com.angel.flexbuddy.dto.ShiftSort;
 import com.angel.flexbuddy.dto.SortDirection;
 import com.angel.flexbuddy.dto.UpdateShiftRequest;
 import com.angel.flexbuddy.exception.InvalidShiftException;
@@ -263,11 +264,18 @@ public class ShiftService {
             shift.setActualEnd(details.actualEnd());
             shift.setOdometerStart(details.odometerStart());
             shift.setOdometerEnd(details.odometerEnd());
+            shift.setStops(details.stops());
+            shift.setPackages(details.packages());
+            shift.setReturns(details.returns());
         } else if (!worked) {
             shift.setActualStart(null);
             shift.setActualEnd(null);
+            shift.setStops(null);
+            shift.setPackages(null);
+            shift.setReturns(null);
         }
         applyOdometer(shift, requestedMiles);
+        checkRoute(shift);
         if (shift.getActualStart() == null && shift.getActualEnd() == null) return;
         if (!worked) throw new InvalidShiftException("Actual times are only recorded for completed blocks.");
         if (shift.getActualStart() == null) throw new InvalidShiftException("Enter when the block started.");
@@ -276,6 +284,16 @@ public class ShiftService {
         }
         if (shift.getActualStart().equals(shift.getActualEnd())) {
             throw new InvalidShiftException("The finish time must be after the start time.");
+        }
+    }
+
+    private static void checkRoute(Shift shift) {
+        if (shift.getStops() == null && shift.getPackages() == null && shift.getReturns() == null) return;
+        if (shift.getStatus() != ShiftStatus.COMPLETED) {
+            throw new InvalidShiftException("Stops, packages, and returns are only recorded for completed blocks.");
+        }
+        if (shift.getReturns() != null && shift.getPackages() != null && shift.getReturns() > shift.getPackages()) {
+            throw new InvalidShiftException("Returns cannot be more than the packages carried.");
         }
     }
 
@@ -312,7 +330,8 @@ public class ShiftService {
         BigDecimal actualHourly = actual == null || actual == 0 ? null : shift.getEarnedPay()
                 .multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(actual), 2, RoundingMode.HALF_UP);
         return new BlockDetailsResponse(shift.getActualStart(), shift.getActualEnd(), actual, actualHourly,
-                shift.getFinishedEarlyMinutes(), shift.getOdometerStart(), shift.getOdometerEnd());
+                shift.getFinishedEarlyMinutes(), shift.getOdometerStart(), shift.getOdometerEnd(), shift.getStops(),
+                shift.getPackages(), shift.getReturns(), shift.getMinutesPerStop(), shift.getReturnsRate());
     }
 
     private Comparator<ShiftResponse> responseComparator(ShiftFilter filter) {
@@ -329,12 +348,22 @@ public class ShiftService {
             case TIME_WORKED -> Comparator.comparingInt(ShiftResponse::getTimeWorked);
             case HOURLY_RATE -> Comparator.comparing(ShiftResponse::getHourlyRate);
             case MILES -> Comparator.comparing(response -> money(response.getMiles()));
+            case STOPS -> Comparator.comparingInt(response -> response.getDetails().stops() == null ? 0
+                    : response.getDetails().stops());
+            case MINUTES_PER_STOP -> Comparator.comparing(response -> money(response.getDetails().minutesPerStop()));
             case NET_PAY -> Comparator.comparing(ShiftResponse::getNetPay);
             case NET_HOURLY_RATE -> Comparator.comparing(ShiftResponse::getNetHourlyRate);
             case CREATED_AT -> Comparator.comparing(ShiftResponse::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
             case UPDATED_AT -> Comparator.comparing(ShiftResponse::getUpdatedAt, Comparator.nullsLast(Comparator.naturalOrder()));
         };
         if (filter.direction() == SortDirection.DESC) primary = primary.reversed();
+        // Blocks without route counts go last in either direction instead of sorting as zero.
+        if (filter.sort() == ShiftSort.STOPS) {
+            primary = Comparator.comparing((ShiftResponse response) -> response.getDetails().stops() == null).thenComparing(primary);
+        } else if (filter.sort() == ShiftSort.MINUTES_PER_STOP) {
+            primary = Comparator.comparing((ShiftResponse response) -> response.getDetails().minutesPerStop() == null)
+                    .thenComparing(primary);
+        }
         return primary.thenComparing(newestFirst);
     }
 

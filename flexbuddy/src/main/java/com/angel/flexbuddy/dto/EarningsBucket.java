@@ -23,5 +23,9 @@ public record EarningsBucket(
         int timedShifts,
         int clockedMinutes,
         BigDecimal clockedHourlyRate,
-        Integer averageFinishedEarlyMinutes
+        Integer averageFinishedEarlyMinutes,
+        int shiftsWithRouteData,
+        BigDecimal averageStops,
+        BigDecimal averageMinutesPerStop,
+        BigDecimal returnsRate
 ) {}

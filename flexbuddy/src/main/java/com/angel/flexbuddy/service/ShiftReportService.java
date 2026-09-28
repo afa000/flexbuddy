@@ -84,6 +84,32 @@ public class ShiftReportService {
         return shifts.stream().filter(shift -> shift.getFinishedEarlyMinutes() != null).toList();
     }
 
+    /** Worked blocks with stops recorded; route averages ignore every other block. */
+    private static List<Shift> routeShifts(List<Shift> shifts) {
+        return shifts.stream().filter(shift -> shift.getMinutesPerStop() != null).toList();
+    }
+
+    private static BigDecimal averageStops(List<Shift> shifts) {
+        List<Shift> route = routeShifts(shifts);
+        return route.isEmpty() ? null : BigDecimal.valueOf(route.stream().mapToInt(Shift::getStops).sum())
+                .divide(BigDecimal.valueOf(route.size()), 1, RoundingMode.HALF_UP);
+    }
+
+    private static BigDecimal averageMinutesPerStop(List<Shift> shifts) {
+        List<Shift> route = routeShifts(shifts);
+        return route.isEmpty() ? null : BigDecimal.valueOf(route.stream().mapToInt(Shift::getClockedMinutes).sum())
+                .divide(BigDecimal.valueOf(route.stream().mapToInt(Shift::getStops).sum()), 1, RoundingMode.HALF_UP);
+    }
+
+    /** Returns as a percentage of everything carried, over blocks that recorded both. */
+    private static BigDecimal returnsRate(List<Shift> shifts) {
+        List<Shift> counted = shifts.stream().filter(shift -> shift.getReturnsBase() != null).toList();
+        if (counted.isEmpty()) return null;
+        long returned = counted.stream().mapToLong(Shift::getReturns).sum();
+        long carried = counted.stream().mapToLong(Shift::getReturnsBase).sum();
+        return BigDecimal.valueOf(returned * 100).divide(BigDecimal.valueOf(carried), 1, RoundingMode.HALF_UP);
+    }
+
     private static int clockedMinutes(List<Shift> shifts) {
         return shifts.stream().mapToInt(Shift::getClockedMinutes).sum();
     }
@@ -207,7 +233,8 @@ public class ShiftReportService {
                     money(sum(shifts, false)), net.grossEarnings(), net.minutesWorked(), net.grossHourlyRate(), net.miles(),
                     net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
                     timed(shifts).size(), clockedMinutes(shifts), hourly(net.grossEarnings(), clockedMinutes(shifts)),
-                    averageFinishedEarly(shifts));
+                    averageFinishedEarly(shifts), routeShifts(shifts).size(), averageStops(shifts),
+                    averageMinutesPerStop(shifts), returnsRate(shifts));
         }
     }
 }

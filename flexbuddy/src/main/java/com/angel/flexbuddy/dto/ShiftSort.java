@@ -4,7 +4,7 @@ import com.angel.flexbuddy.exception.InvalidFilterException;
 
 public enum ShiftSort {
     DATE, STATION, BASE_PAY, TIPS, TOTAL_PAY, TIME_WORKED, HOURLY_RATE, MILES, NET_PAY, NET_HOURLY_RATE,
-    CREATED_AT, UPDATED_AT;
+    CREATED_AT, UPDATED_AT, STOPS, MINUTES_PER_STOP;
 
     public static ShiftSort parse(String value) {
         if (value == null || value.isBlank()) return DATE;

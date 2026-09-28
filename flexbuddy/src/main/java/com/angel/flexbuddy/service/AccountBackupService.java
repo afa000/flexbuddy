@@ -72,7 +72,7 @@ public class AccountBackupService {
                 money(shift.getBasePay()), money(shift.getTips()), decimal(shift.getMiles()), shift.getCreatedAt(), shift.getUpdatedAt(),
                 shift.getDeletedAt(), shift.getStatus().name(), shift.getStatusChangedAt(),
                 shift.getActualStart(), shift.getActualEnd(), decimal(shift.getOdometerStart()),
-                decimal(shift.getOdometerEnd())
+                decimal(shift.getOdometerEnd()), shift.getStops(), shift.getPackages(), shift.getReturns()
         );
     }
 

@@ -5,7 +5,8 @@ import java.time.LocalTime;
 
 /**
  * A block's recorded details with the figures derived from them. actualMinutes, actualHourlyRate, and
- * finishedEarlyMinutes are null unless both actual times were recorded on a worked block.
+ * finishedEarlyMinutes are null unless both actual times were recorded on a worked block; minutesPerStop needs
+ * stops, and returnsRate, a percentage, needs returns and either packages or stops.
  */
 public record BlockDetailsResponse(
         LocalTime actualStart,
@@ -14,7 +15,13 @@ public record BlockDetailsResponse(
         BigDecimal actualHourlyRate,
         Integer finishedEarlyMinutes,
         BigDecimal odometerStart,
-        BigDecimal odometerEnd
+        BigDecimal odometerEnd,
+        Integer stops,
+        Integer packages,
+        Integer returns,
+        BigDecimal minutesPerStop,
+        BigDecimal returnsRate
 ) {
-    public static final BlockDetailsResponse NONE = new BlockDetailsResponse(null, null, null, null, null, null, null);
+    public static final BlockDetailsResponse NONE =
+            new BlockDetailsResponse(null, null, null, null, null, null, null, null, null, null, null, null);
 }

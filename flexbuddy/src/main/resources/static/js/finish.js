@@ -27,6 +27,11 @@
             miles: document.querySelector('#finishMiles'),
             mode: document.querySelector('#finishModeButton'),
             summary: document.querySelector('#finishSummary'),
+            route: document.querySelector('#finishRoute'),
+            routeSummary: document.querySelector('#finishRouteSummary'),
+            stops: document.querySelector('#finishStops'),
+            packages: document.querySelector('#finishPackages'),
+            returns: document.querySelector('#finishReturns'),
             payField: document.querySelector('#finishPayField'),
             pay: document.querySelector('#finishPay'),
             error: document.querySelector('#finishError'),
@@ -45,7 +50,7 @@
                 trapFocus(el.modal, event);
             }
         });
-        [el.start, el.end, el.odometerStart, el.odometerEnd, el.miles]
+        [el.start, el.end, el.odometerStart, el.odometerEnd, el.miles, el.stops, el.packages, el.returns]
             .forEach(input => input.addEventListener('input', updateSummary));
         el.mode.addEventListener('click', () => {
             setMode(!useOdometer);
@@ -73,6 +78,10 @@
         el.odometerStart.value = details.odometerStart ?? latest?.reading ?? '';
         el.odometerEnd.value = details.odometerEnd ?? '';
         el.miles.value = shift.miles ?? '';
+        el.stops.value = details.stops ?? '';
+        el.packages.value = details.packages ?? '';
+        el.returns.value = details.returns ?? '';
+        el.route.open = details.stops != null || details.packages != null || details.returns != null;
         // Drivers who log readings keep getting the odometer; everyone else starts with a plain miles field.
         setMode(details.odometerStart != null || details.odometerEnd != null || (latest != null && shift.miles == null));
         el.payField.classList.toggle('is-hidden', !completing());
@@ -143,6 +152,7 @@
         const miles = useOdometer ? odometerMiles() : (el.miles.value === '' ? null : Number(el.miles.value));
         if (miles !== null && miles >= 0) parts.push(`${miles.toFixed(1)} mi`);
         el.summary.textContent = parts.join(' · ') || 'Enter both times to see how long the block took.';
+        el.routeSummary.textContent = routeSummary(count(el.stops), count(el.returns), minutes || shift.timeWorked) || 'Optional';
         updateOdometerHint();
     }
 
@@ -158,11 +168,18 @@
             : `Last reading ${latest.reading}, from ${from}.`;
     }
 
+    function count(input) {
+        return input.value === '' ? null : Number(input.value);
+    }
+
     function problem() {
         if (el.end.value && !el.start.value) return 'Enter when the block started.';
         if (el.start.value && el.start.value === el.end.value) return 'The finish time must be after the start time.';
         if (useOdometer && odometerMiles() !== null && odometerMiles() < 0) {
             return 'The odometer end reading must be at least the start reading.';
+        }
+        if (count(el.returns) !== null && count(el.packages) !== null && count(el.returns) > count(el.packages)) {
+            return 'Returns cannot be more than the packages carried.';
         }
         if (completing() && !(Number(el.pay.value) > 0)) return 'Enter the base pay for this block.';
         return null;
@@ -183,7 +200,10 @@
                 actualStart: el.start.value || null,
                 actualEnd: el.end.value || null,
                 odometerStart: reading(el.odometerStart),
-                odometerEnd: reading(el.odometerEnd)
+                odometerEnd: reading(el.odometerEnd),
+                stops: count(el.stops),
+                packages: count(el.packages),
+                returns: count(el.returns)
             }
         };
         // With both readings the server works out the miles; a typed miles value is sent as is.

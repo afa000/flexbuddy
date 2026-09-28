@@ -163,13 +163,17 @@
         return earlyMinutes > 0 ? `${earlyMinutes} min early` : `${-earlyMinutes} min over`;
     }
 
+    function optional(value) {
+        return value == null ? '—' : Number(value).toFixed(1);
+    }
+
     function renderTable(tbody, report, onDrill) {
         tbody.replaceChildren();
         const buckets = report?.buckets ?? [];
         if (!buckets.length) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 11;
+            cell.colSpan = 14;
             cell.className = 'table-empty';
             cell.textContent = 'No shifts match these filters.';
             row.append(cell);
@@ -185,7 +189,9 @@
                 bucket.label, bucket.shifts, hours(bucket.minutesWorked),
                 fullMoney(bucket.totalEarnings), Number(bucket.miles || 0).toFixed(1),
                 fullMoney(bucket.mileageCost), fullMoney(bucket.expenses), fullMoney(bucket.deductions),
-                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate), pace(bucket.averageFinishedEarlyMinutes)
+                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate), pace(bucket.averageFinishedEarlyMinutes),
+                optional(bucket.averageStops), optional(bucket.averageMinutesPerStop),
+                bucket.returnsRate == null ? '—' : `${Number(bucket.returnsRate).toFixed(1)}%`
             ];
             values.forEach((value, index) => {
                 const cell = document.createElement(index === 0 ? 'th' : 'td');

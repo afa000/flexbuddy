@@ -491,7 +491,7 @@ class ShiftControllerTest {
         ShiftResponse started = new ShiftResponse();
         started.setId(7L);
         started.setStatus(ShiftStatus.SCHEDULED);
-        started.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(15, 3), null, null, null, null, null, null));
+        started.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(15, 3), null, null, null, null, null, null, null, null, null, null, null));
         when(shiftService.startShift("angel@example.com", 7L)).thenReturn(started);
 
         mockMvc.perform(post("/shifts/7/start").with(user("angel@example.com")).with(csrf()))

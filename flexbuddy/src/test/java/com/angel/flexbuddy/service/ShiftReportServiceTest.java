@@ -281,4 +281,28 @@ class ShiftReportServiceTest {
                 .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple("VEA7", 40),
                         org.assertj.core.groups.Tuple.tuple("DAX5", -15));
     }
+
+    @Test
+    void earningsByStation_averageRouteCountsOnlyOverBlocksThatHaveThem() {
+        Shift counted = shift("VEA7", LocalDate.of(2026, 9, 6), "84.00", "0.00", 240);
+        counted.setStops(40);
+        counted.setPackages(80);
+        counted.setReturns(2);
+        Shift alsoCounted = shift("VEA7", LocalDate.of(2026, 9, 7), "84.00", "0.00", 240);
+        alsoCounted.setStops(60);
+        alsoCounted.setReturns(3);
+        Shift uncounted = shift("VEA7", LocalDate.of(2026, 9, 8), "84.00", "0.00", 240);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(counted, alsoCounted, uncounted));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).singleElement().satisfies(bucket -> {
+            assertThat(bucket.shifts()).isEqualTo(3);
+            assertThat(bucket.shiftsWithRouteData()).isEqualTo(2);
+            assertThat(bucket.averageStops()).isEqualByComparingTo("50.0");
+            // 480 minutes over 100 stops; 5 returns out of 80 packages plus 60 stops.
+            assertThat(bucket.averageMinutesPerStop()).isEqualByComparingTo("4.8");
+            assertThat(bucket.returnsRate()).isEqualByComparingTo("3.6");
+        });
+    }
 }

@@ -385,6 +385,8 @@
                     <option value="miles">Miles</option><option value="netPay">Estimated net pay</option>
                     <option value="netHourlyRate">Estimated net hourly rate</option>
                     <option value="updatedAt">Recently edited</option>
+                    <option value="stops">Stops</option>
+                    <option value="minutesPerStop">Minutes per stop</option>
                 </select></label>
                 <button class="sort-direction" id="sortDirectionButton" type="button" aria-label="Sort descending">↓ Desc</button>
             </div>
@@ -424,7 +426,7 @@
             <div class="breakdown-scroll">
                 <table class="breakdown-table">
                     <caption class="sr-only">Filtered earnings grouped for reporting</caption>
-                    <thead><tr><th>Bucket</th><th>Shifts</th><th>Hours</th><th>Gross</th><th>Miles</th><th>Mileage cost</th><th>Expenses</th><th>Deductions</th><th>Est. net</th><th>Est. net $/hr</th><th>Finishes</th></tr></thead>
+                    <thead><tr><th>Bucket</th><th>Shifts</th><th>Hours</th><th>Gross</th><th>Miles</th><th>Mileage cost</th><th>Expenses</th><th>Deductions</th><th>Est. net</th><th>Est. net $/hr</th><th>Finishes</th><th>Avg stops</th><th>Min/stop</th><th>Returns</th></tr></thead>
                     <tbody id="breakdownBody"></tbody>
                 </table>
             </div>
@@ -562,6 +564,15 @@
                     </div>
                 </details>
 
+                <details class="block-details field-wide" id="editRoute">
+                    <summary>Route <small id="editRouteSummary">Optional</small></summary>
+                    <div class="route-counts">
+                        <label class="field"><span>Stops</span><input id="editStops" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                        <label class="field"><span>Packages</span><input id="editPackages" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                        <label class="field"><span>Returns</span><input id="editReturns" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                    </div>
+                </details>
+
                 <details class="block-details field-wide" id="editActualTimes">
                     <summary>Actual times <small id="editActualSummary">Optional</small></summary>
                     <div class="finish-pair">
@@ -622,6 +633,14 @@
                 </label>
                 <button class="text-button finish-mode-button field-wide" id="finishModeButton" type="button">Enter miles instead</button>
                 <p class="finish-summary field-wide" id="finishSummary" aria-live="polite"></p>
+                <details class="block-details field-wide" id="finishRoute">
+                    <summary>Route <small id="finishRouteSummary">Optional</small></summary>
+                    <div class="route-counts">
+                        <label class="field"><span>Stops</span><input id="finishStops" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                        <label class="field"><span>Packages</span><input id="finishPackages" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                        <label class="field"><span>Returns</span><input id="finishReturns" type="number" min="0" max="9999" step="1" inputmode="numeric"></label>
+                    </div>
+                </details>
                 <label class="field money-field field-wide" id="finishPayField">
                     <span>Base pay</span>
                     <span class="input-with-prefix"><b>$</b><input id="finishPay" type="number" min="0.01" step="0.01" inputmode="decimal"></span>

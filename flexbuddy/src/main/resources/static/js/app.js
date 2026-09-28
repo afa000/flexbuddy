@@ -89,6 +89,11 @@ const elements = {
     timeWorkedDetail: document.querySelector('#timeWorkedDetail'),
     editActualTimes: document.querySelector('#editActualTimes'),
     editOdometer: document.querySelector('#editOdometer'),
+    editRoute: document.querySelector('#editRoute'),
+    editRouteSummary: document.querySelector('#editRouteSummary'),
+    editStops: document.querySelector('#editStops'),
+    editPackages: document.querySelector('#editPackages'),
+    editReturns: document.querySelector('#editReturns'),
     editOdometerSummary: document.querySelector('#editOdometerSummary'),
     editOdometerStart: document.querySelector('#editOdometerStart'),
     editOdometerEnd: document.querySelector('#editOdometerEnd'),
@@ -257,6 +262,8 @@ elements.editForm.addEventListener('submit', saveEditedShift);
     if (miles !== null && miles >= 0) elements.editMiles.value = miles.toFixed(1);
     updateOdometerSummary();
 }));
+[elements.editStops, elements.editReturns, elements.editActualStart, elements.editActualEnd,
+    elements.editStartTime, elements.editEndTime].forEach(input => input.addEventListener('input', updateRouteSummary));
 elements.sameAsScheduledButton.addEventListener('click', () => {
     elements.editActualStart.value = elements.editStartTime.value;
     elements.editActualEnd.value = elements.editEndTime.value;
@@ -788,6 +795,8 @@ function renderShifts(shifts) {
             ? `${formatMinutes(actual)} worked of ${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.details.actualHourlyRate)}/hr worked`
             : worked ? `${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross`
             : shift.status === 'CANCELLED' ? 'Cancellation pay · no hours' : 'Not worked · no pay';
+        const route = worked ? routeSummary(shift.details?.stops, shift.details?.returns,
+            shift.details?.actualMinutes ?? shift.timeWorked) : '';
         const edited = shift.createdAt && shift.updatedAt
                 && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
 
@@ -795,7 +804,7 @@ function renderShifts(shifts) {
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}${statusBadge}</strong><span>${escapeHtml(weekday)} shift</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span></div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span>${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -830,6 +839,11 @@ function openEditModal(shift, trigger, options = {}) {
     elements.editOdometerEnd.value = shift.details?.odometerEnd ?? '';
     elements.editOdometer.open = shift.details?.odometerStart != null || shift.details?.odometerEnd != null;
     updateOdometerSummary();
+    elements.editStops.value = shift.details?.stops ?? '';
+    elements.editPackages.value = shift.details?.packages ?? '';
+    elements.editReturns.value = shift.details?.returns ?? '';
+    elements.editRoute.open = [shift.details?.stops, shift.details?.packages, shift.details?.returns].some(value => value != null);
+    updateRouteSummary();
     elements.editStatus.value = options.status || editOriginalStatus;
     // A block that already happened cannot go back to scheduled; delete it and add it again instead.
     [...elements.editStatus.options].forEach(option => {
@@ -881,6 +895,7 @@ function applyEditStatusRules(statusChanged = false) {
     // Only a worked block has actual times; a scheduled one gets its start from the Start block button.
     elements.editActualTimes.classList.toggle('is-hidden', status !== 'COMPLETED');
     elements.editOdometer.classList.toggle('is-hidden', status === 'SCHEDULED');
+    elements.editRoute.classList.toggle('is-hidden', status !== 'COMPLETED');
     // The offered amount is never earned by a cancelled or forfeited block unless the driver enters it.
     if (statusChanged && (status === 'CANCELLED' || status === 'FORFEITED')) elements.editBasePay.value = 0;
     elements.saveEditButton.querySelector('span').textContent = saveEditLabel();
@@ -892,6 +907,24 @@ function minutesBetween(start, end) {
     const toMinutes = value => value.split(':').map(Number).reduce((hours, minutes) => hours * 60 + minutes);
     const minutes = toMinutes(end) - toMinutes(start);
     return minutes < 0 ? minutes + 1440 : minutes;
+}
+
+/** "42 stops · 5.7 min/stop · 1 return", from whichever counts are known; empty when there are no stops or returns. */
+function routeSummary(stops, returns, clockedMinutes) {
+    const parts = [];
+    if (stops) {
+        parts.push(`${stops} ${stops === 1 ? 'stop' : 'stops'}`);
+        if (clockedMinutes) parts.push(`${(clockedMinutes / stops).toFixed(1)} min/stop`);
+    }
+    if (returns !== null && returns !== undefined) parts.push(`${returns} ${returns === 1 ? 'return' : 'returns'}`);
+    return parts.join(' · ');
+}
+
+function updateRouteSummary() {
+    const count = input => input.value === '' ? null : Number(input.value);
+    const clocked = minutesBetween(elements.editActualStart.value, elements.editActualEnd.value)
+        || minutesBetween(elements.editStartTime.value, elements.editEndTime.value);
+    elements.editRouteSummary.textContent = routeSummary(count(elements.editStops), count(elements.editReturns), clocked) || 'Optional';
 }
 
 function odometerMiles() {
@@ -972,11 +1005,19 @@ async function saveEditedShift(event) {
             return;
         }
         const reading = input => input.value === '' ? null : Number(input.value);
+        if (worked && reading(elements.editReturns) !== null && reading(elements.editPackages) !== null
+                && reading(elements.editReturns) > reading(elements.editPackages)) {
+            showMessage(elements.editError, 'Returns cannot be more than the packages carried.');
+            return;
+        }
         shift.details = {
             actualStart: worked ? elements.editActualStart.value || null : null,
             actualEnd: worked ? elements.editActualEnd.value || null : null,
             odometerStart: reading(elements.editOdometerStart),
-            odometerEnd: reading(elements.editOdometerEnd)
+            odometerEnd: reading(elements.editOdometerEnd),
+            stops: worked ? reading(elements.editStops) : null,
+            packages: worked ? reading(elements.editPackages) : null,
+            returns: worked ? reading(elements.editReturns) : null
         };
     }
 
@@ -1068,7 +1109,10 @@ async function undoEdit(id, previous) {
                 actualStart: previous.status === 'COMPLETED' ? previous.details.actualStart : null,
                 actualEnd: previous.status === 'COMPLETED' ? previous.details.actualEnd : null,
                 odometerStart: previous.details.odometerStart,
-                odometerEnd: previous.details.odometerEnd
+                odometerEnd: previous.details.odometerEnd,
+                stops: previous.status === 'COMPLETED' ? previous.details.stops : null,
+                packages: previous.status === 'COMPLETED' ? previous.details.packages : null,
+                returns: previous.status === 'COMPLETED' ? previous.details.returns : null
             } : undefined
         })
     });

@@ -2139,3 +2139,4 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .block-details + .block-details { margin-top: -6px; }
 .finish-pair .field-hint { grid-column: 1 / -1; margin-top: -4px; }
 .finish-mode-button { justify-self: start; margin-top: -8px; }
+.route-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }

@@ -22,14 +22,17 @@ public record BackupShift(
         LocalTime actualStart,
         LocalTime actualEnd,
         String odometerStart,
-        String odometerEnd
+        String odometerEnd,
+        Integer stops,
+        Integer packages,
+        Integer returns
 ) implements Serializable {
     /** Version 3 backups have no block details. */
     public BackupShift(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             String basePay, String tips, String miles, Instant createdAt, Instant updatedAt, Instant deletedAt,
             String status, Instant statusChangedAt) {
         this(id, station, date, startTime, endTime, basePay, tips, miles, createdAt, updatedAt, deletedAt, status,
-                statusChangedAt, null, null, null, null);
+                statusChangedAt, null, null, null, null, null, null, null);
     }
 
     public BackupShift(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,

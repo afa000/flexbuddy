@@ -261,6 +261,9 @@ public class AccountRestoreService {
         shift.setActualEnd(source.actualEnd());
         shift.setOdometerStart(decimalOrNull(source.odometerStart()));
         shift.setOdometerEnd(decimalOrNull(source.odometerEnd()));
+        shift.setStops(source.stops());
+        shift.setPackages(source.packages());
+        shift.setReturns(source.returns());
         Instant now = Instant.now(clock);
         shift.setCreatedAt(source.createdAt() == null ? now : source.createdAt());
         shift.setUpdatedAt(source.updatedAt() == null ? shift.getCreatedAt() : source.updatedAt());
@@ -377,6 +380,15 @@ public class AccountRestoreService {
                 problems.add(new RestoreProblem(index, "odometerStart", "readings cannot be negative"));
             } else if (odometerStart != null && odometerEnd != null && odometerEnd.compareTo(odometerStart) < 0) {
                 problems.add(new RestoreProblem(index, "odometerEnd", "must be at least the start reading"));
+            }
+            boolean hasRoute = shift.stops() != null || shift.packages() != null || shift.returns() != null;
+            if (hasRoute && status != ShiftStatus.COMPLETED) {
+                problems.add(new RestoreProblem(index, "stops", "is only recorded for completed blocks"));
+            } else if ((shift.stops() != null && shift.stops() < 0) || (shift.packages() != null && shift.packages() < 0)
+                    || (shift.returns() != null && shift.returns() < 0)) {
+                problems.add(new RestoreProblem(index, "stops", "counts cannot be negative"));
+            } else if (shift.returns() != null && shift.packages() != null && shift.returns() > shift.packages()) {
+                problems.add(new RestoreProblem(index, "returns", "cannot be more than the packages carried"));
             }
             if (shift.actualEnd() != null && shift.actualStart() == null) {
                 problems.add(new RestoreProblem(index, "actualStart", "is required when actualEnd is set"));

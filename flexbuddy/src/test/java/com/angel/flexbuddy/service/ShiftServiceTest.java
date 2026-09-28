@@ -438,7 +438,7 @@ class ShiftServiceTest {
     }
 
     private static BlockDetailsRequest times(LocalTime start, LocalTime end) {
-        return new BlockDetailsRequest(start, end, null, null);
+        return new BlockDetailsRequest(start, end, null, null, null, null, null);
     }
 
     @Test
@@ -499,6 +499,73 @@ class ShiftServiceTest {
 
     private static BlockDetailsRequest odometer(String start, String end) {
         return new BlockDetailsRequest(null, null, start == null ? null : new BigDecimal(start),
-                end == null ? null : new BigDecimal(end));
+                end == null ? null : new BigDecimal(end), null, null, null);
+    }
+
+    @Test
+    void routeCountsGiveMinutesPerStopAndAReturnsRate() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse paid = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                null, null, null, route(null, null, 42, 60, 3)));
+        assertThat(paid.getDetails().minutesPerStop()).isEqualByComparingTo("5.7");
+        assertThat(paid.getDetails().returnsRate()).isEqualByComparingTo("5.0");
+
+        ShiftResponse timed = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                null, null, null, route(LocalTime.of(15, 20), LocalTime.of(18, 42), 42, null, 1)));
+        assertThat(timed.getDetails().minutesPerStop()).isEqualByComparingTo("4.8");
+        assertThat(timed.getDetails().returnsRate()).isEqualByComparingTo("2.4");
+    }
+
+    @Test
+    void routeCountsNeedACompletedBlockAndNoMoreReturnsThanPackages() {
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL))
+                .thenReturn(Optional.of(shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0")));
+
+        assertDetailsRejected(1L, route(null, null, 40, 50, 51), "Returns cannot be more than the packages carried.");
+        assertThatThrownBy(() -> shiftService.changeStatus(OWNER_EMAIL, 1L, new ShiftStatusRequest(ShiftStatus.CANCELLED,
+                null, null, null, route(null, null, 40, null, null))))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("Stops, packages, and returns are only recorded for completed blocks.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void cancellingAWorkedBlockDropsItsRouteCountsButKeepsItsOdometer() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        completed.setStops(42);
+        completed.setOdometerStart(new BigDecimal("45210.4"));
+        completed.setOdometerEnd(new BigDecimal("45233.8"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.changeStatus(OWNER_EMAIL, 1L, new ShiftStatusRequest(ShiftStatus.CANCELLED));
+
+        assertThat(completed.getStops()).isNull();
+        assertThat(completed.getOdometerEnd()).isEqualByComparingTo("45233.8");
+        assertThat(completed.getMiles()).isEqualByComparingTo("23.4");
+    }
+
+    @Test
+    void sortingByMinutesPerStopPutsBlocksWithoutStopsLastEitherWay() {
+        Shift slow = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        slow.setStops(40);
+        Shift quick = shift(2L, "VEA7", LocalDate.of(2026, 9, 7), "120", "0");
+        quick.setStops(96);
+        Shift uncounted = shift(3L, "VEA7", LocalDate.of(2026, 9, 8), "120", "0");
+        when(shiftRepository.findFiltered(any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(slow, quick, uncounted));
+
+        assertThat(shiftService.getShifts(OWNER_EMAIL, ShiftFilter.of(null, null, null, null, "minutesPerStop", "asc")))
+                .extracting(ShiftResponse::getId).containsExactly(2L, 1L, 3L);
+        assertThat(shiftService.getShifts(OWNER_EMAIL, ShiftFilter.of(null, null, null, null, "minutesPerStop", "desc")))
+                .extracting(ShiftResponse::getId).containsExactly(1L, 2L, 3L);
+    }
+
+    private static BlockDetailsRequest route(LocalTime start, LocalTime end, Integer stops, Integer packages,
+            Integer returns) {
+        return new BlockDetailsRequest(start, end, null, null, stops, packages, returns);
     }
 }

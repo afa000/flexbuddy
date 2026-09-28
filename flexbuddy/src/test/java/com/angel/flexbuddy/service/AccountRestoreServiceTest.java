@@ -251,10 +251,10 @@ class AccountRestoreServiceTest {
     void versionFourRestoreKeepsBlockDetailsAndFlagsReadingsThatRunBackwards() throws Exception {
         BackupShift timed = new BackupShift(42L, "BDL4", LocalDate.of(2026, 9, 7), LocalTime.of(3, 30),
                 LocalTime.of(8, 0), "157.50", "0.00", "23.4", NOW, NOW, null, "COMPLETED", NOW,
-                LocalTime.of(3, 40), LocalTime.of(7, 10), "45210.4", "45233.8");
+                LocalTime.of(3, 40), LocalTime.of(7, 10), "45210.4", "45233.8", 42, 60, 1);
         BackupShift backwards = new BackupShift(43L, "BDL4", LocalDate.of(2026, 9, 8), LocalTime.of(3, 30),
                 LocalTime.of(8, 0), "157.50", "0.00", null, NOW, NOW, null, "COMPLETED", NOW,
-                null, null, "45300.0", "45250.0");
+                null, null, "45300.0", "45250.0", null, null, null);
         backup = new AccountBackupFile("flexbuddy-backup", 4, NOW, "4.0",
                 new BackupAccount("Angel", EMAIL, NOW), List.of(timed, backwards), List.of(), null,
                 new BackupCounts(2, 0, 0, 0));

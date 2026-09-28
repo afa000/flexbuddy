@@ -75,6 +75,16 @@ public class Shift implements Timestamped {
     @Column(precision = 9, scale = 1)
     private BigDecimal odometerEnd;
 
+    /** How the route went, all optional: stops made, packages carried, and packages brought back to the station. */
+    @Column(name = "stop_count")
+    private Integer stops;
+
+    @Column(name = "package_count")
+    private Integer packages;
+
+    @Column(name = "return_count")
+    private Integer returns;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.COMPLETED;
@@ -229,6 +239,25 @@ public class Shift implements Timestamped {
     public Integer getFinishedEarlyMinutes() {
         Integer actual = getActualMinutes();
         return actual == null || !countsTowardHours() ? null : getTimeWorked() - actual;
+    }
+
+    /** Minutes on the clock per stop for a worked block with stops recorded, to one decimal place. */
+    public BigDecimal getMinutesPerStop() {
+        if (!countsTowardHours() || stops == null || stops == 0) return null;
+        return BigDecimal.valueOf(getClockedMinutes()).divide(BigDecimal.valueOf(stops), 1, RoundingMode.HALF_UP);
+    }
+
+    /** Packages that came back as a share of those carried, or of stops when packages were not counted. */
+    public Integer getReturnsBase() {
+        if (returns == null) return null;
+        Integer base = packages != null ? packages : stops;
+        return base == null || base == 0 ? null : base;
+    }
+
+    public BigDecimal getReturnsRate() {
+        Integer base = getReturnsBase();
+        return base == null ? null
+                : BigDecimal.valueOf(returns * 100L).divide(BigDecimal.valueOf(base), 1, RoundingMode.HALF_UP);
     }
 
     public LocalDateTime getStartDateTime() {

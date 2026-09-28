@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalTime;
 
 import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.PositiveOrZero;
 
 /**
@@ -14,8 +15,11 @@ public record BlockDetailsRequest(
         LocalTime actualStart,
         LocalTime actualEnd,
         @PositiveOrZero @Digits(integer = 8, fraction = 1) BigDecimal odometerStart,
-        @PositiveOrZero @Digits(integer = 8, fraction = 1) BigDecimal odometerEnd
+        @PositiveOrZero @Digits(integer = 8, fraction = 1) BigDecimal odometerEnd,
+        @PositiveOrZero @Max(9999) Integer stops,
+        @PositiveOrZero @Max(9999) Integer packages,
+        @PositiveOrZero @Max(9999) Integer returns
 ) {
 
-    public static final BlockDetailsRequest EMPTY = new BlockDetailsRequest(null, null, null, null);
+    public static final BlockDetailsRequest EMPTY = new BlockDetailsRequest(null, null, null, null, null, null, null);
 }
