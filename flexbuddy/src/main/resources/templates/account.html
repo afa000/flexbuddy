@@ -73,6 +73,10 @@
                     </select></label>
                     <label class="checkbox-row"><input id="remindConfirm" type="checkbox"> Nudge me to confirm blocks after they end</label>
                     <label class="checkbox-row"><input id="remindMiles" type="checkbox"> Remind me to log miles 20 minutes after a block ends</label>
+                    <label class="field"><span>Forfeit cutoff (minutes before a block)</span>
+                        <input id="forfeitCutoff" type="number" min="0" max="720" step="5" inputmode="numeric" required>
+                        <small class="field-hint">Forfeits after this count as late. Flex uses 45 minutes in most areas.</small>
+                    </label>
                     <div class="notice error-notice is-hidden" id="reminderError" role="alert"></div>
                     <div class="form-actions"><button class="primary-button" id="saveRemindersButton" type="submit">Save reminders</button></div>
                 </form>

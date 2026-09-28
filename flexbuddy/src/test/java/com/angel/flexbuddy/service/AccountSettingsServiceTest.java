@@ -72,12 +72,13 @@ class AccountSettingsServiceTest {
     void updateRemindersStoresTheZoneLeadTimeAndConfirmationNudge() {
         when(userRepository.save(user)).thenReturn(user);
 
-        var settings = service.updateReminders(EMAIL, new ReminderSettingsRequest("America/Chicago", 120, true, true));
+        var settings = service.updateReminders(EMAIL, new ReminderSettingsRequest("America/Chicago", 120, true, true, 60));
 
         assertThat(settings.timeZone()).isEqualTo("America/Chicago");
         assertThat(settings.remindBeforeMinutes()).isEqualTo(120);
         assertThat(settings.remindConfirm()).isTrue();
         assertThat(settings.remindMiles()).isTrue();
+        assertThat(settings.forfeitCutoffMinutes()).isEqualTo(60);
     }
 
     @Test

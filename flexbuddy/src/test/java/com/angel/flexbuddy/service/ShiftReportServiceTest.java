@@ -305,4 +305,30 @@ class ShiftReportServiceTest {
             assertThat(bucket.returnsRate()).isEqualByComparingTo("3.6");
         });
     }
+
+    @Test
+    void statistics_countLateForfeitsInTheRangeAndThisMonth() {
+        Shift late = withStatus(shift("VEA7", LocalDate.of(2026, 9, 5), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
+        late.setLateForfeit(true);
+        Shift onTime = withStatus(shift("VEA7", LocalDate.of(2026, 9, 6), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
+        Shift lastMonth = withStatus(shift("VEA7", LocalDate.of(2026, 8, 30), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
+        lastMonth.setLateForfeit(true);
+        List<Shift> all = List.of(late, onTime, lastMonth);
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    return all.stream()
+                            .filter(shift -> filter.statuses().contains(shift.getStatus()))
+                            .filter(shift -> filter.from() == null || !shift.getDate().isBefore(filter.from()))
+                            .filter(shift -> filter.to() == null || !shift.getDate().isAfter(filter.to()))
+                            .toList();
+                });
+
+        ShiftStatisticsResponse statistics = reportService.statistics(EMAIL, ALL);
+
+        assertThat(statistics.getForfeitedShifts()).isEqualTo(3);
+        assertThat(statistics.getLateForfeitedShifts()).isEqualTo(2);
+        assertThat(statistics.getForfeitedThisMonth()).isEqualTo(2);
+        assertThat(statistics.getLateForfeitedThisMonth()).isEqualTo(1);
+    }
 }

@@ -85,6 +85,10 @@ public class Shift implements Timestamped {
     @Column(name = "return_count")
     private Integer returns;
 
+    /** Set when the block was forfeited inside the owner's cutoff before its start; kept even if the cutoff changes. */
+    @Column(nullable = false)
+    private boolean lateForfeit;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.COMPLETED;

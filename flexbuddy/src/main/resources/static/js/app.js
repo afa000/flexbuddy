@@ -704,7 +704,8 @@ async function loadStatistics(query, signal) {
         const planned = statistics.scheduledShifts ?? 0;
         elements.plannedWeek.textContent = formatMinutes(statistics.scheduledMinutes);
         elements.plannedWeekDetail.textContent = `${formatMoney(statistics.expectedPay)} expected · ${planned} ${planned === 1 ? 'block' : 'blocks'}`;
-        elements.forfeitsMonth.textContent = statistics.forfeitedThisMonth ?? 0;
+        const lateThisMonth = statistics.lateForfeitedThisMonth ?? 0;
+        elements.forfeitsMonth.textContent = `${statistics.forfeitedThisMonth ?? 0}${lateThisMonth ? ` (${lateThisMonth} late)` : ''}`;
         elements.forfeitsDetail.textContent = statistics.needsConfirmation
             ? `${statistics.needsConfirmation} ${statistics.needsConfirmation === 1 ? 'block' : 'blocks'} to confirm`
             : `${statistics.cancelledShifts ?? 0} cancelled in this view`;
@@ -790,7 +791,8 @@ function renderShifts(shifts) {
         const total = shift.earnedPay ?? shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
         const worked = !shift.status || shift.status === 'COMPLETED';
         const statusBadge = worked ? ''
-            : `<small class="status-badge status-${shift.status.toLowerCase()}">${shift.status === 'CANCELLED' ? 'Cancelled' : 'Forfeited'}</small>`;
+            : `<small class="status-badge status-${shift.status.toLowerCase()}">${shift.status === 'CANCELLED' ? 'Cancelled'
+                : shift.lateForfeit ? 'Late forfeit' : 'Forfeited'}</small>`;
         const actual = shift.details?.actualMinutes;
         const workSummary = worked && actual != null
             ? `${formatMinutes(actual)} worked of ${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.details.actualHourlyRate)}/hr worked`

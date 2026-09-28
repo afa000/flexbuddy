@@ -27,7 +27,7 @@ public class ShiftCsvWriter {
             "base_pay", "tips", "total_pay", "hourly_rate", "miles", "mileage_cost",
             "expenses", "net_pay", "net_hourly_rate", "earnings_per_mile", "created_at", "updated_at",
             "status", "actual_start", "actual_end", "actual_minutes", "actual_hourly_rate",
-            "odometer_start", "odometer_end", "stops", "packages", "returns", "minutes_per_stop"
+            "odometer_start", "odometer_end", "stops", "packages", "returns", "minutes_per_stop", "late_forfeit"
     };
 
     public void write(List<ShiftResponse> shifts, OutputStream output) throws IOException {
@@ -48,7 +48,8 @@ public class ShiftCsvWriter {
                     text(details(shift).actualMinutes()), optionalMoney(details(shift).actualHourlyRate()),
                     decimal(details(shift).odometerStart()), decimal(details(shift).odometerEnd()),
                     text(details(shift).stops()), text(details(shift).packages()), text(details(shift).returns()),
-                    decimal(details(shift).minutesPerStop())
+                    decimal(details(shift).minutesPerStop()),
+                    shift.getStatus() == com.angel.flexbuddy.model.ShiftStatus.FORFEITED ? String.valueOf(shift.isLateForfeit()) : ""
             ));
         }
         writer.flush();

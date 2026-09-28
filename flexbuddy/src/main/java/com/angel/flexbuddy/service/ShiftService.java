@@ -126,12 +126,15 @@ public class ShiftService {
     public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
+        ShiftStatus previous = shift.getStatus();
         ShiftStatus status = request.getStatus() == null ? shift.getStatus() : request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
                 request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
         applyDetails(shift, request.getDetails(), request.getMiles());
+        AccountSettingsResponse settings = settingsService.get(email);
+        recordForfeitTiming(shift, previous, email, settings);
         Shift saved = shiftRepository.save(shift);
-        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settings);
     }
 
     /**
@@ -144,7 +147,8 @@ public class ShiftService {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
         ShiftStatus target = request.status();
-        boolean unchanged = target == shift.getStatus();
+        ShiftStatus previous = shift.getStatus();
+        boolean unchanged = target == previous;
         BigDecimal basePay = request.basePay() != null ? request.basePay()
                 : unchanged || target == ShiftStatus.COMPLETED ? shift.getBasePay() : BigDecimal.ZERO;
         BigDecimal tips = request.tips() != null ? request.tips()
@@ -154,8 +158,26 @@ public class ShiftService {
         applyRequest(shift, target, shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 basePay, tips, miles);
         applyDetails(shift, request.details(), request.miles());
+        AccountSettingsResponse settings = settingsService.get(email);
+        recordForfeitTiming(shift, previous, email, settings);
         Shift saved = shiftRepository.save(shift);
-        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settings);
+    }
+
+    /**
+     * Judges a forfeit as late or on time when it happens, against the cutoff in force at that moment. A block that
+     * stays forfeited keeps its judgement, and one that is no longer forfeited loses it.
+     */
+    private void recordForfeitTiming(Shift shift, ShiftStatus previous, String email, AccountSettingsResponse settings) {
+        if (shift.getStatus() != ShiftStatus.FORFEITED) {
+            shift.setLateForfeit(false);
+        } else if (previous != ShiftStatus.FORFEITED) {
+            shift.setLateForfeit(userTime.now(email).isAfter(forfeitDeadline(shift, settings)));
+        }
+    }
+
+    private static java.time.LocalDateTime forfeitDeadline(Shift shift, AccountSettingsResponse settings) {
+        return shift.getStartDateTime().minusMinutes(settings.forfeitCutoffMinutes());
     }
 
     /**
@@ -342,7 +364,9 @@ public class ShiftService {
                 net.cashSpent(), net.netEarnings(), net.netHourlyRate(),
                 shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt(),
                 shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP),
-                details(shift)
+                details(shift),
+                shift.getStatus() == ShiftStatus.SCHEDULED ? forfeitDeadline(shift, settings) : null,
+                shift.getStatus() == ShiftStatus.FORFEITED && shift.isLateForfeit()
         );
     }
 

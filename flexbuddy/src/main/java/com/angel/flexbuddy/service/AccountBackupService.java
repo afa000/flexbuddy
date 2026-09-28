@@ -62,7 +62,7 @@ public class AccountBackupService {
                         ? com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod()).name(),
                         user.getMileageRate() == null ? null : user.getMileageRate().toPlainString(),
                         user.getTimeZone(), user.getRemindBeforeMinutes(), user.isRemindConfirm(),
-                        user.isRemindMiles()),
+                        user.isRemindMiles(), user.getForfeitCutoffMinutes()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
         );
     }
@@ -73,7 +73,8 @@ public class AccountBackupService {
                 money(shift.getBasePay()), money(shift.getTips()), decimal(shift.getMiles()), shift.getCreatedAt(), shift.getUpdatedAt(),
                 shift.getDeletedAt(), shift.getStatus().name(), shift.getStatusChangedAt(),
                 shift.getActualStart(), shift.getActualEnd(), decimal(shift.getOdometerStart()),
-                decimal(shift.getOdometerEnd()), shift.getStops(), shift.getPackages(), shift.getReturns()
+                decimal(shift.getOdometerEnd()), shift.getStops(), shift.getPackages(), shift.getReturns(),
+                shift.isLateForfeit()
         );
     }
 

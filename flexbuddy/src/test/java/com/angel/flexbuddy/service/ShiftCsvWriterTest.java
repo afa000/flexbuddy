@@ -33,7 +33,7 @@ class ShiftCsvWriterTest {
         assertThat(bytes).startsWith((byte) 0xEF, (byte) 0xBB, (byte) 0xBF);
         String csv = new String(bytes, 3, bytes.length - 3, StandardCharsets.UTF_8);
         assertThat(csv).startsWith("id,date,station,start_time,end_time,minutes_worked,hours_worked,");
-        assertThat(csv).contains(",status,actual_start,actual_end,actual_minutes,actual_hourly_rate,odometer_start,odometer_end,stops,packages,returns,minutes_per_stop\r\n");
+        assertThat(csv).contains(",status,actual_start,actual_end,actual_minutes,actual_hourly_rate,odometer_start,odometer_end,stops,packages,returns,minutes_per_stop,late_forfeit\r\n");
         assertThat(csv).contains("\"VEA7, \"\"North\"\"\"");
         assertThat(csv).contains(",04:00,07:30,210,3.50,124.50,0.00,124.50,35.57,");
         assertThat(csv.replace("\r\n", "")).doesNotContain("\n", "\r");
@@ -77,6 +77,18 @@ class ShiftCsvWriterTest {
         writer.write(List.of(shift), output);
 
         assertThat(output.toString(StandardCharsets.UTF_8))
-                .contains(",COMPLETED,09:20,12:42,202,29.70,45210.4,45233.8,42,,1,4.8\r\n");
+                .contains(",COMPLETED,09:20,12:42,202,29.70,45210.4,45233.8,42,,1,4.8,\r\n");
+    }
+
+    @Test
+    void marksWhetherAForfeitWasLate() throws Exception {
+        ShiftResponse forfeited = response("VEA7");
+        forfeited.setStatus(com.angel.flexbuddy.model.ShiftStatus.FORFEITED);
+        forfeited.setLateForfeit(true);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+
+        writer.write(List.of(forfeited), output);
+
+        assertThat(output.toString(StandardCharsets.UTF_8)).contains(",FORFEITED,,,,,,,,,,,true\r\n");
     }
 }

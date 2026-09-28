@@ -76,7 +76,8 @@ public class ShiftReportService {
                 rollingSevenDayMinutes, schedule.plannedShifts(), schedule.plannedMinutes(), schedule.expectedPay(),
                 schedule.needsConfirmation(), schedule.cancelled(), schedule.forfeited(),
                 schedule.forfeitedThisMonth(), timed(shifts).size(), clockedMinutes(shifts),
-                hourly(net.grossEarnings(), clockedMinutes(shifts)), averageFinishedEarly(shifts));
+                hourly(net.grossEarnings(), clockedMinutes(shifts)), averageFinishedEarly(shifts),
+                schedule.lateForfeited(), schedule.lateForfeitedThisMonth());
     }
 
     /** Worked blocks with both actual times recorded. */
@@ -139,13 +140,13 @@ public class ShiftReportService {
         List<Shift> unworked = shiftService.findFiltered(email,
                 filter.withStatuses(Set.of(ShiftStatus.CANCELLED, ShiftStatus.FORFEITED)));
         YearMonth month = YearMonth.from(today);
-        int forfeitedThisMonth = shiftService.findFiltered(email,
+        List<Shift> forfeitedThisMonth = shiftService.findFiltered(email,
                 ShiftFilter.report(month.atDay(1), month.atEndOfMonth(), null, null)
-                        .withStatuses(Set.of(ShiftStatus.FORFEITED))).size();
+                        .withStatuses(Set.of(ShiftStatus.FORFEITED)));
         return new ScheduleSnapshot(planned.size(), planned.stream().mapToInt(Shift::getTimeWorked).sum(),
                 money(planned.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)),
                 needsConfirmation, count(unworked, ShiftStatus.CANCELLED), count(unworked, ShiftStatus.FORFEITED),
-                forfeitedThisMonth);
+                forfeitedThisMonth.size(), late(unworked), late(forfeitedThisMonth));
     }
 
     @Transactional(readOnly = true)
@@ -213,6 +214,9 @@ public class ShiftReportService {
         return shifts.stream().map(shift -> base ? shift.getEarnedBasePay() : shift.getEarnedTips())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+    private static int late(List<Shift> shifts) {
+        return (int) shifts.stream().filter(shift -> shift.getStatus() == ShiftStatus.FORFEITED && shift.isLateForfeit()).count();
+    }
     private int count(List<Shift> shifts, ShiftStatus status) { return (int) shifts.stream().filter(shift -> shift.getStatus() == status).count(); }
     private BigDecimal money(BigDecimal value) { return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP); }
     private BigDecimal divide(BigDecimal value, int divisor) { return divisor == 0 ? BigDecimal.ZERO.setScale(2) : value.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP); }
@@ -220,7 +224,8 @@ public class ShiftReportService {
     private BigDecimal percentage(BigDecimal part, BigDecimal whole) { return whole.signum() == 0 ? BigDecimal.ZERO.setScale(1) : part.multiply(BigDecimal.valueOf(100)).divide(whole, 1, RoundingMode.HALF_UP); }
 
     private record ScheduleSnapshot(int plannedShifts, int plannedMinutes, BigDecimal expectedPay,
-            int needsConfirmation, int cancelled, int forfeited, int forfeitedThisMonth) {}
+            int needsConfirmation, int cancelled, int forfeited, int forfeitedThisMonth, int lateForfeited,
+            int lateForfeitedThisMonth) {}
     private record GroupKey(String key, String label, LocalDate start, LocalDate end) {}
     private final class GroupAccumulator {
         private final GroupKey key;

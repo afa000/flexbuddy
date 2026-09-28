@@ -4,6 +4,8 @@
     const UPCOMING_DAYS = 14;
     // Matches the server: a block can be started from 2 hours before its scheduled start.
     const EARLIEST_START_MS = 2 * 60 * 60000;
+    // The deadline turns amber this close to the forfeit cutoff.
+    const DEADLINE_WARNING_MS = 15 * 60000;
     const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>';
     const calendar = window.flexbuddyCalendar;
     const state = {upcoming: null, fetchedAt: 0, month: null, monthDays: [], selected: null, focusDate: null, countdownTimer: undefined};
@@ -129,6 +131,7 @@
                 <h2>${escapeHtml(shift.station)}</h2>
                 <p class="next-up-when">${escapeHtml(dayLabel(shift.date))} · ${timeRange(shift)}</p>
                 <p class="next-up-countdown"></p>
+                <p class="forfeit-deadline"></p>
             </div>
             <div class="next-up-pay"><strong>${formatMoney(shift.basePay)}</strong><span>offered · ${formatMinutes(shift.timeWorked)}</span></div>
             <div class="next-up-actions">
@@ -140,9 +143,14 @@
             </div>`;
         bindActions(el.nextUp, shift);
         const countdown = el.nextUp.querySelector('.next-up-countdown');
+        const deadline = el.nextUp.querySelector('.forfeit-deadline');
         const tick = () => {
             if (!isVisible()) return;
             countdown.textContent = countdownText(shift);
+            const {text, state: deadlineState} = deadlineText(shift);
+            deadline.textContent = text;
+            deadline.dataset.state = deadlineState;
+            deadline.hidden = !text;
         };
         tick();
         state.countdownTimer = window.setInterval(tick, 30000);
@@ -166,7 +174,7 @@
                 row.className = 'upcoming-row';
                 row.innerHTML = `
                     <div><strong>${timeRange(shift)}</strong>
-                        <span>${escapeHtml(shift.station)}${overlapping.has(shift.id) ? ' <small class="status-badge status-conflict">Overlaps</small>' : ''}</span></div>
+                        <span>${escapeHtml(shift.station)}${shift.forfeitDeadline ? ` · forfeit by ${escapeHtml(formatTime(shift.forfeitDeadline.slice(11, 16)))}` : ''}${overlapping.has(shift.id) ? ' <small class="status-badge status-conflict">Overlaps</small>' : ''}</span></div>
                     <strong class="upcoming-pay">${formatMoney(shift.basePay)}</strong>
                     <button class="edit-shift-button" type="button" data-action="edit">${PENCIL}</button>`;
                 row.querySelector('button').setAttribute('aria-label', `Edit ${shift.station} block on ${formatDate(shift.date)}`);
@@ -341,10 +349,41 @@
     }
 
     function confirmForfeit(shift) {
+        if (insideForfeitWindow(shift)) {
+            openConfirm('Late forfeit',
+                `${shift.station} on ${formatDate(shift.date)} is inside the forfeit window, so this is a late forfeit and may affect your standing. Forfeit anyway?`,
+                () => changeStatus(shift, {status: 'FORFEITED'}, 'Block forfeited late'),
+                'Forfeit anyway');
+            return;
+        }
         openConfirm('Forfeit this block?',
             `${shift.station} on ${formatDate(shift.date)} will be marked forfeited. It earns nothing and counts toward this month's forfeits.`,
             () => changeStatus(shift, {status: 'FORFEITED'}, 'Block forfeited'),
             'Forfeit block');
+    }
+
+    function deadlineMs(shift) {
+        if (!shift.forfeitDeadline) return null;
+        const [date, time] = shift.forfeitDeadline.split('T');
+        return localMs(date, time);
+    }
+
+    function insideForfeitWindow(shift) {
+        const deadline = deadlineMs(shift);
+        return deadline !== null && state.upcoming && nowMs() > deadline;
+    }
+
+    /** "Forfeit deadline 2:30 PM · in 1 h 10 m", amber in the last 15 minutes and red once it has passed. */
+    function deadlineText(shift) {
+        const deadline = deadlineMs(shift);
+        if (deadline === null || shift.details?.actualStart) return {text: '', state: ''};
+        const at = formatTime(shift.forfeitDeadline.slice(11, 16));
+        const remaining = deadline - nowMs();
+        if (remaining < 0) return {text: `Inside the forfeit window since ${at}`, state: 'passed'};
+        return {
+            text: `Forfeit deadline ${at} · in ${duration(remaining)}`,
+            state: remaining <= DEADLINE_WARNING_MS ? 'soon' : ''
+        };
     }
 
     async function changeStatus(shift, body, title) {

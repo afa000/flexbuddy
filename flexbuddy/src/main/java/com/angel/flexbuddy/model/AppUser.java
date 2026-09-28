@@ -29,6 +29,9 @@ public class AppUser {
 
     public static final String DEFAULT_TIME_ZONE = "America/New_York";
     public static final Set<Integer> REMINDER_LEAD_MINUTES = Set.of(30, 60, 120, 720);
+    /** Flex's forfeit window in most markets; drivers can change it for theirs. */
+    public static final int DEFAULT_FORFEIT_CUTOFF_MINUTES = 45;
+    public static final int MAX_FORFEIT_CUTOFF_MINUTES = 720;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -70,6 +73,9 @@ public class AppUser {
     /** Push a reminder to log miles shortly after a block ends without any. */
     @Column(nullable = false)
     private boolean remindMiles;
+
+    @Column(nullable = false)
+    private int forfeitCutoffMinutes = DEFAULT_FORFEIT_CUTOFF_MINUTES;
 
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;

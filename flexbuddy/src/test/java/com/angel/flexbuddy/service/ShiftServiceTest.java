@@ -564,6 +564,70 @@ class ShiftServiceTest {
                 .extracting(ShiftResponse::getId).containsExactly(1L, 2L, 3L);
     }
 
+    @Test
+    void aForfeitIsLateOnlyAfterTheCutoffBeforeTheStart() {
+        // The block starts at 15:15; with the default 45-minute cutoff the deadline is 14:30.
+        assertThat(forfeitAt(LocalDateTime.of(2026, 9, 13, 14, 20))).isFalse();
+        assertThat(forfeitAt(LocalDateTime.of(2026, 9, 13, 14, 29))).isFalse();
+        assertThat(forfeitAt(LocalDateTime.of(2026, 9, 13, 14, 30))).isFalse();
+        assertThat(forfeitAt(LocalDateTime.of(2026, 9, 13, 14, 31))).isTrue();
+        assertThat(forfeitAt(LocalDateTime.of(2026, 9, 13, 14, 40))).isTrue();
+    }
+
+    @Test
+    void aForfeitKeepsItsJudgementWhenTheCutoffChangesLater() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 14, 20));
+        shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));
+        assertThat(scheduled.isLateForfeit()).isFalse();
+
+        when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
+                new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null));
+        ShiftResponse edited = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));
+
+        assertThat(edited.isLateForfeit()).isFalse();
+    }
+
+    @Test
+    void completingAForfeitedBlockClearsTheLateFlag() {
+        Shift forfeited = scheduled(7L);
+        forfeited.setStatus(ShiftStatus.FORFEITED);
+        forfeited.setBasePay(BigDecimal.ZERO);
+        forfeited.setLateForfeit(true);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(forfeited));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                new BigDecimal("84.00"), null, null));
+
+        assertThat(forfeited.isLateForfeit()).isFalse();
+    }
+
+    @Test
+    void aScheduledBlockReportsItsForfeitDeadline() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+
+        ShiftResponse response = shiftService.getShift(OWNER_EMAIL, 7L);
+
+        assertThat(response.getForfeitDeadline()).isEqualTo(LocalDateTime.of(2026, 9, 13, 14, 30));
+        assertThat(response.isLateForfeit()).isFalse();
+    }
+
+    private boolean forfeitAt(LocalDateTime now) {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        org.mockito.Mockito.lenient().when(shiftRepository.save(any(Shift.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(now);
+        ShiftResponse response = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));
+        assertThat(response.getForfeitDeadline()).isNull();
+        return response.isLateForfeit();
+    }
+
     private static BlockDetailsRequest route(LocalTime start, LocalTime end, Integer stops, Integer packages,
             Integer returns) {
         return new BlockDetailsRequest(start, end, null, null, stops, packages, returns);

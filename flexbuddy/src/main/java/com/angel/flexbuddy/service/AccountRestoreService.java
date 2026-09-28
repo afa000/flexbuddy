@@ -225,6 +225,9 @@ public class AccountRestoreService {
                     owner.setRemindBeforeMinutes(file.settings().remindBeforeMinutes());
                     owner.setRemindConfirm(Boolean.TRUE.equals(file.settings().remindConfirm()));
                     owner.setRemindMiles(Boolean.TRUE.equals(file.settings().remindMiles()));
+                    if (file.settings().forfeitCutoffMinutes() != null) {
+                        owner.setForfeitCutoffMinutes(file.settings().forfeitCutoffMinutes());
+                    }
                 }
                 userRepository.save(owner);
             } catch (RuntimeException exception) {
@@ -265,6 +268,7 @@ public class AccountRestoreService {
         shift.setStops(source.stops());
         shift.setPackages(source.packages());
         shift.setReturns(source.returns());
+        shift.setLateForfeit(shift.getStatus() == ShiftStatus.FORFEITED && Boolean.TRUE.equals(source.lateForfeit()));
         Instant now = Instant.now(clock);
         shift.setCreatedAt(source.createdAt() == null ? now : source.createdAt());
         shift.setUpdatedAt(source.updatedAt() == null ? shift.getCreatedAt() : source.updatedAt());
@@ -344,6 +348,10 @@ public class AccountRestoreService {
                 }
                 if (file.settings().remindBeforeMinutes() != null
                         && !AppUser.REMINDER_LEAD_MINUTES.contains(file.settings().remindBeforeMinutes())) {
+                    throw new IllegalArgumentException();
+                }
+                Integer cutoff = file.settings().forfeitCutoffMinutes();
+                if (cutoff != null && (cutoff < 0 || cutoff > AppUser.MAX_FORFEIT_CUTOFF_MINUTES)) {
                     throw new IllegalArgumentException();
                 }
             } catch (RuntimeException exception) {

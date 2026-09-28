@@ -41,6 +41,9 @@ public class ShiftResponse {
     private Instant statusChangedAt;
     private BigDecimal earnedPay;
     private BlockDetailsResponse details;
+    /** For a scheduled block, the last moment to forfeit it without it counting as late, in the driver's zone. */
+    private java.time.LocalDateTime forfeitDeadline;
+    private boolean lateForfeit;
 
     public ShiftResponse(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips, BigDecimal totalPay, int timeWorked, BigDecimal hourlyRate,
@@ -48,6 +51,6 @@ public class ShiftResponse {
         this(id, station, date, startTime, endTime, basePay, tips, totalPay, timeWorked, hourlyRate,
                 null, BigDecimal.ZERO.setScale(2), null, BigDecimal.ZERO.setScale(2), totalPay, hourlyRate,
                 createdAt, updatedAt, deletedAt, ShiftStatus.COMPLETED, null, totalPay,
-                BlockDetailsResponse.NONE);
+                BlockDetailsResponse.NONE, null, false);
     }
 }

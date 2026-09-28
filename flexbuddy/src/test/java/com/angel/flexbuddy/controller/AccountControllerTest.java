@@ -309,6 +309,16 @@ class AccountControllerTest {
     }
 
     @Test
+    void updateReminders_rejectsAForfeitCutoffOutsideTwelveHours() throws Exception {
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"America/Chicago\",\"remindConfirm\":false,\"forfeitCutoffMinutes\":800}"))
+                .andExpect(status().isBadRequest());
+
+        verify(settingsService, never()).updateReminders(any(), any());
+    }
+
+    @Test
     void updateReminders_savesValidSettings() throws Exception {
         mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

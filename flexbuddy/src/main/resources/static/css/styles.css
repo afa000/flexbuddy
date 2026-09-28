@@ -1943,6 +1943,9 @@ h1 {
 .next-up h2 { margin: 0 0 6px; font-size: 30px; }
 .next-up-when { margin: 0; color: var(--muted); }
 .next-up-countdown { margin: 8px 0 0; color: var(--cyan); font-weight: 750; }
+.forfeit-deadline { margin: 4px 0 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+.forfeit-deadline[data-state="soon"] { color: var(--warning); }
+.forfeit-deadline[data-state="passed"] { color: var(--error); }
 .next-up-pay { text-align: right; }
 .next-up-pay strong { display: block; font-size: 28px; font-weight: 650; }
 .next-up-pay span { color: var(--muted); font-size: 12px; }
