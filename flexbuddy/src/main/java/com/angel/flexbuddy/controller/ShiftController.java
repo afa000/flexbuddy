@@ -149,6 +149,11 @@ public class ShiftController {
         return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
     }
 
+    @GetMapping("/goals")
+    public com.angel.flexbuddy.dto.GoalsResponse goals(Principal principal) {
+        return reportService.goals(principal.getName());
+    }
+
     @GetMapping("/missing-miles")
     public List<ShiftResponse> missingMiles(Principal principal, @RequestParam(defaultValue = "7") int days) {
         return shiftService.missingMiles(principal.getName(), days);

@@ -42,14 +42,67 @@ public class ShiftReportService {
     private final AccountSettingsService settingsService;
     private final NetEarningsCalculator calculator;
     private final UserTimeService userTime;
+    private final GoalProgressCalculator goalCalculator;
 
     public ShiftReportService(ShiftService shiftService, ExpenseService expenseService,
-            AccountSettingsService settingsService, NetEarningsCalculator calculator, UserTimeService userTime) {
+            AccountSettingsService settingsService, NetEarningsCalculator calculator, UserTimeService userTime,
+            GoalProgressCalculator goalCalculator) {
         this.shiftService = shiftService;
         this.expenseService = expenseService;
         this.settingsService = settingsService;
         this.calculator = calculator;
         this.userTime = userTime;
+        this.goalCalculator = goalCalculator;
+    }
+
+    static final int GOAL_HISTORY_DAYS = 90;
+
+    /** This week's and this month's goal progress on the driver's chosen basis; weeks run Monday to Sunday. */
+    @Transactional(readOnly = true)
+    public com.angel.flexbuddy.dto.GoalsResponse goals(String email) {
+        AccountSettingsResponse settings = settingsService.get(email);
+        if (settings.weeklyGoal() == null && settings.monthlyGoal() == null) {
+            return new com.angel.flexbuddy.dto.GoalsResponse(settings.goalBasis(), null, null);
+        }
+        LocalDate today = userTime.today(email);
+        boolean net = settings.goalBasis() == com.angel.flexbuddy.model.GoalBasis.NET;
+        NetEarningsResult history = earningsBetween(email, today.minusDays(GOAL_HISTORY_DAYS - 1L), today, settings);
+        List<Shift> recent = shiftService.findFiltered(email,
+                ShiftFilter.report(today.minusDays(GOAL_HISTORY_DAYS - 1L), today, null, null)
+                        .withStatuses(Set.of(ShiftStatus.COMPLETED)));
+        int blocks = recent.size();
+        BigDecimal averageBlockPay = blocks == 0 ? null
+                : divide(net ? history.netEarnings() : history.grossEarnings(), blocks);
+        Integer averageBlockMinutes = blocks == 0 ? null
+                : Math.round((float) recent.stream().mapToInt(Shift::getWorkedMinutes).sum() / blocks);
+        // Scheduled pay is gross, so on a net basis it is scaled by the share of pay usually kept.
+        BigDecimal keptShare = !net || history.grossEarnings().signum() == 0 ? BigDecimal.ONE
+                : history.netEarnings().divide(history.grossEarnings(), 4, RoundingMode.HALF_UP);
+
+        LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+        YearMonth month = YearMonth.from(today);
+        return new com.angel.flexbuddy.dto.GoalsResponse(settings.goalBasis(),
+                goal(email, settings.weeklyGoal(), weekStart, weekStart.plusDays(6), today, net, keptShare,
+                        averageBlockPay, averageBlockMinutes, settings),
+                goal(email, settings.monthlyGoal(), month.atDay(1), month.atEndOfMonth(), today, net, keptShare,
+                        averageBlockPay, averageBlockMinutes, settings));
+    }
+
+    private com.angel.flexbuddy.dto.GoalProgress goal(String email, BigDecimal target, LocalDate start, LocalDate end,
+            LocalDate today, boolean net, BigDecimal keptShare, BigDecimal averageBlockPay, Integer averageBlockMinutes,
+            AccountSettingsResponse settings) {
+        if (target == null) return null;
+        NetEarningsResult period = earningsBetween(email, start, end, settings);
+        BigDecimal planned = shiftService.findScheduled(email, start, end).stream()
+                .map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add).multiply(keptShare);
+        return goalCalculator.progress(target, net ? period.netEarnings() : period.grossEarnings(), planned,
+                averageBlockPay, averageBlockMinutes, start, end, today);
+    }
+
+    private NetEarningsResult earningsBetween(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {
+        ShiftFilter filter = ShiftFilter.report(from, to, null, null);
+        return calculator.calculate(shiftService.findFiltered(email, filter), reportExpenses(email, filter),
+                settings.vehicleCostMethod(), settings.mileageRate());
     }
 
     @Transactional(readOnly = true)

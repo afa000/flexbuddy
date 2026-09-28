@@ -309,6 +309,27 @@ class AccountControllerTest {
     }
 
     @Test
+    void updateGoals_savesPositiveGoalsAndRejectsTheRest() throws Exception {
+        for (String body : new String[] {
+                "{\"weeklyGoal\":-5,\"goalBasis\":\"GROSS\"}",
+                "{\"weeklyGoal\":0,\"goalBasis\":\"GROSS\"}",
+                "{\"weeklyGoal\":600}"}) {
+            mockMvc.perform(put("/account/goals").with(user("angel@example.com")).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(settingsService, never()).updateGoals(any(), any());
+
+        mockMvc.perform(put("/account/goals").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"weeklyGoal\":600,\"monthlyGoal\":null,\"goalBasis\":\"NET\"}"))
+                .andExpect(status().isOk());
+        verify(settingsService).updateGoals(org.mockito.ArgumentMatchers.eq("angel@example.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> request.weeklyGoal().compareTo(new java.math.BigDecimal("600")) == 0
+                        && request.monthlyGoal() == null && request.goalBasis() == com.angel.flexbuddy.model.GoalBasis.NET));
+    }
+
+    @Test
     void updateReminders_rejectsAForfeitCutoffOutsideTwelveHours() throws Exception {
         mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

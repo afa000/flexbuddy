@@ -77,6 +77,16 @@ public class AppUser {
     @Column(nullable = false)
     private int forfeitCutoffMinutes = DEFAULT_FORFEIT_CUTOFF_MINUTES;
 
+    @Column(precision = 10, scale = 2)
+    private java.math.BigDecimal weeklyGoal;
+
+    @Column(precision = 10, scale = 2)
+    private java.math.BigDecimal monthlyGoal;
+
+    @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    private GoalBasis goalBasis = GoalBasis.GROSS;
+
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;
         this.email = email;

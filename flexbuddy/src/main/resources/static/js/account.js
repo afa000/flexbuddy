@@ -207,7 +207,48 @@ function renderSettings(settings) {
     document.querySelector('#accountMileageRate').value = settings.mileageRate;
     document.querySelector('#mileageRateHelp').textContent = `App default: $${Number(settings.defaultMileageRate).toFixed(3)} per mile (${settings.mileageRateYear}). This is an estimate, not tax advice.`;
     renderReminders(settings);
+    renderGoals(settings);
 }
+
+const goalForm = document.querySelector('#goalSettingsForm');
+
+function renderGoals(settings) {
+    document.querySelector('#weeklyGoal').value = settings.weeklyGoal ?? '';
+    document.querySelector('#monthlyGoal').value = settings.monthlyGoal ?? '';
+    const basis = goalForm.querySelector(`input[name="goalBasis"][value="${settings.goalBasis || 'GROSS'}"]`);
+    if (basis) basis.checked = true;
+}
+
+goalForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const error = document.querySelector('#goalError');
+    error.classList.add('is-hidden');
+    const button = document.querySelector('#saveGoalsButton');
+    const amount = id => {
+        const value = document.querySelector(id).value;
+        return value === '' ? null : Number(value);
+    };
+    button.disabled = true;
+    try {
+        const response = await apiFetch('/account/goals', {
+            method: 'PUT',
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({
+                weeklyGoal: amount('#weeklyGoal'),
+                monthlyGoal: amount('#monthlyGoal'),
+                goalBasis: goalForm.querySelector('input[name="goalBasis"]:checked').value
+            })
+        });
+        if (!response.ok) throw await responseError(response, 'Goals must be more than zero, or left empty to turn them off.');
+        renderSettings(await response.json());
+        showToast('Goals saved', 'Your dashboard shows the new targets.');
+    } catch (exception) {
+        error.textContent = exception.message || 'Goals could not be saved.';
+        error.classList.remove('is-hidden');
+    } finally {
+        button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
+    }
+});
 
 loadSettings();
 

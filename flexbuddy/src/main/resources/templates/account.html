@@ -58,6 +58,22 @@
                     <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
                 </form>
             </article>
+            <article class="panel data-card" id="goals">
+                <p class="step-label">GOALS</p>
+                <h2>Earnings goals</h2>
+                <p>Set a target and the dashboard shows your progress, counting blocks you have scheduled.</p>
+                <form class="settings-form" id="goalSettingsForm">
+                    <label class="field"><span>Weekly goal (Monday to Sunday)</span><span class="input-with-prefix"><b>$</b><input id="weeklyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
+                    <label class="field"><span>Monthly goal</span><span class="input-with-prefix"><b>$</b><input id="monthlyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
+                    <fieldset class="goal-basis">
+                        <legend>Count toward goals</legend>
+                        <label class="checkbox-row"><input type="radio" name="goalBasis" value="GROSS" checked> Pay before costs, as Flex shows it</label>
+                        <label class="checkbox-row"><input type="radio" name="goalBasis" value="NET"> Estimated net after vehicle costs and expenses</label>
+                    </fieldset>
+                    <div class="notice error-notice is-hidden" id="goalError" role="alert"></div>
+                    <div class="form-actions"><button class="primary-button" id="saveGoalsButton" type="submit">Save goals</button></div>
+                </form>
+            </article>
             <article class="panel data-card reminders-card">
                 <p class="step-label">REMINDERS</p>
                 <h2>Shift reminders</h2>

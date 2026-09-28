@@ -550,4 +550,22 @@ class ShiftControllerTest {
         mockMvc.perform(get("/shifts/99").with(user("angel@example.com")))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void goals_returnsWeekAndMonthProgress() throws Exception {
+        when(reportService.goals("angel@example.com")).thenReturn(new com.angel.flexbuddy.dto.GoalsResponse(
+                com.angel.flexbuddy.model.GoalBasis.GROSS,
+                new com.angel.flexbuddy.dto.GoalProgress(new BigDecimal("600.00"), new BigDecimal("412.50"),
+                        new BigDecimal("84.00"), new BigDecimal("103.50"), new BigDecimal("68.8"), true, 2,
+                        new BigDecimal("78.40"), 240, LocalDate.of(2026, 9, 7), LocalDate.of(2026, 9, 13)),
+                null));
+
+        mockMvc.perform(get("/shifts/goals").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.basis").value("GROSS"))
+                .andExpect(jsonPath("$.week.percent").value(68.8))
+                .andExpect(jsonPath("$.week.blocksToGo").value(2))
+                .andExpect(jsonPath("$.week.periodStart").value("2026-09-07"))
+                .andExpect(jsonPath("$.month").doesNotExist());
+    }
 }

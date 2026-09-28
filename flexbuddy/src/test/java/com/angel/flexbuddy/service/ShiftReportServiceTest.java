@@ -44,6 +44,7 @@ class ShiftReportServiceTest {
     @Mock AccountSettingsService settingsService;
     @Mock UserTimeService userTime;
     @Spy NetEarningsCalculator calculator = new NetEarningsCalculator();
+    @Spy GoalProgressCalculator goalCalculator = new GoalProgressCalculator();
     @InjectMocks ShiftReportService reportService;
 
     @BeforeEach
@@ -212,7 +213,7 @@ class ShiftReportServiceTest {
         driver.setTimeZone("America/Los_Angeles");
         when(users.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(driver));
         ShiftReportService service = new ShiftReportService(shiftService, expenseService, settingsService, calculator,
-                new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)));
+                new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)), new GoalProgressCalculator());
         Shift missed = withStatus(shift("VEA7", LocalDate.of(2026, 9, 11), "70.00", "0.00", 240), ShiftStatus.SCHEDULED);
         Shift tonight = withStatus(new Shift(2L, "VEA7", LocalDate.of(2026, 9, 11), LocalTime.of(21, 0),
                 LocalTime.of(0, 0), new BigDecimal("60.00"), BigDecimal.ZERO), ShiftStatus.SCHEDULED);
@@ -330,5 +331,61 @@ class ShiftReportServiceTest {
         assertThat(statistics.getLateForfeitedShifts()).isEqualTo(2);
         assertThat(statistics.getForfeitedThisMonth()).isEqualTo(2);
         assertThat(statistics.getLateForfeitedThisMonth()).isEqualTo(1);
+    }
+
+    @Test
+    void goals_countTheWeekAndMonthOnTheChosenBasis() {
+        // NOW is Saturday, September 12, so the week is September 7 to 13.
+        Shift monday = shift("VEA7", LocalDate.of(2026, 9, 7), "100.00", "20.00", 240);
+        monday.setMiles(new BigDecimal("30.0"));
+        Shift lastWeek = shift("VEA7", LocalDate.of(2026, 9, 3), "80.00", "0.00", 240);
+        Shift sunday = withStatus(shift("VEA7", LocalDate.of(2026, 9, 13), "90.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        List<Shift> all = List.of(monday, lastWeek, sunday);
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    return all.stream()
+                            .filter(shift -> filter.statuses().contains(shift.getStatus()))
+                            .filter(shift -> !shift.getDate().isBefore(filter.from()) && !shift.getDate().isAfter(filter.to()))
+                            .toList();
+                });
+        when(shiftService.findScheduled(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenReturn(List.of(sunday));
+        when(userTime.today(EMAIL)).thenReturn(NOW.toLocalDate());
+
+        when(settingsService.get(EMAIL)).thenReturn(goalSettings("600.00", null, com.angel.flexbuddy.model.GoalBasis.GROSS));
+        com.angel.flexbuddy.dto.GoalsResponse gross = reportService.goals(EMAIL);
+        assertThat(gross.month()).isNull();
+        assertThat(gross.week().earned()).isEqualByComparingTo("120.00");
+        assertThat(gross.week().planned()).isEqualByComparingTo("90.00");
+        assertThat(gross.week().averageBlockPay()).isEqualByComparingTo("100.00");
+        assertThat(gross.week().averageBlockMinutes()).isEqualTo(240);
+
+        when(settingsService.get(EMAIL)).thenReturn(goalSettings("600.00", "2000.00", com.angel.flexbuddy.model.GoalBasis.NET));
+        com.angel.flexbuddy.dto.GoalsResponse net = reportService.goals(EMAIL);
+        // Monday nets $120 - 30 mi x $0.70 = $99; over 90 days $200 gross nets $179, so $90 scheduled counts as $80.55.
+        assertThat(net.week().earned()).isEqualByComparingTo("99.00");
+        assertThat(net.week().planned()).isEqualByComparingTo("80.55");
+        assertThat(net.week().averageBlockPay()).isEqualByComparingTo("89.50");
+        assertThat(net.month().goal()).isEqualByComparingTo("2000.00");
+        assertThat(net.month().earned()).isEqualByComparingTo("179.00");
+    }
+
+    @Test
+    void goals_areEmptyWithoutAnyGoalSet() {
+        when(settingsService.get(EMAIL)).thenReturn(goalSettings(null, null, com.angel.flexbuddy.model.GoalBasis.GROSS));
+
+        com.angel.flexbuddy.dto.GoalsResponse goals = reportService.goals(EMAIL);
+
+        assertThat(goals.week()).isNull();
+        assertThat(goals.month()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(shiftService);
+    }
+
+    private static com.angel.flexbuddy.dto.AccountSettingsResponse goalSettings(String weekly, String monthly,
+            com.angel.flexbuddy.model.GoalBasis basis) {
+        return new com.angel.flexbuddy.dto.AccountSettingsResponse(com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45,
+                weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis, null);
     }
 }

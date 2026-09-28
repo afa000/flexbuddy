@@ -585,7 +585,8 @@ class ShiftServiceTest {
 
         when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
                 com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
-                new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null));
+                new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null, null,
+                com.angel.flexbuddy.model.GoalBasis.GROSS, null));
         ShiftResponse edited = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));
 
         assertThat(edited.isLateForfeit()).isFalse();

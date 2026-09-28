@@ -135,6 +135,12 @@ const elements = {
     plannedWeek: document.querySelector('#plannedWeek'),
     plannedWeekDetail: document.querySelector('#plannedWeekDetail'),
     forfeitsMonth: document.querySelector('#forfeitsMonth'),
+    goalCard: document.querySelector('#goalCard'),
+    goalRingFill: document.querySelector('#goalRingFill'),
+    goalProgress: document.querySelector('#goalProgress'),
+    goalSentence: document.querySelector('#goalSentence'),
+    goalMonth: document.querySelector('#goalMonth'),
+    goalLink: document.querySelector('#goalLink'),
     forfeitsDetail: document.querySelector('#forfeitsDetail'),
     importStatus: document.querySelector('#importStatus'),
     scheduleMatchNotice: document.querySelector('#scheduleMatchNotice'),
@@ -669,6 +675,61 @@ async function loadDashboard() {
     ]);
     window.flexbuddySchedule?.refresh();
     window.flexbuddyFinish?.loadMissing();
+    loadGoals();
+}
+
+let lastWeekGoalPercent;
+
+/** The week's goal tile: a ring, "$412.50 of $600", and how many usual blocks would close the gap. */
+async function loadGoals() {
+    let goals;
+    try {
+        const response = await apiFetch('/shifts/goals');
+        if (!response.ok) throw new Error();
+        goals = await response.json();
+    } catch {
+        return;
+    }
+    const week = goals.week;
+    const month = goals.month;
+    elements.goalMonth.textContent = month
+        ? `This month: ${formatMoney(month.earned)} of ${formatMoney(month.goal)} · ${Number(month.percent).toFixed(0)}%`
+        : '';
+    elements.goalLink.textContent = week || month ? 'Change goals' : 'Set a goal';
+    if (!week) {
+        elements.goalCard.dataset.state = 'none';
+        elements.goalRingFill.setAttribute('stroke-dasharray', '0 100');
+        elements.goalProgress.textContent = month ? 'No weekly goal' : 'No goal yet';
+        elements.goalSentence.textContent = month ? 'Your monthly goal is below.' : 'Set a weekly target to see your progress here.';
+        return;
+    }
+    const percent = Number(week.percent);
+    const reached = percent >= 100;
+    elements.goalCard.dataset.state = reached ? 'reached' : week.onTrack ? 'on-track' : 'behind';
+    elements.goalRingFill.setAttribute('stroke-dasharray', `${Math.min(percent, 100)} 100`);
+    elements.goalProgress.textContent = `${formatMoney(week.earned)} of ${formatMoney(week.goal)}`;
+    elements.goalSentence.textContent = goalSentence(week, goals.basis);
+    if (lastWeekGoalPercent !== undefined && lastWeekGoalPercent < 100 && reached) {
+        showToast('Weekly goal reached', formatMoney(week.earned));
+    }
+    lastWeekGoalPercent = percent;
+}
+
+function goalSentence(week, basis) {
+    const amount = basis === 'NET' ? 'estimated net' : 'pay';
+    if (Number(week.percent) >= 100) return `Goal reached with ${formatMoney(Number(week.earned) - Number(week.goal))} to spare.`;
+    if (Number(week.remaining) === 0) return 'Your scheduled blocks cover the rest.';
+    const scheduled = Number(week.planned) > 0 ? 'With your scheduled blocks, ' : '';
+    if (!week.blocksToGo || !week.averageBlockMinutes) {
+        return `${formatMoney(week.remaining)} to go${scheduled ? ' after your scheduled blocks' : ''}.`;
+    }
+    const hours = Math.round(week.averageBlockMinutes / 30) / 2;
+    const count = week.blocksToGo;
+    const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+    const number = words[count] || String(count);
+    const sentence = `${number} more ${hours}-hour ${count === 1 ? 'block' : 'blocks'} at your usual ${amount} reach ${formatMoney(week.goal)}.`;
+    const text = `${scheduled}${sentence}`;
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 async function loadStatistics(query, signal) {

@@ -57,6 +57,15 @@ public class AccountSettingsService {
     }
 
     @Transactional
+    public AccountSettingsResponse updateGoals(String email, com.angel.flexbuddy.dto.GoalSettingsRequest request) {
+        AppUser user = user(email);
+        user.setWeeklyGoal(request.weeklyGoal());
+        user.setMonthlyGoal(request.monthlyGoal());
+        user.setGoalBasis(request.goalBasis());
+        return response(userRepository.save(user));
+    }
+
+    @Transactional
     public AccountSettingsResponse updateTimeZone(String email, TimeZoneRequest request) {
         AppUser user = user(email);
         user.setTimeZone(request.timeZone());
@@ -87,6 +96,8 @@ public class AccountSettingsService {
         return new AccountSettingsResponse(method, effectiveMileageRate(user), defaultMileageRate, mileageRateYear,
                 user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone(),
                 user.getRemindBeforeMinutes(), user.isRemindConfirm(), user.isRemindMiles(), user.getForfeitCutoffMinutes(),
+                user.getWeeklyGoal(), user.getMonthlyGoal(),
+                user.getGoalBasis() == null ? com.angel.flexbuddy.model.GoalBasis.GROSS : user.getGoalBasis(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics");
     }
 

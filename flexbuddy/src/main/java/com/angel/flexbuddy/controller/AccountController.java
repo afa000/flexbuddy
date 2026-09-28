@@ -182,6 +182,13 @@ public class AccountController {
         return settingsService.updateReminders(principal.getName(), request);
     }
 
+    @PutMapping("/account/goals")
+    @ResponseBody
+    public AccountSettingsResponse updateGoals(Principal principal,
+            @Valid @RequestBody com.angel.flexbuddy.dto.GoalSettingsRequest request) {
+        return settingsService.updateGoals(principal.getName(), request);
+    }
+
     @PutMapping("/account/time-zone")
     @ResponseBody
     public AccountSettingsResponse updateTimeZone(Principal principal, @Valid @RequestBody TimeZoneRequest request) {

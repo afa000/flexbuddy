@@ -112,6 +112,22 @@
         </details>
 
         <section class="stats-grid" data-screen="dashboard" aria-label="Shift statistics">
+            <article class="stat-card goal-card" id="goalCard" data-state="none">
+                <span>This week's goal</span>
+                <div class="goal-body">
+                    <svg class="goal-ring" viewBox="0 0 36 36" aria-hidden="true">
+                        <circle class="goal-ring-track" cx="18" cy="18" r="15.9"/>
+                        <circle class="goal-ring-fill" id="goalRingFill" cx="18" cy="18" r="15.9" pathLength="100" stroke-dasharray="0 100"/>
+                        <path class="goal-ring-tick" d="m12.5 18.5 3.8 3.7 7.2-8"/>
+                    </svg>
+                    <div class="goal-text">
+                        <strong id="goalProgress">No goal yet</strong>
+                        <small id="goalSentence">Set a weekly target to see your progress here.</small>
+                    </div>
+                </div>
+                <small class="goal-month" id="goalMonth"></small>
+                <a class="text-link goal-link" id="goalLink" href="/account#goals">Set a goal</a>
+            </article>
             <article class="stat-card stat-card-accent">
                 <span>Total earnings</span>
                 <strong id="totalEarnings">$0.00</strong>

@@ -228,6 +228,13 @@ public class AccountRestoreService {
                     if (file.settings().forfeitCutoffMinutes() != null) {
                         owner.setForfeitCutoffMinutes(file.settings().forfeitCutoffMinutes());
                     }
+                    if (file.version() >= 4) {
+                        owner.setWeeklyGoal(decimalOrNull(file.settings().weeklyGoal()));
+                        owner.setMonthlyGoal(decimalOrNull(file.settings().monthlyGoal()));
+                        if (file.settings().goalBasis() != null) {
+                            owner.setGoalBasis(com.angel.flexbuddy.model.GoalBasis.valueOf(file.settings().goalBasis()));
+                        }
+                    }
                 }
                 userRepository.save(owner);
             } catch (RuntimeException exception) {
@@ -350,6 +357,10 @@ public class AccountRestoreService {
                         && !AppUser.REMINDER_LEAD_MINUTES.contains(file.settings().remindBeforeMinutes())) {
                     throw new IllegalArgumentException();
                 }
+                for (String goal : new String[] {file.settings().weeklyGoal(), file.settings().monthlyGoal()}) {
+                    if (goal != null && new BigDecimal(goal).signum() <= 0) throw new IllegalArgumentException();
+                }
+                if (file.settings().goalBasis() != null) com.angel.flexbuddy.model.GoalBasis.valueOf(file.settings().goalBasis());
                 Integer cutoff = file.settings().forfeitCutoffMinutes();
                 if (cutoff != null && (cutoff < 0 || cutoff > AppUser.MAX_FORFEIT_CUTOFF_MINUTES)) {
                     throw new IllegalArgumentException();

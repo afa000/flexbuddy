@@ -2144,6 +2144,28 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .finish-mode-button { justify-self: start; margin-top: -8px; }
 .route-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 
+/* Weekly goal tile */
+.goal-card { gap: 8px; justify-content: flex-start; }
+.goal-body { margin-top: 6px; display: flex; align-items: center; gap: 14px; }
+.goal-ring { width: 64px; height: 64px; flex: none; }
+.goal-ring circle { fill: none; stroke-width: 3.6; }
+.goal-ring-track { stroke: var(--line-soft); }
+.goal-ring-fill { stroke: var(--cyan); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dasharray .6s ease; }
+.goal-card[data-state="behind"] .goal-ring-fill { stroke: var(--warning); }
+.goal-ring-tick { fill: none; stroke: var(--cyan); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+.goal-card[data-state="reached"] .goal-ring-tick { opacity: 1; }
+.goal-text { min-width: 0; display: grid; gap: 4px; }
+.goal-card .goal-text strong { margin: 0; font-size: 20px; }
+.goal-card .goal-text small { color: var(--muted); font-size: 12px; line-height: 1.4; }
+.goal-card .goal-month { color: var(--muted); }
+.goal-link { font-size: 12px; font-weight: 750; }
+.goal-basis { margin: 0; padding: 0; display: grid; gap: 8px; border: 0; }
+.goal-basis legend { margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
+
+@media (max-width: 620px) {
+    .goal-card { grid-column: 1 / -1; }
+}
+
 /* Blocks without miles */
 .missing-miles { margin-top: 18px; padding: 20px 29px; border-left: 5px solid var(--cyan); }
 .missing-miles[hidden] { display: none; }

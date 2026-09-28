@@ -62,7 +62,10 @@ public class AccountBackupService {
                         ? com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod()).name(),
                         user.getMileageRate() == null ? null : user.getMileageRate().toPlainString(),
                         user.getTimeZone(), user.getRemindBeforeMinutes(), user.isRemindConfirm(),
-                        user.isRemindMiles(), user.getForfeitCutoffMinutes()),
+                        user.isRemindMiles(), user.getForfeitCutoffMinutes(),
+                        user.getWeeklyGoal() == null ? null : user.getWeeklyGoal().toPlainString(),
+                        user.getMonthlyGoal() == null ? null : user.getMonthlyGoal().toPlainString(),
+                        user.getGoalBasis() == null ? null : user.getGoalBasis().name()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
         );
     }
