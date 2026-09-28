@@ -696,6 +696,8 @@ async function loadGoals() {
         ? `This month: ${formatMoney(month.earned)} of ${formatMoney(month.goal)} · ${Number(month.percent).toFixed(0)}%`
         : '';
     elements.goalLink.textContent = week || month ? 'Change goals' : 'Set a goal';
+    // A round line cap would draw a dot for an empty ring, so the fill is hidden until there is progress.
+    elements.goalRingFill.classList.toggle('is-empty', !week || Number(week.percent) <= 0);
     if (!week) {
         elements.goalCard.dataset.state = 'none';
         elements.goalRingFill.setAttribute('stroke-dasharray', '0 100');
