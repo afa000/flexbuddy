@@ -309,6 +309,27 @@ class AccountControllerTest {
     }
 
     @Test
+    void updatePayouts_needsADayAndALagOfUpToTwoWeeks() throws Exception {
+        for (String body : new String[] {
+                "{\"payoutDays\":[],\"payoutLagDays\":1}",
+                "{\"payoutDays\":[\"TUESDAY\"],\"payoutLagDays\":15}",
+                "{\"payoutDays\":[\"PAYDAY\"],\"payoutLagDays\":1}"}) {
+            mockMvc.perform(put("/account/payouts").with(user("angel@example.com")).with(csrf())
+                            .contentType(MediaType.APPLICATION_JSON).content(body))
+                    .andExpect(status().isBadRequest());
+        }
+        verify(settingsService, never()).updatePayouts(any(), any());
+
+        mockMvc.perform(put("/account/payouts").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"payoutDays\":[\"FRIDAY\"],\"payoutLagDays\":0}"))
+                .andExpect(status().isOk());
+        verify(settingsService).updatePayouts(org.mockito.ArgumentMatchers.eq("angel@example.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> request.payoutDays().equals(java.util.Set.of(java.time.DayOfWeek.FRIDAY))
+                        && request.payoutLagDays() == 0));
+    }
+
+    @Test
     void updateGoals_savesPositiveGoalsAndRejectsTheRest() throws Exception {
         for (String body : new String[] {
                 "{\"weeklyGoal\":-5,\"goalBasis\":\"GROSS\"}",

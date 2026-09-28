@@ -149,6 +149,12 @@ public class ShiftController {
         return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
     }
 
+    @GetMapping("/pay-periods")
+    public com.angel.flexbuddy.dto.PayPeriodsResponse payPeriods(Principal principal,
+            @RequestParam(defaultValue = "2") int count) {
+        return reportService.payPeriods(principal.getName(), count);
+    }
+
     @GetMapping("/goals")
     public com.angel.flexbuddy.dto.GoalsResponse goals(Principal principal) {
         return reportService.goals(principal.getName());

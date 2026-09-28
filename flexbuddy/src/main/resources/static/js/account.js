@@ -208,7 +208,45 @@ function renderSettings(settings) {
     document.querySelector('#mileageRateHelp').textContent = `App default: $${Number(settings.defaultMileageRate).toFixed(3)} per mile (${settings.mileageRateYear}). This is an estimate, not tax advice.`;
     renderReminders(settings);
     renderGoals(settings);
+    renderPayouts(settings);
 }
+
+const payoutForm = document.querySelector('#payoutSettingsForm');
+
+function renderPayouts(settings) {
+    const days = new Set(settings.payoutDays || ['TUESDAY', 'FRIDAY']);
+    payoutForm.querySelectorAll('.payout-days input').forEach(box => box.checked = days.has(box.value));
+    document.querySelector('#payoutLagDays').value = settings.payoutLagDays ?? 1;
+}
+
+payoutForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const error = document.querySelector('#payoutError');
+    error.classList.add('is-hidden');
+    const days = [...payoutForm.querySelectorAll('.payout-days input:checked')].map(box => box.value);
+    if (!days.length) {
+        error.textContent = 'Choose at least one payout day.';
+        error.classList.remove('is-hidden');
+        return;
+    }
+    const button = document.querySelector('#savePayoutsButton');
+    button.disabled = true;
+    try {
+        const response = await apiFetch('/account/payouts', {
+            method: 'PUT',
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({payoutDays: days, payoutLagDays: Number(document.querySelector('#payoutLagDays').value)})
+        });
+        if (!response.ok) throw await responseError(response, 'Choose at least one payout day and a lag from 0 to 14 days.');
+        renderSettings(await response.json());
+        showToast('Payout schedule saved', 'Pay periods and the Next payout tile use the new schedule.');
+    } catch (exception) {
+        error.textContent = exception.message || 'The payout schedule could not be saved.';
+        error.classList.remove('is-hidden');
+    } finally {
+        button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
+    }
+});
 
 const goalForm = document.querySelector('#goalSettingsForm');
 

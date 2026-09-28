@@ -568,4 +568,19 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.week.periodStart").value("2026-09-07"))
                 .andExpect(jsonPath("$.month").doesNotExist());
     }
+
+    @Test
+    void payPeriods_returnsTheNextPayoutAndRecentPeriods() throws Exception {
+        com.angel.flexbuddy.dto.PayPeriodResponse current = new com.angel.flexbuddy.dto.PayPeriodResponse(
+                LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 14), 2,
+                new BigDecimal("108.00"), 1, new BigDecimal("84.00"));
+        when(reportService.payPeriods("angel@example.com", 2))
+                .thenReturn(new com.angel.flexbuddy.dto.PayPeriodsResponse(current, List.of(current)));
+
+        mockMvc.perform(get("/shifts/pay-periods").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nextPayout.payoutDate").value("2026-09-15"))
+                .andExpect(jsonPath("$.periods[0].from").value("2026-09-11"))
+                .andExpect(jsonPath("$.periods[0].earned").value(108.00));
+    }
 }

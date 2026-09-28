@@ -234,6 +234,11 @@ public class AccountRestoreService {
                         if (file.settings().goalBasis() != null) {
                             owner.setGoalBasis(com.angel.flexbuddy.model.GoalBasis.valueOf(file.settings().goalBasis()));
                         }
+                        if (file.settings().payoutDays() != null) {
+                            owner.setPayoutDays(PayPeriodCalculator.formatDays(
+                                    PayPeriodCalculator.parseDays(file.settings().payoutDays())));
+                        }
+                        if (file.settings().payoutLagDays() != null) owner.setPayoutLagDays(file.settings().payoutLagDays());
                     }
                 }
                 userRepository.save(owner);
@@ -361,6 +366,8 @@ public class AccountRestoreService {
                     if (goal != null && new BigDecimal(goal).signum() <= 0) throw new IllegalArgumentException();
                 }
                 if (file.settings().goalBasis() != null) com.angel.flexbuddy.model.GoalBasis.valueOf(file.settings().goalBasis());
+                Integer lag = file.settings().payoutLagDays();
+                if (lag != null && (lag < 0 || lag > AppUser.MAX_PAYOUT_LAG_DAYS)) throw new IllegalArgumentException();
                 Integer cutoff = file.settings().forfeitCutoffMinutes();
                 if (cutoff != null && (cutoff < 0 || cutoff > AppUser.MAX_FORFEIT_CUTOFF_MINUTES)) {
                     throw new IllegalArgumentException();

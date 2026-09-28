@@ -45,6 +45,7 @@ class ShiftReportServiceTest {
     @Mock UserTimeService userTime;
     @Spy NetEarningsCalculator calculator = new NetEarningsCalculator();
     @Spy GoalProgressCalculator goalCalculator = new GoalProgressCalculator();
+    @Spy PayPeriodCalculator payPeriodCalculator = new PayPeriodCalculator();
     @InjectMocks ShiftReportService reportService;
 
     @BeforeEach
@@ -213,7 +214,8 @@ class ShiftReportServiceTest {
         driver.setTimeZone("America/Los_Angeles");
         when(users.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(driver));
         ShiftReportService service = new ShiftReportService(shiftService, expenseService, settingsService, calculator,
-                new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)), new GoalProgressCalculator());
+                new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)), new GoalProgressCalculator(),
+                new PayPeriodCalculator());
         Shift missed = withStatus(shift("VEA7", LocalDate.of(2026, 9, 11), "70.00", "0.00", 240), ShiftStatus.SCHEDULED);
         Shift tonight = withStatus(new Shift(2L, "VEA7", LocalDate.of(2026, 9, 11), LocalTime.of(21, 0),
                 LocalTime.of(0, 0), new BigDecimal("60.00"), BigDecimal.ZERO), ShiftStatus.SCHEDULED);
@@ -386,6 +388,54 @@ class ShiftReportServiceTest {
             com.angel.flexbuddy.model.GoalBasis basis) {
         return new com.angel.flexbuddy.dto.AccountSettingsResponse(com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
                 new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45,
-                weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis, null);
+                weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis,
+                List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null);
+    }
+
+    @Test
+    void payPeriods_totalEarnedAndScheduledPayForEachPeriod() {
+        // NOW is Saturday, September 12: its blocks are paid Tuesday the 15th, for September 11 to 14.
+        Shift friday = shift("VEA7", LocalDate.of(2026, 9, 11), "80.00", "10.00", 240);
+        Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 9, 12), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
+        Shift sunday = withStatus(shift("VEA7", LocalDate.of(2026, 9, 13), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        Shift wednesday = shift("VEA7", LocalDate.of(2026, 9, 9), "70.00", "0.00", 240);
+        List<Shift> all = List.of(friday, cancelled, sunday, wednesday);
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    return all.stream().filter(shift -> filter.statuses().contains(shift.getStatus()))
+                            .filter(shift -> !shift.getDate().isBefore(filter.from()) && !shift.getDate().isAfter(filter.to()))
+                            .toList();
+                });
+        when(shiftService.findScheduled(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any())).thenAnswer(invocation -> {
+                    LocalDate from = invocation.getArgument(1);
+                    LocalDate to = invocation.getArgument(2);
+                    return all.stream().filter(shift -> shift.getStatus() == ShiftStatus.SCHEDULED)
+                            .filter(shift -> !shift.getDate().isBefore(from) && !shift.getDate().isAfter(to)).toList();
+                });
+        when(userTime.today(EMAIL)).thenReturn(NOW.toLocalDate());
+
+        com.angel.flexbuddy.dto.PayPeriodsResponse periods = reportService.payPeriods(EMAIL, 2);
+
+        assertThat(periods.periods()).hasSize(2);
+        com.angel.flexbuddy.dto.PayPeriodResponse current = periods.periods().getFirst();
+        assertThat(current.payoutDate()).isEqualTo(LocalDate.of(2026, 9, 15));
+        assertThat(current.from()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(current.to()).isEqualTo(LocalDate.of(2026, 9, 14));
+        assertThat(current.blocks()).isEqualTo(2);
+        assertThat(current.earned()).isEqualByComparingTo("108.00");
+        assertThat(current.scheduledBlocks()).isEqualTo(1);
+        assertThat(current.scheduledPay()).isEqualByComparingTo("84.00");
+        com.angel.flexbuddy.dto.PayPeriodResponse last = periods.periods().get(1);
+        assertThat(last.payoutDate()).isEqualTo(LocalDate.of(2026, 9, 11));
+        assertThat(last.earned()).isEqualByComparingTo("70.00");
+        assertThat(periods.nextPayout()).isEqualTo(current);
+    }
+
+    @Test
+    void payPeriods_rejectsACountOutsideHalfAYear() {
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> reportService.payPeriods(EMAIL, 27))
+                .isInstanceOf(com.angel.flexbuddy.exception.InvalidFilterException.class);
     }
 }

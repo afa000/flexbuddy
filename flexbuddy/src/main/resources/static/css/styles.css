@@ -2230,6 +2230,10 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .swipe-confirm[hidden] { display: none; }
 .swipe-confirm span { margin-right: auto; color: var(--text); font-size: 13px; font-weight: 750; }
 
+/* Payout schedule */
+.payout-days { margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 0 12px; border: 0; }
+.payout-days legend { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
+
 /* Checked on a phone after the touch target change */
 .text-link { color: var(--cyan); font-weight: 750; text-decoration: none; }
 .text-link:hover { color: var(--action-hover); }

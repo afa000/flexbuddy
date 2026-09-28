@@ -65,7 +65,8 @@ public class AccountBackupService {
                         user.isRemindMiles(), user.getForfeitCutoffMinutes(),
                         user.getWeeklyGoal() == null ? null : user.getWeeklyGoal().toPlainString(),
                         user.getMonthlyGoal() == null ? null : user.getMonthlyGoal().toPlainString(),
-                        user.getGoalBasis() == null ? null : user.getGoalBasis().name()),
+                        user.getGoalBasis() == null ? null : user.getGoalBasis().name(), user.getPayoutDays(),
+                        user.getPayoutLagDays()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses)
         );
     }

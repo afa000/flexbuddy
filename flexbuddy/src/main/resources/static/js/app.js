@@ -137,6 +137,8 @@ const elements = {
     plannedWeekDetail: document.querySelector('#plannedWeekDetail'),
     forfeitsMonth: document.querySelector('#forfeitsMonth'),
     goalCard: document.querySelector('#goalCard'),
+    nextPayoutAmount: document.querySelector('#nextPayoutAmount'),
+    nextPayoutDetail: document.querySelector('#nextPayoutDetail'),
     goalRingFill: document.querySelector('#goalRingFill'),
     goalProgress: document.querySelector('#goalProgress'),
     goalSentence: document.querySelector('#goalSentence'),
@@ -680,6 +682,44 @@ async function loadDashboard() {
     window.flexbuddySchedule?.refresh();
     window.flexbuddyFinish?.loadMissing();
     loadGoals();
+    loadPayPeriods();
+}
+
+// Which of the server's pay periods each preset shows: the one covering today, and the one before it.
+const PAY_PERIOD_PRESETS = {payperiod: 0, lastpayperiod: 1};
+let payPeriods;
+
+/** Loads this and last pay period and the next payout; the server owns the payout calendar. */
+async function loadPayPeriods() {
+    try {
+        const response = await apiFetch('/shifts/pay-periods?count=2');
+        if (!response.ok) throw new Error();
+        payPeriods = await response.json();
+    } catch {
+        elements.nextPayoutAmount.textContent = '—';
+        elements.nextPayoutDetail.textContent = 'Pay periods could not be loaded.';
+        return payPeriods;
+    }
+    renderNextPayout(payPeriods.nextPayout);
+    // A pay-period view restored from the address bar follows the calendar into the next period.
+    const index = PAY_PERIOD_PRESETS[filterState.preset];
+    const period = index === undefined ? null : payPeriods.periods[index];
+    if (period && (period.from !== filterState.from || period.to !== filterState.to)) applyPreset(filterState.preset);
+    return payPeriods;
+}
+
+function renderNextPayout(payout) {
+    const scheduled = Number(payout.scheduledPay) > 0 ? ` · +${formatMoney(payout.scheduledPay)} scheduled` : '';
+    elements.nextPayoutAmount.textContent = formatMoney(payout.earned);
+    elements.nextPayoutDetail.textContent = `${payoutDay(payout.payoutDate)} · ${payout.blocks} ${payout.blocks === 1 ? 'block' : 'blocks'}${scheduled}`;
+    elements.nextPayoutDetail.title = `Blocks from ${formatDate(payout.from)} to ${formatDate(payout.to)}. An estimate: tips can arrive in a later payout.`;
+}
+
+function payoutDay(date) {
+    const days = Math.round((parseLocalDate(date) - startOfToday()) / 86400000);
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Tomorrow';
+    return parseLocalDate(date).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
 }
 
 let lastWeekGoalPercent;
@@ -1466,7 +1506,7 @@ function readFilterState() {
 }
 
 function initializeFilters() {
-    if (!['all', 'week', 'month', 'year', '30days', 'custom'].includes(filterState.preset)) {
+    if (!['all', 'week', 'month', 'year', '30days', 'custom', 'payperiod', 'lastpayperiod'].includes(filterState.preset)) {
         filterState.preset = filterState.from || filterState.to ? 'custom' : 'all';
     }
     if (!['station', 'week', 'month', 'year'].includes(reportGroupBy)) reportGroupBy = 'month';
@@ -1489,7 +1529,7 @@ function syncFilterControls() {
     elements.activeFilterSummary.textContent = `Showing: ${presetLabel}`;
 }
 
-function applyPreset(preset) {
+async function applyPreset(preset) {
     filterState.preset = preset;
     const today = startOfToday();
     let from = '';
@@ -1514,6 +1554,14 @@ function applyPreset(preset) {
     } else if (preset === 'custom') {
         from = filterState.from;
         to = filterState.to;
+    } else if (PAY_PERIOD_PRESETS[preset] !== undefined) {
+        const period = (payPeriods ?? await loadPayPeriods())?.periods[PAY_PERIOD_PRESETS[preset]];
+        if (!period) {
+            showToast('Pay period unavailable', 'Your pay periods could not be loaded. Try again in a moment.', {alert: true});
+            return;
+        }
+        from = period.from;
+        to = period.to;
     }
     filterState.from = from;
     filterState.to = to;

@@ -32,6 +32,10 @@ public class AppUser {
     /** Flex's forfeit window in most markets; drivers can change it for theirs. */
     public static final int DEFAULT_FORFEIT_CUTOFF_MINUTES = 45;
     public static final int MAX_FORFEIT_CUTOFF_MINUTES = 720;
+    /** Flex pays twice a week in most markets, for blocks up to the day before. */
+    public static final String DEFAULT_PAYOUT_DAYS = "TUESDAY,FRIDAY";
+    public static final int DEFAULT_PAYOUT_LAG_DAYS = 1;
+    public static final int MAX_PAYOUT_LAG_DAYS = 14;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -86,6 +90,13 @@ public class AppUser {
     @jakarta.persistence.Enumerated(jakarta.persistence.EnumType.STRING)
     @Column(nullable = false, length = 10)
     private GoalBasis goalBasis = GoalBasis.GROSS;
+
+    /** Weekdays money arrives, as comma-separated DayOfWeek names, and how many days before a payout its blocks end. */
+    @Column(nullable = false, length = 80)
+    private String payoutDays = DEFAULT_PAYOUT_DAYS;
+
+    @Column(nullable = false)
+    private int payoutLagDays = DEFAULT_PAYOUT_LAG_DAYS;
 
     public AppUser(String displayName, String email, String passwordHash) {
         this.displayName = displayName;

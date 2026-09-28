@@ -58,6 +58,29 @@
                     <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
                 </form>
             </article>
+            <article class="panel data-card" id="payouts">
+                <p class="step-label">PAYOUTS</p>
+                <h2>Payout schedule</h2>
+                <p>Used for the Next payout tile and the pay period filters. Flex pays twice a week in most areas, for blocks up to the day before.</p>
+                <form class="settings-form" id="payoutSettingsForm">
+                    <fieldset class="payout-days">
+                        <legend>Payout days</legend>
+                        <label class="checkbox-row"><input type="checkbox" value="MONDAY"> Monday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="TUESDAY"> Tuesday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="WEDNESDAY"> Wednesday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="THURSDAY"> Thursday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="FRIDAY"> Friday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="SATURDAY"> Saturday</label>
+                        <label class="checkbox-row"><input type="checkbox" value="SUNDAY"> Sunday</label>
+                    </fieldset>
+                    <label class="field"><span>Days between a block and its payout</span>
+                        <input id="payoutLagDays" type="number" min="0" max="14" step="1" inputmode="numeric" required>
+                        <small class="field-hint">With 1, a Monday block is paid on Tuesday and a Tuesday block on the next payout day.</small>
+                    </label>
+                    <div class="notice error-notice is-hidden" id="payoutError" role="alert"></div>
+                    <div class="form-actions"><button class="primary-button" id="savePayoutsButton" type="submit">Save payout schedule</button></div>
+                </form>
+            </article>
             <article class="panel data-card" id="goals">
                 <p class="step-label">GOALS</p>
                 <h2>Earnings goals</h2>

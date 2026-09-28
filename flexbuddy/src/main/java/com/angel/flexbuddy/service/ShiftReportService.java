@@ -43,16 +43,47 @@ public class ShiftReportService {
     private final NetEarningsCalculator calculator;
     private final UserTimeService userTime;
     private final GoalProgressCalculator goalCalculator;
+    private final PayPeriodCalculator payPeriods;
 
     public ShiftReportService(ShiftService shiftService, ExpenseService expenseService,
             AccountSettingsService settingsService, NetEarningsCalculator calculator, UserTimeService userTime,
-            GoalProgressCalculator goalCalculator) {
+            GoalProgressCalculator goalCalculator, PayPeriodCalculator payPeriods) {
         this.shiftService = shiftService;
         this.expenseService = expenseService;
         this.settingsService = settingsService;
         this.calculator = calculator;
         this.userTime = userTime;
         this.goalCalculator = goalCalculator;
+        this.payPeriods = payPeriods;
+    }
+
+    static final int MAX_PAY_PERIODS = 26;
+
+    /** The pay period covering today and the {@code count - 1} before it, newest first, and the next payout. */
+    @Transactional(readOnly = true)
+    public com.angel.flexbuddy.dto.PayPeriodsResponse payPeriods(String email, int count) {
+        if (count < 1 || count > MAX_PAY_PERIODS) {
+            throw new com.angel.flexbuddy.exception.InvalidFilterException("count must be between 1 and 26.");
+        }
+        AccountSettingsResponse settings = settingsService.get(email);
+        Set<DayOfWeek> days = Set.copyOf(settings.payoutDays());
+        int lag = settings.payoutLagDays();
+        LocalDate today = userTime.today(email);
+        List<com.angel.flexbuddy.dto.PayPeriodResponse> periods = new ArrayList<>();
+        PayPeriodCalculator.Period period = payPeriods.periodFor(today, days, lag);
+        for (int index = 0; index < count; index++) {
+            periods.add(payPeriod(email, period));
+            period = payPeriods.previous(period, days, lag);
+        }
+        return new com.angel.flexbuddy.dto.PayPeriodsResponse(payPeriod(email, payPeriods.nextPayout(today, days, lag)), periods);
+    }
+
+    private com.angel.flexbuddy.dto.PayPeriodResponse payPeriod(String email, PayPeriodCalculator.Period period) {
+        List<Shift> earned = shiftService.findFiltered(email, ShiftFilter.report(period.from(), period.to(), null, null));
+        List<Shift> scheduled = shiftService.findScheduled(email, period.from(), period.to());
+        return new com.angel.flexbuddy.dto.PayPeriodResponse(period.payoutDate(), period.from(), period.to(),
+                earned.size(), money(earned.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                scheduled.size(), money(scheduled.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)));
     }
 
     static final int GOAL_HISTORY_DAYS = 90;

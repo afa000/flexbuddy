@@ -182,6 +182,13 @@ public class AccountController {
         return settingsService.updateReminders(principal.getName(), request);
     }
 
+    @PutMapping("/account/payouts")
+    @ResponseBody
+    public AccountSettingsResponse updatePayouts(Principal principal,
+            @Valid @RequestBody com.angel.flexbuddy.dto.PayoutSettingsRequest request) {
+        return settingsService.updatePayouts(principal.getName(), request);
+    }
+
     @PutMapping("/account/goals")
     @ResponseBody
     public AccountSettingsResponse updateGoals(Principal principal,
