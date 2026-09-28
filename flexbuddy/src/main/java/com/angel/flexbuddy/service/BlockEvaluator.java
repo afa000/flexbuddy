@@ -71,6 +71,7 @@ public class BlockEvaluator {
                 rates.basePerMinute().multiply(BigDecimal.valueOf(minutes)),
                 rates.tipsPerMinute().multiply(BigDecimal.valueOf(minutes)), minutes, rates, settings);
         BigDecimal difference = usual == null ? null : differencePercent(offer.netHourlyRate(), usual.netHourlyRate());
+        BigDecimal baseHourly = usualBaseHourly(sample.shifts());
 
         return new BlockEvaluationResponse(sample.basis(), sample.shifts().size(),
                 sample.basis() == Basis.ACCOUNT ? station : sample.shifts().getFirst().getStation().trim(),
@@ -78,7 +79,29 @@ public class BlockEvaluator {
                 offer.grossHourlyRate(), money(tips), rates.milesPerMinute() == null ? null : offer.miles(),
                 offer.vehicleCost(), offer.outOfPocketExpenses(), offer.netEarnings(), offer.netHourlyRate(),
                 usual == null ? null : usual.netHourlyRate(), usual == null ? null : usual.grossHourlyRate(),
-                verdict(difference), difference);
+                verdict(difference), difference, baseHourly, surge(request.offeredPay(), baseHourly, minutes));
+    }
+
+    /**
+     * The base pay per hour seen most often in the sample, rounded to the dollar: Flex pays most blocks at a
+     * station's standard rate, so the most common value is that rate and anything above it is surge. A tie goes to
+     * the higher rate, so surge is never overstated.
+     */
+    static BigDecimal usualBaseHourly(List<Shift> shifts) {
+        java.util.Map<BigDecimal, Long> counts = shifts.stream().filter(shift -> shift.getWorkedMinutes() > 0)
+                .map(shift -> shift.getEarnedBasePay().multiply(BigDecimal.valueOf(60))
+                        .divide(BigDecimal.valueOf(shift.getWorkedMinutes()), 0, RoundingMode.HALF_UP))
+                .collect(java.util.stream.Collectors.groupingBy(rate -> rate, java.util.stream.Collectors.counting()));
+        return counts.entrySet().stream()
+                .max(java.util.Map.Entry.<BigDecimal, Long>comparingByValue().thenComparing(java.util.Map.Entry.comparingByKey()))
+                .map(entry -> entry.getKey().setScale(2))
+                .orElse(null);
+    }
+
+    private static BigDecimal surge(BigDecimal offeredPay, BigDecimal baseHourly, int minutes) {
+        if (baseHourly == null) return null;
+        BigDecimal base = baseHourly.multiply(BigDecimal.valueOf(minutes)).divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        return offeredPay.subtract(base).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** The station's last 90 days, then its whole history, then every block on the account. */

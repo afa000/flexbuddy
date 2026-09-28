@@ -2107,6 +2107,8 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .evaluate-breakdown .evaluate-total { padding-top: 8px; border-top: 1px solid var(--line-soft); font-weight: 800; }
 .evaluate-breakdown .evaluate-total dt { color: var(--text); }
 .evaluate-basis { margin: 14px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.evaluate-breakdown .evaluate-surge { margin-top: -4px; padding-left: 12px; font-size: 12px; }
+.evaluate-breakdown .evaluate-surge dd { color: var(--cyan); font-weight: 750; }
 .evaluate-basis strong { color: var(--text); }
 
 @media (max-width: 900px) {

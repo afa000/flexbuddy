@@ -246,4 +246,29 @@ class BlockEvaluatorTest {
         expense.setDate(date);
         expenses.add(expense);
     }
+
+    @Test
+    void theOfferAboveTheStationsUsualBaseRateIsSurge() {
+        // Two blocks at the standard $18 an hour and one surged block at $24 an hour.
+        block("VEA7", TODAY.minusDays(1), 240, "72.00", "0", null);
+        block("VEA7", TODAY.minusDays(2), 240, "72.00", "0", null);
+        block("VEA7", TODAY.minusDays(3), 240, "96.00", "0", null);
+
+        BlockEvaluationResponse surged = evaluate("VEA7", "4", "84.00", null);
+        BlockEvaluationResponse plain = evaluate("VEA7", "4", "70.00", null);
+
+        assertThat(surged.usualBaseHourly()).isEqualByComparingTo("18.00");
+        assertThat(surged.surgePay()).isEqualByComparingTo("12.00");
+        assertThat(plain.surgePay()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void aTieBetweenRatesTakesTheHigherSoSurgeIsNotOverstated() {
+        block("VEA7", TODAY.minusDays(1), 240, "72.00", "0", null);
+        block("VEA7", TODAY.minusDays(2), 240, "80.00", "0", null);
+        block("VEA7", TODAY.minusDays(3), 180, "81.00", "0", null);
+
+        assertThat(evaluate("VEA7", "4", "84.00", null).usualBaseHourly()).isEqualByComparingTo("27.00");
+        assertThat(BlockEvaluator.usualBaseHourly(List.of())).isNull();
+    }
 }

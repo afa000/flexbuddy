@@ -169,6 +169,7 @@
             </div>
             <dl class="evaluate-breakdown">
                 <div><dt>Offer</dt><dd>${formatMoney(offer.offeredPay)} · ${formatMoney(estimate.offeredHourly)}/hr</dd></div>
+                ${Number(estimate.surgePay) > 0 ? `<div class="evaluate-surge"><dt>Includes surge over the usual ${formatMoney(estimate.usualBaseHourly)}/hr</dt><dd>${formatMoney(estimate.surgePay)}</dd></div>` : ''}
                 <div><dt>${offer.expectedTips === null ? 'Tips (your average)' : 'Tips'}</dt><dd>+${formatMoney(estimate.estimatedTips)}</dd></div>
                 <div><dt>Vehicle cost</dt><dd>−${formatMoney(estimate.estimatedVehicleCost)}${miles}</dd></div>
                 <div><dt>Tolls, parking, other</dt><dd>−${formatMoney(estimate.estimatedOtherExpenses)}</dd></div>

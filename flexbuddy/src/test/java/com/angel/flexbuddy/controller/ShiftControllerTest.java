@@ -122,7 +122,7 @@ class ShiftControllerTest {
                         new BigDecimal("21.00"), new BigDecimal("22.50"), new BigDecimal("6.00"), new BigDecimal("22.0"),
                         new BigDecimal("15.40"), new BigDecimal("0.33"), new BigDecimal("74.27"), new BigDecimal("18.57"),
                         new BigDecimal("18.57"), new BigDecimal("22.50"), BlockEvaluationResponse.Verdict.ABOUT_USUAL,
-                        new BigDecimal("0.0")));
+                        new BigDecimal("0.0"), new BigDecimal("18.00"), new BigDecimal("12.00")));
 
         mockMvc.perform(post("/shifts/evaluate").with(user("angel@example.com")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
