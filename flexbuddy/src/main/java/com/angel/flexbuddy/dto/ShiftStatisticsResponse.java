@@ -50,6 +50,13 @@ public class ShiftStatisticsResponse {
     private int cancelledShifts;
     private int forfeitedShifts;
     private int forfeitedThisMonth;
+    /** Worked blocks with both actual times recorded. */
+    private int timedShifts;
+    /** Actual minutes for timed blocks plus scheduled minutes for the rest. */
+    private int clockedMinutes;
+    private BigDecimal clockedHourlyRate;
+    /** Average of scheduled minus actual minutes over timed blocks, or null when none are timed. */
+    private Integer averageFinishedEarlyMinutes;
 
     public ShiftStatisticsResponse(int totalShifts, BigDecimal totalBasePay, BigDecimal totalTips,
             BigDecimal totalEarnings, BigDecimal averagePayPerShift, int totalTimeWorked,
@@ -62,6 +69,6 @@ public class ShiftStatisticsResponse {
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, totalEarnings, averageHourlyEarnings,
                 null, BigDecimal.ZERO, Map.of(), BigDecimal.ZERO, BigDecimal.ZERO, averagePayPerShift,
                 VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO, 0,
-                0, 0, BigDecimal.ZERO, 0, 0, 0, 0);
+                0, 0, BigDecimal.ZERO, 0, 0, 0, 0, 0, totalTimeWorked, averageHourlyEarnings, null);
     }
 }

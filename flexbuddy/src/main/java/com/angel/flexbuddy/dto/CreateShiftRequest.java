@@ -6,6 +6,7 @@ import java.time.LocalTime;
 
 import com.angel.flexbuddy.model.ShiftStatus;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Digits;
@@ -47,6 +48,10 @@ public class CreateShiftRequest {
     private BigDecimal miles;
 
     private ShiftStatus status;
+
+    /** Optional; when absent a new shift has no details and an edited one keeps its saved details. */
+    @Valid
+    private BlockDetailsRequest details;
 
     public CreateShiftRequest(String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips) {

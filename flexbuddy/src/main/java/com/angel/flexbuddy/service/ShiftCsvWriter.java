@@ -16,16 +16,19 @@ import java.util.Arrays;
 
 import org.springframework.stereotype.Component;
 
+import com.angel.flexbuddy.dto.BlockDetailsResponse;
 import com.angel.flexbuddy.dto.ShiftResponse;
 
 @Component
 public class ShiftCsvWriter {
 
+    private static final BlockDetailsResponse NO_DETAILS = new BlockDetailsResponse(null, null, null, null, null);
+
     private static final String[] HEADERS = {
             "id", "date", "station", "start_time", "end_time", "minutes_worked", "hours_worked",
             "base_pay", "tips", "total_pay", "hourly_rate", "miles", "mileage_cost",
             "expenses", "net_pay", "net_hourly_rate", "earnings_per_mile", "created_at", "updated_at",
-            "status"
+            "status", "actual_start", "actual_end", "actual_minutes", "actual_hourly_rate"
     };
 
     public void write(List<ShiftResponse> shifts, OutputStream output) throws IOException {
@@ -41,7 +44,9 @@ public class ShiftCsvWriter {
                     money(shift.getHourlyRate()), decimal(shift.getMiles()), money(shift.getMileageCost()),
                     money(shift.getLinkedExpenses()), money(shift.getNetPay()), money(shift.getNetHourlyRate()),
                     decimal(shift.getEarningsPerMile()), instant(shift.getCreatedAt()), instant(shift.getUpdatedAt()),
-                    shift.getStatus() == null ? "" : shift.getStatus().name()
+                    shift.getStatus() == null ? "" : shift.getStatus().name(),
+                    time(details(shift).actualStart()), time(details(shift).actualEnd()),
+                    text(details(shift).actualMinutes()), optionalMoney(details(shift).actualHourlyRate())
             ));
         }
         writer.flush();
@@ -70,6 +75,11 @@ public class ShiftCsvWriter {
         return safe;
     }
 
+    private static BlockDetailsResponse details(ShiftResponse shift) {
+        return shift.getDetails() == null ? NO_DETAILS : shift.getDetails();
+    }
+
+    private String optionalMoney(BigDecimal value) { return value == null ? "" : money(value); }
     private String text(Object value) { return value == null ? "" : value.toString(); }
     private String decimal(BigDecimal value) { return value == null ? "" : value.stripTrailingZeros().toPlainString(); }
     private String money(BigDecimal value) { return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP).toPlainString(); }

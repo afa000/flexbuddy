@@ -1,0 +1,17 @@
+package com.angel.flexbuddy.dto;
+
+import java.math.BigDecimal;
+import java.time.LocalTime;
+
+/**
+ * A block's recorded details with the figures derived from them. actualMinutes, actualHourlyRate, and
+ * finishedEarlyMinutes are null unless both actual times were recorded on a worked block.
+ */
+public record BlockDetailsResponse(
+        LocalTime actualStart,
+        LocalTime actualEnd,
+        Integer actualMinutes,
+        BigDecimal actualHourlyRate,
+        Integer finishedEarlyMinutes
+) {
+}

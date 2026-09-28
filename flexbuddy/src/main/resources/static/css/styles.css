@@ -2127,3 +2127,12 @@ button.calendar-day:hover { border-color: var(--cyan); }
     .evaluate-result { margin: 14px 18px 18px; padding: 16px; }
     .evaluate-figure strong { font-size: 34px; }
 }
+
+/* Finish block sheet and actual times */
+.finish-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.finish-summary { margin: -4px 0 0; color: var(--muted); font-size: 13px; font-weight: 700; }
+.block-details { padding: 12px 14px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 8px; }
+.block-details > summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; color: var(--text); font-size: 13px; font-weight: 750; cursor: pointer; }
+.block-details > summary small { color: var(--muted); font-weight: 650; }
+.block-details[open] > summary { margin-bottom: 12px; }
+.block-details .text-button { margin-top: 8px; }

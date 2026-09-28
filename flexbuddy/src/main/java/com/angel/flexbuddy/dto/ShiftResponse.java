@@ -40,12 +40,14 @@ public class ShiftResponse {
     private ShiftStatus status;
     private Instant statusChangedAt;
     private BigDecimal earnedPay;
+    private BlockDetailsResponse details;
 
     public ShiftResponse(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips, BigDecimal totalPay, int timeWorked, BigDecimal hourlyRate,
             Instant createdAt, Instant updatedAt, Instant deletedAt) {
         this(id, station, date, startTime, endTime, basePay, tips, totalPay, timeWorked, hourlyRate,
                 null, BigDecimal.ZERO.setScale(2), null, BigDecimal.ZERO.setScale(2), totalPay, hourlyRate,
-                createdAt, updatedAt, deletedAt, ShiftStatus.COMPLETED, null, totalPay);
+                createdAt, updatedAt, deletedAt, ShiftStatus.COMPLETED, null, totalPay,
+                new BlockDetailsResponse(null, null, null, null, null));
     }
 }

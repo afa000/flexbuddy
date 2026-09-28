@@ -86,6 +86,12 @@ const elements = {
     editBasePay: document.querySelector('#editBasePay'),
     editTips: document.querySelector('#editTips'),
     editMiles: document.querySelector('#editMiles'),
+    timeWorkedDetail: document.querySelector('#timeWorkedDetail'),
+    editActualTimes: document.querySelector('#editActualTimes'),
+    editActualSummary: document.querySelector('#editActualSummary'),
+    editActualStart: document.querySelector('#editActualStart'),
+    editActualEnd: document.querySelector('#editActualEnd'),
+    sameAsScheduledButton: document.querySelector('#sameAsScheduledButton'),
     linkedExpensesList: document.querySelector('#linkedExpensesList'),
     editError: document.querySelector('#editError'),
     closeEditButton: document.querySelector('#closeEditButton'),
@@ -239,6 +245,13 @@ elements.groupButtons.forEach(button => button.addEventListener('click', () => {
     loadEarningsReport(buildQuery(false));
 }));
 elements.editForm.addEventListener('submit', saveEditedShift);
+[elements.editActualStart, elements.editActualEnd, elements.editStartTime, elements.editEndTime]
+    .forEach(input => input.addEventListener('input', updateActualSummary));
+elements.sameAsScheduledButton.addEventListener('click', () => {
+    elements.editActualStart.value = elements.editStartTime.value;
+    elements.editActualEnd.value = elements.editEndTime.value;
+    updateActualSummary();
+});
 elements.closeEditButton.addEventListener('click', closeEditModal);
 elements.cancelEditButton.addEventListener('click', closeEditModal);
 elements.deleteShiftButton.addEventListener('click', showDeleteConfirmation);
@@ -652,7 +665,13 @@ async function loadStatistics(query, signal) {
         elements.rollingSevenDayTime.textContent = formatMinutes(statistics.rollingSevenDayMinutes);
         elements.averagePay.textContent = formatMoney(statistics.averagePayPerShift);
         elements.averageHourly.textContent = formatMoney(statistics.averageHourlyEarnings);
-        elements.hourlyBreakdown.textContent = `${formatMoney(statistics.averageHourlyBasePay)} base · ${formatMoney(statistics.averageHourlyTips)} tips`;
+        const timed = statistics.timedShifts > 0;
+        elements.hourlyBreakdown.textContent = timed
+            ? `${formatMoney(statistics.clockedHourlyRate)}/hr on the clock`
+            : `${formatMoney(statistics.averageHourlyBasePay)} base · ${formatMoney(statistics.averageHourlyTips)} tips`;
+        elements.timeWorkedDetail.textContent = timed
+            ? `${formatMinutes(statistics.clockedMinutes)} on the clock · ${paceText(statistics.averageFinishedEarlyMinutes)}`
+            : 'Across every shift';
         elements.baseTipsTotal.textContent = `${formatMoney(statistics.totalBasePay)} · ${formatMoney(statistics.totalTips)}`;
         const tipShare = Number(statistics.tipsShareOfEarnings || 0);
         elements.baseShareBar.style.width = `${100 - tipShare}%`;
@@ -674,7 +693,7 @@ async function loadStatistics(query, signal) {
     } catch (error) {
         if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.rollingSevenDayTime, elements.averagePay,
-            elements.averageHourly, elements.hourlyBreakdown, elements.baseTipsTotal,
+            elements.averageHourly, elements.hourlyBreakdown, elements.timeWorkedDetail, elements.baseTipsTotal,
             elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
             elements.expenseTotal, elements.totalMiles, elements.mileageCost, elements.plannedWeek,
             elements.plannedWeekDetail, elements.forfeitsMonth, elements.forfeitsDetail].forEach(element => element.textContent = '—');
@@ -754,7 +773,10 @@ function renderShifts(shifts) {
         const worked = !shift.status || shift.status === 'COMPLETED';
         const statusBadge = worked ? ''
             : `<small class="status-badge status-${shift.status.toLowerCase()}">${shift.status === 'CANCELLED' ? 'Cancelled' : 'Forfeited'}</small>`;
-        const workSummary = worked ? `${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross`
+        const actual = shift.details?.actualMinutes;
+        const workSummary = worked && actual != null
+            ? `${formatMinutes(actual)} worked of ${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.details.actualHourlyRate)}/hr worked`
+            : worked ? `${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross`
             : shift.status === 'CANCELLED' ? 'Cancellation pay · no hours' : 'Not worked · no pay';
         const edited = shift.createdAt && shift.updatedAt
                 && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
@@ -790,6 +812,10 @@ function openEditModal(shift, trigger, options = {}) {
     elements.editBasePay.value = shift.basePay ?? '';
     elements.editTips.value = shift.tips ?? 0;
     elements.editMiles.value = shift.miles ?? '';
+    elements.editActualStart.value = trimTime(shift.details?.actualStart);
+    elements.editActualEnd.value = trimTime(shift.details?.actualEnd);
+    elements.editActualTimes.open = Boolean(shift.details?.actualStart);
+    updateActualSummary();
     elements.editStatus.value = options.status || editOriginalStatus;
     // A block that already happened cannot go back to scheduled; delete it and add it again instead.
     [...elements.editStatus.options].forEach(option => {
@@ -838,9 +864,31 @@ function applyEditStatusRules(statusChanged = false) {
     if (!tipsAllowed) elements.editTips.value = 0;
     elements.editMiles.disabled = status === 'SCHEDULED';
     if (status === 'SCHEDULED') elements.editMiles.value = '';
+    // Only a worked block has actual times; a scheduled one gets its start from the Start block button.
+    elements.editActualTimes.classList.toggle('is-hidden', status !== 'COMPLETED');
     // The offered amount is never earned by a cancelled or forfeited block unless the driver enters it.
     if (statusChanged && (status === 'CANCELLED' || status === 'FORFEITED')) elements.editBasePay.value = 0;
     elements.saveEditButton.querySelector('span').textContent = saveEditLabel();
+}
+
+/** Minutes between two "HH:MM" values, the finish wrapping past midnight, or null when either is missing. */
+function minutesBetween(start, end) {
+    if (!start || !end) return null;
+    const toMinutes = value => value.split(':').map(Number).reduce((hours, minutes) => hours * 60 + minutes);
+    const minutes = toMinutes(end) - toMinutes(start);
+    return minutes < 0 ? minutes + 1440 : minutes;
+}
+
+function updateActualSummary() {
+    const actual = minutesBetween(elements.editActualStart.value, elements.editActualEnd.value);
+    const scheduled = minutesBetween(elements.editStartTime.value, elements.editEndTime.value);
+    if (!actual) {
+        elements.editActualSummary.textContent = elements.editActualStart.value ? 'Started, not finished' : 'Optional';
+        return;
+    }
+    const early = scheduled === null ? 0 : scheduled - actual;
+    const pace = early > 0 ? ` · ${formatMinutes(early)} early` : early < 0 ? ` · ${formatMinutes(-early)} over` : '';
+    elements.editActualSummary.textContent = `${formatMinutes(actual)} on the clock${pace}`;
 }
 
 function saveEditLabel() {
@@ -885,6 +933,17 @@ async function saveEditedShift(event) {
         miles: elements.editMiles.value === '' ? null : Number(elements.editMiles.value),
         status: elements.editStatus.value
     };
+    // A worked block always sends its details so a cleared time is saved; other statuses leave them to the server.
+    if (shift.status === 'COMPLETED') {
+        if (elements.editActualEnd.value && !elements.editActualStart.value) {
+            showMessage(elements.editError, 'Enter when the block started.');
+            return;
+        }
+        shift.details = {
+            actualStart: elements.editActualStart.value || null,
+            actualEnd: elements.editActualEnd.value || null
+        };
+    }
 
     setEditSaving(true);
 
@@ -969,7 +1028,11 @@ async function undoEdit(id, previous) {
             endTime: previous.endTime,
             basePay: previous.basePay,
             tips: previous.tips,
-            miles: previous.miles
+            miles: previous.miles,
+            details: previous.details && previous.status === 'COMPLETED' ? {
+                actualStart: previous.details.actualStart,
+                actualEnd: previous.details.actualEnd
+            } : undefined
         })
     });
     if (!response.ok) throw new Error(await response.text());
@@ -1165,6 +1228,13 @@ function formatMoney(value) {
         style: 'currency',
         currency: 'USD'
     }).format(Number(value || 0));
+}
+
+/** How a timed block's length compared with its schedule, for example "finish 38m early on average". */
+function paceText(earlyMinutes) {
+    if (earlyMinutes == null || earlyMinutes === 0) return 'on schedule on average';
+    return earlyMinutes > 0 ? `finish ${formatMinutes(earlyMinutes)} early on average`
+        : `run ${formatMinutes(-earlyMinutes)} over on average`;
 }
 
 function formatMinutes(value) {

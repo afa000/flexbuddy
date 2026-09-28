@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.angel.flexbuddy.dto.BlockDetailsRequest;
+import com.angel.flexbuddy.dto.BlockDetailsResponse;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftResponse;
@@ -37,6 +39,8 @@ public class ShiftService {
 
     private static final LocalDate EARLIEST_DATE = LocalDate.of(1, 1, 1);
     private static final LocalDate LATEST_DATE = LocalDate.of(9999, 12, 31);
+    /** A block can be started this long before its scheduled start, for drivers who arrive early. */
+    static final int EARLIEST_START_MINUTES = 120;
 
     private final ShiftRepository shiftRepository;
     private final AppUserRepository userRepository;
@@ -44,15 +48,18 @@ public class ShiftService {
     private final ExpenseService expenseService;
     private final AccountSettingsService settingsService;
     private final NetEarningsCalculator netCalculator;
+    private final UserTimeService userTime;
 
     public ShiftService(ShiftRepository shiftRepository, AppUserRepository userRepository, Clock clock,
-            ExpenseService expenseService, AccountSettingsService settingsService, NetEarningsCalculator netCalculator) {
+            ExpenseService expenseService, AccountSettingsService settingsService, NetEarningsCalculator netCalculator,
+            UserTimeService userTime) {
         this.shiftRepository = shiftRepository;
         this.userRepository = userRepository;
         this.clock = clock;
         this.expenseService = expenseService;
         this.settingsService = settingsService;
         this.netCalculator = netCalculator;
+        this.userTime = userTime;
     }
 
     public List<ShiftResponse> getAllShifts(String email) {
@@ -108,6 +115,7 @@ public class ShiftService {
         ShiftStatus status = request.getStatus() == null ? ShiftStatus.COMPLETED : request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
                 request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
+        applyDetails(shift, request.getDetails() == null ? BlockDetailsRequest.EMPTY : request.getDetails());
         shift.setOwner(owner);
         return toResponse(shiftRepository.save(shift), List.of(), settingsService.get(email));
     }
@@ -118,6 +126,7 @@ public class ShiftService {
         ShiftStatus status = request.getStatus() == null ? shift.getStatus() : request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
                 request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
+        applyDetails(shift, request.getDetails());
         Shift saved = shiftRepository.save(shift);
         return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
     }
@@ -141,6 +150,28 @@ public class ShiftService {
                 : target == ShiftStatus.SCHEDULED ? null : shift.getMiles();
         applyRequest(shift, target, shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 basePay, tips, miles);
+        applyDetails(shift, request.details());
+        Shift saved = shiftRepository.save(shift);
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
+    }
+
+    /** Records that a scheduled block has started now, in the driver's time zone. */
+    @org.springframework.transaction.annotation.Transactional
+    public ShiftResponse startShift(String email, Long id) {
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+        if (shift.getStatus() != ShiftStatus.SCHEDULED) {
+            throw new InvalidShiftException("Only a scheduled block can be started.");
+        }
+        java.time.LocalDateTime now = userTime.now(email).truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
+        if (now.isBefore(shift.getStartDateTime().minusMinutes(EARLIEST_START_MINUTES))) {
+            throw new InvalidShiftException("A block can be started from 2 hours before its scheduled start.");
+        }
+        if (now.isAfter(shift.getEndDateTime())) {
+            throw new InvalidShiftException("This block's scheduled time has passed. Mark it completed instead.");
+        }
+        shift.setActualStart(now.toLocalTime());
+        shift.setActualEnd(null);
         Shift saved = shiftRepository.save(shift);
         return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
     }
@@ -206,6 +237,30 @@ public class ShiftService {
         shift.setMiles(miles);
     }
 
+    /**
+     * Replaces the block's details when the request carries them. Without them, a block that was cancelled or
+     * forfeited loses its actual times, because it was not worked; every other block keeps what it had.
+     */
+    private void applyDetails(Shift shift, BlockDetailsRequest details) {
+        boolean worked = shift.getStatus() == ShiftStatus.COMPLETED || shift.getStatus() == ShiftStatus.SCHEDULED;
+        if (details != null) {
+            shift.setActualStart(details.actualStart());
+            shift.setActualEnd(details.actualEnd());
+        } else if (!worked) {
+            shift.setActualStart(null);
+            shift.setActualEnd(null);
+        }
+        if (shift.getActualStart() == null && shift.getActualEnd() == null) return;
+        if (!worked) throw new InvalidShiftException("Actual times are only recorded for completed blocks.");
+        if (shift.getActualStart() == null) throw new InvalidShiftException("Enter when the block started.");
+        if (shift.getStatus() == ShiftStatus.SCHEDULED && shift.getActualEnd() != null) {
+            throw new InvalidShiftException("Mark the block completed to record when it finished.");
+        }
+        if (shift.getActualStart().equals(shift.getActualEnd())) {
+            throw new InvalidShiftException("The finish time must be after the start time.");
+        }
+    }
+
     private ShiftResponse toResponse(Shift shift, List<Expense> expenses, AccountSettingsResponse settings) {
         NetEarningsResult net = netCalculator.calculate(List.of(shift), expenses,
                 settings.vehicleCostMethod(), settings.mileageRate());
@@ -215,8 +270,17 @@ public class ShiftService {
                 shift.getMiles(), shift.getMileageCost(settings.mileageRate()), shift.getEarningsPerMile(),
                 net.cashSpent(), net.netEarnings(), net.netHourlyRate(),
                 shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt(),
-                shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP)
+                shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP),
+                details(shift)
         );
+    }
+
+    private static BlockDetailsResponse details(Shift shift) {
+        Integer actual = shift.countsTowardHours() ? shift.getActualMinutes() : null;
+        BigDecimal actualHourly = actual == null || actual == 0 ? null : shift.getEarnedPay()
+                .multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(actual), 2, RoundingMode.HALF_UP);
+        return new BlockDetailsResponse(shift.getActualStart(), shift.getActualEnd(), actual, actualHourly,
+                shift.getFinishedEarlyMinutes());
     }
 
     private Comparator<ShiftResponse> responseComparator(ShiftFilter filter) {

@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.Clock;
 import java.time.Instant;
@@ -27,6 +28,7 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.angel.flexbuddy.dto.BlockDetailsRequest;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftResponse;
@@ -52,6 +54,7 @@ class ShiftServiceTest {
     @Mock ExpenseService expenseService;
     @Mock AccountSettingsService settingsService;
     @Spy NetEarningsCalculator netCalculator = new NetEarningsCalculator();
+    @Mock UserTimeService userTime;
     @InjectMocks ShiftService shiftService;
 
     private AppUser owner;
@@ -305,5 +308,136 @@ class ShiftServiceTest {
                 new BigDecimal("84.00"), BigDecimal.ZERO, owner);
         shift.setStatus(ShiftStatus.SCHEDULED);
         return shift;
+    }
+
+    @Test
+    void startShift_stampsTheCurrentMinuteInTheDriversZone() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 15, 3, 40));
+
+        ShiftResponse result = shiftService.startShift(OWNER_EMAIL, 7L);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(result.getDetails().actualStart()).isEqualTo(LocalTime.of(15, 3));
+        assertThat(result.getDetails().actualEnd()).isNull();
+    }
+
+    @Test
+    void startShift_opensTwoHoursBeforeTheBlockAndClosesAtItsEnd() {
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled(7L)));
+
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 13, 14));
+        assertThatThrownBy(() -> shiftService.startShift(OWNER_EMAIL, 7L))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("A block can be started from 2 hours before its scheduled start.");
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 19, 16));
+        assertThatThrownBy(() -> shiftService.startShift(OWNER_EMAIL, 7L))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("This block's scheduled time has passed. Mark it completed instead.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void startShift_refusesABlockThatIsNoLongerScheduled() {
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL))
+                .thenReturn(Optional.of(shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "10")));
+
+        assertThatThrownBy(() -> shiftService.startShift(OWNER_EMAIL, 1L))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("Only a scheduled block can be started.");
+    }
+
+    @Test
+    void changeStatus_completesWithActualTimesAndReportsTheWorkedRate() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                new BigDecimal("84.00"), null, null, times(LocalTime.of(15, 20), LocalTime.of(18, 42))));
+
+        // Paid for the scheduled 4 hours, on the clock for 3 h 22 m: the worked rate is 19 percent higher.
+        assertThat(result.getTimeWorked()).isEqualTo(240);
+        assertThat(result.getHourlyRate()).isEqualByComparingTo("21.00");
+        assertThat(result.getDetails().actualMinutes()).isEqualTo(202);
+        assertThat(result.getDetails().finishedEarlyMinutes()).isEqualTo(38);
+        assertThat(result.getDetails().actualHourlyRate()).isEqualByComparingTo("24.95");
+    }
+
+    @Test
+    void actualTimesPastMidnightFinishTheNextDay() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.COMPLETED,
+                null, null, null, times(LocalTime.of(23, 30), LocalTime.of(1, 10))));
+
+        assertThat(result.getDetails().actualMinutes()).isEqualTo(100);
+        assertThat(result.getDetails().finishedEarlyMinutes()).isEqualTo(140);
+    }
+
+    @Test
+    void updateShift_keepsSavedActualTimesUnlessTheRequestCarriesDetails() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        completed.setActualStart(LocalTime.of(9, 5));
+        completed.setActualEnd(LocalTime.of(16, 10));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.updateShift(OWNER_EMAIL, 1L, updateRequest());
+        assertThat(completed.getActualEnd()).isEqualTo(LocalTime.of(16, 10));
+
+        UpdateShiftRequest cleared = updateRequest();
+        cleared.setDetails(times(null, null));
+        shiftService.updateShift(OWNER_EMAIL, 1L, cleared);
+        assertThat(completed.getActualStart()).isNull();
+        assertThat(completed.getActualEnd()).isNull();
+    }
+
+    @Test
+    void cancellingAWorkedBlockDropsItsActualTimes() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        completed.setActualStart(LocalTime.of(9, 5));
+        completed.setActualEnd(LocalTime.of(16, 10));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.changeStatus(OWNER_EMAIL, 1L, new ShiftStatusRequest(ShiftStatus.CANCELLED));
+
+        assertThat(completed.getActualStart()).isNull();
+        assertThat(completed.getActualEnd()).isNull();
+    }
+
+    @Test
+    void actualTimesMustMakeSenseForTheBlock() {
+        Shift completed = shift(1L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(1L, OWNER_EMAIL)).thenReturn(Optional.of(completed));
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+
+        assertDetailsRejected(1L, times(null, LocalTime.of(16, 0)), "Enter when the block started.");
+        assertDetailsRejected(1L, times(LocalTime.of(9, 0), LocalTime.of(9, 0)), "The finish time must be after the start time.");
+        assertDetailsRejected(7L, times(LocalTime.of(15, 0), LocalTime.of(18, 0)),
+                "Mark the block completed to record when it finished.");
+        assertThatThrownBy(() -> shiftService.changeStatus(OWNER_EMAIL, 1L, new ShiftStatusRequest(ShiftStatus.FORFEITED,
+                null, null, null, times(LocalTime.of(9, 0), LocalTime.of(12, 0)))))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("Actual times are only recorded for completed blocks.");
+        verify(shiftRepository, never()).save(any());
+    }
+
+    private void assertDetailsRejected(Long id, BlockDetailsRequest details, String message) {
+        UpdateShiftRequest request = updateRequest();
+        request.setDetails(details);
+        assertThatThrownBy(() -> shiftService.updateShift(OWNER_EMAIL, id, request))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage(message);
+    }
+
+    private static BlockDetailsRequest times(LocalTime start, LocalTime end) {
+        return new BlockDetailsRequest(start, end);
     }
 }

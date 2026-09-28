@@ -2,6 +2,8 @@
 // Loaded before app.js and uses its shared helpers (apiFetch, formatMoney, openEditModal, ...) at call time.
 (() => {
     const UPCOMING_DAYS = 14;
+    // Matches the server: a block can be started from 2 hours before its scheduled start.
+    const EARLIEST_START_MS = 2 * 60 * 60000;
     const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>';
     const calendar = window.flexbuddyCalendar;
     const state = {upcoming: null, fetchedAt: 0, month: null, monthDays: [], selected: null, focusDate: null, countdownTimer: undefined};
@@ -115,15 +117,22 @@
                 </div>`;
             return;
         }
+        const started = Boolean(shift.details?.actualStart);
+        const current = started || nowMs() >= localMs(shift.date, shift.startTime) - EARLIEST_START_MS;
+        const blockActions = !current ? ''
+            : started ? '<button class="primary-button compact-button" type="button" data-action="finish">Finish block</button>'
+            : `<button class="primary-button compact-button" type="button" data-action="start">Start block</button>
+               <button class="secondary-button compact-button" type="button" data-action="finish">Finish block</button>`;
         el.nextUp.innerHTML = `
             <div class="next-up-main">
-                <p class="step-label">NEXT UP</p>
+                <p class="step-label">${started ? 'IN PROGRESS' : 'NEXT UP'}</p>
                 <h2>${escapeHtml(shift.station)}</h2>
                 <p class="next-up-when">${escapeHtml(dayLabel(shift.date))} · ${timeRange(shift)}</p>
                 <p class="next-up-countdown"></p>
             </div>
             <div class="next-up-pay"><strong>${formatMoney(shift.basePay)}</strong><span>offered · ${formatMinutes(shift.timeWorked)}</span></div>
             <div class="next-up-actions">
+                ${blockActions}
                 <a class="secondary-button compact-button" href="/shifts/${shift.id}.ics" download>Add to calendar</a>
                 <button class="secondary-button compact-button" type="button" data-action="cancelled">Mark cancelled</button>
                 <button class="danger-text-button" type="button" data-action="forfeited">Forfeit</button>
@@ -308,12 +317,27 @@
                 button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
             }
             button.addEventListener('click', () => {
-                if (action === 'completed') openEditModal(shift, button, {status: 'COMPLETED', focusPay: true});
+                if (action === 'completed' || action === 'finish') window.flexbuddyFinish.open(shift, button);
+                else if (action === 'start') startBlock(shift, button);
                 else if (action === 'cancelled') openEditModal(shift, button, {status: 'CANCELLED', focusPay: true});
                 else if (action === 'forfeited') confirmForfeit(shift);
                 else openEditModal(shift, button);
             });
         });
+    }
+
+    async function startBlock(shift, button) {
+        button.disabled = true;
+        try {
+            const response = await apiFetch(`/shifts/${shift.id}/start`, {method: 'POST', headers: csrfHeaders()});
+            if (!response.ok) throw new Error(await response.text() || 'The block could not be started.');
+            const started = await response.json();
+            showToast('Block started', `Started at ${formatTime(started.details.actualStart)}. Tap Finish block when you are done.`);
+            await loadDashboard();
+        } catch (error) {
+            showToast('Block not started', error.message || 'The block could not be started.', {alert: true});
+            button.disabled = false;
+        }
     }
 
     function confirmForfeit(shift) {
@@ -343,11 +367,20 @@
     function countdownText(shift) {
         const start = localMs(shift.date, shift.startTime);
         const end = start + shift.timeWorked * 60000;
-        const [nowDate, nowTime] = state.upcoming.now.split('T');
-        const now = localMs(nowDate, nowTime) + (Date.now() - state.fetchedAt);
+        const now = nowMs();
+        if (shift.details?.actualStart) {
+            const ends = now < end ? ` · scheduled to end in ${duration(end - now)}` : ' · past its scheduled end';
+            return `Started at ${formatTime(shift.details.actualStart)}${ends}`;
+        }
         if (now < start) return `Starts in ${duration(start - now)}`;
         if (now < end) return `In progress · ends in ${duration(end - now)}`;
         return 'Finished · confirm it when the list refreshes';
+    }
+
+    /** The current time in the driver's zone, from the server's clock when the schedule loaded. */
+    function nowMs() {
+        const [nowDate, nowTime] = state.upcoming.now.split('T');
+        return localMs(nowDate, nowTime) + (Date.now() - state.fetchedAt);
     }
 
     function localMs(date, time) {

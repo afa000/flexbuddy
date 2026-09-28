@@ -54,7 +54,7 @@ public class AccountBackupService {
         int deleted = (int) shifts.stream().filter(shift -> shift.getDeletedAt() != null).count();
         int deletedExpenses = (int) expenses.stream().filter(expense -> expense.getDeletedAt() != null).count();
         return new AccountBackupFile(
-                "flexbuddy-backup", 3, exportedAt, appVersion,
+                "flexbuddy-backup", 4, exportedAt, appVersion,
                 new BackupAccount(user.getDisplayName(), user.getEmail(), user.getCreatedAt()),
                 shifts.stream().map(this::toBackupShift).toList(),
                 expenses.stream().map(this::toBackupExpense).toList(),
@@ -70,7 +70,8 @@ public class AccountBackupService {
         return new BackupShift(
                 shift.getId(), shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 money(shift.getBasePay()), money(shift.getTips()), decimal(shift.getMiles()), shift.getCreatedAt(), shift.getUpdatedAt(),
-                shift.getDeletedAt(), shift.getStatus().name(), shift.getStatusChangedAt()
+                shift.getDeletedAt(), shift.getStatus().name(), shift.getStatusChangedAt(),
+                shift.getActualStart(), shift.getActualEnd()
         );
     }
 

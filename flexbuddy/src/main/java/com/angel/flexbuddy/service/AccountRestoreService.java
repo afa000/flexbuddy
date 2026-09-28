@@ -257,6 +257,8 @@ public class AccountRestoreService {
         shift.setStatus(source.status() == null || source.status().isBlank()
                 ? ShiftStatus.COMPLETED : ShiftStatus.valueOf(source.status()));
         shift.setStatusChangedAt(source.statusChangedAt());
+        shift.setActualStart(source.actualStart());
+        shift.setActualEnd(source.actualEnd());
         Instant now = Instant.now(clock);
         shift.setCreatedAt(source.createdAt() == null ? now : source.createdAt());
         shift.setUpdatedAt(source.updatedAt() == null ? shift.getCreatedAt() : source.updatedAt());
@@ -288,7 +290,7 @@ public class AccountRestoreService {
     private void validateHeader(AccountBackupFile file) {
         if (file == null) throw new InvalidBackupException("This file is not a readable FlexBuddy backup.");
         if (!"flexbuddy-backup".equals(file.format())) throw new InvalidBackupException("This is not a FlexBuddy backup file.");
-        if (file.version() > 3) throw new InvalidBackupException("This backup was created by a newer FlexBuddy version.");
+        if (file.version() > 4) throw new InvalidBackupException("This backup was created by a newer FlexBuddy version.");
         if (file.version() < 1) throw new InvalidBackupException("This backup version is not supported.");
         if (file.shifts().size() > MAX_SHIFTS) throw new InvalidBackupException("A backup can contain at most 10,000 shifts.");
         if (file.shifts().size() + file.expenses().size() > MAX_RECORDS) {
@@ -366,6 +368,12 @@ public class AccountRestoreService {
             if (status != null && basePay != null && tips != null) {
                 String statusProblem = status.validate(basePay, tips, miles);
                 if (statusProblem != null) problems.add(new RestoreProblem(index, "status", statusProblem));
+            }
+            if (shift.actualEnd() != null && shift.actualStart() == null) {
+                problems.add(new RestoreProblem(index, "actualStart", "is required when actualEnd is set"));
+            }
+            if (shift.actualStart() != null && status != ShiftStatus.COMPLETED && status != ShiftStatus.SCHEDULED) {
+                problems.add(new RestoreProblem(index, "actualStart", "is only recorded for completed blocks"));
             }
         }
         return problems;

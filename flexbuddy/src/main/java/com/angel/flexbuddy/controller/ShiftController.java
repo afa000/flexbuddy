@@ -148,6 +148,11 @@ public class ShiftController {
         return ResponseEntity.noContent().header("X-Delete-Batch", batch).build();
     }
 
+    @PostMapping("/{id}/start")
+    public ShiftResponse startShift(Principal principal, @PathVariable Long id) {
+        return shiftService.startShift(principal.getName(), id);
+    }
+
     @PostMapping("/{id}/restore")
     public ShiftResponse restoreShift(Principal principal, @PathVariable Long id) {
         return shiftService.restoreShift(principal.getName(), id);

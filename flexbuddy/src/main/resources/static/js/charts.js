@@ -156,13 +156,20 @@
         container.replaceChildren(svg);
     }
 
+    /** Average minutes a bucket's timed blocks finished before (or after) their scheduled end. */
+    function pace(earlyMinutes) {
+        if (earlyMinutes == null) return '—';
+        if (earlyMinutes === 0) return 'On time';
+        return earlyMinutes > 0 ? `${earlyMinutes} min early` : `${-earlyMinutes} min over`;
+    }
+
     function renderTable(tbody, report, onDrill) {
         tbody.replaceChildren();
         const buckets = report?.buckets ?? [];
         if (!buckets.length) {
             const row = document.createElement('tr');
             const cell = document.createElement('td');
-            cell.colSpan = 10;
+            cell.colSpan = 11;
             cell.className = 'table-empty';
             cell.textContent = 'No shifts match these filters.';
             row.append(cell);
@@ -178,7 +185,7 @@
                 bucket.label, bucket.shifts, hours(bucket.minutesWorked),
                 fullMoney(bucket.totalEarnings), Number(bucket.miles || 0).toFixed(1),
                 fullMoney(bucket.mileageCost), fullMoney(bucket.expenses), fullMoney(bucket.deductions),
-                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate)
+                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate), pace(bucket.averageFinishedEarlyMinutes)
             ];
             values.forEach((value, index) => {
                 const cell = document.createElement(index === 0 ? 'th' : 'td');

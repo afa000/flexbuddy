@@ -19,5 +19,9 @@ public record EarningsBucket(
         BigDecimal expenses,
         BigDecimal deductions,
         BigDecimal netEarnings,
-        BigDecimal netHourlyRate
+        BigDecimal netHourlyRate,
+        int timedShifts,
+        int clockedMinutes,
+        BigDecimal clockedHourlyRate,
+        Integer averageFinishedEarlyMinutes
 ) {}

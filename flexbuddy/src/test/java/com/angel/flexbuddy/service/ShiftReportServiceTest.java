@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.EarningsReportResponse;
+import com.angel.flexbuddy.dto.EarningsBucket;
 import com.angel.flexbuddy.dto.GroupBy;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
@@ -231,5 +232,53 @@ class ShiftReportServiceTest {
     private Shift withStatus(Shift shift, ShiftStatus status) {
         shift.setStatus(status);
         return shift;
+    }
+
+    @Test
+    void statistics_useActualTimesForTheClockedRateAndLeaveUntimedBlocksAsScheduled() {
+        Shift timed = shift("VEA7", LocalDate.of(2026, 9, 6), "84.00", "0.00", 240);
+        timed.setActualStart(LocalTime.of(8, 20));
+        timed.setActualEnd(LocalTime.of(11, 42));
+        Shift untimed = shift("VEA7", LocalDate.of(2026, 9, 7), "84.00", "0.00", 240);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(timed, untimed));
+
+        ShiftStatisticsResponse statistics = reportService.statistics(EMAIL, ALL);
+
+        assertThat(statistics.getTotalTimeWorked()).isEqualTo(480);
+        assertThat(statistics.getAverageHourlyEarnings()).isEqualByComparingTo("21.00");
+        assertThat(statistics.getTimedShifts()).isEqualTo(1);
+        assertThat(statistics.getClockedMinutes()).isEqualTo(442);
+        assertThat(statistics.getClockedHourlyRate()).isEqualByComparingTo("22.81");
+        assertThat(statistics.getAverageFinishedEarlyMinutes()).isEqualTo(38);
+    }
+
+    @Test
+    void statistics_reportNoEarlyFinishWhenNoBlockIsTimed() {
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(
+                shift("VEA7", LocalDate.of(2026, 9, 6), "84.00", "0.00", 240)));
+
+        ShiftStatisticsResponse statistics = reportService.statistics(EMAIL, ALL);
+
+        assertThat(statistics.getTimedShifts()).isZero();
+        assertThat(statistics.getClockedMinutes()).isEqualTo(240);
+        assertThat(statistics.getClockedHourlyRate()).isEqualByComparingTo(statistics.getAverageHourlyEarnings());
+        assertThat(statistics.getAverageFinishedEarlyMinutes()).isNull();
+    }
+
+    @Test
+    void earningsByStation_reportsHowEarlyEachStationFinishes() {
+        Shift early = shift("VEA7", LocalDate.of(2026, 9, 6), "84.00", "0.00", 240);
+        early.setActualStart(LocalTime.of(8, 0));
+        early.setActualEnd(LocalTime.of(11, 20));
+        Shift over = shift("DAX5", LocalDate.of(2026, 9, 7), "84.00", "0.00", 240);
+        over.setActualStart(LocalTime.of(8, 0));
+        over.setActualEnd(LocalTime.of(12, 15));
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(early, over));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).extracting(EarningsBucket::label, EarningsBucket::averageFinishedEarlyMinutes)
+                .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple("VEA7", 40),
+                        org.assertj.core.groups.Tuple.tuple("DAX5", -15));
     }
 }

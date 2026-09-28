@@ -485,4 +485,25 @@ class ShiftControllerTest {
         verify(shiftService).getShifts(eq("angel@example.com"), org.mockito.ArgumentMatchers.argThat(filter ->
                 filter.statuses().equals(Set.of(ShiftStatus.SCHEDULED, ShiftStatus.COMPLETED))));
     }
+
+    @Test
+    void startShift_stampsTheBlockForTheSignedInDriver() throws Exception {
+        ShiftResponse started = new ShiftResponse();
+        started.setId(7L);
+        started.setStatus(ShiftStatus.SCHEDULED);
+        started.setDetails(new com.angel.flexbuddy.dto.BlockDetailsResponse(LocalTime.of(15, 3), null, null, null, null));
+        when(shiftService.startShift("angel@example.com", 7L)).thenReturn(started);
+
+        mockMvc.perform(post("/shifts/7/start").with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.details.actualStart").value("15:03:00"));
+    }
+
+    @Test
+    void startShift_returnsNotFoundForAnotherDriversBlock() throws Exception {
+        when(shiftService.startShift("angel@example.com", 99L)).thenThrow(new ShiftNotFoundException(99L));
+
+        mockMvc.perform(post("/shifts/99/start").with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isNotFound());
+    }
 }

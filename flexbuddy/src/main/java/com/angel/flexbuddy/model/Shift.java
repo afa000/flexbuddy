@@ -63,6 +63,11 @@ public class Shift implements Timestamped {
     @Column(precision = 8, scale = 1)
     private BigDecimal miles;
 
+    /** When the driver actually started and finished, on the shift's date; an end before the start is the next day. */
+    private LocalTime actualStart;
+
+    private LocalTime actualEnd;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ShiftStatus status = ShiftStatus.COMPLETED;
@@ -197,6 +202,26 @@ public class Shift implements Timestamped {
 
     public BigDecimal getCountedMiles() {
         return countsTowardMiles() ? miles : null;
+    }
+
+    /** Minutes between the actual start and finish, or null unless both were recorded. */
+    public Integer getActualMinutes() {
+        if (actualStart == null || actualEnd == null) return null;
+        int minutes = (int) ChronoUnit.MINUTES.between(actualStart, actualEnd);
+        return minutes < 0 ? minutes + (24 * 60) : minutes;
+    }
+
+    /** Time on the clock for a worked block: the actual duration when recorded, otherwise the scheduled one. */
+    public int getClockedMinutes() {
+        if (!countsTowardHours()) return 0;
+        Integer actual = getActualMinutes();
+        return actual == null ? getTimeWorked() : actual;
+    }
+
+    /** How much sooner than scheduled a worked block finished; negative when it ran over. */
+    public Integer getFinishedEarlyMinutes() {
+        Integer actual = getActualMinutes();
+        return actual == null || !countsTowardHours() ? null : getTimeWorked() - actual;
     }
 
     public LocalDateTime getStartDateTime() {

@@ -75,7 +75,23 @@ public class ShiftReportService {
                 net.outOfPocketExpenses(), net.netPerShift(), settings.vehicleCostMethod(), settings.mileageRate(),
                 rollingSevenDayMinutes, schedule.plannedShifts(), schedule.plannedMinutes(), schedule.expectedPay(),
                 schedule.needsConfirmation(), schedule.cancelled(), schedule.forfeited(),
-                schedule.forfeitedThisMonth());
+                schedule.forfeitedThisMonth(), timed(shifts).size(), clockedMinutes(shifts),
+                hourly(net.grossEarnings(), clockedMinutes(shifts)), averageFinishedEarly(shifts));
+    }
+
+    /** Worked blocks with both actual times recorded. */
+    private static List<Shift> timed(List<Shift> shifts) {
+        return shifts.stream().filter(shift -> shift.getFinishedEarlyMinutes() != null).toList();
+    }
+
+    private static int clockedMinutes(List<Shift> shifts) {
+        return shifts.stream().mapToInt(Shift::getClockedMinutes).sum();
+    }
+
+    private static Integer averageFinishedEarly(List<Shift> shifts) {
+        List<Shift> timed = timed(shifts);
+        return timed.isEmpty() ? null
+                : Math.round((float) timed.stream().mapToInt(Shift::getFinishedEarlyMinutes).sum() / timed.size());
     }
 
     private int rollingSevenDayMinutes(String email, LocalDate today) {
@@ -189,7 +205,9 @@ public class ShiftReportService {
             NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
             return new EarningsBucket(key.key(), key.label(), key.start(), key.end(), shifts.size(), money(sum(shifts, true)),
                     money(sum(shifts, false)), net.grossEarnings(), net.minutesWorked(), net.grossHourlyRate(), net.miles(),
-                    net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate());
+                    net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
+                    timed(shifts).size(), clockedMinutes(shifts), hourly(net.grossEarnings(), clockedMinutes(shifts)),
+                    averageFinishedEarly(shifts));
         }
     }
 }

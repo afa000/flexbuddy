@@ -9,7 +9,7 @@ const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const VERSIONED_ASSETS = [
     '/css/styles.css', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/calendar.js',
-    '/js/schedule.js', '/js/evaluate.js', '/js/app.js', '/js/account.js'
+    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/app.js', '/js/account.js'
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [
     '/manifest.webmanifest', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png',
