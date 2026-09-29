@@ -61,10 +61,12 @@ public class AccountRestoreService {
     private final Clock clock;
     private final ExpenseRepository expenseRepository;
     private final TaxPaymentRepository taxPaymentRepository;
+    private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
 
     public AccountRestoreService(ObjectMapper objectMapper, Validator validator, ShiftRepository shiftRepository,
             AppUserRepository userRepository, Clock clock, ExpenseRepository expenseRepository,
-            TaxPaymentRepository taxPaymentRepository) {
+            TaxPaymentRepository taxPaymentRepository,
+            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository) {
         this.objectMapper = objectMapper;
         this.validator = validator;
         this.shiftRepository = shiftRepository;
@@ -72,6 +74,7 @@ public class AccountRestoreService {
         this.clock = clock;
         this.expenseRepository = expenseRepository;
         this.taxPaymentRepository = taxPaymentRepository;
+        this.payoutDepositRepository = payoutDepositRepository;
     }
 
     public RestorePreviewResponse preview(String email, MultipartFile backup, HttpSession session) {
@@ -255,6 +258,7 @@ public class AccountRestoreService {
         }
         session.removeAttribute(SESSION_KEY);
         restoreTaxPayments(file, owner);
+        restorePayouts(file, owner);
         return new RestoreResult(insert.size(), skipped, expenseInsert.size(), expensesSkipped, batch);
     }
 
@@ -491,6 +495,38 @@ public class AccountRestoreService {
             insert.add(payment);
         }
         taxPaymentRepository.saveAll(insert);
+    }
+
+    /**
+     * Adds the backup's recorded payouts for dates that have none yet, in either mode, like tax payments. A payout
+     * already recorded on this account is kept as it is; impossible amounts are skipped.
+     */
+    private void restorePayouts(AccountBackupFile file, AppUser owner) {
+        Set<java.time.LocalDate> recorded = new HashSet<>();
+        payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc(owner.getEmail())
+                .forEach(deposit -> recorded.add(deposit.getPayoutDate()));
+        List<com.angel.flexbuddy.model.PayoutDeposit> insert = new ArrayList<>();
+        for (com.angel.flexbuddy.dto.BackupPayout source : file.payouts()) {
+            BigDecimal amount;
+            try {
+                amount = source == null || source.amount() == null ? null : new BigDecimal(source.amount());
+            } catch (NumberFormatException exception) {
+                amount = null;
+            }
+            boolean valid = amount != null && amount.signum() >= 0 && amount.compareTo(new BigDecimal("99999.99")) <= 0
+                    && source.payoutDate() != null;
+            if (!valid || !recorded.add(source.payoutDate())) continue;
+            com.angel.flexbuddy.model.PayoutDeposit deposit = new com.angel.flexbuddy.model.PayoutDeposit();
+            deposit.setOwner(owner);
+            deposit.setPayoutDate(source.payoutDate());
+            deposit.setAmount(amount.setScale(2, java.math.RoundingMode.HALF_UP));
+            deposit.setNote(source.note() == null || source.note().isBlank() ? null
+                    : source.note().trim().substring(0, Math.min(255, source.note().trim().length())));
+            deposit.setCreatedAt(Instant.now(clock));
+            deposit.setUpdatedAt(Instant.now(clock));
+            insert.add(deposit);
+        }
+        payoutDepositRepository.saveAll(insert);
     }
 
     private static String taxKey(int year, java.time.LocalDate paidOn, BigDecimal amount) {

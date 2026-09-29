@@ -573,7 +573,8 @@ class ShiftControllerTest {
     void payPeriods_returnsTheNextPayoutAndRecentPeriods() throws Exception {
         com.angel.flexbuddy.dto.PayPeriodResponse current = new com.angel.flexbuddy.dto.PayPeriodResponse(
                 LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 14), 2,
-                new BigDecimal("108.00"), 1, new BigDecimal("84.00"));
+                new BigDecimal("108.00"), 1, new BigDecimal("84.00"), null, null, null,
+                com.angel.flexbuddy.dto.PayoutStatus.UPCOMING);
         when(reportService.payPeriods("angel@example.com", 2))
                 .thenReturn(new com.angel.flexbuddy.dto.PayPeriodsResponse(current, List.of(current)));
 

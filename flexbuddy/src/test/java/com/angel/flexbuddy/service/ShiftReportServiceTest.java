@@ -46,6 +46,7 @@ class ShiftReportServiceTest {
     @Spy NetEarningsCalculator calculator = new NetEarningsCalculator();
     @Spy GoalProgressCalculator goalCalculator = new GoalProgressCalculator();
     @Spy PayPeriodCalculator payPeriodCalculator = new PayPeriodCalculator();
+    @Mock com.angel.flexbuddy.repository.PayoutDepositRepository deposits;
     @InjectMocks ShiftReportService reportService;
 
     @BeforeEach
@@ -215,7 +216,7 @@ class ShiftReportServiceTest {
         when(users.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(driver));
         ShiftReportService service = new ShiftReportService(shiftService, expenseService, settingsService, calculator,
                 new UserTimeService(users, Clock.fixed(Instant.parse("2026-09-12T03:00:00Z"), ZoneOffset.UTC)), new GoalProgressCalculator(),
-                new PayPeriodCalculator());
+                new PayPeriodCalculator(), deposits);
         Shift missed = withStatus(shift("VEA7", LocalDate.of(2026, 9, 11), "70.00", "0.00", 240), ShiftStatus.SCHEDULED);
         Shift tonight = withStatus(new Shift(2L, "VEA7", LocalDate.of(2026, 9, 11), LocalTime.of(21, 0),
                 LocalTime.of(0, 0), new BigDecimal("60.00"), BigDecimal.ZERO), ShiftStatus.SCHEDULED);
@@ -431,6 +432,69 @@ class ShiftReportServiceTest {
         assertThat(last.payoutDate()).isEqualTo(LocalDate.of(2026, 9, 11));
         assertThat(last.earned()).isEqualByComparingTo("70.00");
         assertThat(periods.nextPayout()).isEqualTo(current);
+    }
+
+    @Test
+    void payPeriods_compareWhatLandedWithWhatTheBlocksEarned() {
+        // NOW is Saturday, September 12. Payouts: Tue 15th (upcoming), Fri 11th, Tue 8th, Fri 4th.
+        List<Shift> all = List.of(
+                shift("VEA7", LocalDate.of(2026, 9, 9), "70.00", "0.00", 240),     // paid Fri 11th
+                shift("VEA7", LocalDate.of(2026, 9, 5), "50.00", "10.00", 180),    // paid Tue 8th
+                shift("VEA7", LocalDate.of(2026, 9, 1), "72.00", "0.00", 240),     // paid Fri 4th
+                shift("VEA7", LocalDate.of(2026, 9, 12), "84.00", "0.00", 240));   // paid Tue 15th
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    return all.stream()
+                            .filter(shift -> !shift.getDate().isBefore(filter.from()) && !shift.getDate().isAfter(filter.to()))
+                            .toList();
+                });
+        when(userTime.today(EMAIL)).thenReturn(NOW.toLocalDate());
+        when(deposits.findByOwnerEmailIgnoreCaseAndPayoutDateBetween(EMAIL, LocalDate.of(2026, 9, 4), LocalDate.of(2026, 9, 15)))
+                .thenReturn(List.of(deposit(LocalDate.of(2026, 9, 11), "65.00", "Chase"),
+                        deposit(LocalDate.of(2026, 9, 8), "72.50", null)));
+
+        List<com.angel.flexbuddy.dto.PayPeriodResponse> periods = reportService.payPeriods(EMAIL, 4).periods();
+
+        assertThat(periods).extracting(com.angel.flexbuddy.dto.PayPeriodResponse::payoutDate).containsExactly(
+                LocalDate.of(2026, 9, 15), LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 8), LocalDate.of(2026, 9, 4));
+        assertThat(periods).extracting(com.angel.flexbuddy.dto.PayPeriodResponse::status).containsExactly(
+                com.angel.flexbuddy.dto.PayoutStatus.UPCOMING, com.angel.flexbuddy.dto.PayoutStatus.SHORT,
+                com.angel.flexbuddy.dto.PayoutStatus.OVER, com.angel.flexbuddy.dto.PayoutStatus.UNCHECKED);
+        com.angel.flexbuddy.dto.PayPeriodResponse friday = periods.get(1);
+        assertThat(friday.received()).isEqualByComparingTo("65.00");
+        assertThat(friday.difference()).isEqualByComparingTo("-5.00");
+        assertThat(friday.note()).isEqualTo("Chase");
+        assertThat(periods.get(2).difference()).isEqualByComparingTo("12.50");
+        assertThat(periods.get(3).received()).isNull();
+        assertThat(periods.get(3).difference()).isNull();
+    }
+
+    @Test
+    void payPeriods_anAmountWithinACentOfTheEarnedPayMatches() {
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    Shift wednesday = shift("VEA7", LocalDate.of(2026, 9, 9), "70.00", "0.00", 240);
+                    return filter.from().equals(LocalDate.of(2026, 9, 8)) ? List.of(wednesday) : List.<Shift>of();
+                });
+        when(userTime.today(EMAIL)).thenReturn(NOW.toLocalDate());
+        when(deposits.findByOwnerEmailIgnoreCaseAndPayoutDateBetween(org.mockito.ArgumentMatchers.eq(EMAIL),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(deposit(LocalDate.of(2026, 9, 11), "70.00", null)));
+
+        com.angel.flexbuddy.dto.PayPeriodResponse friday = reportService.payPeriods(EMAIL, 2).periods().get(1);
+
+        assertThat(friday.status()).isEqualTo(com.angel.flexbuddy.dto.PayoutStatus.MATCHED);
+        assertThat(friday.difference()).isEqualByComparingTo("0.00");
+    }
+
+    private static com.angel.flexbuddy.model.PayoutDeposit deposit(LocalDate payoutDate, String amount, String note) {
+        com.angel.flexbuddy.model.PayoutDeposit deposit = new com.angel.flexbuddy.model.PayoutDeposit();
+        deposit.setPayoutDate(payoutDate);
+        deposit.setAmount(new BigDecimal(amount));
+        deposit.setNote(note);
+        return deposit;
     }
 
     @Test

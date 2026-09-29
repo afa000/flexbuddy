@@ -14,18 +14,27 @@ public record AccountBackupFile(
         List<BackupExpense> expenses,
         BackupSettings settings,
         BackupCounts counts,
-        List<BackupTaxPayment> taxPayments
+        List<BackupTaxPayment> taxPayments,
+        List<BackupPayout> payouts
 ) implements Serializable {
     public AccountBackupFile {
         shifts = shifts == null ? List.of() : List.copyOf(shifts);
         expenses = expenses == null ? List.of() : List.copyOf(expenses);
         taxPayments = taxPayments == null ? List.of() : List.copyOf(taxPayments);
+        payouts = payouts == null ? List.of() : List.copyOf(payouts);
+    }
+
+    /** Backups made before payouts were recorded. */
+    public AccountBackupFile(String format, int version, Instant exportedAt, String appVersion, BackupAccount account,
+            List<BackupShift> shifts, List<BackupExpense> expenses, BackupSettings settings, BackupCounts counts,
+            List<BackupTaxPayment> taxPayments) {
+        this(format, version, exportedAt, appVersion, account, shifts, expenses, settings, counts, taxPayments, List.of());
     }
 
     /** Backups made before tax payments were recorded. */
     public AccountBackupFile(String format, int version, Instant exportedAt, String appVersion, BackupAccount account,
             List<BackupShift> shifts, List<BackupExpense> expenses, BackupSettings settings, BackupCounts counts) {
-        this(format, version, exportedAt, appVersion, account, shifts, expenses, settings, counts, List.of());
+        this(format, version, exportedAt, appVersion, account, shifts, expenses, settings, counts, List.of(), List.of());
     }
 
     public AccountBackupFile(String format, int version, Instant exportedAt, String appVersion,

@@ -64,6 +64,7 @@ class AccountRestoreServiceTest {
     @Mock AppUserRepository userRepository;
     @Mock ExpenseRepository expenseRepository;
     @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
+    @Mock com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
 
     private AccountRestoreService service;
     private AppUser owner;
@@ -72,7 +73,7 @@ class AccountRestoreServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new AccountRestoreService(objectMapper, validator, shiftRepository, userRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository, taxPaymentRepository);
+                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository, taxPaymentRepository, payoutDepositRepository);
         owner = new AppUser("Angel", EMAIL, "hash");
         owner.setId(1L);
         BackupShift existing = backupShift("VEA7", null);
@@ -108,6 +109,37 @@ class AccountRestoreServiceTest {
         verify(shiftRepository).saveAll(shifts.capture());
         assertThat(shifts.getValue()).extracting(Shift::getStation).containsExactly("BDL4");
         assertThat(shifts.getValue().getFirst().getOwner()).isSameAs(owner);
+    }
+
+    @Test
+    void restoreAddsRecordedPayoutsForDatesWithNoneAndSkipsImpossibleOnes() throws Exception {
+        AccountBackupFile withPayouts = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), null, new BackupCounts(2, 1), List.of(),
+                List.of(new com.angel.flexbuddy.dto.BackupPayout(java.time.LocalDate.of(2026, 9, 11), "84.5", " Chase "),
+                        new com.angel.flexbuddy.dto.BackupPayout(java.time.LocalDate.of(2026, 9, 8), "70.00", null),
+                        new com.angel.flexbuddy.dto.BackupPayout(java.time.LocalDate.of(2026, 9, 4), "-3.00", null),
+                        new com.angel.flexbuddy.dto.BackupPayout(null, "10.00", null)));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(withPayouts);
+        com.angel.flexbuddy.model.PayoutDeposit recorded = new com.angel.flexbuddy.model.PayoutDeposit();
+        recorded.setPayoutDate(java.time.LocalDate.of(2026, 9, 8));
+        recorded.setAmount(new BigDecimal("68.00"));
+        when(payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc(EMAIL)).thenReturn(List.of(recorded));
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        @SuppressWarnings({"unchecked", "rawtypes"})
+        ArgumentCaptor<List<com.angel.flexbuddy.model.PayoutDeposit>> saved = (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
+        verify(payoutDepositRepository).saveAll(saved.capture());
+        assertThat(saved.getValue()).singleElement().satisfies(deposit -> {
+            assertThat(deposit.getPayoutDate()).isEqualTo(java.time.LocalDate.of(2026, 9, 11));
+            assertThat(deposit.getAmount()).isEqualByComparingTo("84.50");
+            assertThat(deposit.getNote()).isEqualTo("Chase");
+            assertThat(deposit.getOwner()).isSameAs(owner);
+            assertThat(deposit.getCreatedAt()).isEqualTo(NOW);
+        });
     }
 
     @Test

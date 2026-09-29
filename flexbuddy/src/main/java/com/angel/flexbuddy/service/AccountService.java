@@ -28,11 +28,13 @@ public class AccountService {
     private final PushSubscriptionRepository pushSubscriptionRepository;
     private final PersistentTokenRepository persistentTokenRepository;
     private final TaxPaymentRepository taxPaymentRepository;
+    private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
             ShiftRepository shiftRepository, PushSubscriptionRepository pushSubscriptionRepository,
-            PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository) {
+            PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository,
+            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -41,6 +43,7 @@ public class AccountService {
         this.pushSubscriptionRepository = pushSubscriptionRepository;
         this.persistentTokenRepository = persistentTokenRepository;
         this.taxPaymentRepository = taxPaymentRepository;
+        this.payoutDepositRepository = payoutDepositRepository;
     }
 
     public boolean emailIsRegistered(String email) {
@@ -69,6 +72,7 @@ public class AccountService {
         Long ownerId = user.getId();
         expenseRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         taxPaymentRepository.deleteAllByOwnerId(ownerId);
+        payoutDepositRepository.deleteAllByOwnerId(ownerId);
         reminderLogRepository.deleteAllByOwnerId(ownerId);
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);

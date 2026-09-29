@@ -57,6 +57,9 @@ class AccountServiceTest {
     @Mock
     private com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
 
+    @Mock
+    private com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
+
     @InjectMocks
     private AccountService accountService;
 
@@ -92,7 +95,7 @@ class AccountServiceTest {
 
         verify(userRepository, never()).deleteAccountById(any());
         verifyNoInteractions(expenseRepository, reminderLogRepository, shiftRepository,
-                pushSubscriptionRepository, persistentTokenRepository, taxPaymentRepository);
+                pushSubscriptionRepository, persistentTokenRepository, taxPaymentRepository, payoutDepositRepository);
     }
 
     @Test
@@ -103,10 +106,11 @@ class AccountServiceTest {
 
         accountService.deleteAccount("angel@example.com", "correct-password");
 
-        InOrder deletionOrder = inOrder(expenseRepository, taxPaymentRepository, reminderLogRepository, shiftRepository,
-                pushSubscriptionRepository, persistentTokenRepository, userRepository);
+        InOrder deletionOrder = inOrder(expenseRepository, taxPaymentRepository, payoutDepositRepository,
+                reminderLogRepository, shiftRepository, pushSubscriptionRepository, persistentTokenRepository, userRepository);
         deletionOrder.verify(expenseRepository).deleteAllByOwnerIdIncludingTrash(42L);
         deletionOrder.verify(taxPaymentRepository).deleteAllByOwnerId(42L);
+        deletionOrder.verify(payoutDepositRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(reminderLogRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(shiftRepository).deleteAllByOwnerIdIncludingTrash(42L);
         deletionOrder.verify(pushSubscriptionRepository).deleteAllByOwnerId(42L);

@@ -35,6 +35,7 @@ class AccountBackupServiceTest {
     @Mock ShiftRepository shiftRepository;
     @Mock ExpenseRepository expenseRepository;
     @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
+    @Mock com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
 
     @Test
     void createsVersionedBackupWithActiveAndDeletedCountsAndRecordsBackupTime() {
@@ -62,8 +63,14 @@ class AccountBackupServiceTest {
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(user));
         when(shiftRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(active, deleted));
         when(expenseRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(expense));
+        com.angel.flexbuddy.model.PayoutDeposit deposit = new com.angel.flexbuddy.model.PayoutDeposit();
+        deposit.setPayoutDate(LocalDate.of(2026, 9, 8));
+        deposit.setAmount(new BigDecimal("118"));
+        deposit.setNote("Chase");
+        when(payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc("angel@example.com"))
+                .thenReturn(List.of(deposit));
         AccountBackupService service = new AccountBackupService(userRepository, shiftRepository, expenseRepository,
-                taxPaymentRepository, clock, "1.2.3");
+                taxPaymentRepository, payoutDepositRepository, clock, "1.2.3");
 
         AccountBackupFile backup = service.create("angel@example.com");
 
@@ -82,6 +89,8 @@ class AccountBackupServiceTest {
         });
         assertThat(backup.settings().vehicleCostMethod()).isEqualTo("ACTUAL_EXPENSES");
         assertThat(backup.settings().mileageRate()).isEqualTo("0.655");
+        assertThat(backup.payouts()).containsExactly(
+                new com.angel.flexbuddy.dto.BackupPayout(LocalDate.of(2026, 9, 8), "118.00", "Chase"));
         assertThat(user.getLastBackupAt()).isEqualTo(now);
         verify(userRepository).save(user);
     }

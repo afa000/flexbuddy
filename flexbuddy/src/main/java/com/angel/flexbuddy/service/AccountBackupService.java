@@ -23,6 +23,7 @@ import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
+import com.angel.flexbuddy.repository.PayoutDepositRepository;
 import com.angel.flexbuddy.repository.TaxPaymentRepository;
 
 @Service
@@ -32,16 +33,19 @@ public class AccountBackupService {
     private final ShiftRepository shiftRepository;
     private final ExpenseRepository expenseRepository;
     private final TaxPaymentRepository taxPaymentRepository;
+    private final PayoutDepositRepository payoutDepositRepository;
     private final Clock clock;
     private final String appVersion;
 
     public AccountBackupService(AppUserRepository userRepository, ShiftRepository shiftRepository,
-            ExpenseRepository expenseRepository, TaxPaymentRepository taxPaymentRepository, Clock clock,
+            ExpenseRepository expenseRepository, TaxPaymentRepository taxPaymentRepository,
+            PayoutDepositRepository payoutDepositRepository, Clock clock,
             @Value("${spring.application.version:0.0.1-SNAPSHOT}") String appVersion) {
         this.userRepository = userRepository;
         this.shiftRepository = shiftRepository;
         this.expenseRepository = expenseRepository;
         this.taxPaymentRepository = taxPaymentRepository;
+        this.payoutDepositRepository = payoutDepositRepository;
         this.clock = clock;
         this.appVersion = appVersion;
     }
@@ -76,6 +80,10 @@ public class AccountBackupService {
                 taxPaymentRepository.findByOwnerEmailIgnoreCaseOrderByPaidOnAscIdAsc(email).stream()
                         .map(payment -> new BackupTaxPayment(payment.getTaxYear(), payment.getQuarter(), payment.getPaidOn(),
                                 money(payment.getAmount()), payment.getNote()))
+                        .toList(),
+                payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc(email).stream()
+                        .map(deposit -> new com.angel.flexbuddy.dto.BackupPayout(deposit.getPayoutDate(),
+                                money(deposit.getAmount()), deposit.getNote()))
                         .toList()
         );
     }

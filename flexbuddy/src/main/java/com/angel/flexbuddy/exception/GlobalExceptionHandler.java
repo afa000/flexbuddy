@@ -49,6 +49,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidPayoutException.class)
+    public ResponseEntity<String> handleInvalidPayout(InvalidPayoutException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidPushSubscriptionException.class)
     public ResponseEntity<String> handleInvalidPushSubscription(InvalidPushSubscriptionException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());

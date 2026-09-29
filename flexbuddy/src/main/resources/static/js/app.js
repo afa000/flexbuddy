@@ -146,6 +146,7 @@ const elements = {
     taxWeekAmount: document.querySelector('#taxWeekAmount'),
     taxWeekDetail: document.querySelector('#taxWeekDetail'),
     nextPayoutDetail: document.querySelector('#nextPayoutDetail'),
+    payoutCheckButton: document.querySelector('#payoutCheckButton'),
     goalRingFill: document.querySelector('#goalRingFill'),
     goalProgress: document.querySelector('#goalProgress'),
     goalSentence: document.querySelector('#goalSentence'),
@@ -264,6 +265,7 @@ elements.filterStation.addEventListener('change', () => updateFilter('station', 
 elements.filterSort.addEventListener('change', () => updateFilter('sort', elements.filterSort.value));
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
 elements.heatmapMetric.addEventListener('change', loadHeatmap);
+elements.payoutCheckButton.addEventListener('click', event => window.flexbuddyPayouts.open(event.currentTarget));
 // The grid needs width, so it starts open on wider screens and folded on a phone.
 elements.heatmapCard.open = window.matchMedia('(min-width: 621px)').matches;
 elements.groupButtons.forEach(button => button.addEventListener('click', () => {
@@ -722,10 +724,14 @@ async function loadTaxTile() {
 const PAY_PERIOD_PRESETS = {payperiod: 0, lastpayperiod: 1};
 let payPeriods;
 
-/** Loads this and last pay period and the next payout; the server owns the payout calendar. */
+/**
+ * Loads the pay period covering today, the two before it, and the next payout; the server owns the payout calendar.
+ * Three periods reach back to the latest payout that has already arrived on any usual schedule, for the tile's
+ * check reminder.
+ */
 async function loadPayPeriods() {
     try {
-        const response = await apiFetch('/shifts/pay-periods?count=2');
+        const response = await apiFetch('/shifts/pay-periods?count=3');
         if (!response.ok) throw new Error();
         payPeriods = await response.json();
     } catch {
@@ -734,6 +740,7 @@ async function loadPayPeriods() {
         return payPeriods;
     }
     renderNextPayout(payPeriods.nextPayout);
+    renderPayoutCheck(payPeriods.periods.find(period => period.status !== 'UPCOMING'));
     // A pay-period view restored from the address bar follows the calendar into the next period.
     const index = PAY_PERIOD_PRESETS[filterState.preset];
     const period = index === undefined ? null : payPeriods.periods[index];
@@ -746,6 +753,20 @@ function renderNextPayout(payout) {
     elements.nextPayoutAmount.textContent = formatMoney(payout.earned);
     elements.nextPayoutDetail.textContent = `${payoutDay(payout.payoutDate)} · ${payout.blocks} ${payout.blocks === 1 ? 'block' : 'blocks'}${scheduled}`;
     elements.nextPayoutDetail.title = `Blocks from ${formatDate(payout.from)} to ${formatDate(payout.to)}. An estimate: tips can arrive in a later payout.`;
+}
+
+/** The tile's link into the payouts sheet, nudging when the latest payout that arrived is unchecked or came up short. */
+function renderPayoutCheck(latest) {
+    const button = elements.payoutCheckButton;
+    const day = latest ? parseLocalDate(latest.payoutDate).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'}) : '';
+    button.classList.toggle('is-warning', latest?.status === 'SHORT');
+    if (latest?.status === 'UNCHECKED' && latest.blocks > 0) {
+        button.textContent = `Check the ${day} payout`;
+    } else if (latest?.status === 'SHORT') {
+        button.textContent = `${day} payout was ${formatMoney(Math.abs(Number(latest.difference)))} short`;
+    } else {
+        button.textContent = 'Payout history';
+    }
 }
 
 function payoutDay(date) {

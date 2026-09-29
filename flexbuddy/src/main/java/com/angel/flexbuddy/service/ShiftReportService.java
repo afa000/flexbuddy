@@ -44,10 +44,12 @@ public class ShiftReportService {
     private final UserTimeService userTime;
     private final GoalProgressCalculator goalCalculator;
     private final PayPeriodCalculator payPeriods;
+    private final com.angel.flexbuddy.repository.PayoutDepositRepository deposits;
 
     public ShiftReportService(ShiftService shiftService, ExpenseService expenseService,
             AccountSettingsService settingsService, NetEarningsCalculator calculator, UserTimeService userTime,
-            GoalProgressCalculator goalCalculator, PayPeriodCalculator payPeriods) {
+            GoalProgressCalculator goalCalculator, PayPeriodCalculator payPeriods,
+            com.angel.flexbuddy.repository.PayoutDepositRepository deposits) {
         this.shiftService = shiftService;
         this.expenseService = expenseService;
         this.settingsService = settingsService;
@@ -55,6 +57,7 @@ public class ShiftReportService {
         this.userTime = userTime;
         this.goalCalculator = goalCalculator;
         this.payPeriods = payPeriods;
+        this.deposits = deposits;
     }
 
     /** Start-time bands for the heatmap: before 8, 8 to 11, 11 to 2, 2 to 5, and 5 onward, by the block's start hour. */
@@ -136,21 +139,41 @@ public class ShiftReportService {
         Set<DayOfWeek> days = Set.copyOf(settings.payoutDays());
         int lag = settings.payoutLagDays();
         LocalDate today = userTime.today(email);
-        List<com.angel.flexbuddy.dto.PayPeriodResponse> periods = new ArrayList<>();
+        List<PayPeriodCalculator.Period> spans = new ArrayList<>();
         PayPeriodCalculator.Period period = payPeriods.periodFor(today, days, lag);
         for (int index = 0; index < count; index++) {
-            periods.add(payPeriod(email, period));
+            spans.add(period);
             period = payPeriods.previous(period, days, lag);
         }
-        return new com.angel.flexbuddy.dto.PayPeriodsResponse(payPeriod(email, payPeriods.nextPayout(today, days, lag)), periods);
+        PayPeriodCalculator.Period next = payPeriods.nextPayout(today, days, lag);
+        Map<LocalDate, com.angel.flexbuddy.model.PayoutDeposit> received = new java.util.HashMap<>();
+        deposits.findByOwnerEmailIgnoreCaseAndPayoutDateBetween(email, spans.getLast().payoutDate(), spans.getFirst().payoutDate())
+                .forEach(deposit -> received.put(deposit.getPayoutDate(), deposit));
+        List<com.angel.flexbuddy.dto.PayPeriodResponse> periods = spans.stream()
+                .map(span -> payPeriod(email, span, received.get(span.payoutDate()), today)).toList();
+        return new com.angel.flexbuddy.dto.PayPeriodsResponse(payPeriod(email, next, received.get(next.payoutDate()), today), periods);
     }
 
-    private com.angel.flexbuddy.dto.PayPeriodResponse payPeriod(String email, PayPeriodCalculator.Period period) {
-        List<Shift> earned = shiftService.findFiltered(email, ShiftFilter.report(period.from(), period.to(), null, null));
+    private com.angel.flexbuddy.dto.PayPeriodResponse payPeriod(String email, PayPeriodCalculator.Period period,
+            com.angel.flexbuddy.model.PayoutDeposit deposit, LocalDate today) {
+        List<Shift> worked = shiftService.findFiltered(email, ShiftFilter.report(period.from(), period.to(), null, null));
         List<Shift> scheduled = shiftService.findScheduled(email, period.from(), period.to());
+        BigDecimal earned = money(worked.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add));
+        BigDecimal difference = deposit == null ? null : money(deposit.getAmount().subtract(earned));
         return new com.angel.flexbuddy.dto.PayPeriodResponse(period.payoutDate(), period.from(), period.to(),
-                earned.size(), money(earned.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add)),
-                scheduled.size(), money(scheduled.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)));
+                worked.size(), earned,
+                scheduled.size(), money(scheduled.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)),
+                deposit == null ? null : money(deposit.getAmount()), difference, deposit == null ? null : deposit.getNote(),
+                payoutStatus(period.payoutDate(), today, difference));
+    }
+
+    private static com.angel.flexbuddy.dto.PayoutStatus payoutStatus(LocalDate payoutDate, LocalDate today, BigDecimal difference) {
+        if (difference != null) {
+            // Amounts are in cents, so anything under a cent either way is a match.
+            if (difference.abs().compareTo(new BigDecimal("0.01")) < 0) return com.angel.flexbuddy.dto.PayoutStatus.MATCHED;
+            return difference.signum() < 0 ? com.angel.flexbuddy.dto.PayoutStatus.SHORT : com.angel.flexbuddy.dto.PayoutStatus.OVER;
+        }
+        return payoutDate.isAfter(today) ? com.angel.flexbuddy.dto.PayoutStatus.UPCOMING : com.angel.flexbuddy.dto.PayoutStatus.UNCHECKED;
     }
 
     static final int GOAL_HISTORY_DAYS = 90;

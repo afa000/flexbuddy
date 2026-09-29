@@ -132,6 +132,7 @@
                 <span>Next payout</span>
                 <strong id="nextPayoutAmount">—</strong>
                 <small id="nextPayoutDetail">Estimate from your logged blocks</small>
+                <button class="text-link payout-check" id="payoutCheckButton" type="button">Payout history</button>
             </article>
             <article class="stat-card" id="taxCard">
                 <span>Set aside this week · estimate</span>
@@ -652,6 +653,25 @@
         </section>
     </div>
 
+    <div class="modal-backdrop is-hidden" id="payoutsModal">
+        <section class="edit-dialog payouts-dialog" role="dialog" aria-modal="true" aria-labelledby="payoutsTitle">
+            <div class="edit-dialog-heading">
+                <div>
+                    <p class="step-label">PAYOUTS</p>
+                    <h2 id="payoutsTitle">Check your payouts</h2>
+                    <p>Enter what landed for each payout, from your bank or the Flex app, and FlexBuddy compares it
+                        with what your logged blocks earned. Tips can arrive in a later payout, so a small gap is not
+                        always missing pay.</p>
+                </div>
+                <button class="icon-button dialog-close-button" id="closePayoutsButton" type="button" aria-label="Close">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
+                </button>
+            </div>
+            <div class="notice error-notice is-hidden" id="payoutsError" role="alert"></div>
+            <ol class="payout-list" id="payoutsList" aria-live="polite"></ol>
+        </section>
+    </div>
+
     <div class="modal-backdrop is-hidden" id="finishModal">
         <section class="edit-dialog finish-dialog" role="dialog" aria-modal="true" aria-labelledby="finishTitle">
             <div class="edit-dialog-heading">
@@ -748,6 +768,7 @@
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>

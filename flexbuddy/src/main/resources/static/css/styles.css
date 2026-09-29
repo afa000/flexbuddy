@@ -2256,6 +2256,34 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .tax-payment-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .tax-payment-form .notice, .tax-payment-form .form-actions { grid-column: 1 / -1; }
 
+/* Payout reconciliation */
+.payout-check { min-height: 44px; margin-top: 4px; padding: 0; align-self: flex-start; background: none; border: 0; font: inherit; font-size: 13px; font-weight: 750; text-align: left; cursor: pointer; }
+.payout-check.is-warning { color: var(--warning); }
+.payouts-dialog { width: min(620px, 100%); }
+.payout-list { margin: 0; padding: 0; display: grid; gap: 12px; list-style: none; }
+.payout-row { min-width: 0; padding: 16px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-left: 4px solid var(--line); border-radius: 8px; }
+.payout-row.is-matched { border-left-color: var(--cyan); }
+.payout-row.is-short { border-left-color: var(--warning); }
+.payout-row.is-unchecked { border-left-color: var(--warning-border); }
+.payout-row.is-empty { border-left-color: var(--line); }
+.payout-record { margin-top: 4px; padding: 0; justify-content: flex-start; }
+.payout-row-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; }
+.payout-row-head strong { font-size: 15px; }
+.payout-status { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; }
+.payout-row.is-matched .payout-status { color: var(--cyan); }
+.payout-row.is-short .payout-status { color: var(--warning); }
+.payout-row-meta { margin: 6px 0 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+.payout-received { margin-top: 12px; }
+.payout-received p { margin: 0 0 8px; overflow-wrap: anywhere; }
+.payout-received .payout-gap { color: var(--muted); font-size: 13px; line-height: 1.5; }
+.payout-row.is-short .payout-gap { color: var(--warning); }
+.payout-form { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.payout-form .error-notice, .payout-form .confirm-actions { grid-column: 1 / -1; }
+.payout-form .field small { color: var(--faint); font-weight: 600; text-transform: none; letter-spacing: 0; }
+@media (max-width: 480px) {
+    .payout-form { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Best times heatmap */
 .heatmap-card { margin-top: 16px; }
 .heatmap-card > summary { min-height: 44px; display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 14px; cursor: pointer; }
