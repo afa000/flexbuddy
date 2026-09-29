@@ -252,6 +252,7 @@ public class AccountRestoreService {
                         }
                         if (file.settings().payoutLagDays() != null) owner.setPayoutLagDays(file.settings().payoutLagDays());
                         owner.setTaxSetAsidePercent(decimalOrNull(file.settings().taxSetAsidePercent()));
+                        if (file.settings().remindTax() != null) owner.setRemindTax(file.settings().remindTax());
                     }
                 }
                 userRepository.save(owner);

@@ -13,6 +13,9 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     Optional<AppUser> findByEmailIgnoreCase(String email);
 
+    /** Accounts that asked for estimated-tax due-date reminders. */
+    java.util.List<AppUser> findByRemindTaxTrue();
+
     boolean existsByEmailIgnoreCase(String email);
 
     Optional<AppUser> findByCalendarToken(String calendarToken);

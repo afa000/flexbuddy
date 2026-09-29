@@ -96,7 +96,7 @@ public class TaxService {
             BigDecimal net = net(email, from, to, settings).netEarnings();
             int quarter = index + 1;
             BigDecimal paid = sum(recorded.stream().filter(payment -> Integer.valueOf(quarter).equals(payment.getQuarter())).toList());
-            quarters.add(new TaxQuarterResponse(quarter, from, to, dueDate(year, index), net, setAside(net, percent), paid));
+            quarters.add(new TaxQuarterResponse(quarter, from, to, dueDateAt(year, index), net, setAside(net, percent), paid));
         }
 
         BigDecimal netYear = net(email, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31), settings).netEarnings();
@@ -218,7 +218,12 @@ public class TaxService {
                 .toList();
     }
 
-    private LocalDate dueDate(int year, int index) {
+    /** The configured due date of a tax year's quarter (1 to 4); the fourth quarter's falls in the following January. */
+    public LocalDate dueDate(int taxYear, int quarter) {
+        return dueDateAt(taxYear, quarter - 1);
+    }
+
+    private LocalDate dueDateAt(int year, int index) {
         MonthDay due = dueDates.get(index);
         // A due date earlier in the calendar than its period's start falls in the following year, as January's does.
         return due.getMonthValue() < QUARTER_START_MONTHS[index] ? due.atYear(year + 1) : due.atYear(year);

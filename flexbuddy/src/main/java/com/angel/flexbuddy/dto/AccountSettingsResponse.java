@@ -13,12 +13,23 @@ public record AccountSettingsResponse(VehicleCostMethod vehicleCostMethod, BigDe
         BigDecimal defaultMileageRate, int mileageRateYear, String timeZone, Integer remindBeforeMinutes,
         boolean remindConfirm, boolean remindMiles, int forfeitCutoffMinutes, BigDecimal weeklyGoal,
         BigDecimal monthlyGoal, GoalBasis goalBasis, List<DayOfWeek> payoutDays, int payoutLagDays,
-        BigDecimal taxSetAsidePercent, String calendarFeedPath) {
+        BigDecimal taxSetAsidePercent, String calendarFeedPath, boolean remindTax) {
+
+    /** The settings before tax due-date reminders existed. */
+    public AccountSettingsResponse(VehicleCostMethod vehicleCostMethod, BigDecimal mileageRate,
+            BigDecimal defaultMileageRate, int mileageRateYear, String timeZone, Integer remindBeforeMinutes,
+            boolean remindConfirm, boolean remindMiles, int forfeitCutoffMinutes, BigDecimal weeklyGoal,
+            BigDecimal monthlyGoal, GoalBasis goalBasis, List<DayOfWeek> payoutDays, int payoutLagDays,
+            BigDecimal taxSetAsidePercent, String calendarFeedPath) {
+        this(vehicleCostMethod, mileageRate, defaultMileageRate, mileageRateYear, timeZone, remindBeforeMinutes,
+                remindConfirm, remindMiles, forfeitCutoffMinutes, weeklyGoal, monthlyGoal, goalBasis, payoutDays,
+                payoutLagDays, taxSetAsidePercent, calendarFeedPath, false);
+    }
 
     public AccountSettingsResponse(VehicleCostMethod vehicleCostMethod, BigDecimal mileageRate,
             BigDecimal defaultMileageRate, int mileageRateYear) {
         this(vehicleCostMethod, mileageRate, defaultMileageRate, mileageRateYear, AppUser.DEFAULT_TIME_ZONE,
                 null, false, false, AppUser.DEFAULT_FORFEIT_CUTOFF_MINUTES, null, null, GoalBasis.GROSS,
-                List.of(DayOfWeek.TUESDAY, DayOfWeek.FRIDAY), AppUser.DEFAULT_PAYOUT_LAG_DAYS, null, null);
+                List.of(DayOfWeek.TUESDAY, DayOfWeek.FRIDAY), AppUser.DEFAULT_PAYOUT_LAG_DAYS, null, null, false);
     }
 }

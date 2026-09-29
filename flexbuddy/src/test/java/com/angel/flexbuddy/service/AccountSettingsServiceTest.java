@@ -82,6 +82,23 @@ class AccountSettingsServiceTest {
     }
 
     @Test
+    void updateTaxTurnsDueDateRemindersOnAndKeepsThemWhenOmitted() {
+        when(userRepository.save(user)).thenReturn(user);
+
+        var on = service.updateTax(EMAIL, new com.angel.flexbuddy.dto.TaxSettingsRequest(new BigDecimal("25.00"), Boolean.TRUE));
+        assertThat(on.remindTax()).isTrue();
+        assertThat(on.taxSetAsidePercent()).isEqualByComparingTo("25.00");
+
+        var kept = service.updateTax(EMAIL, new com.angel.flexbuddy.dto.TaxSettingsRequest(new BigDecimal("30.00")));
+        assertThat(kept.remindTax()).isTrue();
+        assertThat(kept.taxSetAsidePercent()).isEqualByComparingTo("30.00");
+
+        var off = service.updateTax(EMAIL, new com.angel.flexbuddy.dto.TaxSettingsRequest(null, Boolean.FALSE));
+        assertThat(off.remindTax()).isFalse();
+        assertThat(off.taxSetAsidePercent()).isNull();
+    }
+
+    @Test
     void regeneratingTheCalendarTokenReplacesTheFeedLink() {
         when(userRepository.save(user)).thenReturn(user);
 

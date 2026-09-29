@@ -68,6 +68,9 @@ class AccountDeletionJpaTest {
     private com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
 
     @Autowired
+    private com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -116,6 +119,8 @@ class AccountDeletionJpaTest {
         standing.setCreatedAt(NOW);
         standing.setUpdatedAt(NOW);
         standingEntryRepository.save(standing);
+        taxReminderLogRepository.save(new com.angel.flexbuddy.model.TaxReminderLog(owner.getId(),
+                LocalDate.of(2026, 9, 15), com.angel.flexbuddy.model.TaxReminderKind.WEEK_BEFORE, NOW));
         entityManager.flush();
         when(passwordEncoder.matches("correct-password", "stored-hash")).thenReturn(true);
 
@@ -128,6 +133,7 @@ class AccountDeletionJpaTest {
         assertThat(rowCount("push_subscription")).isZero();
         assertThat(rowCount("reminder_log")).isZero();
         assertThat(rowCount("standing_entry")).isZero();
+        assertThat(rowCount("tax_reminder_log")).isZero();
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
     }
 

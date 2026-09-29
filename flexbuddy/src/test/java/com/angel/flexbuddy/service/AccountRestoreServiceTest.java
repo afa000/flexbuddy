@@ -193,6 +193,40 @@ class AccountRestoreServiceTest {
         assertThat(saved.getValue()).isEmpty();
     }
 
+    @Test
+    void restoreSetsTaxRemindersFromAVersionFourBackup() throws Exception {
+        owner.setRemindTax(false);
+        AccountBackupFile withReminders = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), new BackupSettings("STANDARD_MILEAGE", "0.700", "America/Chicago", 60, true,
+                        false, 45, null, null, "GROSS", "TUESDAY,FRIDAY", 1, "25", Boolean.TRUE),
+                new BackupCounts(2, 1));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(withReminders);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(owner.isRemindTax()).isTrue();
+    }
+
+    @Test
+    void aBackupWithoutTheTaxReminderFieldKeepsTheCurrentChoice() throws Exception {
+        owner.setRemindTax(true);
+        AccountBackupFile older = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), new BackupSettings("STANDARD_MILEAGE", "0.700", "America/Chicago", 60, true,
+                        false, 45, null, null, "GROSS", "TUESDAY,FRIDAY", 1, "25"),
+                new BackupCounts(2, 1));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(older);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(owner.isRemindTax()).isTrue();
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private ArgumentCaptor<List<com.angel.flexbuddy.model.StandingEntry>> standingCaptor() {
         return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);

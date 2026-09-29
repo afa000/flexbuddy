@@ -325,6 +325,26 @@ class AccountControllerTest {
     }
 
     @Test
+    void updateTax_acceptsTheDueDateReminderSwitch() throws Exception {
+        org.mockito.ArgumentCaptor<com.angel.flexbuddy.dto.TaxSettingsRequest> request =
+                org.mockito.ArgumentCaptor.forClass(com.angel.flexbuddy.dto.TaxSettingsRequest.class);
+        when(settingsService.updateTax(org.mockito.ArgumentMatchers.eq("angel@example.com"), request.capture()))
+                .thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                        com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new java.math.BigDecimal("0.70"),
+                        new java.math.BigDecimal("0.70"), 2026, "America/New_York", null, false, false, 45, null, null,
+                        com.angel.flexbuddy.model.GoalBasis.GROSS,
+                        List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, new java.math.BigDecimal("25"),
+                        null, true));
+
+        mockMvc.perform(put("/account/tax").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"taxSetAsidePercent\":25,\"remindTax\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.remindTax").value(true));
+
+        assertThat(request.getValue().remindTax()).isEqualTo(Boolean.TRUE);
+    }
+
+    @Test
     void updatePayouts_needsADayAndALagOfUpToTwoWeeks() throws Exception {
         for (String body : new String[] {
                 "{\"payoutDays\":[],\"payoutLagDays\":1}",

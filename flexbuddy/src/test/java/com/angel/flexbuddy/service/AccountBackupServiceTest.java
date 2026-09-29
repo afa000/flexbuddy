@@ -61,6 +61,7 @@ class AccountBackupServiceTest {
         expense.setUpdatedAt(now);
         user.setVehicleCostMethod(VehicleCostMethod.ACTUAL_EXPENSES);
         user.setMileageRate(new BigDecimal("0.655"));
+        user.setRemindTax(true);
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(user));
         when(shiftRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(active, deleted));
         when(expenseRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(expense));
@@ -96,6 +97,8 @@ class AccountBackupServiceTest {
         });
         assertThat(backup.settings().vehicleCostMethod()).isEqualTo("ACTUAL_EXPENSES");
         assertThat(backup.settings().mileageRate()).isEqualTo("0.655");
+        assertThat(backup.settings().remindTax()).isTrue();
+        assertThat(backup.version()).isEqualTo(4);
         assertThat(backup.standing()).containsExactly(
                 new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 10), "FAIR", "After late forfeit"));
         assertThat(backup.payouts()).containsExactly(

@@ -78,6 +78,10 @@ public class AppUser {
     @Column(nullable = false)
     private boolean remindMiles;
 
+    /** Push a reminder a week before and on each estimated tax due date. */
+    @Column(nullable = false)
+    private boolean remindTax;
+
     @Column(nullable = false)
     private int forfeitCutoffMinutes = DEFAULT_FORFEIT_CUTOFF_MINUTES;
 

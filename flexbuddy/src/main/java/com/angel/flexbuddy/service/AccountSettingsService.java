@@ -69,6 +69,7 @@ public class AccountSettingsService {
     public AccountSettingsResponse updateTax(String email, com.angel.flexbuddy.dto.TaxSettingsRequest request) {
         AppUser user = user(email);
         user.setTaxSetAsidePercent(request.taxSetAsidePercent());
+        if (request.remindTax() != null) user.setRemindTax(request.remindTax());
         return response(userRepository.save(user));
     }
 
@@ -115,7 +116,8 @@ public class AccountSettingsService {
                 user.getGoalBasis() == null ? com.angel.flexbuddy.model.GoalBasis.GROSS : user.getGoalBasis(),
                 java.util.List.copyOf(PayPeriodCalculator.parseDays(user.getPayoutDays())), user.getPayoutLagDays(),
                 user.getTaxSetAsidePercent(),
-                user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics");
+                user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics",
+                user.isRemindTax());
     }
 
     private AppUser user(String email) {

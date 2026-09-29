@@ -303,6 +303,7 @@ function renderReminders(settings) {
     document.querySelector('#remindBefore').value = settings.remindBeforeMinutes ?? '';
     document.querySelector('#remindConfirm').checked = Boolean(settings.remindConfirm);
     document.querySelector('#remindMiles').checked = Boolean(settings.remindMiles);
+    document.querySelector('#remindTax').checked = Boolean(settings.remindTax);
     document.querySelector('#forfeitCutoff').value = settings.forfeitCutoffMinutes ?? 45;
     const hasFeed = Boolean(settings.calendarFeedPath);
     calendarFeedUrl.value = hasFeed ? new URL(settings.calendarFeedPath, window.location.origin).href : '';

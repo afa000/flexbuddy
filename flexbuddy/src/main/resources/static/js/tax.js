@@ -11,6 +11,7 @@
         year: card.querySelector('#taxYear'),
         csv: card.querySelector('#taxCsvLink'),
         print: card.querySelector('#taxPrintLink'),
+        remind: card.querySelector('#remindTax'),
         figures: card.querySelector('#taxFigures'),
         quarters: card.querySelector('#taxQuarters'),
         payments: card.querySelector('#taxPayments'),
@@ -100,10 +101,11 @@
             const response = await apiFetch('/account/tax', {
                 method: 'PUT',
                 headers: csrfHeaders({'Content-Type': 'application/json'}),
-                body: JSON.stringify({taxSetAsidePercent: value === '' ? null : Number(value)})
+                body: JSON.stringify({taxSetAsidePercent: value === '' ? null : Number(value), remindTax: el.remind.checked})
             });
             if (!response.ok) throw await responseError(response, 'Choose a percentage from 1 to 60, or leave it empty to turn this off.');
-            showToast('Tax reserve saved', value === '' ? 'The set-aside estimate is off.' : `Setting aside ${value}% of net earnings.`);
+            const reminders = `Due-date reminders are ${el.remind.checked ? 'on' : 'off'}.`;
+            showToast('Tax settings saved', `${value === '' ? 'The set-aside estimate is off.' : `Setting aside ${value}% of net earnings.`} ${reminders}`);
             await load();
         } catch (error) {
             el.percentError.textContent = error.message;

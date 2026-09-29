@@ -300,6 +300,14 @@ class TaxServiceTest {
         return expense;
     }
 
+    @Test
+    void dueDateMapsEachQuarterToItsConfiguredDate() {
+        assertThat(service.dueDate(2026, 1)).isEqualTo(LocalDate.of(2026, 4, 15));
+        assertThat(service.dueDate(2026, 2)).isEqualTo(LocalDate.of(2026, 6, 15));
+        assertThat(service.dueDate(2026, 3)).isEqualTo(LocalDate.of(2026, 9, 15));
+        assertThat(service.dueDate(2026, 4)).isEqualTo(LocalDate.of(2027, 1, 15));
+    }
+
     private void useRate(BigDecimal percent) {
         lenient().when(settingsService.get(EMAIL)).thenReturn(new AccountSettingsResponse(VehicleCostMethod.STANDARD_MILEAGE,
                 new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45, null,

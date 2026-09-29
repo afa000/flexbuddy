@@ -67,8 +67,10 @@
                         <input id="taxPercent" type="number" min="1" max="60" step="0.5" inputmode="decimal" placeholder="Off">
                         <small class="field-hint">Many drivers use 25 to 30 percent. Leave it empty to turn this off.</small>
                     </label>
+                    <label class="checkbox-row"><input id="remindTax" type="checkbox"> Remind me a week before and on each estimated tax due date</label>
+                    <small class="field-hint">A push notification at 9 in the morning, using the dates shown below. Estimates only.</small>
                     <div class="notice error-notice is-hidden" id="taxPercentError" role="alert"></div>
-                    <div class="form-actions"><button class="primary-button" type="submit">Save percentage</button></div>
+                    <div class="form-actions"><button class="primary-button" type="submit">Save tax settings</button></div>
                 </form>
                 <div class="tax-year-row">
                     <label class="field"><span>Tax year</span><select id="taxYear"></select></label>
@@ -137,7 +139,7 @@
             </article>
             <article class="panel data-card reminders-card">
                 <p class="step-label">REMINDERS</p>
-                <h2>Shift reminders</h2>
+                <h2>Reminders</h2>
                 <p>Your phone's calendar can remind you before every block. Push reminders are an optional extra.</p>
                 <form class="settings-form" id="reminderSettingsForm">
                     <label class="field"><span>Time zone</span><select id="timeZoneSelect"></select></label>

@@ -30,13 +30,15 @@ public class AccountService {
     private final TaxPaymentRepository taxPaymentRepository;
     private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
     private final com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
+    private final com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
             ShiftRepository shiftRepository, PushSubscriptionRepository pushSubscriptionRepository,
             PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository,
             com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
-            com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository) {
+            com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository,
+            com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -47,6 +49,7 @@ public class AccountService {
         this.taxPaymentRepository = taxPaymentRepository;
         this.payoutDepositRepository = payoutDepositRepository;
         this.standingEntryRepository = standingEntryRepository;
+        this.taxReminderLogRepository = taxReminderLogRepository;
     }
 
     public boolean emailIsRegistered(String email) {
@@ -77,6 +80,7 @@ public class AccountService {
         taxPaymentRepository.deleteAllByOwnerId(ownerId);
         payoutDepositRepository.deleteAllByOwnerId(ownerId);
         standingEntryRepository.deleteAllByOwnerId(ownerId);
+        taxReminderLogRepository.deleteAllByOwnerId(ownerId);
         reminderLogRepository.deleteAllByOwnerId(ownerId);
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);
