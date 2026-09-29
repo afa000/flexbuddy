@@ -87,6 +87,14 @@ version 1, with one object store, `items`, keyed by `id`.
   send them before adding more." and nothing is queued.
 - **If IndexedDB is unavailable** (for example a private window), saving behaves as today
   and shows the offline error.
+- **Ask Android not to evict the queue.** The first time anything is queued, call
+  `navigator.storage.persist()` once, and don't wait on its result. Chrome can otherwise
+  delete a site's IndexedDB when the phone is low on storage. For an installed app it
+  normally grants persistence. If it says no, the queue still works; it just isn't
+  protected from eviction.
+- **Android's "Clear storage" wipes the queue**, as it wipes the cached data. That's
+  expected. The strip and the sign-out guard are the driver's warning that changes are
+  still waiting.
 
 ## 3. Backend
 
@@ -451,6 +459,26 @@ can be discarded.
 **I. The limit.** Queue 50 items offline (a quick loop in the console with `submit`). The
 51st save shows "Too many changes are waiting to sync…".
 
+**J. The Android app (TWA) on a real phone, with the Play build installed.**
+
+1. **Cold start with no signal.** Put the phone in airplane mode, swipe the app away, and
+   open FlexBuddy from the home screen. It opens **full screen, without Chrome's address
+   bar**, and shows the last synced data with the offline banner.
+
+   If an address bar appears, the app couldn't confirm it belongs to the site while
+   offline. Note it and stop: that's a finding for the Android shell, not this commit.
+2. **Persistence.** After queuing one item, run `await navigator.storage.persisted()` in the
+   app. Use Chrome's remote debugging at `chrome://inspect` from a computer over USB. It
+   returns `true`.
+3. **Surviving a phone restart.** Queue two items in airplane mode, restart the phone, turn
+   the network back on, and open the app. Both sync once.
+4. **A no-signal day.** Queue about 10 items over a few hours with the app in the
+   background between them. They're all in the strip when you open the app, and they sync
+   in the order they were made.
+5. **Ship order:** 06a, then `plans/js-unit-tests.md`, then this plan. Every push to `main`
+   reaches testers' phones on their next launch, with no Play review in between, so run
+   these checks on the phone before pushing.
+
 ## 8. Suggested commit message
 
 ```
@@ -490,3 +518,6 @@ All questions are settled. Nothing is left open.
 - **The limit is 50 queued items**, for now.
 - **JavaScript tests** get their own plan, `plans/js-unit-tests.md`, and cover the pure
   functions above.
+- **Android:** no new app build is needed, because the app loads the site. The plan adds
+  `navigator.storage.persist()` against storage eviction, and phone checks for an offline
+  cold start, a restart and a long day without signal (section 7, J).
