@@ -10,8 +10,9 @@ other and can ship in either order.
 
 Give the driver a page for a chosen tax year that they can print, or save as PDF, for a
 tax preparer. It carries the same numbers as the existing year CSV, **to the cent**, plus
-the four estimated-payment periods and the payments recorded. Every tax figure is labelled
-as an estimate, and the page carries the Taxes card's disclaimer.
+the four estimated-payment periods, the payments recorded, and **every expense line for
+the year**. Every tax figure is labelled as an estimate, and the page carries the Taxes
+card's disclaimer. It prints in **landscape** and shows the driver's display name.
 
 - The account page's Taxes card gets **"View printable summary"** next to "Download year
   summary (CSV)", for the selected year.
@@ -24,7 +25,8 @@ as an estimate, and the page carries the Taxes card's disclaimer.
 
 - Generating a PDF on the server.
 - Emailing or sharing the summary.
-- Any new figures: the monthly rows are exactly the CSV's columns.
+- Any new figures: the monthly rows are exactly the CSV's columns, and the expense list is
+  the same expenses the monthly totals already count.
 - Offline use: the page is network-only, like the CSV.
 - A print style for any other page.
 
@@ -48,12 +50,22 @@ public record TaxYearRow(String label, int shifts, BigDecimal basePay, BigDecima
         BigDecimal vehicleCost, BigDecimal totalDeductions, BigDecimal net) {}
 ```
 
+**New record `dto/TaxYearExpense.java`:**
+
+```java
+public record TaxYearExpense(LocalDate date, ExpenseCategory category, BigDecimal amount,
+        String station, String note) {}
+```
+
+`station` is the linked block's station, or null.
+
 **New record `dto/TaxYearReport.java`:**
 
 ```java
 public record TaxYearReport(int year, LocalDate generatedOn, String displayName,
         VehicleCostMethod vehicleCostMethod, BigDecimal mileageRate,
-        List<TaxYearRow> months, TaxYearRow total, TaxSummaryResponse summary) {}
+        List<TaxYearRow> months, TaxYearRow total, TaxSummaryResponse summary,
+        List<TaxYearExpense> expenses) {}
 ```
 
 `summary` is the existing `TaxSummaryResponse` for the same year. It carries the percentage,
@@ -74,7 +86,14 @@ the quarters (period, due date, net, estimated set-aside, paid) and the payments
 - Add `@Transactional(readOnly = true) public TaxYearReport yearReport(String email, int year)`.
   It builds the rows from `yearRows`, the display name from the user,
   `generatedOn = userTime.today(email)` (the account's time zone), the method and rate from
-  `settingsService.get(email)`, and `summary(email, year)`.
+  `settingsService.get(email)`, `summary(email, year)`, and the expenses:
+  - Use the existing private `expenses(email, Jan 1, Dec 31)`, the same set the monthly
+    totals count. Deleted expenses are already excluded by `@SQLRestriction`, and expenses
+    linked to a block that hasn't happened yet are left out as in the reports.
+  - Sort by date, then id.
+  - Map each to a `TaxYearExpense`, with `station` from `expense.getShift()` when linked.
+  - So for each category, the listed amounts add up to the year total row's column for that
+    category, to the cent. A test pins this.
 
   Two notes:
   - `TaxService` already has `settingsService` and `userTime`. The display name needs the
@@ -137,7 +156,17 @@ contains, in order:
    line says "No set-aside percentage chosen." Also wrapped in `.breakdown-scroll`.
 6. **Payments recorded:** a simple list of date, period, amount and note, or "No payments
    recorded."
-7. **Footer line:** "FlexBuddy · figures are estimates from your own records."
+7. **Expenses** (`<table class="breakdown-table print-table print-expenses">`, with a
+   caption):
+   - Columns: Date, Category (Fuel, Toll, Parking, Maintenance, Other), Block (the station,
+     or "—"), Note, Amount.
+   - One row per expense in date order.
+   - A `<tfoot>` with one subtotal row per category that has expenses, then a total. These
+     equal the year row's fuel, tolls, parking, maintenance and other columns.
+   - Empty state: "No expenses recorded for 2026."
+   - Wrapped in `.breakdown-scroll`. Notes wrap (`white-space: normal; min-width: 12ch`),
+     unlike the numeric tables.
+8. **Footer line:** "FlexBuddy · figures are estimates from your own records."
 
 **Print button.** An inline script at the end of the body, the same style as the theme
 script:
@@ -189,6 +218,7 @@ Add a section `/* Printable tax summary */`.
     .print-table th, .print-table td { border: 1px solid #999; padding: 3px 5px; color: #000; }
     .notice { border: 1px solid #000; background: none; color: #000; }
     tr, .print-section { break-inside: avoid; }
+    thead { display: table-header-group; }   /* repeat headers when the expense list runs over pages */
     a { color: #000; text-decoration: none; }
 }
 ```
@@ -227,6 +257,9 @@ leaves it alone, and it isn't a data path. No new JS file.
 | `tax.js` | + one `href` update |
 | `styles.css` | + section and the print block |
 
+**Records:** `TaxYearRow`, `TaxYearExpense` and `TaxYearReport` are new and only
+constructed in `TaxService` and the new tests.
+
 **Existing tests that must keep passing unchanged** (they pin the CSV bytes):
 
 - `TaxControllerTest.theYearCsvDownloadsForTheCurrentYearByDefault`
@@ -234,7 +267,7 @@ leaves it alone, and it isn't a data path. No new JS file.
 
 ## 6. Tests to add
 
-Expect about 7 new tests.
+Expect about 9 new tests.
 
 **`service/TaxServiceTest.java`** (add)
 
@@ -248,22 +281,31 @@ Expect about 7 new tests.
    `2026-09-30T02:00:00Z` and the zone `America/Los_Angeles`, `generatedOn` is
    `2026-09-29`. `summary().year()` is 2026, and `total()` equals `yearRows(...).getLast()`.
 
+4. `yearReportListsTheYearsExpensesInDateOrderAndTheyAddUpToTheYearRow`: the fixture has
+   fuel on Jun 3 (linked to a VEA7 block), parking on Sep 9, a deleted toll, and a fuel
+   expense linked to a still-scheduled block. The list has the two counted expenses in date
+   order, with `station` "VEA7" on the first and null on the second. For each category, the
+   list's sum equals `total()`'s column.
+5. `aYearWithNoExpensesHasAnEmptyList`
+
 **New `controller/TaxPageControllerTest.java`** (`@WebMvcTest(TaxPageController.class)`,
 `@Import(SecurityConfig.class)`, mocking `TaxService`, `UserTimeService`,
 `AppUserRepository`, `ShiftRepository` and `Clock`, as `PageControllerTest` does)
 
-4. `theSummaryPageRequiresSignIn`: an anonymous GET redirects to `/login`.
-5. `rendersTheYearWithTheEstimateNoticeAndPrintButton`: stub a report with one June row
+6. `theSummaryPageRequiresSignIn`: an anonymous GET redirects to `/login`.
+7. `rendersTheYearWithTheEstimateNoticeAndPrintButton`: stub a report with one June row
    (gross `1234.5`) and a total. The body contains:
    - "Tax year summary · 2026"
    - `$1,234.50`
    - `id="printButton"`
    - `window.print()`
    - the estimate notice sentence
-   - "Figures match the CSV download".
-6. `defaultsToTheCurrentYearInTheAccountTimeZone`: `userTime.today` returns 2026-09-29, and
+   - "Figures match the CSV download"
+   - the display name
+   - one stubbed expense row: "Fuel", "VEA7", `$45.20`.
+8. `defaultsToTheCurrentYearInTheAccountTimeZone`: `userTime.today` returns 2026-09-29, and
    the service is asked for 2026.
-7. `aYearOutOfRangeIsABadRequest`: the service throws `InvalidFilterException` for
+9. `aYearOutOfRangeIsABadRequest`: the service throws `InvalidFilterException` for
    `?year=1999`, which gives 400.
 
 **`controller/PageControllerTest.java` or `AccountControllerTest`** (optional, if the account
@@ -272,7 +314,8 @@ page render is already tested): the account page contains `id="taxPrintLink"`.
 ## 7. Manual checks
 
 **Setup:** tax percentage 25; a few 2026 blocks in June and September, including tips and
-miles; one fuel expense; one recorded payment of $500 for Q3.
+miles; a $45.20 fuel expense linked to a June block; a $12.00 parking expense on its own; a
+deleted toll; one recorded payment of $500 for Q3.
 
 1. **Account page at 1280×800, Taxes card.**
    - "View printable summary" sits next to the CSV button, both at least 44px tall.
@@ -284,6 +327,10 @@ miles; one fuel expense; one recorded payment of $500 for Q3.
    - The estimated-payments table lists the four periods: Jan 1–Mar 31 due Apr 15 2026,
      Apr 1–May 31 due Jun 15, Jun 1–Aug 31 due Sep 15, and Sep 1–Dec 31 due Jan 15 2027.
    - Q3 shows $500.00 paid.
+   - The Expenses table lists the fuel ($45.20, with the June block's station) and the
+     parking ($12.00, Block "—"), but not the deleted toll. The Fuel subtotal is $45.20,
+     Parking $12.00 and Total $57.20, equal to the year row's fuel and parking columns.
+   - The driver's display name is under the title.
 3. **Match to the cent.**
    - Download the 2026 CSV.
    - For June and the year total, every figure on the page equals the CSV field. Only the
@@ -293,7 +340,8 @@ miles; one fuel expense; one recorded payment of $500 for Q3.
    - Landscape, white background, black text.
    - No header, Print button or Back link.
    - The monthly table fits the page width without cutting off columns.
-   - Rows aren't split across pages.
+   - Rows aren't split across pages. If the expense list runs onto a second page, its
+     header row repeats.
    - Saving as PDF gives a readable file.
 5. **Phone at 375×667 and 430×932.**
    - `document.documentElement.scrollWidth === window.innerWidth`.
@@ -314,7 +362,8 @@ feat(taxes): add a printable year summary for a tax preparer
 The Taxes card now links to a printable summary for the chosen year,
 with the same month-by-month figures and year total as the CSV
 download, the four estimated-payment periods with their due dates,
-estimated set-aside and payments recorded, and the payments themselves.
+estimated set-aside and payments recorded, the payments themselves, and
+every expense for the year with a subtotal for each category.
 A Print button opens the print dialog, which the Android app has no
 menu for, and the page prints black on white in landscape without the
 buttons.
@@ -326,14 +375,12 @@ notice as the Taxes card, and the tables scroll inside their own boxes
 on a phone.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **What the page includes.** It shows the monthly table, the quarters and the payments.
-   Should it also list each expense line, like the expenses CSV? That would make it longer
-   but self-contained for a preparer.
-2. **The driver's name.** The page shows the account display name. Leave that, or should
-   the name be left off, since preparers usually know who the client is and the printout
-   may be shared?
-3. **Paper orientation.** It forces landscape with `@page { size: landscape }`. That fits
-   17 columns, but some printers ignore it. Is landscape right, or should the table be
-   split into two portrait tables (income, then costs)?
+All questions are settled. Nothing is left open.
+
+- **Expense lines are included.** Every counted expense for the year is listed, with
+  category subtotals that equal the year row.
+- **The driver's display name is shown** under the title.
+- **Landscape.** `@page { size: landscape }` stays. The table isn't split into portrait
+  halves.
