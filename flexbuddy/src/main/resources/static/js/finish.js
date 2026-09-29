@@ -214,11 +214,21 @@
         const finished = shift;
         el.save.disabled = true;
         try {
-            const response = await apiFetch(`/shifts/${finished.id}/status`, {
-                method: 'PATCH',
-                headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
-                body: JSON.stringify(body)
+            const drove = body.miles ?? (body.details.odometerStart != null && body.details.odometerEnd != null
+                ? Math.round((body.details.odometerEnd - body.details.odometerStart) * 10) / 10 : null);
+            const result = await window.flexbuddyOutbox.submit('shift-finish', {
+                method: 'PATCH', url: `/shifts/${finished.id}/status`, body,
+                shiftId: finished.id, expectedUpdatedAt: finished.updatedAt,
+                summary: {title: `Finish · ${finished.station}`,
+                    detail: `${formatShortDay(finished.date)}${drove == null ? '' : ` · ${drove.toFixed(1)} mi`}`}
             });
+            if (result.queued) {
+                close();
+                showToast('Saved offline · will sync',
+                    `${finished.station} on ${formatDate(finished.date)} will be updated when you're back online.`);
+                return;
+            }
+            const response = result.sent;
             if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text() || 'The block could not be saved.');
             const wasScheduled = completing();
             close();
@@ -285,7 +295,7 @@
                 <p><strong>${escapeHtml(formatDate(shift.date))} · ${escapeHtml(shift.station)}</strong>
                     <span>${escapeHtml(formatTime(shift.startTime))}–${escapeHtml(formatTime(shift.endTime))}</span></p>
                 <div class="confirm-actions">
-                    <button class="primary-button compact-button" type="button" data-action="add" data-online-only>Add miles</button>
+                    <button class="primary-button compact-button" type="button" data-action="add">Add miles</button>
                     <button class="secondary-button compact-button" type="button" data-action="none" data-online-only>No miles</button>
                     <button class="text-button" type="button" data-action="later">Not now</button>
                 </div>`;

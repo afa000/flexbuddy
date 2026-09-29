@@ -258,9 +258,8 @@
         el.dayPanel.replaceChildren();
         const heading = document.createElement('div');
         heading.className = 'day-panel-heading';
-        heading.innerHTML = `<h3>${escapeHtml(longDay(date))}</h3><button class="text-button" type="button" data-online-only>Add scheduled shift</button>`;
+        heading.innerHTML = `<h3>${escapeHtml(longDay(date))}</h3><button class="text-button" type="button">Add scheduled shift</button>`;
         const addButton = heading.querySelector('button');
-        addButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
         addButton.addEventListener('click', () => addScheduled(date, addButton));
         el.dayPanel.append(heading);
         if (!shifts.length) {
@@ -320,7 +319,8 @@
     function bindActions(container, shift) {
         container.querySelectorAll('[data-action]').forEach(button => {
             const action = button.dataset.action;
-            if (action !== 'edit') {
+            // Finishing a block is queued when there is no connection; the other status changes still need one.
+            if (action !== 'edit' && action !== 'completed' && action !== 'finish') {
                 button.dataset.onlineOnly = '';
                 button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
             }

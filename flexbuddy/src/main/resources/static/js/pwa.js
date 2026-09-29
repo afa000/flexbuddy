@@ -80,7 +80,8 @@
         if (offline) return;
         offline = true;
         document.body.classList.add('is-offline');
-        document.querySelectorAll('[data-online-only], form button[type="submit"], #dropZone').forEach(element => {
+        // A form marked data-queueable keeps its Save button: what it saves is kept on the phone until it can be sent.
+        document.querySelectorAll('[data-online-only], form:not([data-queueable]) button[type="submit"], #dropZone').forEach(element => {
             if (element.disabled) return;
             element.disabled = true;
             element.dataset.offlineTitle = element.title || '';
@@ -135,6 +136,8 @@
                 .map(key => caches.delete(key)));
         }
         navigator.serviceWorker?.controller?.postMessage({type: 'clear-data'});
+        // Unsent changes belong to this driver too, so every path that wipes cached data wipes the queue with it.
+        await window.flexbuddyOutbox?.clear();
     }
 
     function promptUpdate(worker) {

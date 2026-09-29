@@ -14,6 +14,7 @@
     <meta name="description" content="Import, review, and track delivery shifts.">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <meta name="flexbuddy-account" th:content="${currentUser != null ? currentUser.id : ''}">
     <title>FlexBuddy | Shift tracker</title>
     <script>
         document.documentElement.dataset.theme =
@@ -50,6 +51,15 @@
     </header>
 
     <div class="offline-banner is-hidden" id="offlineBanner" role="status" aria-live="polite"></div>
+
+    <section class="outbox-strip" id="outboxStrip" aria-labelledby="outboxTitle" hidden>
+        <div class="outbox-heading">
+            <strong id="outboxTitle">Waiting to sync</strong>
+            <button class="text-button" id="outboxSyncButton" type="button">Sync now</button>
+            <a class="text-link" id="outboxSignIn" href="/login" hidden>Sign in</a>
+        </div>
+        <ul class="outbox-list" id="outboxList"></ul>
+    </section>
 
     <main>
         <section class="hero" data-screen="dashboard" aria-labelledby="page-title">
@@ -211,7 +221,7 @@
                     <h1 id="schedule-title">Schedule</h1>
                     <p>Plan upcoming blocks, confirm the ones you finished, and add them to your phone's calendar.</p>
                 </div>
-                <button class="primary-button" id="addScheduledShiftButton" type="button" data-online-only>Add scheduled shift</button>
+                <button class="primary-button" id="addScheduledShiftButton" type="button">Add scheduled shift</button>
             </header>
             <div class="notice error-notice is-hidden" id="scheduleError" role="alert"></div>
 
@@ -534,7 +544,7 @@
             <section class="expense-layout">
                 <article class="panel expense-form-panel">
                     <div class="panel-heading"><div><p class="step-label">QUICK ADD</p><h2 id="expenseFormTitle">Log an expense</h2><p>Link it to a shift when the cost belongs to one block.</p></div></div>
-                    <form class="preview-form" id="expenseForm">
+                    <form class="preview-form" id="expenseForm" data-queueable>
                         <label class="field"><span>Date</span><input id="expenseDate" type="date" required></label>
                         <label class="field"><span>Category</span><select id="expenseCategory" required><option value="FUEL">Fuel</option><option value="TOLL">Toll</option><option value="PARKING">Parking</option><option value="MAINTENANCE">Maintenance</option><option value="OTHER">Other</option></select></label>
                         <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
@@ -596,7 +606,7 @@
                 </button>
             </div>
 
-            <form class="preview-form" id="editForm">
+            <form class="preview-form" id="editForm" data-queueable>
                 <label class="field field-wide">
                     <span>Status</span>
                     <select id="editStatus">
@@ -711,6 +721,33 @@
         </section>
     </div>
 
+    <div class="modal-backdrop is-hidden" id="conflictModal">
+        <section class="edit-dialog conflict-dialog" role="dialog" aria-modal="true" aria-labelledby="conflictTitle">
+            <div class="edit-dialog-heading">
+                <div>
+                    <p class="step-label">SYNC</p>
+                    <h2 id="conflictTitle">This block changed on another device</h2>
+                    <p id="conflictShift"></p>
+                    <p>You finished it offline, but it was changed elsewhere before your change was sent. Choose which version to keep.</p>
+                </div>
+                <button class="icon-button dialog-close-button" id="closeConflictButton" type="button" aria-label="Close">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
+                </button>
+            </div>
+            <div class="breakdown-scroll">
+                <table class="breakdown-table conflict-table">
+                    <caption class="sr-only">Your offline change next to the saved block</caption>
+                    <thead><tr><th scope="col">Field</th><th scope="col">Your offline change</th><th scope="col">Saved now</th></tr></thead>
+                    <tbody id="conflictRows"></tbody>
+                </table>
+            </div>
+            <div class="form-actions">
+                <button class="secondary-button" id="conflictKeepSaved" type="button">Keep saved version</button>
+                <button class="primary-button" id="conflictUseMine" type="button">Use my change</button>
+            </div>
+        </section>
+    </div>
+
     <div class="modal-backdrop is-hidden" id="finishModal">
         <section class="edit-dialog finish-dialog" role="dialog" aria-modal="true" aria-labelledby="finishTitle">
             <div class="edit-dialog-heading">
@@ -724,7 +761,7 @@
                 </button>
             </div>
 
-            <form class="preview-form finish-form" id="finishForm" novalidate>
+            <form class="preview-form finish-form" id="finishForm" data-queueable novalidate>
                 <div class="finish-pair field-wide">
                     <label class="field"><span>Started</span><input id="finishStart" type="time"></label>
                     <label class="field"><span>Finished</span><input id="finishEnd" type="time"></label>
@@ -795,11 +832,11 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
                 <span><strong>Import screenshot</strong><small>Read a block from the Flex app</small></span>
             </button>
-            <button class="action-sheet-row" id="qaAddShift" type="button" role="menuitem" data-online-only>
+            <button class="action-sheet-row" id="qaAddShift" type="button" role="menuitem">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm7 6v6m-3-3h6"/></svg>
                 <span><strong>Add shift</strong><small id="qaAddShiftHint">A block you worked</small></span>
             </button>
-            <button class="action-sheet-row" id="qaAddExpense" type="button" role="menuitem" data-online-only>
+            <button class="action-sheet-row" id="qaAddExpense" type="button" role="menuitem">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg>
                 <span><strong>Add expense</strong><small>Fuel, tolls, parking</small></span>
             </button>
@@ -807,7 +844,7 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
                 <span><strong id="qaStartLabel">Start block</strong><small id="qaStartHint"></small></span>
             </button>
-            <p class="action-sheet-offline">Offline · adding is available when you are back online</p>
+            <p class="action-sheet-offline">Offline · importing and starting a block need a connection</p>
         </section>
     </div>
 
@@ -829,6 +866,7 @@
 
 <script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/outbox.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/charts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/calendar.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>

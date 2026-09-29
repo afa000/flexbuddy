@@ -203,6 +203,20 @@ class AccountControllerTest {
     }
 
     @Test
+    void accountPageCarriesTheAccountIdAndTheOutboxScript() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(angel));
+
+        mockMvc.perform(get("/account").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("<meta name=\"flexbuddy-account\" content=\"42\">")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"outboxAccountRow\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("id=\"signOutEverywhereForm\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/js/outbox.js?v=")));
+    }
+
+    @Test
     void deleteAccount_requiresCsrf() throws Exception {
         mockMvc.perform(post("/account")
                         .with(user("angel@example.com"))

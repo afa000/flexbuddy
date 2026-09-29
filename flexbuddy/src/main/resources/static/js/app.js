@@ -205,7 +205,9 @@ async function apiFetch(url, options = {}) {
         // Being offline is not an expired session, so a failed request never bounces to the login page.
         if (error?.name !== 'AbortError' && !navigator.onLine) {
             window.flexbuddyPwa?.noteNetworkFailure();
-            throw new Error('You are offline. Try again when your connection returns.');
+            const offlineError = new Error('You are offline. Try again when your connection returns.');
+            offlineError.offline = true;
+            throw offlineError;
         }
         throw error;
     }
@@ -266,6 +268,16 @@ elements.filterSort.addEventListener('change', () => updateFilter('sort', elemen
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
 elements.heatmapMetric.addEventListener('change', loadHeatmap);
 elements.payoutCheckButton.addEventListener('click', event => window.flexbuddyPayouts.open(event.currentTarget));
+// The queue is on the phone, so its Pending tags and the offline state of the edit controls follow it.
+document.addEventListener('flexbuddy:outbox', refreshPendingTags);
+document.addEventListener('flexbuddy:online', () => {
+    applyOfflineEditState();
+    applyOfflineExpenseState();
+});
+window.addEventListener('offline', () => {
+    applyOfflineEditState();
+    applyOfflineExpenseState();
+});
 // The grid needs width, so it starts open on wider screens and folded on a phone.
 elements.heatmapCard.open = window.matchMedia('(min-width: 621px)').matches;
 elements.groupButtons.forEach(button => button.addEventListener('click', () => {
@@ -1008,6 +1020,7 @@ function renderShifts(shifts) {
             </button>
         `;
 
+        row.dataset.shiftId = shift.id;
         const editButton = row.querySelector('.edit-shift-button');
         editButton.setAttribute('aria-label', `Edit ${shift.station} shift on ${shift.date}`);
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
@@ -1019,6 +1032,25 @@ function renderShifts(shifts) {
         }) : row);
     }
     elements.showMoreButton.classList.toggle('is-hidden', visibleShiftCount >= shifts.length);
+    refreshPendingTags();
+}
+
+/** Tags the history rows whose finish is queued, and untags the ones that synced. */
+function refreshPendingTags() {
+    const pending = window.flexbuddyOutbox?.pendingShiftIds() ?? new Set();
+    elements.historyList.querySelectorAll('[data-shift-id]').forEach(row => {
+        const heading = row.querySelector('.shift-main strong');
+        const tag = heading?.querySelector('.pending-tag');
+        const queued = pending.has(Number(row.dataset.shiftId));
+        if (queued && !tag) {
+            const added = document.createElement('small');
+            added.className = 'pending-tag';
+            added.textContent = 'Pending';
+            heading.append(added);
+        } else if (!queued && tag) {
+            tag.remove();
+        }
+    });
 }
 
 function openEditModal(shift, trigger, options = {}) {
@@ -1067,6 +1099,7 @@ function openEditModal(shift, trigger, options = {}) {
         elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
     }
     applyEditStatusRules(Boolean(options.status) && options.status !== editOriginalStatus);
+    applyOfflineEditState();
     hideDeleteConfirmation();
     hideMessage(elements.editError);
     elements.editModal.classList.remove('is-hidden');
@@ -1248,11 +1281,26 @@ async function saveEditedShift(event) {
     setEditSaving(true);
 
     try {
-        const response = await apiFetch(creating ? '/shifts' : `/shifts/${shiftId}`, {
-            method: creating ? 'POST' : 'PUT',
-            headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
-            body: JSON.stringify(shift)
-        });
+        let response;
+        if (creating) {
+            const result = await window.flexbuddyOutbox.submit('shift-create', {
+                method: 'POST', url: '/shifts', body: shift,
+                summary: {title: `Add shift · ${shift.station}`,
+                    detail: `${formatShortDay(shift.date)} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)}`}
+            });
+            if (result.queued) {
+                closeEditModal();
+                showToast('Saved offline · will sync', `${shift.station} on ${formatDate(shift.date)} will be added when you're back online.`);
+                return;
+            }
+            response = result.sent;
+        } else {
+            response = await apiFetch(`/shifts/${shiftId}`, {
+                method: 'PUT',
+                headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
+                body: JSON.stringify(shift)
+            });
+        }
 
         if (!response.ok && !(await isDuplicate(response))) {
             const message = await response.text();
@@ -1278,6 +1326,7 @@ async function saveEditedShift(event) {
         showMessage(elements.editError, error.message || 'The shift could not be updated.');
     } finally {
         setEditSaving(false);
+        applyOfflineEditState();
     }
 }
 
@@ -1523,6 +1572,15 @@ function setSaving(saving) {
     elements.saveButton.disabled = saving;
     elements.saveButton.querySelector('span').textContent = saving ? 'Adding shift…'
         : elements.importStatus.value === 'SCHEDULED' ? 'Add scheduled shift' : 'Add shift';
+}
+
+/** Editing, deleting and duplicating a saved shift need a connection; adding one does not, because it can be queued. */
+function applyOfflineEditState() {
+    const blocked = editMode === 'edit' && (window.flexbuddyPwa?.isOffline() ?? false);
+    [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton].forEach(button => {
+        button.disabled = blocked;
+        button.title = blocked ? 'Available when you are back online' : '';
+    });
 }
 
 function setEditSaving(saving) {
@@ -1784,6 +1842,11 @@ function drillIntoBucket(bucket, groupBy) {
     document.querySelector('.filter-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
+/** "Sep 29": a day without its year, for the short lines in the Waiting to sync strip. */
+function formatShortDay(value) {
+    return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+}
+
 function formatDate(value) {
     return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
 }
@@ -1937,6 +2000,14 @@ function editExpense(expense) {
     elements.expenseShift.value = expense.shiftId ?? '';
     elements.expenseNote.value = expense.note ?? '';
     elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+    applyOfflineExpenseState();
+}
+
+/** Saving an edited expense needs a connection, because only adding one can be queued. */
+function applyOfflineExpenseState() {
+    const blocked = editingExpenseId !== undefined && (window.flexbuddyPwa?.isOffline() ?? false);
+    elements.saveExpenseButton.disabled = blocked;
+    elements.saveExpenseButton.title = blocked ? 'Available when you are back online' : '';
 }
 
 function resetExpenseForm() {
@@ -1947,6 +2018,7 @@ function resetExpenseForm() {
     elements.saveExpenseButton.textContent = 'Add expense';
     elements.cancelExpenseEdit.classList.add('is-hidden');
     hideMessage(elements.expenseError);
+    applyOfflineExpenseState();
 }
 
 async function saveExpense(event) {
@@ -1957,19 +2029,31 @@ async function saveExpense(event) {
         amount: Number(elements.expenseAmount.value), note: elements.expenseNote.value.trim() || null,
         shiftId: elements.expenseShift.value ? Number(elements.expenseShift.value) : null};
     const id = editingExpenseId;
-    // Only adding is retried by key; the key is made once per submit, so a double tap cannot add it twice.
-    const headers = id ? csrfHeaders({'Content-Type': 'application/json'})
-        : retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'});
     elements.saveExpenseButton.disabled = true;
     try {
-        const response = await apiFetch(id ? `/expenses/${id}` : '/expenses', {method: id ? 'PUT' : 'POST',
-            headers, body: JSON.stringify(body)});
+        let response;
+        if (id) {
+            response = await apiFetch(`/expenses/${id}`, {method: 'PUT',
+                headers: csrfHeaders({'Content-Type': 'application/json'}), body: JSON.stringify(body)});
+        } else {
+            const label = elements.expenseCategory.selectedOptions[0].textContent;
+            const result = await window.flexbuddyOutbox.submit('expense-create', {
+                method: 'POST', url: '/expenses', body,
+                summary: {title: `${label} · ${formatMoney(body.amount)}`, detail: formatShortDay(body.date)}
+            });
+            if (result.queued) {
+                resetExpenseForm();
+                showToast('Saved offline · will sync', `${label} · ${formatMoney(body.amount)} will be added when you're back online.`);
+                return;
+            }
+            response = result.sent;
+        }
         if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text());
         resetExpenseForm();
         showToast(id ? 'Expense updated' : 'Expense added', 'Net earnings have been recalculated.');
         await Promise.all([loadExpenses(), loadDashboard()]);
     } catch (error) { showMessage(elements.expenseError, error.message || 'The expense could not be saved.'); }
-    finally { elements.saveExpenseButton.disabled = false; }
+    finally { elements.saveExpenseButton.disabled = false; applyOfflineExpenseState(); }
 }
 
 async function deleteExpense(expense) {
@@ -2073,8 +2157,20 @@ async function takeSharedFile(id) {
 
 async function signOut(event) {
     event.preventDefault();
+    const waiting = window.flexbuddyOutbox?.count() ?? 0;
+    if (waiting > 0) {
+        openConfirm(`${waiting} ${waiting === 1 ? "change hasn't" : "changes haven't"} synced`,
+            'Signing out now discards them. Stay signed in to let them sync first.',
+            finishSignOut, 'Sign out and discard');
+        return;
+    }
+    await finishSignOut();
+}
+
+async function finishSignOut() {
     try {
-        // The next person to sign in on this device must never see this driver's cached data.
+        // The next person to sign in on this device must never see this driver's cached data or unsent changes.
+        await window.flexbuddyOutbox?.clear();
         await window.flexbuddyPwa?.clearUserData();
     } finally {
         elements.logoutForm.submit();

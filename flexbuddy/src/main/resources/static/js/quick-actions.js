@@ -43,7 +43,8 @@
             ? `${startShift.station} · ${formatTime(startShift.startTime)}–${formatTime(startShift.endTime)}`
             : 'Blocks can start 2 hours before their start time';
         startRow.disabled = !startShift || offline;
-        rows.filter(row => row !== startRow).forEach(row => row.disabled = offline);
+        // Adding a shift or an expense is queued offline; only importing and starting a block need a connection.
+        sheet.querySelector('#qaImport').disabled = offline;
     }
 
     button.addEventListener('click', () => (isOpen() ? close() : open()));

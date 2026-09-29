@@ -14,6 +14,7 @@
     <meta name="description" content="Back up and restore your FlexBuddy account data.">
     <meta name="_csrf" th:content="${_csrf.token}">
     <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <meta name="flexbuddy-account" th:content="${currentUser != null ? currentUser.id : ''}">
     <title>Account data | FlexBuddy</title>
     <script>document.documentElement.dataset.theme = localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';</script>
     <style>
@@ -188,6 +189,13 @@
                 <p>Your backup contains shifts, expenses, driver cost settings, and recently deleted items. It never contains your password.</p>
                 <p class="backup-status" id="backupStatus" th:attr="data-last-backup=${currentUser.lastBackupAt}" th:text="${currentUser.lastBackupAt == null ? 'Last backup: Never' : 'Last backup recorded'}">Last backup: Never</p>
                 <a class="primary-button download-button" href="/account/backup" download>Download backup</a>
+                <div class="outbox-account-row" id="outboxAccountRow" hidden>
+                    <p class="outbox-status" id="outboxStatus" role="status">Changes waiting to sync</p>
+                    <div class="confirm-actions">
+                        <button class="secondary-button compact-button" id="outboxAccountSync" type="button">Sync now</button>
+                        <button class="text-button danger-text-button" id="outboxAccountDiscard" type="button">Discard all</button>
+                    </div>
+                </div>
             </article>
 
             <article class="panel data-card">
@@ -238,7 +246,7 @@
                 <p class="step-label">SECURITY</p>
                 <h2>Signed-in devices</h2>
                 <p>Remove every persistent sign-in for your account, including this device. You will need your password the next time you open FlexBuddy.</p>
-                <form th:action="@{/account/sign-out-everywhere}" method="post">
+                <form th:action="@{/account/sign-out-everywhere}" method="post" id="signOutEverywhereForm">
                     <button class="danger-button" type="submit">Sign out everywhere</button>
                 </form>
             </article>
@@ -279,6 +287,7 @@
 </div>
 <script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/outbox.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/account.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/tax.js(v=${buildId})}" defer></script>
 </body>

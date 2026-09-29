@@ -18,6 +18,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.angel.flexbuddy.config.SecurityConfig;
+import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
@@ -55,8 +56,13 @@ class PageControllerTest {
 
         assertThat(page).contains("id=\"quickActionButton\"", "aria-haspopup=\"menu\"", "aria-expanded=\"false\"",
                 "role=\"menu\"", "/js/quick-actions.js?v=");
-        for (String row : new String[] {"qaImport", "qaAddShift", "qaAddExpense", "qaStartBlock"}) {
+        // Importing and starting a block need a connection; adding a shift or an expense is queued offline.
+        for (String row : new String[] {"qaImport", "qaStartBlock"}) {
             assertThat(page).containsPattern("<button[^>]*id=\"" + row + "\"[^>]*role=\"menuitem\"[^>]*data-online-only");
+        }
+        for (String row : new String[] {"qaAddShift", "qaAddExpense"}) {
+            assertThat(page).containsPattern("<button[^>]*id=\"" + row + "\"[^>]*role=\"menuitem\"[^>]*>");
+            assertThat(page).doesNotContainPattern("<button[^>]*id=\"" + row + "\"[^>]*data-online-only");
         }
         // The stylesheet lifts the toast above the button with a sibling selector, so the button must come first.
         assertThat(page.indexOf("id=\"quickActionButton\"")).isPositive()
@@ -74,6 +80,37 @@ class PageControllerTest {
         for (String level : new String[] {"FANTASTIC", "GREAT", "FAIR", "AT_RISK"}) {
             assertThat(page).contains("data-level=\"" + level + "\"");
         }
+    }
+
+    @Test
+    void shiftsPageCarriesTheAccountIdAndTheOutbox() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        org.mockito.Mockito.when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(java.util.Optional.of(angel));
+
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<meta name=\"flexbuddy-account\" content=\"42\">", "id=\"outboxStrip\"",
+                "id=\"conflictModal\"", "/js/outbox.js?v=");
+        // The forms that can be saved offline keep their Save button; nothing else about them changes.
+        for (String form : new String[] {"editForm", "expenseForm", "finishForm"}) {
+            assertThat(page).containsPattern("<form[^>]*id=\"" + form + "\"[^>]*data-queueable");
+        }
+        assertThat(page).doesNotContainPattern("<button[^>]*id=\"addScheduledShiftButton\"[^>]*data-online-only");
+        // Completing from a screenshot is a separate write that is not queued.
+        assertThat(page).containsPattern("<button[^>]*id=\"completeScheduledButton\"[^>]*data-online-only");
+    }
+
+    @Test
+    void theAccountMetaIsEmptyWithoutAUser() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Thymeleaf drops an empty attribute, and either way the script reads no account id.
+        assertThat(page).containsPattern("<meta name=\"flexbuddy-account\"( content=\"\")?>");
     }
 
     @Test

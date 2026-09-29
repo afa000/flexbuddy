@@ -298,6 +298,21 @@ const pushToggleButton = document.querySelector('#pushToggleButton');
 const pushStatus = document.querySelector('#pushStatus');
 let pushConfig = {configured: false};
 
+// Signing out everywhere ends this device's session too, so unsent changes are confirmed first and then cleared.
+document.querySelector('#signOutEverywhereForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const waiting = window.flexbuddyOutbox?.count() ?? 0;
+    if (waiting > 0 && !window.confirm(`${waiting} ${waiting === 1 ? "change hasn't" : "changes haven't"} synced. Signing out discards ${waiting === 1 ? 'it' : 'them'}. Sign out anyway?`)) {
+        return;
+    }
+    try {
+        await window.flexbuddyOutbox?.clear();
+    } finally {
+        form.submit();
+    }
+});
+
 function renderReminders(settings) {
     fillTimeZones(settings.timeZone);
     document.querySelector('#remindBefore').value = settings.remindBeforeMinutes ?? '';
