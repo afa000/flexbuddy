@@ -344,7 +344,7 @@ class ShiftControllerTest {
                 }
                 """;
 
-        when(shiftService.updateShift(eq("angel@example.com"), eq(id), any(UpdateShiftRequest.class)))
+        when(shiftService.updateShift(eq("angel@example.com"), eq(id), any(UpdateShiftRequest.class), org.mockito.ArgumentMatchers.isNull()))
                 .thenThrow(new ShiftNotFoundException(id));
 
         mockMvc.perform(put("/shifts/{id}", id)
@@ -435,7 +435,7 @@ class ShiftControllerTest {
         ShiftResponse cancelled = new ShiftResponse();
         cancelled.setId(5L);
         cancelled.setStatus(ShiftStatus.CANCELLED);
-        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class))).thenReturn(cancelled);
+        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class), org.mockito.ArgumentMatchers.isNull())).thenReturn(cancelled);
 
         mockMvc.perform(patch("/shifts/{id}/status", 5L)
                         .with(user("angel@example.com"))
@@ -446,12 +446,13 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.status").value("CANCELLED"));
 
         verify(shiftService).changeStatus(eq("angel@example.com"), eq(5L), org.mockito.ArgumentMatchers.argThat(request ->
-                request.status() == ShiftStatus.CANCELLED && request.basePay().compareTo(new BigDecimal("18.00")) == 0));
+                request.status() == ShiftStatus.CANCELLED && request.basePay().compareTo(new BigDecimal("18.00")) == 0),
+                org.mockito.ArgumentMatchers.isNull());
     }
 
     @Test
     void changeStatus_returnsTheRuleThatWasBroken() throws Exception {
-        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class)))
+        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class), org.mockito.ArgumentMatchers.isNull()))
                 .thenThrow(new InvalidShiftException("A completed shift cannot be moved back to scheduled. Delete it and add the block again."));
 
         mockMvc.perform(patch("/shifts/{id}/status", 5L)
@@ -597,5 +598,87 @@ class ShiftControllerTest {
         mockMvc.perform(get("/shifts/reports/heatmap"))
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/login"));
+    }
+
+    private static final String CREATE_JSON =
+            "{\"station\":\"VEA7\",\"date\":\"2026-09-12\",\"startTime\":\"09:00\",\"endTime\":\"13:00\",\"basePay\":80,\"tips\":10}";
+
+    @Test
+    void anIdempotencyKeyThatIsNotAUuidIsRejected() throws Exception {
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "abc")
+                        .contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Idempotency-Key must be a UUID."));
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
+    void theKeyIsPassedLowerCased() throws Exception {
+        when(shiftService.createShift(eq("angel@example.com"), any(), any())).thenReturn(new ShiftResponse());
+
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "AAAAAAAA-BBBB-4CCC-8DDD-EEEEEEEEEEEE")
+                        .contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isOk());
+
+        verify(shiftService).createShift(eq("angel@example.com"), any(), eq("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"));
+    }
+
+    @Test
+    void anEditPassesItsKeyToTheService() throws Exception {
+        when(shiftService.updateShift(eq("angel@example.com"), eq(5L), any(UpdateShiftRequest.class), any()))
+                .thenReturn(new ShiftResponse());
+
+        mockMvc.perform(put("/shifts/{id}", 5L).with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+                        .contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isOk());
+
+        verify(shiftService).updateShift(eq("angel@example.com"), eq(5L), any(UpdateShiftRequest.class),
+                eq("11111111-1111-4111-8111-111111111111"));
+    }
+
+    @Test
+    void aConflictIs409WithTheCurrentShift() throws Exception {
+        ShiftResponse current = new ShiftResponse();
+        current.setId(5L);
+        current.setUpdatedAt(java.time.Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class), any()))
+                .thenThrow(new com.angel.flexbuddy.exception.ShiftConflictException(current));
+
+        mockMvc.perform(patch("/shifts/{id}/status", 5L).with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\",\"miles\":10,\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.current.id").value(5))
+                .andExpect(jsonPath("$.current.updatedAt").exists());
+    }
+
+    @Test
+    void aDuplicateInsertIs409Duplicate() throws Exception {
+        when(shiftService.createShift(eq("angel@example.com"), any(), any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("could not execute statement",
+                        new RuntimeException("Unique index or primary key violation: UK_SHIFT_OWNER_CREATE_REQUEST")));
+
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+                        .contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("DUPLICATE"));
+    }
+
+    @Test
+    void anyOtherConstraintFailureStaysAGenericServerError() throws Exception {
+        when(shiftService.createShift(eq("angel@example.com"), any(), any()))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("could not execute statement",
+                        new RuntimeException("violates foreign key constraint fk_shift_owner")));
+
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(CREATE_JSON))
+                .andExpect(status().isInternalServerError())
+                .andExpect(content().string("The change could not be saved."));
     }
 }

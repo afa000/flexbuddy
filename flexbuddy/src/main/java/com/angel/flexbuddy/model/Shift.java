@@ -19,6 +19,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import jakarta.persistence.Column;
 import jakarta.persistence.EntityListeners;
 import lombok.Getter;
@@ -30,7 +31,8 @@ import org.hibernate.annotations.SQLRestriction;
 @Table(name = "shift", indexes = {
         @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"),
         @Index(name = "idx_shift_owner_status_date", columnList = "owner_id,status,date")
-})
+}, uniqueConstraints = @UniqueConstraint(name = "uk_shift_owner_create_request",
+        columnNames = {"owner_id", "create_request_id"}))
 @EntityListeners(TimestampListener.class)
 @SQLRestriction("deleted_at is null")
 @Getter
@@ -94,6 +96,14 @@ public class Shift implements Timestamped {
     private ShiftStatus status = ShiftStatus.COMPLETED;
 
     private Instant statusChangedAt;
+
+    /** The Idempotency-Key the shift was created with, so a repeat of the same create finds it instead of adding another. */
+    @Column(name = "create_request_id", length = 36, updatable = false)
+    private String createRequestId;
+
+    /** The key of the last change applied, so a repeat of that change is recognised and not applied again. */
+    @Column(name = "last_request_id", length = 36)
+    private String lastRequestId;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;

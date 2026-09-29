@@ -39,6 +39,13 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
             """, nativeQuery = true)
     List<Expense> findAllIncludingDeleted(@Param("email") String email);
 
+    /** The expense a create with this key made, trash included, so a repeat still finds it after it was deleted. */
+    @Query(value = """
+            select e.* from expense e join app_users u on u.id=e.owner_id
+            where lower(u.email)=lower(:email) and e.create_request_id = :requestId
+            """, nativeQuery = true)
+    java.util.Optional<Expense> findByCreateRequestIdIncludingDeleted(@Param("email") String email, @Param("requestId") String requestId);
+
     @Query(value = """
             select e.* from expense e join app_users u on u.id=e.owner_id
             where lower(u.email)=lower(:email) and e.deleted_at is not null order by e.deleted_at desc

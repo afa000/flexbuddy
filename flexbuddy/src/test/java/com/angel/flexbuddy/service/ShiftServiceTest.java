@@ -303,6 +303,154 @@ class ShiftServiceTest {
         assertThat(scheduled.getStatusChangedAt()).isNull();
     }
 
+    private static final String KEY = "11111111-1111-4111-8111-111111111111";
+    private static final String OTHER_KEY = "22222222-2222-4222-8222-222222222222";
+
+    @Test
+    void aRepeatedCreateWithTheSameKeyReturnsTheFirstShiftAndSavesNothing() {
+        Shift first = shift(5L, "VEA7", LocalDate.of(2026, 9, 3), "120", "35.50");
+        when(shiftRepository.findByCreateRequestIdIncludingDeleted(OWNER_EMAIL, KEY)).thenReturn(Optional.of(first));
+
+        ShiftResponse result = shiftService.createShift(OWNER_EMAIL, request(), KEY);
+
+        assertThat(result.getId()).isEqualTo(5L);
+        verify(shiftRepository, never()).save(any(Shift.class));
+        verify(userRepository, never()).findByEmailIgnoreCase(any());
+    }
+
+    @Test
+    void aCreateWithAKeyStoresItAsCreateAndLastRequestId() {
+        when(shiftRepository.findByCreateRequestIdIncludingDeleted(OWNER_EMAIL, KEY)).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.createShift(OWNER_EMAIL, request(), KEY);
+
+        ArgumentCaptor<Shift> saved = ArgumentCaptor.forClass(Shift.class);
+        verify(shiftRepository).save(saved.capture());
+        assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
+        assertThat(saved.getValue().getLastRequestId()).isEqualTo(KEY);
+    }
+
+    @Test
+    void aCreateWithoutAKeyNeverLooksOneUp() {
+        when(userRepository.findByEmailIgnoreCase(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.createShift(OWNER_EMAIL, request());
+
+        verify(shiftRepository, never()).findByCreateRequestIdIncludingDeleted(any(), any());
+        ArgumentCaptor<Shift> saved = ArgumentCaptor.forClass(Shift.class);
+        verify(shiftRepository).save(saved.capture());
+        assertThat(saved.getValue().getCreateRequestId()).isNull();
+    }
+
+    @Test
+    void aCreateWhoseShiftWasTrashedStillReturnsIt() {
+        Shift trashed = shift(6L, "VEA7", LocalDate.of(2026, 9, 3), "120", "0");
+        trashed.setDeletedAt(Instant.parse("2026-09-10T00:00:00Z"));
+        when(shiftRepository.findByCreateRequestIdIncludingDeleted(OWNER_EMAIL, KEY)).thenReturn(Optional.of(trashed));
+
+        ShiftResponse result = shiftService.createShift(OWNER_EMAIL, request(), KEY);
+
+        assertThat(result.getId()).isEqualTo(6L);
+        verify(shiftRepository, never()).save(any(Shift.class));
+    }
+
+    @Test
+    void aRepeatedStatusChangeWithTheLastRequestIdIsNotAppliedAgain() {
+        Shift scheduled = scheduled(7L);
+        scheduled.setLastRequestId(KEY);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(
+                ShiftStatus.COMPLETED, new BigDecimal("86.50"), new BigDecimal("12.00"), new BigDecimal("99.0")), KEY);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(scheduled.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        verify(shiftRepository, never()).save(any(Shift.class));
+    }
+
+    @Test
+    void aStatusChangeWithAStaleExpectedUpdatedAtIsRefusedWithTheCurrentShift() {
+        Shift scheduled = scheduled(7L);
+        scheduled.setUpdatedAt(Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        ShiftStatusRequest stale = new ShiftStatusRequest(ShiftStatus.COMPLETED, null, null, new BigDecimal("31.5"), null,
+                Instant.parse("2026-09-11T11:00:00Z"));
+
+        assertThatThrownBy(() -> shiftService.changeStatus(OWNER_EMAIL, 7L, stale, OTHER_KEY))
+                .isInstanceOfSatisfying(com.angel.flexbuddy.exception.ShiftConflictException.class,
+                        conflict -> assertThat(conflict.getCurrent().getId()).isEqualTo(7L));
+
+        verify(shiftRepository, never()).save(any(Shift.class));
+        assertThat(scheduled.getLastRequestId()).isNull();
+    }
+
+    @Test
+    void expectedUpdatedAtIsComparedAtMicrosecondPrecision() {
+        Shift scheduled = scheduled(7L);
+        scheduled.setUpdatedAt(Instant.parse("2026-09-11T12:00:00.123456Z"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        ShiftStatusRequest sameMoment = new ShiftStatusRequest(ShiftStatus.COMPLETED, null, null, new BigDecimal("31.5"),
+                null, Instant.parse("2026-09-11T12:00:00.123456789Z"));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, sameMoment, KEY);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.COMPLETED);
+        assertThat(scheduled.getLastRequestId()).isEqualTo(KEY);
+    }
+
+    @Test
+    void aReplayWinsOverTheConflictCheck() {
+        Shift scheduled = scheduled(7L);
+        scheduled.setLastRequestId(KEY);
+        scheduled.setUpdatedAt(Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        ShiftStatusRequest stale = new ShiftStatusRequest(ShiftStatus.COMPLETED, null, null, new BigDecimal("31.5"), null,
+                Instant.parse("2026-09-01T00:00:00Z"));
+
+        ShiftResponse result = shiftService.changeStatus(OWNER_EMAIL, 7L, stale, KEY);
+
+        assertThat(result.getId()).isEqualTo(7L);
+        verify(shiftRepository, never()).save(any(Shift.class));
+    }
+
+    @Test
+    void withoutAKeyOrExpectedUpdatedAtNothingChanges() {
+        Shift scheduled = scheduled(7L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(
+                ShiftStatus.COMPLETED, new BigDecimal("86.50"), new BigDecimal("12.00"), new BigDecimal("31.5")));
+
+        verify(shiftRepository).save(scheduled);
+        assertThat(scheduled.getLastRequestId()).isNull();
+    }
+
+    @Test
+    void aRepeatedEditWithTheLastRequestIdIsNotAppliedAgain() {
+        Shift stored = shift(9L, "VEA7", LocalDate.of(2026, 9, 6), "120", "0");
+        stored.setLastRequestId(KEY);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(9L, OWNER_EMAIL)).thenReturn(Optional.of(stored));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        UpdateShiftRequest edit = new UpdateShiftRequest("BDL4", LocalDate.of(2026, 9, 6), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("120.00"), BigDecimal.ZERO);
+
+        ShiftResponse replay = shiftService.updateShift(OWNER_EMAIL, 9L, edit, KEY);
+
+        assertThat(replay.getStation()).isEqualTo("VEA7");
+        verify(shiftRepository, never()).save(any(Shift.class));
+
+        ShiftResponse applied = shiftService.updateShift(OWNER_EMAIL, 9L, edit, OTHER_KEY);
+
+        assertThat(applied.getStation()).isEqualTo("BDL4");
+        assertThat(stored.getLastRequestId()).isEqualTo(OTHER_KEY);
+        verify(shiftRepository).save(stored);
+    }
+
     private Shift scheduled(Long id) {
         Shift shift = new Shift(id, "VEA7", LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15),
                 new BigDecimal("84.00"), BigDecimal.ZERO, owner);

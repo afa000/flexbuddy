@@ -19,6 +19,7 @@ import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,7 +29,8 @@ import lombok.Setter;
         @Index(name = "idx_expense_owner_date", columnList = "owner_id,date"),
         @Index(name = "idx_expense_owner_deleted", columnList = "owner_id,deleted_at"),
         @Index(name = "idx_expense_shift", columnList = "shift_id")
-})
+}, uniqueConstraints = @UniqueConstraint(name = "uk_expense_owner_create_request",
+        columnNames = {"owner_id", "create_request_id"}))
 @EntityListeners(TimestampListener.class)
 @SQLRestriction("deleted_at is null")
 @Getter
@@ -70,4 +72,8 @@ public class Expense implements Timestamped {
 
     @Column(length = 36)
     private String deleteBatch;
+
+    /** The Idempotency-Key the expense was created with, so a repeat of the same create finds it instead of adding another. */
+    @Column(name = "create_request_id", length = 36, updatable = false)
+    private String createRequestId;
 }

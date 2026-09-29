@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -61,7 +62,11 @@ public class ExpenseController {
         return expenseService.summary(principal.getName(), ExpenseFilter.of(from,to,station,query,category,shiftId));
     }
 
-    @PostMapping public ExpenseResponse create(Principal p, @Valid @RequestBody ExpenseRequest r) { return expenseService.create(p.getName(), r); }
+    @PostMapping
+    public ExpenseResponse create(Principal p, @Valid @RequestBody ExpenseRequest r,
+            @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
+        return expenseService.create(p.getName(), r, RequestIds.parse(key));
+    }
     @PutMapping("/{id}") public ExpenseResponse update(Principal p, @PathVariable Long id, @Valid @RequestBody ExpenseRequest r) { return expenseService.update(p.getName(), id, r); }
     @DeleteMapping("/{id}") public ResponseEntity<Void> delete(Principal p, @PathVariable Long id) {
         return ResponseEntity.noContent().header("X-Delete-Batch", expenseService.delete(p.getName(), id)).build();

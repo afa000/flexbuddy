@@ -74,9 +74,23 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseResponse create(String email, ExpenseRequest request) {
+        return create(email, request, null);
+    }
+
+    /**
+     * Creates an expense. With a request id, a repeat of the same create returns the expense the first one made,
+     * even if it was deleted since, instead of adding another.
+     */
+    @Transactional
+    public ExpenseResponse create(String email, ExpenseRequest request, String requestId) {
+        if (requestId != null) {
+            Expense existing = expenseRepository.findByCreateRequestIdIncludingDeleted(email, requestId).orElse(null);
+            if (existing != null) return toResponse(existing);
+        }
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
         Expense expense = new Expense();
+        expense.setCreateRequestId(requestId);
         expense.setOwner(owner);
         apply(expense, email, request);
         return toResponse(expenseRepository.save(expense));

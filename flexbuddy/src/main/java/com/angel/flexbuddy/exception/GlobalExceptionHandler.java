@@ -59,6 +59,31 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidRequestIdException.class)
+    public ResponseEntity<String> handleInvalidRequestId(InvalidRequestIdException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
+    @ExceptionHandler(ShiftConflictException.class)
+    public ResponseEntity<com.angel.flexbuddy.dto.ConflictResponse> handleShiftConflict(ShiftConflictException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new com.angel.flexbuddy.dto.ConflictResponse("CONFLICT", exception.getCurrent()));
+    }
+
+    /**
+     * Two copies of the same create raced and the second hit the unique key: the first one landed, so the client
+     * treats it as delivered. Any other constraint stays a plain failure, and its text is never returned.
+     */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException exception) {
+        Throwable cause = org.springframework.core.NestedExceptionUtils.getMostSpecificCause(exception);
+        String message = cause.getMessage() == null ? "" : cause.getMessage().toLowerCase(java.util.Locale.ROOT);
+        if (message.contains("uk_shift_owner_create_request") || message.contains("uk_expense_owner_create_request")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new com.angel.flexbuddy.dto.ConflictResponse("DUPLICATE", null));
+        }
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("The change could not be saved.");
+    }
+
     @ExceptionHandler(InvalidPushSubscriptionException.class)
     public ResponseEntity<String> handleInvalidPushSubscription(InvalidPushSubscriptionException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());

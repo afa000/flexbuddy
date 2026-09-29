@@ -131,4 +131,41 @@ class ExpenseServiceTest {
         expense.setAmount(new BigDecimal(amount));
         return expense;
     }
+
+    private static final String KEY = "11111111-1111-4111-8111-111111111111";
+
+    @Test
+    void aRepeatedCreateWithTheSameKeyReturnsTheFirstExpense() {
+        Expense first = new Expense();
+        first.setId(20L);
+        first.setOwner(owner);
+        first.setDate(LocalDate.of(2026, 9, 12));
+        first.setCategory(ExpenseCategory.FUEL);
+        first.setAmount(new BigDecimal("45.20"));
+        when(expenseRepository.findByCreateRequestIdIncludingDeleted(EMAIL, KEY)).thenReturn(Optional.of(first));
+
+        var result = service.create(EMAIL, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.FUEL,
+                new BigDecimal("45.20"), null, null), KEY);
+
+        assertThat(result.id()).isEqualTo(20L);
+        verify(expenseRepository, org.mockito.Mockito.never()).save(any(Expense.class));
+    }
+
+    @Test
+    void aCreateWithAKeyStoresIt() {
+        when(expenseRepository.findByCreateRequestIdIncludingDeleted(EMAIL, KEY)).thenReturn(Optional.empty());
+        when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(owner));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
+            Expense expense = invocation.getArgument(0);
+            expense.setId(21L);
+            return expense;
+        });
+
+        service.create(EMAIL, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.FUEL,
+                new BigDecimal("45.20"), null, null), KEY);
+
+        org.mockito.ArgumentCaptor<Expense> saved = org.mockito.ArgumentCaptor.forClass(Expense.class);
+        verify(expenseRepository).save(saved.capture());
+        assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
+    }
 }

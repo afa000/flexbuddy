@@ -58,7 +58,7 @@ class ExpenseControllerTest {
 
     @Test
     void createValidatesAndPassesTheSignedInOwnerToTheService() throws Exception {
-        when(expenseService.create(eq(EMAIL), any(ExpenseRequest.class))).thenReturn(new ExpenseResponse(
+        when(expenseService.create(eq(EMAIL), any(ExpenseRequest.class), org.mockito.ArgumentMatchers.isNull())).thenReturn(new ExpenseResponse(
                 20L, LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL, new BigDecimal("6.25"),
                 "Bridge", 8L, "VEA7", null, null, null));
 
@@ -73,7 +73,7 @@ class ExpenseControllerTest {
                 .andExpect(jsonPath("$.station").value("VEA7"));
 
         ArgumentCaptor<ExpenseRequest> request = ArgumentCaptor.forClass(ExpenseRequest.class);
-        verify(expenseService).create(eq(EMAIL), request.capture());
+        verify(expenseService).create(eq(EMAIL), request.capture(), org.mockito.ArgumentMatchers.isNull());
         assertThat(request.getValue().shiftId()).isEqualTo(8L);
         assertThat(request.getValue().amount()).isEqualByComparingTo("6.25");
     }

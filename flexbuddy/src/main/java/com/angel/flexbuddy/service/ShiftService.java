@@ -110,10 +110,24 @@ public class ShiftService {
     }
 
     public ShiftResponse createShift(String email, CreateShiftRequest request) {
+        return createShift(email, request, null);
+    }
+
+    /**
+     * Creates a shift. With a request id, a repeat of the same create returns the shift the first one made, even if
+     * it was deleted since, instead of adding another.
+     */
+    public ShiftResponse createShift(String email, CreateShiftRequest request, String requestId) {
+        if (requestId != null) {
+            Shift existing = shiftRepository.findByCreateRequestIdIncludingDeleted(email, requestId).orElse(null);
+            if (existing != null) return toResponse(existing, List.of(), settingsService.get(email));
+        }
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
 
         Shift shift = new Shift();
+        shift.setCreateRequestId(requestId);
+        shift.setLastRequestId(requestId);
         ShiftStatus status = request.getStatus() == null ? ShiftStatus.COMPLETED : request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
                 request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
@@ -124,8 +138,17 @@ public class ShiftService {
     }
 
     public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request) {
+        return updateShift(email, id, request, null);
+    }
+
+    /** Edits a shift. A repeat of the change already applied under the same request id returns the shift as it is. */
+    public ShiftResponse updateShift(String email, Long id, UpdateShiftRequest request, String requestId) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
+        if (requestId != null && requestId.equals(shift.getLastRequestId())) {
+            return toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email));
+        }
+        if (requestId != null) shift.setLastRequestId(requestId);
         ShiftStatus previous = shift.getStatus();
         ShiftStatus status = request.getStatus() == null ? shift.getStatus() : request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
@@ -144,8 +167,30 @@ public class ShiftService {
      */
     @org.springframework.transaction.annotation.Transactional
     public ShiftResponse changeStatus(String email, Long id, ShiftStatusRequest request) {
+        return changeStatus(email, id, request, null);
+    }
+
+    /**
+     * Moves a shift to another status. A repeat of the change already applied under the same request id returns the
+     * shift as it is, and that check comes before the conflict check, so a queued change whose response was lost
+     * comes back as a success rather than as a conflict with its own write. When the request names the version it was
+     * made against and the shift has changed since, nothing is written and the current shift is returned in the
+     * conflict, compared at microsecond precision since that is what the database keeps.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public ShiftResponse changeStatus(String email, Long id, ShiftStatusRequest request, String requestId) {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
+        if (requestId != null && requestId.equals(shift.getLastRequestId())) {
+            return toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email));
+        }
+        if (request.expectedUpdatedAt() != null && shift.getUpdatedAt() != null
+                && !shift.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+                        .equals(request.expectedUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS))) {
+            throw new com.angel.flexbuddy.exception.ShiftConflictException(
+                    toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email)));
+        }
+        if (requestId != null) shift.setLastRequestId(requestId);
         ShiftStatus target = request.status();
         ShiftStatus previous = shift.getStatus();
         boolean unchanged = target == previous;

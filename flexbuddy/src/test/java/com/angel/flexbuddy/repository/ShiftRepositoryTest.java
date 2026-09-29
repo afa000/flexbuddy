@@ -349,4 +349,40 @@ class ShiftRepositoryTest {
                 .extracting(shift -> shift.getOwner().getEmail() + " " + shift.getStatus())
                 .containsExactlyInAnyOrder("angel@example.com COMPLETED", "angel@example.com SCHEDULED");
     }
+
+    @Test
+    void findByCreateRequestIdIncludingDeletedFindsTrashedRowsAndOnlyTheOwners() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        AppUser other = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        String key = "11111111-1111-4111-8111-111111111111";
+        Shift mine = shift(angel, "VEA7", LocalDate.of(2026, 9, 5));
+        mine.setCreateRequestId(key);
+        mine.setDeletedAt(NOW);
+        shiftRepository.save(mine);
+        Shift theirs = shift(other, "BDL4", LocalDate.of(2026, 9, 5));
+        theirs.setCreateRequestId("22222222-2222-4222-8222-222222222222");
+        shiftRepository.save(theirs);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(shiftRepository.findByCreateRequestIdIncludingDeleted("ANGEL@example.com", key))
+                .get().extracting(Shift::getStation).isEqualTo("VEA7");
+        assertThat(shiftRepository.findByCreateRequestIdIncludingDeleted("angel@example.com",
+                "22222222-2222-4222-8222-222222222222")).isEmpty();
+        assertThat(shiftRepository.findByCreateRequestIdIncludingDeleted("other@example.com", key)).isEmpty();
+    }
+
+    @Test
+    void theSameKeyCannotCreateTwoShiftsForOneOwner() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        String key = "11111111-1111-4111-8111-111111111111";
+        Shift first = shift(angel, "VEA7", LocalDate.of(2026, 9, 5));
+        first.setCreateRequestId(key);
+        shiftRepository.saveAndFlush(first);
+        Shift second = shift(angel, "BDL4", LocalDate.of(2026, 9, 6));
+        second.setCreateRequestId(key);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> shiftRepository.saveAndFlush(second))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+    }
 }

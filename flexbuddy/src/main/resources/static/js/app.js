@@ -1250,11 +1250,11 @@ async function saveEditedShift(event) {
     try {
         const response = await apiFetch(creating ? '/shifts' : `/shifts/${shiftId}`, {
             method: creating ? 'POST' : 'PUT',
-            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
 
-        if (!response.ok) {
+        if (!response.ok && !(await isDuplicate(response))) {
             const message = await response.text();
             throw new Error(message || 'The shift could not be updated. Check each field and try again.');
         }
@@ -1822,6 +1822,24 @@ function csrfHeaders(headers = {}) {
     return headers;
 }
 
+/**
+ * Headers for a save that can be retried: the security token plus a key made once per submit, so a repeat of the
+ * same request is recognised by the server instead of being applied twice.
+ */
+function retryHeaders(requestId, headers = {}) {
+    return csrfHeaders({...headers, 'Idempotency-Key': requestId});
+}
+
+/** True for the 409 that a repeated create gets when the first copy already landed: the change was delivered. */
+async function isDuplicate(response) {
+    if (response.status !== 409) return false;
+    try {
+        return (await response.clone().json()).code === 'DUPLICATE';
+    } catch {
+        return false;
+    }
+}
+
 function populateExpenseShifts(shifts) {
     const selected = elements.expenseShift.value;
     elements.expenseShift.innerHTML = '<option value="">No linked shift</option>';
@@ -1939,11 +1957,14 @@ async function saveExpense(event) {
         amount: Number(elements.expenseAmount.value), note: elements.expenseNote.value.trim() || null,
         shiftId: elements.expenseShift.value ? Number(elements.expenseShift.value) : null};
     const id = editingExpenseId;
+    // Only adding is retried by key; the key is made once per submit, so a double tap cannot add it twice.
+    const headers = id ? csrfHeaders({'Content-Type': 'application/json'})
+        : retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'});
     elements.saveExpenseButton.disabled = true;
     try {
         const response = await apiFetch(id ? `/expenses/${id}` : '/expenses', {method: id ? 'PUT' : 'POST',
-            headers: csrfHeaders({'Content-Type': 'application/json'}), body: JSON.stringify(body)});
-        if (!response.ok) throw new Error(await response.text());
+            headers, body: JSON.stringify(body)});
+        if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text());
         resetExpenseForm();
         showToast(id ? 'Expense updated' : 'Expense added', 'Net earnings have been recalculated.');
         await Promise.all([loadExpenses(), loadDashboard()]);

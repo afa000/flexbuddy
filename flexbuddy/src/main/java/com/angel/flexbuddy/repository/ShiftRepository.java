@@ -102,6 +102,13 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             """, nativeQuery = true)
     List<Shift> findAllIncludingDeleted(@Param("email") String email);
 
+    /** The shift a create with this key made, trash included, so a repeat still finds it after it was deleted. */
+    @Query(value = """
+            select s.* from shift s join app_users u on u.id = s.owner_id
+            where lower(u.email) = lower(:email) and s.create_request_id = :requestId
+            """, nativeQuery = true)
+    Optional<Shift> findByCreateRequestIdIncludingDeleted(@Param("email") String email, @Param("requestId") String requestId);
+
     @Query(value = """
             select s.* from shift s join app_users u on u.id = s.owner_id
             where lower(u.email) = lower(:email) and s.deleted_at is not null

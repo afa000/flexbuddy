@@ -216,10 +216,10 @@
         try {
             const response = await apiFetch(`/shifts/${finished.id}/status`, {
                 method: 'PATCH',
-                headers: csrfHeaders({'Content-Type': 'application/json'}),
+                headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
                 body: JSON.stringify(body)
             });
-            if (!response.ok) throw new Error(await response.text() || 'The block could not be saved.');
+            if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text() || 'The block could not be saved.');
             const wasScheduled = completing();
             close();
             showToast(wasScheduled ? 'Block finished' : 'Block details saved',

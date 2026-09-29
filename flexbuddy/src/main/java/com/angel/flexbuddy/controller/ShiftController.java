@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -127,8 +128,9 @@ public class ShiftController {
     }
 
     @PostMapping
-    public ShiftResponse createShift(Principal principal, @Valid @RequestBody CreateShiftRequest request) {
-        return shiftService.createShift(principal.getName(), request);
+    public ShiftResponse createShift(Principal principal, @Valid @RequestBody CreateShiftRequest request,
+            @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
+        return shiftService.createShift(principal.getName(), request, RequestIds.parse(key));
     }
 
     @PostMapping("/evaluate")
@@ -144,14 +146,16 @@ public class ShiftController {
 
     @PutMapping("/{id}")
     public ShiftResponse updateShift(Principal principal, @PathVariable Long id,
-            @Valid @RequestBody UpdateShiftRequest request) {
-        return shiftService.updateShift(principal.getName(), id, request);
+            @Valid @RequestBody UpdateShiftRequest request,
+            @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
+        return shiftService.updateShift(principal.getName(), id, request, RequestIds.parse(key));
     }
 
     @PatchMapping("/{id}/status")
     public ShiftResponse changeStatus(Principal principal, @PathVariable Long id,
-            @Valid @RequestBody ShiftStatusRequest request) {
-        return shiftService.changeStatus(principal.getName(), id, request);
+            @Valid @RequestBody ShiftStatusRequest request,
+            @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
+        return shiftService.changeStatus(principal.getName(), id, request, RequestIds.parse(key));
     }
 
     @DeleteMapping("/{id}")
