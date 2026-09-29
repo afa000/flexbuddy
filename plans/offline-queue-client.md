@@ -42,7 +42,7 @@ online-only, as today.
   - and the only case it adds is "phone reconnects while the app is closed".
 
   With page-only draining, those items sync seconds after the driver next opens the app.
-  See open question 1.
+  Decided: page-only.
 - **No fake rows with negative ids.** Queued creates aren't injected into history or the
   statistics, which are computed on the server and would be wrong. They're listed in the
   Waiting to sync strip. A queued finish marks its shift's history row "Pending".
@@ -51,7 +51,7 @@ online-only, as today.
     Shift dropdown.
   - A queued shift can't be finished before it syncs: it has no id yet.
 - **Conflicts: choose a whole version, not a field-by-field merge.** Per-field merging of
-  times and odometer readings invites nonsense combinations. See open question 3.
+  times and odometer readings invites nonsense combinations. Decided: whole version.
 - **"Pending" and "sync" wording** is used throughout. The draft's account-page line is
   kept, with Sync now and Discard.
 
@@ -62,7 +62,8 @@ online-only, as today.
 - Background Sync.
 - Showing queued creates in totals, charts or goals.
 - Syncing across devices while offline.
-- A JavaScript test harness (open question 5).
+- A JavaScript test harness. It gets its own plan, `plans/js-unit-tests.md`, which ships
+  first or alongside, so `outbox.js`'s pure functions have tests from day one.
 
 ## 2. Data model and migration
 
@@ -258,7 +259,7 @@ markup, handlers and focus trap.
   - Times go through `formatTime`, and money through `formatMoney`.
 - **Buttons:** **Keep saved version** (secondary), which discards, and **Use my change**
   (primary), which resends against the saved version.
-- This is not a field-by-field merge (open question 3).
+- This is not a field-by-field merge (decided: whole version).
 
 ### Sign-out and account page
 
@@ -326,12 +327,42 @@ markup, handlers and focus trap.
 
 **Java tests that change:** none. Tests are added below.
 
+**Fitting 06a.** 06a already sends an `Idempotency-Key` from `saveExpense`,
+`saveEditedShift` and `finish.js` online, and treats `409 DUPLICATE` as success. In this
+commit:
+
+- The three **add and finish** paths replace their inline key with `flexbuddyOutbox.submit`,
+  which makes the key and keeps the same `DUPLICATE` handling.
+- The **edit** path (`PUT`) keeps 06a's inline key. It isn't queued.
+
 ## 6. Tests
 
-There's no JavaScript test harness, and adding one is open question 5. To keep the logic
-testable later, `outbox.js` puts the drain's decision in a pure function,
-`classify(status, redirectedToLogin, body)`, which returns
-`'delete' | 'conflict' | 'failed' | 'retry-token' | 'signed-out' | 'stop'`.
+`outbox.js` keeps its decisions in pure functions, with no DOM, IndexedDB or fetch. They're
+exported for the tests in `plans/js-unit-tests.md`:
+
+- `classify(status, redirectedToLogin, body)`, which returns
+  `'delete' | 'conflict' | 'failed' | 'retry-token' | 'signed-out' | 'stop'`;
+- `nextDelay(attempt)`, the backoff: 30, 60, 120, then 300 s;
+- `conflictRows(queuedBody, current)`, the rows for the conflict sheet, with a `differs` flag
+  on each;
+- `canQueue(count)`, the limit of 50.
+
+**JavaScript tests to add** (under `src/test/js/outbox.test.js`, following the harness
+plan):
+
+1. `classify`:
+   - 200, 201 and 204 give `delete`.
+   - 409 with `DUPLICATE` gives `delete`. 409 with `CONFLICT` gives `conflict`.
+   - The first 403 gives `retry-token`. A redirect to `/login` or a 401 gives `signed-out`.
+   - 400 and 404 give `failed`.
+   - 500, 503 and a network error give `stop`.
+2. `nextDelay`: 30000, 60000, 120000, 300000, and 300000 again after that.
+3. `conflictRows`:
+   - Only the fields present in the queued body appear.
+   - Different values have `differs: true`.
+   - `null` against a value counts as different.
+   - Times compare at minute precision (`"09:00"` equals `"09:00:00"`).
+4. `canQueue`: 49 gives true. 50 gives false.
 
 **Java tests to add** (about 4):
 
@@ -446,16 +477,16 @@ asks first, and queued changes are never sent under a different
 account.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Page-only sync.** Queued changes sync when the app is next open with a connection, not
-   while it is closed. Is that acceptable, or do you want Background Sync added later as a
-   separate plan?
-2. **Add scheduled shift offline.** It's a create, so this plan allows it. Should queueing be
-   limited to worked blocks and expenses?
-3. **Conflict choice.** The driver keeps one version or the other, not a field-by-field mix.
-   Is that right?
-4. **The limit of 50 items.** Too low or too high for a long day without signal?
-5. **A JavaScript test harness.** The outbox is the most logic-heavy script in the app.
-   Should a follow-up plan add `node --test` (built into Node, with no dependencies) for the
-   pure functions, such as `classify`, without touching the browser code?
+All questions are settled. Nothing is left open.
+
+- **Page-only sync.** No Background Sync. Queued changes go out when the app is next open
+  with a connection. This fits the Android app, where the driver opens FlexBuddy at the
+  station anyway, and it keeps all the token, account and error handling in one place.
+  Background Sync can be a separate plan later if testers ask for it.
+- **"Add scheduled shift" is queueable offline.** It's a create, so it can't conflict.
+- **Conflicts resolve by whole version**: "Use my change" or "Keep saved version".
+- **The limit is 50 queued items**, for now.
+- **JavaScript tests** get their own plan, `plans/js-unit-tests.md`, and cover the pure
+  functions above.
