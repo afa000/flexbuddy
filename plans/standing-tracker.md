@@ -43,7 +43,7 @@ way, what changed after a late forfeit is visible in one place.
 - Reading standing from a screenshot. OCR would need samples of Amazon's standing screen.
 - Reminders to log standing.
 - A "Log standing" action on the forfeit toast. Decided: not wanted.
-- Any score or sub-metric beyond the four levels (open question 3).
+- Any score or sub-metric beyond the four levels. Decided: four levels only.
 - The account page.
 
 ## 2. Data model and migration
@@ -573,9 +573,9 @@ them. The backup format stays at version 4, as older files simply have
 no standing to add.
 ```
 
-## 9. Decisions and open questions
+## 9. Decisions
 
-### Decided
+All questions are settled. Nothing is left open.
 
 - **The card lives on the Schedule screen**, with the dashboard tile's link jumping to it,
   as planned in section 4.
@@ -583,14 +583,9 @@ no standing to add.
   besides the Schedule screen.
 - **The backup format stays at version 4.** `AccountRestoreService`'s `> 4` check and its
   tests don't change.
-
-### Still open
-
-1. **Window.** A fixed 90 days, or a 30 / 90 / 180 switch? The API already takes `days`, so
-   a switch would be frontend only. The plan ships a fixed 90 days unless you say otherwise.
-2. **How far back.** Any past date can be logged, which is useful for back-filling from
-   memory. Should there be a limit, such as one year? The plan ships with no limit.
-3. **Levels.** Some regions show extra tiers, such as "Fantastic Plus", or sub-scores like
-   reliability. Are the four levels all you want, or should the check constraint allow
-   more? Adding a level later means a new migration to widen the check. The plan ships the
-   four levels.
+- **The window is a fixed 90 days.** No switch in the UI. The API still accepts `days` from 7
+  to 365, which keeps the service testable, but the page always asks for 90.
+- **There is no limit on how far back an entry can be dated.** Only a day after today, in
+  the account's time zone, is rejected.
+- **There are four levels only:** Fantastic, Great, Fair and At Risk. The check constraint
+  allows exactly these.
