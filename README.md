@@ -71,6 +71,17 @@ $env:FLEXBUDDY_TEST_POSTGRES_PASSWORD = 'flexbuddy'
 .\mvnw.cmd -Dtest=PostgresMigrationTest test
 ```
 
+The browser scripts have their own tests, run with Node 22 or later and no install step:
+
+```powershell
+cd flexbuddy
+node --test "src/test/js/*.test.js"
+```
+
+They load the scripts from `src/main/resources/static/js` as they are, so a script that
+needs the page at load time can't be tested this way; new scripts keep their logic in
+functions they export.
+
 ## Deployment
 
 The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Pushes to `main` are automatically deployed through the connected Render Blueprint.

@@ -388,7 +388,7 @@
         for (let day = first; day <= first + span; day++) {
             const date = new Date(day * DAY_MS);
             if (date.getUTCDate() !== 1) continue;
-            const tick = x(date.toISOString().slice(0, 10));
+            const tick = x(date.toISOString().slice(0, 10)); // utc-day: day numbers here are UTC throughout
             svg.append(svgElement('line', {x1: tick, x2: tick, y1: 140, y2: 146, class: 'standing-grid'}));
             const label = svgElement('text', {x: tick, y: 162, class: 'standing-axis-label', 'text-anchor': 'middle'});
             label.textContent = date.toLocaleDateString(undefined, {month: 'short', timeZone: 'UTC'});
