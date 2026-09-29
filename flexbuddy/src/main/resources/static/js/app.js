@@ -1050,9 +1050,9 @@ function openEditModal(shift, trigger, options = {}) {
         option.disabled = option.value === 'SCHEDULED' && editMode === 'edit' && editOriginalStatus !== 'SCHEDULED';
     });
     const isNew = editMode === 'new';
-    elements.editDialogTitle.textContent = isNew ? 'Add scheduled shift' : 'Edit shift';
+    elements.editDialogTitle.textContent = isNew ? newShiftCopy(elements.editStatus.value).title : 'Edit shift';
     elements.editDialogDescription.textContent = isNew
-        ? 'Enter a block you accepted. It will not count toward earnings or hours until you confirm it.'
+        ? newShiftCopy(elements.editStatus.value).description
         : 'Update the values and save your changes.';
     elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
     elements.duplicateShiftButton.classList.toggle('is-hidden', isNew);
@@ -1076,8 +1076,28 @@ function openEditModal(shift, trigger, options = {}) {
     }
 }
 
+/** The words for adding a shift, which follow the chosen status: a scheduled block is a plan, anything else happened. */
+function newShiftCopy(status) {
+    return status === 'SCHEDULED'
+        ? {title: 'Add scheduled shift',
+            description: 'Enter a block you accepted. It will not count toward earnings or hours until you confirm it.',
+            toast: ['Shift scheduled', 'It is on your schedule and calendar feed.']}
+        : {title: 'Add shift',
+            description: 'Enter a block you already worked. It counts toward your earnings, hours, and miles.',
+            toast: ['Shift added', 'Your earnings history is up to date.']};
+}
+
 function applyEditStatusRules(statusChanged = false) {
     const status = elements.editStatus.value;
+    if (editMode === 'new') {
+        // The title and description follow the status while adding, but a description written for something else,
+        // such as a duplicate's "A copy of ...", is left alone.
+        elements.editDialogTitle.textContent = newShiftCopy(status).title;
+        const standard = ['SCHEDULED', 'COMPLETED'].map(name => newShiftCopy(name).description);
+        if (standard.includes(elements.editDialogDescription.textContent)) {
+            elements.editDialogDescription.textContent = newShiftCopy(status).description;
+        }
+    }
     const hints = {
         SCHEDULED: 'Offered pay only. It does not count toward earnings or hours until you confirm it.',
         COMPLETED: 'Worked and paid. Counts toward earnings, hours, and miles.',
@@ -1152,8 +1172,8 @@ function updateActualSummary() {
 }
 
 function saveEditLabel() {
-    if (editMode === 'new') return 'Add scheduled shift';
     const status = elements.editStatus.value;
+    if (editMode === 'new') return status === 'SCHEDULED' ? 'Add scheduled shift' : 'Add shift';
     if (status === editOriginalStatus) return 'Save changes';
     return {COMPLETED: 'Mark completed', CANCELLED: 'Mark cancelled', FORFEITED: 'Mark forfeited'}[status] || 'Save changes';
 }
@@ -1239,7 +1259,7 @@ async function saveEditedShift(event) {
         const previous = editSnapshot;
         closeEditModal();
         if (creating) {
-            showToast('Shift scheduled', 'It is on your schedule and calendar feed.');
+            showToast(...newShiftCopy(shift.status).toast);
         } else if (statusChanged) {
             showToast('Shift updated', `Marked ${shift.status.toLowerCase()}. Earnings and hours are up to date.`);
         } else {

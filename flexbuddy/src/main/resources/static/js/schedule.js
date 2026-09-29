@@ -335,7 +335,7 @@
     }
 
     async function startBlock(shift, button) {
-        button.disabled = true;
+        if (button) button.disabled = true;
         try {
             const response = await apiFetch(`/shifts/${shift.id}/start`, {method: 'POST', headers: csrfHeaders()});
             if (!response.ok) throw new Error(await response.text() || 'The block could not be started.');
@@ -344,7 +344,7 @@
             await loadDashboard();
         } catch (error) {
             showToast('Block not started', error.message || 'The block could not be started.', {alert: true});
-            button.disabled = false;
+            if (button) button.disabled = false;
         }
     }
 
@@ -396,6 +396,19 @@
         showToast(title, `${shift.station} on ${formatDate(shift.date)} is up to date.`);
         await loadDashboard();
         return response.json();
+    }
+
+    /**
+     * The next block when the server would let it start now: scheduled, not started, from two hours before its start
+     * until its scheduled end, by the schedule's own clock. Null when there is no such block or the schedule has not
+     * loaded yet.
+     */
+    function startable() {
+        const shift = state.upcoming?.next;
+        if (!shift || shift.status !== 'SCHEDULED' || shift.details?.actualStart) return null;
+        const start = localMs(shift.date, shift.startTime);
+        const now = nowMs();
+        return now >= start - EARLIEST_START_MS && now <= start + shift.timeWorked * 60000 ? shift : null;
     }
 
     function addScheduled(date, trigger) {
@@ -467,5 +480,6 @@
         return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
     }
 
-    window.flexbuddySchedule = {show, refresh, changeStatus};
+    window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock,
+        add: trigger => addScheduled(state.selected || today(), trigger)};
 })();

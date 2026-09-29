@@ -498,7 +498,7 @@
                     <form class="preview-form" id="expenseForm">
                         <label class="field"><span>Date</span><input id="expenseDate" type="date" required></label>
                         <label class="field"><span>Category</span><select id="expenseCategory" required><option value="FUEL">Fuel</option><option value="TOLL">Toll</option><option value="PARKING">Parking</option><option value="MAINTENANCE">Maintenance</option><option value="OTHER">Other</option></select></label>
-                        <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" required></span></label>
+                        <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
                         <label class="field"><span>Shift <small>(optional)</small></span><select id="expenseShift"><option value="">No linked shift</option></select></label>
                         <label class="field field-wide"><span>Note <small>(optional)</small></span><input id="expenseNote" type="text" maxlength="255" placeholder="Gas station, receipt, or details"></label>
                         <div class="notice error-notice is-hidden field-wide" id="expenseError" role="alert"></div>
@@ -745,6 +745,33 @@
         </button>
     </nav>
 
+    <button class="fab" id="quickActionButton" type="button" aria-label="Quick actions"
+            aria-haspopup="menu" aria-expanded="false" aria-controls="quickActionMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+
+    <div class="modal-backdrop quick-actions-backdrop is-hidden" id="quickActionsSheet">
+        <section class="action-sheet" id="quickActionMenu" role="menu" aria-label="Quick actions">
+            <button class="action-sheet-row" id="qaImport" type="button" role="menuitem" data-online-only>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L8 8m4-4 4 4M5 15v3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3"/></svg>
+                <span><strong>Import screenshot</strong><small>Read a block from the Flex app</small></span>
+            </button>
+            <button class="action-sheet-row" id="qaAddShift" type="button" role="menuitem" data-online-only>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm7 6v6m-3-3h6"/></svg>
+                <span><strong>Add shift</strong><small id="qaAddShiftHint">A block you worked</small></span>
+            </button>
+            <button class="action-sheet-row" id="qaAddExpense" type="button" role="menuitem" data-online-only>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v12H4zM7 7V5h10v2M8 12h8M8 16h5"/></svg>
+                <span><strong>Add expense</strong><small>Fuel, tolls, parking</small></span>
+            </button>
+            <button class="action-sheet-row" id="qaStartBlock" type="button" role="menuitem" data-online-only>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+                <span><strong id="qaStartLabel">Start block</strong><small id="qaStartHint"></small></span>
+            </button>
+            <p class="action-sheet-offline">Offline · adding is available when you are back online</p>
+        </section>
+    </div>
+
     <div class="toast is-hidden" id="successToast" role="status" aria-live="polite">
         <span aria-hidden="true">✓</span>
         <div><strong id="toastTitle">Shift added</strong><small id="toastMessage">Your earnings history is up to date.</small></div>
@@ -770,6 +797,7 @@
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
 </html>

@@ -2320,3 +2320,43 @@ a.text-button, a.secondary-button { text-decoration: none; }
     /* Pay details wrap instead of being cut off, so the estimated net and route lines stay readable. */
     .shift-pay span { max-width: 150px; white-space: normal; overflow: visible; text-overflow: clip; }
 }
+
+/* Quick-action button */
+.fab { position: fixed; z-index: 35; width: 56px; height: 56px; padding: 0; display: grid; place-items: center; color: var(--primary-text); background: var(--cyan); border: 0; border-radius: 50%; box-shadow: var(--toast-shadow); cursor: pointer; }
+.fab svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.fab:hover { background: var(--action-hover); }
+body.modal-open .fab, body.fab-suppressed .fab { display: none; }
+.action-sheet { padding: 6px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--toast-shadow); animation: action-sheet-in .18s ease-out; }
+@keyframes action-sheet-in { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.action-sheet-row { width: 100%; min-height: 60px; padding: 0 14px; display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 14px; align-items: center; color: var(--text); background: none; border: 0; border-radius: 8px; font: inherit; text-align: left; cursor: pointer; }
+.action-sheet-row:hover, .action-sheet-row:focus-visible { background: var(--primary-soft); }
+.action-sheet-row svg { width: 24px; height: 24px; fill: none; stroke: var(--cyan); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.action-sheet-row span { min-width: 0; display: grid; }
+.action-sheet-row strong { font-size: 15px; }
+.action-sheet-row small { overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.action-sheet-row:disabled { opacity: .5; cursor: default; }
+.action-sheet-row:disabled:hover { background: none; }
+.action-sheet-offline { margin: 0; padding: 8px 14px 4px; display: none; color: var(--muted); font-size: 12px; }
+body.is-offline .action-sheet-offline { display: block; }
+
+/* Beyond a phone the menu is a small popover above the button, over an undimmed page. */
+@media (min-width: 621px) {
+    .quick-actions-backdrop { background: transparent; backdrop-filter: none; }
+    .action-sheet { position: fixed; right: 24px; bottom: calc(91px + env(safe-area-inset-bottom)); width: 300px; border-radius: var(--radius); }
+    .fab { right: 24px; bottom: calc(25px + env(safe-area-inset-bottom)); }
+}
+/* Between 621 and 659px the pill nav nearly reaches the button's side, so the button and menu ride above it. */
+@media (min-width: 621px) and (max-width: 659px) {
+    .fab { right: 16px; bottom: calc(100px + env(safe-area-inset-bottom)); }
+    .action-sheet { right: 16px; bottom: calc(166px + env(safe-area-inset-bottom)); }
+    .fab ~ .toast { bottom: calc(168px + env(safe-area-inset-bottom)); }
+    main { padding-bottom: 170px; }
+}
+@media (max-width: 620px) {
+    .quick-actions-backdrop { padding: 0; place-items: end stretch; }
+    .action-sheet { width: 100%; padding: 8px 8px calc(12px + env(safe-area-inset-bottom)); border-radius: 14px 14px 0 0; }
+    .fab { right: 16px; bottom: calc(104px + env(safe-area-inset-bottom)); }
+    .fab ~ .toast { bottom: calc(172px + env(safe-area-inset-bottom)); }
+    main { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
+    .schedule-screen { padding-bottom: calc(178px + env(safe-area-inset-bottom)); }
+}
