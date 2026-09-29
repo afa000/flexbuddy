@@ -232,10 +232,15 @@ on a US evening; the standing chart's month ticks, which count UTC days
 on purpose, are marked as the one exception.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Hooking into Maven.** Should `./mvnw test` also run the JavaScript tests, through
-   `exec-maven-plugin` in a profile (`-Pjs`)? It would fail on a machine without Node, so
-   this plan leaves them as a separate command.
-2. **Node on your machine.** Is Node 22 or later installed where the implementing session
-   runs? If not, installing Node 22 LTS is the only setup this needs.
+All questions are settled. Nothing is left open.
+
+- **The JavaScript tests are not hooked into Maven.** `./mvnw test` stays Java-only, so it
+  can never fail just because Node is missing. The implementing session runs
+  `node --test "src/test/js/*.test.js"` as a separate step whenever a change touches
+  `static/js`, and before every push that does. Revisit this if CI is ever added.
+- **Check Node before starting.** The first step of implementing this plan is
+  `node --version`. If it's missing or older than 22, install Node 22 LTS with
+  `winget install OpenJS.NodeJS.LTS` on Windows, then open a new terminal so `node` is on the
+  PATH. No other setup is needed. The README section in 4 says Node 22 or later is required.
