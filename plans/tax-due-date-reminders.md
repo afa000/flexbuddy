@@ -148,21 +148,26 @@ For each run:
   reminder at night, and never one for a date already past.
 - The hourly run means a restart during the day still sends later that day.
 
-### Settings: the switch (boxed, so null keeps the stored value)
+### Settings: the switch lives on the Taxes card (boxed, so null keeps the stored value)
 
-**`dto/ReminderSettingsRequest.java`**
+The switch is saved with the tax percentage through the existing `PUT /account/tax`.
+`ReminderSettingsRequest` and `/account/reminders` **don't change**.
 
-- Add a 6th component, `Boolean remindTax`, documented as "Optional; when absent the saved
+**`dto/TaxSettingsRequest.java`**
+
+- Add a 2nd component, `Boolean remindTax`, documented as "Optional; when absent the saved
   choice is kept."
-- Keep the existing 4-component constructor, now passing `null, null`.
-- Add a 5-component compatibility constructor
-  `(timeZone, remindBeforeMinutes, remindConfirm, remindMiles, forfeitCutoffMinutes)` that
-  passes `null` for `remindTax`. That keeps `AccountSettingsServiceTest:75` compiling
-  unchanged.
+- Add a 1-component compatibility constructor `(BigDecimal taxSetAsidePercent)` that passes
+  `null`. No Java code constructs this record today (the controller test sends JSON), so
+  this is only a safety net.
+- The percentage keeps its meaning: null turns the reserve off. The two fields are
+  independent. Reminders can be on with no percentage, in which case the push asks for one
+  (see the message rules above).
 
-**`service/AccountSettingsService.updateReminders`**
+**`service/AccountSettingsService.updateTax`**
 
-Add `if (request.remindTax() != null) user.setRemindTax(request.remindTax());`.
+After setting the percentage, add
+`if (request.remindTax() != null) user.setRemindTax(request.remindTax());`.
 
 **`dto/AccountSettingsResponse.java`** (a flagged record)
 
@@ -208,36 +213,40 @@ without that cascade. So the explicit delete is what `AccountDeletionJpaTest` de
 
 ## 4. Frontend
 
-### `templates/account.html`, Reminders card (line ~137)
-
-- Rename the heading from "Shift reminders" to **"Reminders"**. The card now covers more
-  than shifts.
-- After the `#remindMiles` row, add:
-
-  ```html
-  <label class="checkbox-row"><input id="remindTax" type="checkbox"> Remind me a week before and on each estimated tax due date</label>
-  ```
-
-  `.checkbox-row` already meets the 44px rule.
-
 ### `templates/account.html`, Taxes card (`#taxes`)
 
-Under the next-due-date line, add one sentence:
+Inside `#taxPercentForm`, after the percentage field and before its error notice, add:
 
-> Due-date reminders are **on**/**off** · change them in Reminders.
+```html
+<label class="checkbox-row"><input id="remindTax" type="checkbox"> Remind me a week before and on each estimated tax due date</label>
+<small class="field-hint">A push notification at 9 in the morning, using the dates shown below. Estimates only.</small>
+```
 
-Give it `id="taxReminderState"`, with "Reminders" as an in-page link to the reminders card.
-Add `id="reminders"` to the reminders `article` if it has no id.
+- `.checkbox-row` already meets the 44px rule.
+- Relabel the form's submit button from "Save percentage" to **"Save tax settings"**, since
+  it now saves both.
+
+### `templates/account.html`, Reminders card (line ~137)
+
+Rename the heading from "Shift reminders" to **"Reminders"**. It is cosmetic, and you've
+approved it. Nothing else in this card changes, and the tax switch does not appear here.
 
 ### `static/js/account.js`
 
-- In `renderReminders(settings)`:
-  - Set `#remindTax` checked from `Boolean(settings.remindTax)`.
-  - Set the state word in `#taxReminderState` to "on" or "off".
-- In the reminder form submit, add `remindTax: document.querySelector('#remindTax').checked`
-  to the JSON body.
+`account.js` already loads `/account/settings` and passes the result to
+`renderReminders(settings)`. Add one line there to set `#remindTax` checked from
+`Boolean(settings.remindTax)`. The Taxes card's own loader only reads `/tax/summary`, and
+changing `TaxSummaryResponse` to carry the flag is exactly what this avoids.
 
-`tax.js` needs no change.
+### `static/js/tax.js`
+
+- Add `remind: card.querySelector('#remindTax')` to `el`.
+- In `savePercent`, send
+  `{taxSetAsidePercent: value === '' ? null : Number(value), remindTax: el.remind.checked}`.
+- Toast text:
+  - With the percentage set: `Setting aside ${value}% of net earnings. Due-date reminders are on.`
+    (or "off").
+  - With it empty: "The set-aside estimate is off. Due-date reminders are on." (or "off").
 
 ### CSS and service worker
 
@@ -257,7 +266,7 @@ Add `id="reminders"` to the reminders `article` if it has no id.
 | `BlockEvaluationResponse`, `ShiftResponse` | Not touched. |
 | New account data | `remind_tax` is backed up and restored through `BackupSettings`. `tax_reminder_log` is deleted with the account and isn't backed up (see 3). |
 | `sw.js` | No change. |
-| Boxed request fields | `ReminderSettingsRequest.remindTax` is a `Boolean`, where null keeps the stored value. |
+| Boxed request fields | `TaxSettingsRequest.remindTax` is a `Boolean`, where null keeps the stored value. An older cached `tax.js` that sends only the percentage leaves the switch alone. |
 | Phone layout | One checkbox row and one sentence, both wrapping in `min-width: 0` cards. |
 | Dates | The send hour and "today" come from `userTime.zone(owner)`. No browser dates. |
 | Money and tax wording | Every figure in the push body says "estimate" and "not tax advice". The Taxes card's existing disclaimer is unchanged. |
@@ -271,7 +280,8 @@ Add `id="reminders"` to the reminders `article` if it has no id.
 | `PayoutServiceTest:127`, `BlockEvaluatorTest:225` (4 components) | Unchanged |
 | `AccountBackupService:72` | Canonical `BackupSettings`, + `user.isRemindTax()` |
 | `AccountRestoreServiceTest:312` (2 components) | Unchanged |
-| `AccountSettingsServiceTest:75` (5-component `ReminderSettingsRequest`) | Unchanged; binds to the new compatibility constructor |
+| `ReminderSettingsRequest`, `AccountSettingsServiceTest:75` | Not touched |
+| `TaxSettingsRequest` | + `Boolean remindTax`, and a 1-component compatibility constructor. No Java call sites today. |
 | `AccountService` constructor | + `TaxReminderLogRepository`, last. **`AccountServiceTest` uses `@InjectMocks`, so add a `@Mock TaxReminderLogRepository`**, or deletion hits a NullPointerException. `AccountDeletionJpaTest` gets it from the JPA slice. |
 | `TaxService` | Constructor unchanged. The private `dueDate` is renamed to `dueDateAt`, with one caller. |
 | `ReminderJob`, `ReminderJobTest` | Not touched. |
@@ -317,16 +327,18 @@ Tests:
 
 **`service/AccountSettingsServiceTest.java`** (add)
 
-9. `updateRemindersTurnsTaxRemindersOnAndKeepsThemWhenOmitted`: a 6-component request with
-   `TRUE` gives `remindTax()` true. A following 5-component request (`remindTax` null)
-   leaves it true.
+9. `updateTaxTurnsDueDateRemindersOnAndKeepsThemWhenOmitted`: a request
+   `(25.00, TRUE)` gives `remindTax()` true. A following `(30.00)` request (`remindTax`
+   null) leaves it true and changes only the percentage. A `(null, FALSE)` request turns
+   the percentage off and the reminders off.
 
 **`controller/AccountControllerTest.java`** (add)
 
-10. `updateReminders_acceptsTheTaxReminderSwitch`: a PUT with `"remindTax":true` returns 200.
-    Capture the request passed to `settingsService.updateReminders` and assert
-    `remindTax()` is `TRUE`. Also assert the JSON of the stubbed response contains
-    `"remindTax":true`.
+10. `updateTax_acceptsTheDueDateReminderSwitch`: `PUT /account/tax` with
+    `{"taxSetAsidePercent":25,"remindTax":true}` returns 200. Capture the request passed
+    to `settingsService.updateTax` and assert `remindTax()` is `TRUE`. Also assert that the
+    JSON of the stubbed response contains `"remindTax":true`. The existing
+    `updateTax_acceptsOneToSixtyPercentOrOff` keeps passing unchanged.
 
 **`service/AccountBackupServiceTest.java`** (change)
 
@@ -365,13 +377,16 @@ The push part needs VAPID keys configured locally, as for the existing reminders
 them, the job returns 0 and only the settings checks apply.
 
 1. **Account page at 1280×800.**
-   - The card heading reads "Reminders".
-   - Tick "Remind me a week before and on each estimated tax due date" and save. The toast
-     confirms, and after a reload the box is still ticked.
-   - The Taxes card reads "Due-date reminders are on · change them in Reminders", and the
-     link scrolls to the Reminders card.
-2. **Save the form from an older cached `account.js`** (or send a PUT without `remindTax`
-   from DevTools). The choice stays on.
+   - The reminders card heading reads "Reminders", and it has no tax switch.
+   - On the Taxes card, the percentage form has the "Remind me a week before and on each
+     estimated tax due date" checkbox with its hint, and the button reads "Save tax
+     settings".
+   - Tick it with 25 in the percentage and save. The toast reads "Setting aside 25% of net
+     earnings. Due-date reminders are on." After a reload the box is still ticked.
+   - Clear the percentage, keep the box ticked, and save. The toast reads "The set-aside
+     estimate is off. Due-date reminders are on."
+2. **An older client.** From DevTools, send `PUT /account/tax` with only
+   `{"taxSetAsidePercent":25}`. The reminders stay on.
 3. **Trigger the job.**
    - Temporarily set the account time zone so local time is past 9:00, and set
      `flexbuddy.tax.due-dates` so one date is exactly 7 days from today. Restart.
@@ -408,23 +423,20 @@ Reminders go out once each, from 9 in the morning in the account's time
 zone, and only on the exact day, so a driver never gets one at night or
 for a date that has passed. The due dates are the same configured dates
 the Taxes card uses, with January's belonging to the previous year's
-fourth quarter. The switch sits with the other reminders, and the Taxes
-card says whether it is on.
+fourth quarter. The switch sits on the Taxes card and saves with the
+set-aside percentage, and the reminders card is now called Reminders.
 
 The choice is carried in backups, an older backup keeps the current
 choice, and deleting the account removes the record of sent reminders.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Where the switch lives.** This plan puts it in the Reminders card, with the other push
-   reminders, and a status line on the Taxes card. Would you rather it sat in the Taxes
-   card itself, where the draft put it?
-2. **Send time.** Is 9:00 local right, or should it follow the driver's existing reminder
-   lead time? Nothing else in the app has a "morning" setting.
-3. **Weekend and holiday dates.** The IRS moves a due date that lands on a weekend or
-   holiday to the next business day. This plan keeps the configured dates exactly, which
-   is what the Taxes card shows today. Should both move, or is updating the property each
-   year enough?
-4. **Heading rename.** Is renaming "Shift reminders" to "Reminders" all right? It's
-   cosmetic, but it changes a label testers have seen.
+All questions are settled. Nothing is left open.
+
+- **The switch lives on the Taxes card.** It saves with the percentage through
+  `PUT /account/tax` (`TaxSettingsRequest`). `ReminderSettingsRequest` is untouched.
+- **The send time is 9:00 in the account's time zone.** There's no new setting.
+- **No weekend or holiday adjustment.** The configured dates are used exactly, matching what
+  the Taxes card shows. A moved deadline is a property change.
+- **The reminders card is renamed** from "Shift reminders" to "Reminders".
