@@ -9,7 +9,8 @@ The draft is two features, so it becomes two plans and two commits:
 - **06a, this plan: server-side safety.**
   - It is useful on its own the day it ships: a double-tapped Save, or a retry after a
     dropped response, can no longer create two shifts or two expenses.
-  - It changes nothing for the current pages until they send the new header.
+  - The pages start sending the key in this commit, and the server behaves exactly as
+    before for any request without it.
 - **06b, `plans/offline-queue-client.md`: the outbox.**
   - The IndexedDB queue, the form changes, the drain, the pending strip and the conflict
     sheet.
@@ -25,14 +26,17 @@ The draft is two features, so it becomes two plans and two commits:
      `shift`, give the same guarantee.
    - That means no filter, no stored response bodies, no purge job and no second table to
      delete with the account.
-2. **Only three endpoints accept a key:**
+2. **Four endpoints accept a key:**
    - `POST /shifts` (Add shift),
    - `POST /expenses` (Add expense),
    - `PATCH /shifts/{id}/status` (the finish sheet: actual times, odometer, miles, stops,
-     and completing a block).
+     and completing a block),
+   - `PUT /shifts/{id}` (the full edit dialog). This one is for double-tap safety online
+     only; 06b does not queue it.
 
    The draft's `PATCH /shifts/{id}/actual` doesn't exist. The finish sheet is how times and
-   miles are saved today. `PUT /shifts/{id}` (the full edit dialog) stays online-only.
+   miles are saved today. `PUT /shifts/{id}` (the full edit dialog) accepts a key, but it
+   stays online-only in 06b.
 3. **The conflict check is opt-in per request.** `expectedUpdatedAt` is a boxed, optional
    field. It is only sent by queued replays, which the 06b outbox adds. The online path
    sends nothing, so today's behaviour is unchanged and a stale open tab never gets a
@@ -40,12 +44,12 @@ The draft is two features, so it becomes two plans and two commits:
 
 ## 1. Goal and scope
 
-- An optional `Idempotency-Key` header, which must be a UUID, on the three endpoints.
+- An optional `Idempotency-Key` header, which must be a UUID, on the four endpoints.
   - A repeat create with the same key returns the **row that already exists**, with 200,
     instead of making a second one. That includes a row that has since been moved to the
     trash.
-  - A repeat status change with the same key returns the shift as it is now, without
-    applying the change again.
+  - A repeat status change or edit with the same key returns the shift as it is now,
+    without applying the change again.
 - An optional `expectedUpdatedAt` on the status change. If the shift has changed since that
   moment, the server answers **409** with the current shift, and nothing is written.
 - `GET /csrf` returns `{headerName, token, accountId}`, so a page or worker can get a fresh
@@ -53,8 +57,8 @@ The draft is two features, so it becomes two plans and two commits:
 
 ### Out of scope
 
-- Everything in the browser (06b).
-- Keys on any other endpoint.
+- The outbox and everything else in the browser beyond the online key (06b).
+- Keys on any other endpoint (deletes, restores, expense edits, Start block).
 - Background Sync.
 - Merging field by field on the server.
 
@@ -147,6 +151,16 @@ This follows the pattern of `findAllIncludingDeleted`. The native query bypasses
   The replay check comes **before** the conflict check. A queued finish whose response was
   lost must come back as a success, not as a 409 against its own write.
 
+- **Add `updateShift(String email, Long id, UpdateShiftRequest request, String requestId)`.**
+  Keep the 3-argument method, delegating with `null`, so the 7 `ShiftServiceTest` calls stay
+  unchanged. After loading the shift:
+  1. If `requestId != null && requestId.equals(shift.getLastRequestId())`, return the current
+     response without applying anything.
+  2. Otherwise apply as today, then `shift.setLastRequestId(requestId)` when it isn't null.
+
+  There's no `expectedUpdatedAt` here: the edit dialog is online-only and not queued.
+  `UpdateShiftRequest` doesn't change.
+
 **`ExpenseService`:**
 
 - **Add `create(String email, ExpenseRequest request, String requestId)`.** Keep the
@@ -191,6 +205,7 @@ queued finish.
   `@RequestHeader(value = RequestIds.HEADER, required = false) String key`, and call
   `shiftService.createShift(email, request, RequestIds.parse(key))`.
 - `ShiftController.changeStatus`: the same, calling the 4-argument `changeStatus`.
+- `ShiftController.updateShift`: the same, calling the 4-argument `updateShift`.
 - `ExpenseController.create`: the same, calling the 3-argument `create`. It is written on
   one line today; split it over several lines.
 
@@ -217,14 +232,26 @@ signed in on the same device.
 
 ## 4. Frontend
 
-**None in this plan.** The current pages send no key and no `expectedUpdatedAt`, so they
-behave exactly as today.
+**Decided: this commit includes the online key**, so a double-tapped Save can't create or
+apply anything twice. It's the user-visible benefit of 06a on its own.
 
-The one exception is optional: set `Idempotency-Key: crypto.randomUUID()` on the existing
-online Add expense and Add shift saves, so a double-tapped Save can't make two rows. It's a
-two-line change in `app.js` (`saveExpense`, and `saveEditedShift` when creating). **Include
-it**: it's the user-visible benefit of this commit. The key is made once per form submit,
-before the fetch, not per click retry.
+In `app.js`:
+
+- **`saveExpense`** when adding (not editing): make `const requestId = crypto.randomUUID()`
+  once per submit, before the fetch, and send it as `Idempotency-Key`.
+- **`saveEditedShift`**, for both `POST /shifts` (creating) and `PUT /shifts/{id}`
+  (editing): the same.
+- **`finish.js`, `save`**: the same, on `PATCH /shifts/{id}/status`.
+
+The key is made once per form submit, not per click. The Save button is already disabled
+while saving, so a second key can only come from a second, deliberate submit.
+
+**Handling a `409 {"code":"DUPLICATE"}` online.** It can only happen when two copies raced,
+and it means the first one landed. Treat it as success: close the form, show the normal
+toast, and reload, the same as a 200. Add this to the three save handlers where they check
+`response.ok`.
+
+Nothing sends `expectedUpdatedAt` online, so a stale open tab never gets a conflict.
 
 ## 5. Ripple list
 
@@ -249,12 +276,12 @@ before the fetch, not per click retry.
 |---|---|
 | `Shift`, `Expense` | + columns and unique constraints |
 | `ShiftRepository`, `ExpenseRepository` | + one native query each |
-| `ShiftService` | + `createShift(…, requestId)` and `changeStatus(…, requestId)`; the old signatures delegate |
+| `ShiftService` | + `createShift(…, requestId)`, `changeStatus(…, requestId)` and `updateShift(…, requestId)`; the old signatures delegate |
 | `ExpenseService` | + `create(…, requestId)`; the old signature delegates |
 | `ShiftStatusRequest` | + component and a compatibility constructor |
 | `ShiftController`, `ExpenseController` | Header parameter, and they call the new signatures |
 | `GlobalExceptionHandler` | + 3 handlers: invalid key, conflict, duplicate |
-| `app.js` | The optional online key (above) |
+| `app.js`, `finish.js` | The online key and the `DUPLICATE`-as-success handling (above) |
 
 **Existing tests that must change** (the controllers now call the longer service methods, so
 2- and 3-argument stubs no longer match):
@@ -263,11 +290,12 @@ before the fetch, not per click retry.
   becomes `create(eq(EMAIL), any(ExpenseRequest.class), isNull())`.
 - `ShiftControllerTest:438`, `:448` and `:454`: `changeStatus(eq(…), eq(5L), any(…))` gets a
   4th matcher, `isNull()`.
+- `ShiftControllerTest:347`: the `updateShift` stub gets a 4th matcher, `isNull()`.
 - No controller test stubs `createShift` at `0292b67`, so nothing else changes.
 
 ## 6. Tests to add
 
-Expect about 16 new tests.
+Expect about 19 new tests.
 
 **`service/ShiftServiceTest.java`**
 
@@ -288,6 +316,10 @@ Expect about 16 new tests.
 8. `withoutAKeyOrExpectedUpdatedAtNothingChanges`: the existing path. It saves, and
    `lastRequestId` stays null.
 
+8b. `aRepeatedEditWithTheLastRequestIdIsNotAppliedAgain`: the shift has `lastRequestId` K.
+    An edit with K and a different station changes nothing, and `save` is never called. An
+    edit with a new key applies and stores that key.
+
 **`service/ExpenseServiceTest.java`**
 
 9. `aRepeatedCreateWithTheSameKeyReturnsTheFirstExpense`
@@ -299,6 +331,8 @@ Expect about 16 new tests.
     400, and the service is not called.
 12. `theKeyIsPassedLowerCased`: the header is an upper-case UUID, and the service gets it in
     lower case.
+12b. `anEditPassesItsKeyToTheService`: `PUT /shifts/5` with a valid header, and
+     `updateShift` gets the key as its 4th argument.
 13. `aConflictIs409WithTheCurrentShift`: the service throws `ShiftConflictException`. The
     response is 409, with `$.code` equal to `CONFLICT`, `$.current.id` equal to 5 and
     `$.current.updatedAt` present.
@@ -321,7 +355,7 @@ against the entities.
 
 ## 7. Manual checks
 
-There's no UI, apart from the optional online key.
+The only UI change is the online key, checked in step 6.
 
 1. **Duplicate create.**
    - Add an expense from DevTools with a fixed header:
@@ -344,8 +378,11 @@ There's no UI, apart from the optional online key.
    - In a private window with only a remember-me cookie (after the session times out),
      `GET /csrf` still returns a token.
    - Signed out, it redirects to `/login`.
-6. **Double-tap** (with the optional online key). On a throttled "Slow 3G" profile,
-   double-tap Add expense. Only one row is created.
+6. **Double-tap.** On a throttled "Slow 3G" profile:
+   - Double-tap Add expense. Only one row is created, and the toast appears once.
+   - Open a shift, change the tips, and double-tap Save changes. The change is applied once,
+     and the undo toast restores the original value.
+   - Double-tap Finish block on the finish sheet. It's saved once.
 7. **Everything else unchanged.** Add shift, Add expense, the finish sheet, edit and delete
    all behave as before.
 
@@ -354,8 +391,8 @@ There's no UI, apart from the optional online key.
 ```
 feat(sync): make adding shifts and expenses safe to retry
 
-Adding a shift, adding an expense, and saving a block from the finish
-sheet now accept an idempotency key. A repeat with the same key returns
+Adding a shift, editing a shift, adding an expense, and saving a block
+from the finish sheet now send an idempotency key. A repeat with the same key returns
 what the first request made instead of making it again, even if the row
 was deleted since, so a double-tapped Save or a retry after a lost
 response can no longer create a second row. The key is kept on the row
@@ -371,9 +408,11 @@ A small endpoint returns a fresh security token for the signed-in
 account, for requests sent after the session was renewed.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Adding the online key in this commit.** This plan recommends it, since it's the only
-   visible benefit of 06a on its own. Or should 06a ship with no frontend change at all?
-2. **Other endpoints.** Should the full edit dialog (`PUT /shifts/{id}`) also accept a key,
-   for double-tap safety online, even though 06b won't queue it?
+All questions are settled. Nothing is left open.
+
+- **This commit includes the online key**, on Add shift, Add expense, the edit dialog and
+  the finish sheet, with `DUPLICATE` treated as success.
+- **The full edit dialog (`PUT /shifts/{id}`) accepts a key too**, for double-tap safety.
+  06b still doesn't queue it, and it has no `expectedUpdatedAt`.
