@@ -2360,3 +2360,54 @@ body.is-offline .action-sheet-offline { display: block; }
     main { padding-bottom: calc(180px + env(safe-area-inset-bottom)); }
     .schedule-screen { padding-bottom: calc(178px + env(safe-area-inset-bottom)); }
 }
+
+/* Standing */
+.standing-pill { align-self: flex-start; padding: 2px 8px; display: inline-block; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.standing-pill[data-level="FANTASTIC"] { color: var(--cyan); background: var(--primary-soft); border-color: var(--cyan); }
+.standing-pill[data-level="GREAT"] { color: var(--cyan-dark); background: var(--primary-soft); border-color: var(--cyan-dark); }
+.standing-pill[data-level="FAIR"] { color: var(--warning); background: var(--warning-surface); border-color: var(--warning-border); }
+.standing-pill[data-level="AT_RISK"] { color: var(--error); background: var(--error-surface); border-color: var(--error-border); }
+.standing-panel { display: grid; gap: 14px; scroll-margin-top: 104px; }
+.standing-chart { min-width: 0; }
+.standing-svg { width: 100%; height: auto; display: block; }
+.standing-grid { stroke: var(--line-soft); stroke-width: 1; }
+.standing-axis-label { fill: var(--muted); font-size: 10px; }
+.standing-step { fill: none; stroke: var(--muted); stroke-width: 2.5; stroke-linecap: round; }
+.standing-dot { fill: var(--muted); stroke: var(--surface); stroke-width: 1.5; }
+.standing-step[data-level="FANTASTIC"] { stroke: var(--cyan); }
+.standing-step[data-level="GREAT"] { stroke: var(--cyan-dark); }
+.standing-step[data-level="FAIR"] { stroke: var(--warning); }
+.standing-step[data-level="AT_RISK"] { stroke: var(--error); }
+.standing-dot[data-level="FANTASTIC"] { fill: var(--cyan); }
+.standing-dot[data-level="GREAT"] { fill: var(--cyan-dark); }
+.standing-dot[data-level="FAIR"] { fill: var(--warning); }
+.standing-dot[data-level="AT_RISK"] { fill: var(--error); }
+.standing-event-late { fill: var(--error); stroke: var(--error); stroke-width: 1; }
+.standing-event-forfeit { fill: none; stroke: var(--warning); stroke-width: 1.6; }
+.standing-event-cancelled { fill: none; stroke: var(--muted); stroke-width: 1.6; }
+.standing-legend { margin: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); font-size: 12px; }
+.standing-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.standing-legend svg { width: 12px; height: 12px; }
+.standing-form { margin: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 12px 16px; align-items: start; }
+.standing-form .field-wide { grid-column: 1 / -1; }
+.standing-levels { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-radius: 12px; }
+.standing-levels button { min-height: 44px; padding: 6px 4px; font-size: 13px; white-space: nowrap; border-radius: 9px; }
+.standing-levels button.is-active { color: var(--primary-text); background: var(--cyan); border-color: var(--cyan); }
+.standing-levels button[data-level="GREAT"].is-active { background: var(--cyan-dark); border-color: var(--cyan-dark); color: #fff; }
+.standing-levels button[data-level="FAIR"].is-active { color: var(--warning); background: var(--warning-surface); border-color: var(--warning-border); }
+.standing-levels button[data-level="AT_RISK"].is-active { color: var(--error); background: var(--error-surface); border-color: var(--error-border); }
+.standing-list { margin: 0; padding: 0; display: grid; gap: 4px; list-style: none; }
+.standing-row { padding: 8px 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; border-top: 1px solid var(--line-soft); }
+.standing-row-main { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.standing-row-main p { margin: 0; flex-basis: 100%; overflow-wrap: anywhere; color: var(--muted); font-size: 13px; }
+.standing-row-actions { display: flex; }
+.standing-event-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; }
+.standing-event-label[data-kind="LATE_FORFEIT"] { color: var(--error); }
+.standing-event-label[data-kind="FORFEITED"] { color: var(--warning); }
+@media (max-width: 620px) {
+    .standing-panel { padding: 20px 18px; border-radius: 0; }
+    .standing-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 380px) {
+    .standing-levels button { font-size: 12px; }
+}

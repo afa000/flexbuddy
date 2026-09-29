@@ -24,6 +24,7 @@ import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
 import com.angel.flexbuddy.repository.PayoutDepositRepository;
+import com.angel.flexbuddy.repository.StandingEntryRepository;
 import com.angel.flexbuddy.repository.TaxPaymentRepository;
 
 @Service
@@ -34,18 +35,20 @@ public class AccountBackupService {
     private final ExpenseRepository expenseRepository;
     private final TaxPaymentRepository taxPaymentRepository;
     private final PayoutDepositRepository payoutDepositRepository;
+    private final StandingEntryRepository standingEntryRepository;
     private final Clock clock;
     private final String appVersion;
 
     public AccountBackupService(AppUserRepository userRepository, ShiftRepository shiftRepository,
             ExpenseRepository expenseRepository, TaxPaymentRepository taxPaymentRepository,
-            PayoutDepositRepository payoutDepositRepository, Clock clock,
+            PayoutDepositRepository payoutDepositRepository, StandingEntryRepository standingEntryRepository, Clock clock,
             @Value("${spring.application.version:0.0.1-SNAPSHOT}") String appVersion) {
         this.userRepository = userRepository;
         this.shiftRepository = shiftRepository;
         this.expenseRepository = expenseRepository;
         this.taxPaymentRepository = taxPaymentRepository;
         this.payoutDepositRepository = payoutDepositRepository;
+        this.standingEntryRepository = standingEntryRepository;
         this.clock = clock;
         this.appVersion = appVersion;
     }
@@ -84,6 +87,10 @@ public class AccountBackupService {
                 payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc(email).stream()
                         .map(deposit -> new com.angel.flexbuddy.dto.BackupPayout(deposit.getPayoutDate(),
                                 money(deposit.getAmount()), deposit.getNote()))
+                        .toList(),
+                standingEntryRepository.findByOwnerEmailIgnoreCaseOrderByRecordedOnAsc(email).stream()
+                        .map(entry -> new com.angel.flexbuddy.dto.BackupStanding(entry.getRecordedOn(),
+                                entry.getLevel().name(), entry.getNote()))
                         .toList()
         );
     }

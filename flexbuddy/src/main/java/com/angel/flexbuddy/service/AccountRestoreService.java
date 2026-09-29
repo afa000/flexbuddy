@@ -62,11 +62,13 @@ public class AccountRestoreService {
     private final ExpenseRepository expenseRepository;
     private final TaxPaymentRepository taxPaymentRepository;
     private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
+    private final com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
 
     public AccountRestoreService(ObjectMapper objectMapper, Validator validator, ShiftRepository shiftRepository,
             AppUserRepository userRepository, Clock clock, ExpenseRepository expenseRepository,
             TaxPaymentRepository taxPaymentRepository,
-            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository) {
+            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
+            com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository) {
         this.objectMapper = objectMapper;
         this.validator = validator;
         this.shiftRepository = shiftRepository;
@@ -75,6 +77,7 @@ public class AccountRestoreService {
         this.expenseRepository = expenseRepository;
         this.taxPaymentRepository = taxPaymentRepository;
         this.payoutDepositRepository = payoutDepositRepository;
+        this.standingEntryRepository = standingEntryRepository;
     }
 
     public RestorePreviewResponse preview(String email, MultipartFile backup, HttpSession session) {
@@ -259,6 +262,7 @@ public class AccountRestoreService {
         session.removeAttribute(SESSION_KEY);
         restoreTaxPayments(file, owner);
         restorePayouts(file, owner);
+        restoreStanding(file, owner);
         return new RestoreResult(insert.size(), skipped, expenseInsert.size(), expensesSkipped, batch);
     }
 
@@ -527,6 +531,40 @@ public class AccountRestoreService {
             insert.add(deposit);
         }
         payoutDepositRepository.saveAll(insert);
+    }
+
+    /**
+     * Adds the backup's standing entries for days that have none yet, in either mode, like payouts. An entry already
+     * on the account is kept as it is. Entries with no date, a date after today, or a level that is not one of the four
+     * are skipped.
+     */
+    private void restoreStanding(AccountBackupFile file, AppUser owner) {
+        java.time.LocalDate today = java.time.LocalDate.ofInstant(Instant.now(clock),
+                java.time.ZoneId.of(owner.getTimeZone()));
+        Set<java.time.LocalDate> recorded = new HashSet<>();
+        standingEntryRepository.findByOwnerEmailIgnoreCaseOrderByRecordedOnAsc(owner.getEmail())
+                .forEach(entry -> recorded.add(entry.getRecordedOn()));
+        List<com.angel.flexbuddy.model.StandingEntry> insert = new ArrayList<>();
+        for (com.angel.flexbuddy.dto.BackupStanding source : file.standing()) {
+            if (source == null || source.recordedOn() == null || source.recordedOn().isAfter(today)) continue;
+            com.angel.flexbuddy.model.StandingLevel level;
+            try {
+                level = com.angel.flexbuddy.model.StandingLevel.valueOf(source.level());
+            } catch (IllegalArgumentException | NullPointerException exception) {
+                continue;
+            }
+            if (!recorded.add(source.recordedOn())) continue;
+            com.angel.flexbuddy.model.StandingEntry entry = new com.angel.flexbuddy.model.StandingEntry();
+            entry.setOwner(owner);
+            entry.setRecordedOn(source.recordedOn());
+            entry.setLevel(level);
+            entry.setNote(source.note() == null || source.note().isBlank() ? null
+                    : source.note().trim().substring(0, Math.min(255, source.note().trim().length())));
+            entry.setCreatedAt(Instant.now(clock));
+            entry.setUpdatedAt(Instant.now(clock));
+            insert.add(entry);
+        }
+        standingEntryRepository.saveAll(insert);
     }
 
     private static String taxKey(int year, java.time.LocalDate paidOn, BigDecimal amount) {

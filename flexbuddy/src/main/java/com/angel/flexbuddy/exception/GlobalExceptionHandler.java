@@ -54,6 +54,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
     }
 
+    @ExceptionHandler(InvalidStandingException.class)
+    public ResponseEntity<String> handleInvalidStanding(InvalidStandingException exception) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidPushSubscriptionException.class)
     public ResponseEntity<String> handleInvalidPushSubscription(InvalidPushSubscriptionException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());

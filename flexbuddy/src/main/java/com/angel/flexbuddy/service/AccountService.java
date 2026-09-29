@@ -29,12 +29,14 @@ public class AccountService {
     private final PersistentTokenRepository persistentTokenRepository;
     private final TaxPaymentRepository taxPaymentRepository;
     private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
+    private final com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
             ShiftRepository shiftRepository, PushSubscriptionRepository pushSubscriptionRepository,
             PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository,
-            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository) {
+            com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
+            com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -44,6 +46,7 @@ public class AccountService {
         this.persistentTokenRepository = persistentTokenRepository;
         this.taxPaymentRepository = taxPaymentRepository;
         this.payoutDepositRepository = payoutDepositRepository;
+        this.standingEntryRepository = standingEntryRepository;
     }
 
     public boolean emailIsRegistered(String email) {
@@ -73,6 +76,7 @@ public class AccountService {
         expenseRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         taxPaymentRepository.deleteAllByOwnerId(ownerId);
         payoutDepositRepository.deleteAllByOwnerId(ownerId);
+        standingEntryRepository.deleteAllByOwnerId(ownerId);
         reminderLogRepository.deleteAllByOwnerId(ownerId);
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);

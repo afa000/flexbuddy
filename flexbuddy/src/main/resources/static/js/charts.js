@@ -307,5 +307,100 @@
             : 'Slots need at least two blocks to be ranked.';
     }
 
-    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart, renderHeatmap};
+    const STANDING_ROWS = {FANTASTIC: 22, GREAT: 50, FAIR: 78, AT_RISK: 106};
+    const STANDING_LABELS = {FANTASTIC: 'Fantastic', GREAT: 'Great', FAIR: 'Fair', AT_RISK: 'At Risk'};
+    const STANDING_EVENT_LABELS = {LATE_FORFEIT: 'Late forfeit', FORFEITED: 'Forfeit', CANCELLED: 'Cancelled by Amazon'};
+    const DAY_MS = 86400000;
+
+    /** Whole days since a fixed point, from an ISO date, so daylight saving never shifts a column. */
+    function dayNumber(value) {
+        const [year, month, day] = value.split('-').map(Number);
+        return Math.round(Date.UTC(year, month - 1, day) / DAY_MS);
+    }
+
+    /**
+     * The last stretch of days as steps: one row per standing level, a horizontal line for each entry until the next,
+     * and forfeits, late forfeits and cancellations marked on a band below. Nothing is drawn before the first entry,
+     * because no level is known there. It scales to its container, so it never widens the page.
+     */
+    function renderStanding(container, data) {
+        container.replaceChildren();
+        const first = dayNumber(data.from);
+        const span = Math.max(1, dayNumber(data.to) - first);
+        const left = 62;
+        const width = 288;
+        const x = date => left + Math.min(Math.max((dayNumber(date) - first) / span, 0), 1) * width;
+
+        const svg = svgElement('svg', {viewBox: '0 0 360 170', class: 'standing-svg', role: 'img'});
+        const counts = {LATE_FORFEIT: 0, FORFEITED: 0, CANCELLED: 0};
+        data.events.forEach(event => counts[event.kind] += 1);
+        const entries = data.entries;
+        const summary = entries.length
+            ? entries.map(entry => `${STANDING_LABELS[entry.level]} from ${shortDate(entry.recordedOn)}`).join(', ')
+            : 'No standing logged';
+        svg.setAttribute('aria-label', `Standing over the last ${span + 1} days: ${summary}. `
+            + `${counts.LATE_FORFEIT} late forfeit${counts.LATE_FORFEIT === 1 ? '' : 's'}, `
+            + `${counts.FORFEITED} forfeit${counts.FORFEITED === 1 ? '' : 's'}, `
+            + `${counts.CANCELLED} cancellation${counts.CANCELLED === 1 ? '' : 's'}.`);
+
+        Object.entries(STANDING_ROWS).forEach(([level, y]) => {
+            svg.append(svgElement('line', {x1: left, x2: left + width, y1: y, y2: y, class: 'standing-grid'}));
+            const label = svgElement('text', {x: left - 6, y: y + 3.5, class: 'standing-axis-label', 'text-anchor': 'end'});
+            label.textContent = STANDING_LABELS[level];
+            svg.append(label);
+        });
+
+        entries.forEach((entry, index) => {
+            const y = STANDING_ROWS[entry.level];
+            const start = x(entry.recordedOn);
+            const end = index + 1 < entries.length ? x(entries[index + 1].recordedOn) : left + width;
+            if (index > 0) {
+                const before = STANDING_ROWS[entries[index - 1].level];
+                if (before !== y) {
+                    svg.append(svgElement('path', {d: `M${start} ${before}V${y}`, class: 'standing-step', 'data-level': entry.level}));
+                }
+            }
+            svg.append(svgElement('path', {d: `M${start} ${y}H${end}`, class: 'standing-step', 'data-level': entry.level}));
+            // A dot marks where each entry was logged, and shows a lone entry on the last day.
+            if (dayNumber(entry.recordedOn) >= first) {
+                svg.append(svgElement('circle', {cx: start, cy: y, r: 3, class: 'standing-dot', 'data-level': entry.level}));
+            }
+        });
+
+        svg.append(svgElement('line', {x1: left, x2: left + width, y1: 134, y2: 134, class: 'standing-grid'}));
+        const stacked = new Map();
+        data.events.forEach(event => {
+            const height = stacked.get(event.date) ?? 0;
+            stacked.set(event.date, height + 1);
+            const cx = x(event.date);
+            const cy = 134 - height * 9;
+            const mark = event.kind === 'CANCELLED'
+                ? svgElement('circle', {cx, cy, r: 3.5, class: 'standing-event standing-event-cancelled'})
+                : svgElement('path', {d: `M${cx} ${cy - 4.5}L${cx + 4.2} ${cy + 3.5}H${cx - 4.2}Z`,
+                    class: `standing-event standing-event-${event.kind === 'LATE_FORFEIT' ? 'late' : 'forfeit'}`});
+            const title = svgElement('title');
+            title.textContent = `${STANDING_EVENT_LABELS[event.kind]} · ${event.station} · ${shortDate(event.date)}`;
+            mark.append(title);
+            svg.append(mark);
+        });
+
+        // First-of-month ticks, labelled under the axis.
+        for (let day = first; day <= first + span; day++) {
+            const date = new Date(day * DAY_MS);
+            if (date.getUTCDate() !== 1) continue;
+            const tick = x(date.toISOString().slice(0, 10));
+            svg.append(svgElement('line', {x1: tick, x2: tick, y1: 140, y2: 146, class: 'standing-grid'}));
+            const label = svgElement('text', {x: tick, y: 162, class: 'standing-axis-label', 'text-anchor': 'middle'});
+            label.textContent = date.toLocaleDateString(undefined, {month: 'short', timeZone: 'UTC'});
+            svg.append(label);
+        }
+        container.append(svg);
+    }
+
+    function shortDate(value) {
+        const [year, month, day] = value.split('-').map(Number);
+        return new Date(year, month - 1, day).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+    }
+
+    window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart, renderHeatmap, renderStanding};
 })();

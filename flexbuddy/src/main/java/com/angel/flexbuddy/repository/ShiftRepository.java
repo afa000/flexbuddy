@@ -21,6 +21,10 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     Optional<Shift> findByIdAndOwnerEmailIgnoreCase(Long id, String email);
 
+    /** Blocks in the given statuses over a date range, oldest first; the trash is left out by the entity's restriction. */
+    List<Shift> findByOwnerEmailIgnoreCaseAndStatusInAndDateBetweenOrderByDateAscStartTimeAsc(
+            String email, Collection<ShiftStatus> statuses, LocalDate from, LocalDate to);
+
     @Query("""
             select s from Shift s
             where lower(s.owner.email) = lower(:email)

@@ -399,7 +399,9 @@ function showDashboard(smooth = true) {
 
 function showScheduleScreen(smooth = true) {
     showScreen('schedule', smooth);
-    window.flexbuddySchedule.show();
+    window.flexbuddyStanding?.load();
+    // Resolves once the schedule's content has loaded, for callers that need to scroll to something below it.
+    return window.flexbuddySchedule.show();
 }
 
 function showImportScreen(smooth = true) {
@@ -694,6 +696,7 @@ async function loadDashboard() {
     ]);
     window.flexbuddySchedule?.refresh();
     window.flexbuddyFinish?.loadMissing();
+    window.flexbuddyStanding?.load();
     loadGoals();
     loadPayPeriods();
     loadTaxTile();

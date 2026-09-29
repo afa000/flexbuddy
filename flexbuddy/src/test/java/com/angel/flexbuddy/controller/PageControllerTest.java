@@ -64,6 +64,19 @@ class PageControllerTest {
     }
 
     @Test
+    void shiftsPageHasTheStandingCardAndTileLink() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"standingPanel\"", "id=\"standingLink\"", "id=\"standingPill\"",
+                "/js/standing.js?v=");
+        for (String level : new String[] {"FANTASTIC", "GREAT", "FAIR", "AT_RISK"}) {
+            assertThat(page).contains("data-level=\"" + level + "\"");
+        }
+    }
+
+    @Test
     void shareRequiresSignIn() throws Exception {
         mockMvc.perform(multipart("/share-import").file(SHARED))
                 .andExpect(status().is3xxRedirection())

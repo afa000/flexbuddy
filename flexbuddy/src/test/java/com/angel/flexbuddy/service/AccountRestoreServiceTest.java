@@ -65,6 +65,7 @@ class AccountRestoreServiceTest {
     @Mock ExpenseRepository expenseRepository;
     @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
     @Mock com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
+    @Mock com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
 
     private AccountRestoreService service;
     private AppUser owner;
@@ -73,7 +74,8 @@ class AccountRestoreServiceTest {
     @BeforeEach
     void setUp() throws Exception {
         service = new AccountRestoreService(objectMapper, validator, shiftRepository, userRepository,
-                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository, taxPaymentRepository, payoutDepositRepository);
+                Clock.fixed(NOW, ZoneOffset.UTC), expenseRepository, taxPaymentRepository, payoutDepositRepository,
+                standingEntryRepository);
         owner = new AppUser("Angel", EMAIL, "hash");
         owner.setId(1L);
         BackupShift existing = backupShift("VEA7", null);
@@ -140,6 +142,60 @@ class AccountRestoreServiceTest {
             assertThat(deposit.getOwner()).isSameAs(owner);
             assertThat(deposit.getCreatedAt()).isEqualTo(NOW);
         });
+    }
+
+    @Test
+    void restoreAddsStandingForDaysWithNoneAndSkipsUnknownLevelsAndFutureDays() throws Exception {
+        AccountBackupFile withStanding = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), null, new BackupCounts(2, 1), List.of(), List.of(),
+                List.of(new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 1), "GREAT", " After the block "),
+                        new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 10), "FAIR", null),
+                        new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 5), "GOOD", null),
+                        new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 6), null, null),
+                        new com.angel.flexbuddy.dto.BackupStanding(null, "GREAT", null),
+                        new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 12), "FANTASTIC", null)));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(withStanding);
+        com.angel.flexbuddy.model.StandingEntry recorded = new com.angel.flexbuddy.model.StandingEntry();
+        recorded.setRecordedOn(LocalDate.of(2026, 9, 10));
+        recorded.setLevel(com.angel.flexbuddy.model.StandingLevel.AT_RISK);
+        when(standingEntryRepository.findByOwnerEmailIgnoreCaseOrderByRecordedOnAsc(EMAIL)).thenReturn(List.of(recorded));
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        ArgumentCaptor<List<com.angel.flexbuddy.model.StandingEntry>> saved = standingCaptor();
+        verify(standingEntryRepository).saveAll(saved.capture());
+        assertThat(saved.getValue()).singleElement().satisfies(entry -> {
+            assertThat(entry.getRecordedOn()).isEqualTo(LocalDate.of(2026, 9, 1));
+            assertThat(entry.getLevel()).isEqualTo(com.angel.flexbuddy.model.StandingLevel.GREAT);
+            assertThat(entry.getNote()).isEqualTo("After the block");
+            assertThat(entry.getOwner()).isSameAs(owner);
+            assertThat(entry.getCreatedAt()).isEqualTo(NOW);
+            assertThat(entry.getUpdatedAt()).isEqualTo(NOW);
+        });
+    }
+
+    @Test
+    void anOlderBackupWithoutStandingRestoresWithAnEmptyList() throws Exception {
+        AccountBackupFile older = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), null, new BackupCounts(2, 1), List.of(), List.of());
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(older);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        ArgumentCaptor<List<com.angel.flexbuddy.model.StandingEntry>> saved = standingCaptor();
+        verify(standingEntryRepository).saveAll(saved.capture());
+        assertThat(saved.getValue()).isEmpty();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private ArgumentCaptor<List<com.angel.flexbuddy.model.StandingEntry>> standingCaptor() {
+        return (ArgumentCaptor) ArgumentCaptor.forClass(List.class);
     }
 
     @Test

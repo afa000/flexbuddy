@@ -221,6 +221,33 @@ class ShiftRepositoryTest {
     }
 
     @Test
+    void forfeitedAndCancelledInRangeSkipsTrashOtherStatusesAndOtherOwners() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        AppUser other = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        saveWithStatus(angel, LocalDate.of(2026, 9, 3), ShiftStatus.COMPLETED);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 4), ShiftStatus.SCHEDULED);
+        Shift late = shift(angel, "LATE1", LocalDate.of(2026, 9, 8));
+        late.setStatus(ShiftStatus.FORFEITED);
+        late.setLateForfeit(true);
+        shiftRepository.save(late);
+        saveWithStatus(angel, LocalDate.of(2026, 9, 9), ShiftStatus.CANCELLED);
+        Shift trashed = shift(angel, "TRASH", LocalDate.of(2026, 9, 10));
+        trashed.setStatus(ShiftStatus.FORFEITED);
+        trashed.setDeletedAt(NOW);
+        shiftRepository.save(trashed);
+        saveWithStatus(angel, LocalDate.of(2026, 8, 1), ShiftStatus.FORFEITED);
+        saveWithStatus(other, LocalDate.of(2026, 9, 8), ShiftStatus.FORFEITED);
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(shiftRepository.findByOwnerEmailIgnoreCaseAndStatusInAndDateBetweenOrderByDateAscStartTimeAsc(
+                "ANGEL@example.com", java.util.Set.of(ShiftStatus.FORFEITED, ShiftStatus.CANCELLED),
+                LocalDate.of(2026, 9, 1), LocalDate.of(2026, 9, 30)))
+                .extracting(shift -> shift.getDate() + " " + shift.getStatus() + " " + shift.isLateForfeit())
+                .containsExactly("2026-09-08 FORFEITED true", "2026-09-09 CANCELLED false");
+    }
+
+    @Test
     void scheduledLookupIsOwnerScopedAndOrderedByDate() {
         AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
         AppUser other = userRepository.save(new AppUser("Other", "other@example.com", "hash"));

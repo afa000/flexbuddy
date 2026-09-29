@@ -168,6 +168,8 @@
                 <span>Forfeits this month</span>
                 <strong id="forfeitsMonth">0</strong>
                 <small id="forfeitsDetail">0 cancelled in this view</small>
+                <span class="standing-pill is-hidden" id="standingPill" data-level=""></span>
+                <button class="text-link payout-check" id="standingLink" type="button">Log standing</button>
             </article>
             <article class="stat-card">
                 <span>Average shift</span>
@@ -246,6 +248,43 @@
                     <section class="day-panel" id="dayPanel" aria-live="polite"><p class="day-panel-empty">Choose a day to see its shifts.</p></section>
                 </article>
             </div>
+
+            <section class="panel standing-panel" id="standingPanel" aria-labelledby="standingTitle">
+                <div class="panel-heading">
+                    <div>
+                        <p class="step-label">STANDING</p>
+                        <h2 id="standingTitle">Your Flex standing</h2>
+                        <p>Log it from the Flex app when it changes. FlexBuddy never guesses your standing.</p>
+                    </div>
+                    <span class="standing-pill is-hidden" id="standingCurrent" data-level=""></span>
+                </div>
+                <div class="standing-chart" id="standingChart"></div>
+                <p class="standing-legend" aria-hidden="true">
+                    <span><svg viewBox="0 0 12 12"><path class="standing-event standing-event-late" d="M6 1.5 10.2 9.5H1.8Z"/></svg>Late forfeit</span>
+                    <span><svg viewBox="0 0 12 12"><path class="standing-event standing-event-forfeit" d="M6 1.5 10.2 9.5H1.8Z"/></svg>Forfeit</span>
+                    <span><svg viewBox="0 0 12 12"><circle class="standing-event standing-event-cancelled" cx="6" cy="6" r="3.8"/></svg>Cancelled by Amazon</span>
+                </p>
+                <form class="standing-form" id="standingForm" novalidate>
+                    <label class="field"><span>Date</span><input id="standingDate" type="date" required></label>
+                    <div class="field" role="group" aria-labelledby="standingLevelLabel">
+                        <span id="standingLevelLabel">Standing</span>
+                        <div class="segmented-control standing-levels" id="standingLevels">
+                            <button type="button" data-level="FANTASTIC" aria-pressed="false">Fantastic</button>
+                            <button type="button" data-level="GREAT" aria-pressed="false">Great</button>
+                            <button type="button" data-level="FAIR" aria-pressed="false">Fair</button>
+                            <button type="button" data-level="AT_RISK" aria-pressed="false">At Risk</button>
+                        </div>
+                    </div>
+                    <label class="field field-wide"><span>Note <small>(optional)</small></span>
+                        <input id="standingNote" type="text" maxlength="255" autocomplete="off" placeholder="After the late forfeit on Sep 8"></label>
+                    <small class="field-hint field-wide" id="standingReplaceHint"></small>
+                    <div class="notice error-notice is-hidden field-wide" id="standingError" role="alert"></div>
+                    <div class="form-actions field-wide">
+                        <button class="primary-button" id="saveStandingButton" type="submit" disabled>Log standing</button>
+                    </div>
+                </form>
+                <ol class="standing-list" id="standingList" aria-live="polite"></ol>
+            </section>
         </section>
 
         <section class="import-screen is-hidden" id="importScreen" aria-labelledby="import-title">
@@ -796,6 +835,7 @@
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>

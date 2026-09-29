@@ -36,6 +36,7 @@ class AccountBackupServiceTest {
     @Mock ExpenseRepository expenseRepository;
     @Mock com.angel.flexbuddy.repository.TaxPaymentRepository taxPaymentRepository;
     @Mock com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
+    @Mock com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
 
     @Test
     void createsVersionedBackupWithActiveAndDeletedCountsAndRecordsBackupTime() {
@@ -69,8 +70,14 @@ class AccountBackupServiceTest {
         deposit.setNote("Chase");
         when(payoutDepositRepository.findByOwnerEmailIgnoreCaseOrderByPayoutDateAsc("angel@example.com"))
                 .thenReturn(List.of(deposit));
+        com.angel.flexbuddy.model.StandingEntry standing = new com.angel.flexbuddy.model.StandingEntry();
+        standing.setRecordedOn(LocalDate.of(2026, 9, 10));
+        standing.setLevel(com.angel.flexbuddy.model.StandingLevel.FAIR);
+        standing.setNote("After late forfeit");
+        when(standingEntryRepository.findByOwnerEmailIgnoreCaseOrderByRecordedOnAsc("angel@example.com"))
+                .thenReturn(List.of(standing));
         AccountBackupService service = new AccountBackupService(userRepository, shiftRepository, expenseRepository,
-                taxPaymentRepository, payoutDepositRepository, clock, "1.2.3");
+                taxPaymentRepository, payoutDepositRepository, standingEntryRepository, clock, "1.2.3");
 
         AccountBackupFile backup = service.create("angel@example.com");
 
@@ -89,6 +96,8 @@ class AccountBackupServiceTest {
         });
         assertThat(backup.settings().vehicleCostMethod()).isEqualTo("ACTUAL_EXPENSES");
         assertThat(backup.settings().mileageRate()).isEqualTo("0.655");
+        assertThat(backup.standing()).containsExactly(
+                new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 10), "FAIR", "After late forfeit"));
         assertThat(backup.payouts()).containsExactly(
                 new com.angel.flexbuddy.dto.BackupPayout(LocalDate.of(2026, 9, 8), "118.00", "Chase"));
         assertThat(user.getLastBackupAt()).isEqualTo(now);
