@@ -16,6 +16,7 @@ import java.time.YearMonth;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -30,6 +31,9 @@ import com.angel.flexbuddy.dto.TaxPaymentRequest;
 import com.angel.flexbuddy.dto.TaxPaymentResponse;
 import com.angel.flexbuddy.dto.TaxQuarterResponse;
 import com.angel.flexbuddy.dto.TaxSummaryResponse;
+import com.angel.flexbuddy.dto.TaxYearExpense;
+import com.angel.flexbuddy.dto.TaxYearReport;
+import com.angel.flexbuddy.dto.TaxYearRow;
 import com.angel.flexbuddy.exception.InvalidFilterException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Expense;
@@ -136,36 +140,70 @@ public class TaxService {
             "parking", "maintenance", "other", "vehicle_cost_method", "vehicle_cost", "total_deductions", "net"
     };
 
-    /** A month-by-month summary for a tax preparer, with a year total row, built from the same numbers as the reports. */
+    /**
+     * Twelve months and a year total, computed once for the CSV and the printable summary. Each row comes from the
+     * same shifts and expenses as the reports, and the year total is worked out over the whole year rather than
+     * added up from the months, so rounding stays exactly as it always was.
+     */
     @Transactional(readOnly = true)
-    public void writeYearCsv(String email, int year, OutputStream output) throws IOException {
+    public List<TaxYearRow> yearRows(String email, int year) {
         checkYear(year);
         AccountSettingsResponse settings = settingsService.get(email);
+        List<TaxYearRow> rows = new ArrayList<>();
+        for (int month = 1; month <= 12; month++) {
+            YearMonth yearMonth = YearMonth.of(year, month);
+            rows.add(yearRow(yearMonth.toString(), yearMonth.atDay(1), yearMonth.atEndOfMonth(), email, settings));
+        }
+        rows.add(yearRow(String.valueOf(year), LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31), email, settings));
+        return rows;
+    }
+
+    /** A month-by-month summary for a tax preparer, with a year total row, built from the same rows as the printable summary. */
+    @Transactional(readOnly = true)
+    public void writeYearCsv(String email, int year, OutputStream output) throws IOException {
+        List<TaxYearRow> rows = yearRows(email, year);
         output.write(new byte[] {(byte) 0xEF, (byte) 0xBB, (byte) 0xBF});
         Writer writer = new OutputStreamWriter(output, StandardCharsets.UTF_8);
         writer.write(String.join(",", CSV_HEADERS) + "\r\n");
-        for (int month = 1; month <= 12; month++) {
-            YearMonth yearMonth = YearMonth.of(year, month);
-            writeRow(writer, yearMonth.toString(), yearMonth.atDay(1), yearMonth.atEndOfMonth(), email, settings);
+        for (TaxYearRow row : rows) {
+            writer.write(String.join(",", row.label(), String.valueOf(row.shifts()), money(row.basePay()), money(row.tips()),
+                    money(row.gross()), row.miles().toPlainString(), row.mileageRate().toPlainString(),
+                    money(row.mileageCost()), money(row.fuel()), money(row.tolls()), money(row.parking()),
+                    money(row.maintenance()), money(row.other()), row.vehicleCostMethod().name(),
+                    money(row.vehicleCost()), money(row.totalDeductions()), money(row.net())) + "\r\n");
         }
-        writeRow(writer, String.valueOf(year), LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31), email, settings);
         writer.flush();
     }
 
-    private void writeRow(Writer writer, String label, LocalDate from, LocalDate to, String email,
-            AccountSettingsResponse settings) throws IOException {
+    /**
+     * Everything on the printable summary for a tax year. The expenses are the ones the monthly totals count, oldest
+     * first, so each category's listed amounts add up to the year row's column for it.
+     */
+    @Transactional(readOnly = true)
+    public TaxYearReport yearReport(String email, String displayName, int year) {
+        List<TaxYearRow> rows = yearRows(email, year);
+        AccountSettingsResponse settings = settingsService.get(email);
+        List<TaxYearExpense> listed = expenses(email, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)).stream()
+                .sorted(Comparator.comparing(Expense::getDate).thenComparing(Expense::getId,
+                        Comparator.nullsFirst(Comparator.naturalOrder())))
+                .map(expense -> new TaxYearExpense(expense.getDate(), expense.getCategory(), expense.getAmount(),
+                        expense.getShift() == null ? null : expense.getShift().getStation(), expense.getNote()))
+                .toList();
+        return new TaxYearReport(year, userTime.today(email), displayName, settings.vehicleCostMethod(),
+                settings.mileageRate(), rows.subList(0, 12), rows.get(12), summary(email, year), listed);
+    }
+
+    private TaxYearRow yearRow(String label, LocalDate from, LocalDate to, String email, AccountSettingsResponse settings) {
         List<com.angel.flexbuddy.model.Shift> shifts = shiftService.findFiltered(email, ShiftFilter.report(from, to, null, null));
         NetEarningsResult net = calculator.calculate(shifts, expenses(email, from, to), settings.vehicleCostMethod(),
                 settings.mileageRate());
         BigDecimal base = shifts.stream().map(com.angel.flexbuddy.model.Shift::getEarnedBasePay).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal tips = shifts.stream().map(com.angel.flexbuddy.model.Shift::getEarnedTips).reduce(BigDecimal.ZERO, BigDecimal::add);
-        writer.write(String.join(",", label, String.valueOf(shifts.size()), money(base), money(tips),
-                money(net.grossEarnings()), net.miles().toPlainString(), settings.mileageRate().toPlainString(),
-                money(net.mileageCost()), money(net.expenseTotals().get(ExpenseCategory.FUEL)),
-                money(net.expenseTotals().get(ExpenseCategory.TOLL)), money(net.expenseTotals().get(ExpenseCategory.PARKING)),
-                money(net.expenseTotals().get(ExpenseCategory.MAINTENANCE)), money(net.expenseTotals().get(ExpenseCategory.OTHER)),
-                settings.vehicleCostMethod().name(), money(net.vehicleCost()), money(net.totalDeductions()),
-                money(net.netEarnings())) + "\r\n");
+        return new TaxYearRow(label, shifts.size(), base, tips, net.grossEarnings(), net.miles(), settings.mileageRate(),
+                net.mileageCost(), net.expenseTotals().get(ExpenseCategory.FUEL), net.expenseTotals().get(ExpenseCategory.TOLL),
+                net.expenseTotals().get(ExpenseCategory.PARKING), net.expenseTotals().get(ExpenseCategory.MAINTENANCE),
+                net.expenseTotals().get(ExpenseCategory.OTHER), settings.vehicleCostMethod(), net.vehicleCost(),
+                net.totalDeductions(), net.netEarnings());
     }
 
     private NetEarningsResult net(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {

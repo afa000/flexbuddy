@@ -2411,3 +2411,49 @@ body.is-offline .action-sheet-offline { display: block; }
 @media (max-width: 380px) {
     .standing-levels button { font-size: 12px; }
 }
+
+/* Printable tax summary */
+.print-layout { width: min(1160px, calc(100% - 32px)); margin: 0 auto; padding: 24px 0 48px; display: grid; gap: 20px; }
+.print-layout > * { min-width: 0; }
+.print-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.print-header .secondary-button { display: inline-flex; align-items: center; text-decoration: none; }
+.print-title h1 { margin: 4px 0 6px; font-size: 28px; }
+.print-name { margin: 0 0 4px; font-size: 16px; font-weight: 750; }
+.print-meta { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+.print-section h2 { margin: 0 0 8px; font-size: 16px; }
+.print-notice { margin: 0; }
+.print-table th, .print-table td { white-space: nowrap; }
+.print-table .num, .print-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.print-table tbody tr { cursor: default; }
+.print-table tbody tr:hover { background: none; }
+.print-table tbody th { color: inherit; }
+.print-table .print-total th, .print-table .print-total td, .print-table tfoot th { font-weight: 800; }
+.print-table .print-total th, .print-table .print-total td { border-top: 2px solid var(--line); }
+.print-table td.print-note { min-width: 12ch; white-space: normal; overflow-wrap: anywhere; }
+.print-table tfoot th[colspan] { text-align: right; }
+.print-expenses thead th:nth-child(-n+4), .print-expenses tbody td:nth-child(-n+4) { text-align: left; }
+.print-expenses tfoot th[colspan] { text-align: right; }
+.print-payments { margin: 0; padding: 0; display: grid; gap: 6px; list-style: none; }
+.print-payments li { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.print-footer { margin: 0; color: var(--muted); font-size: 12px; }
+@media (max-width: 620px) {
+    .print-layout { width: 100%; padding: 16px 16px 32px; }
+    .print-header { display: grid; grid-template-columns: minmax(0, 1fr); }
+    .print-header .secondary-button, .print-header .primary-button { width: 100%; min-height: 44px; justify-content: center; }
+}
+@page { size: landscape; margin: 12mm; }
+@media print {
+    html, body, .print-page { background: #fff !important; color: #000 !important; }
+    .print-header, .mobile-nav, .toast, .offline-banner, .fab { display: none !important; }
+    .print-layout { width: 100%; padding: 0; gap: 10pt; }
+    .print-title h1, .print-section h2, .print-name { color: #000; }
+    .print-meta, .print-footer, .step-label { color: #000; }
+    .breakdown-scroll { overflow: visible !important; }
+    .print-table { font-size: 9pt; border-collapse: collapse; width: 100%; }
+    .print-table th, .print-table td { border: 1px solid #999; padding: 3px 5px; color: #000; background: none; }
+    .print-table thead th { color: #000; }
+    .notice { border: 1px solid #000; background: none; color: #000; }
+    tr, .print-section { break-inside: avoid; }
+    thead { display: table-header-group; }
+    a { color: #000; text-decoration: none; }
+}

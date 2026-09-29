@@ -10,6 +10,7 @@
         percentError: card.querySelector('#taxPercentError'),
         year: card.querySelector('#taxYear'),
         csv: card.querySelector('#taxCsvLink'),
+        print: card.querySelector('#taxPrintLink'),
         figures: card.querySelector('#taxFigures'),
         quarters: card.querySelector('#taxQuarters'),
         payments: card.querySelector('#taxPayments'),
@@ -41,6 +42,7 @@
     async function load() {
         const year = el.year.value;
         el.csv.href = `/tax/summary.csv?year=${encodeURIComponent(year)}`;
+        el.print.href = `/tax/year-summary?year=${encodeURIComponent(year)}`;
         try {
             const response = await apiFetch(`/tax/summary?year=${encodeURIComponent(year)}`);
             if (!response.ok) throw new Error();
