@@ -701,6 +701,8 @@ h1 {
 
 .chart-scroll,
 .breakdown-scroll {
+    /* Positioned so screen-reader-only labels inside are clipped too; otherwise they widen the page on a phone. */
+    position: relative;
     overflow-x: auto;
 }
 
@@ -2262,7 +2264,7 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .heatmap-metric { max-width: 260px; margin: 12px 0; }
 .heatmap { border-collapse: separate; border-spacing: 4px; font-size: 12px; }
 .heatmap th { padding: 4px 6px; color: var(--muted); font-weight: 700; white-space: nowrap; }
-.heatmap tbody th { position: sticky; left: 0; z-index: 1; background: var(--surface-deep); text-align: left; }
+.heatmap tbody th, .heatmap thead th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface-deep); text-align: left; }
 .heatmap td { min-width: 84px; height: 44px; padding: 0 6px; color: var(--text); background: var(--surface-raised); border-radius: 6px; text-align: center; font-variant-numeric: tabular-nums; }
 .heatmap td.heatmap-empty { background: transparent; border: 1px dashed var(--line-soft); }
 .heatmap td.heatmap-sparse { color: var(--muted); background: repeating-linear-gradient(135deg, var(--surface-raised) 0 6px, var(--line-soft) 6px 8px); }
@@ -2280,7 +2282,7 @@ button.calendar-day:hover { border-color: var(--cyan); }
 /* Checked on a phone after the touch target change */
 .text-link { color: var(--cyan); font-weight: 750; text-decoration: none; }
 .text-link:hover { color: var(--action-hover); }
-a.text-button { text-decoration: none; }
+a.text-button, a.secondary-button { text-decoration: none; }
 .danger-text-button { border: 0; }
 .goal-link { align-self: flex-start; }
 .goal-month:empty { display: none; }

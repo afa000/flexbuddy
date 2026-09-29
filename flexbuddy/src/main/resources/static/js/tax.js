@@ -27,9 +27,11 @@
         : '—';
 
     function init() {
-        const thisYear = new Date().getFullYear();
+        const now = new Date();
+        const thisYear = now.getFullYear();
         el.year.replaceChildren(...[thisYear, thisYear - 1].map(year => new Option(String(year), String(year))));
-        el.paidOn.value = new Date().toISOString().slice(0, 10);
+        // The local date: toISOString is UTC, which is already tomorrow on a US evening.
+        el.paidOn.value = [thisYear, now.getMonth() + 1, now.getDate()].map(part => String(part).padStart(2, '0')).join('-');
         el.year.addEventListener('change', load);
         el.percentForm.addEventListener('submit', savePercent);
         el.paymentForm.addEventListener('submit', addPayment);
