@@ -33,7 +33,7 @@ way, what changed after a late forfeit is visible in one place.
   replaces it" the natural behaviour. There's no separate POST.
 - **The backup format stays at version 4.** Tax payments (V16) and payouts (V17) were both
   added as new lists without a version bump. A missing list deserialises to empty, so older
-  files restore unchanged. See open question 3.
+  files restore unchanged. Decided: keep version 4.
 - **The current standing is not added to `ShiftStatisticsResponse` or
   `AccountSettingsResponse`.** The tile reads it from `GET /standing`, so no shared record
   changes.
@@ -42,8 +42,8 @@ way, what changed after a late forfeit is visible in one place.
 
 - Reading standing from a screenshot. OCR would need samples of Amazon's standing screen.
 - Reminders to log standing.
-- A "Log standing" action on the forfeit toast (open question 2).
-- Any score or sub-metric beyond the four levels (open question 6).
+- A "Log standing" action on the forfeit toast. Decided: not wanted.
+- Any score or sub-metric beyond the four levels (open question 3).
 - The account page.
 
 ## 2. Data model and migration
@@ -573,21 +573,24 @@ them. The backup format stays at version 4, as older files simply have
 no standing to add.
 ```
 
-## 9. Open questions
+## 9. Decisions and open questions
 
-1. **Where the card lives.** This plan puts it on the Schedule screen, as the draft
-   suggests, with the tile link jumping to it. Would you rather it sat on the dashboard
-   under the stats, or opened in its own sheet like Payouts?
-2. **Prompt after a forfeit.** Should the forfeit toast (above all a late forfeit) offer
-   "Log standing" as its action? That fits the draft's risk note, but it's another place
-   that writes. It's left out for now.
-3. **Backup version.** Keep format version 4, as tax payments and payouts did, or bump to 5?
-   A bump would also make the version checks in `AccountRestoreService` (`> 4`) change and
-   ripple into `AccountRestoreServiceTest`.
-4. **Window.** A fixed 90 days, or a 30 / 90 / 180 switch? The API already takes `days`, so
-   it would be frontend only.
-5. **How far back.** Any past date can be logged, which is useful for back-filling from
-   memory. Should there be a limit, such as one year?
-6. **Levels.** Some regions show extra tiers, such as "Fantastic Plus", or sub-scores like
+### Decided
+
+- **The card lives on the Schedule screen**, with the dashboard tile's link jumping to it,
+  as planned in section 4.
+- **The forfeit toast gets no "Log standing" prompt.** The tile link is the only way in
+  besides the Schedule screen.
+- **The backup format stays at version 4.** `AccountRestoreService`'s `> 4` check and its
+  tests don't change.
+
+### Still open
+
+1. **Window.** A fixed 90 days, or a 30 / 90 / 180 switch? The API already takes `days`, so
+   a switch would be frontend only. The plan ships a fixed 90 days unless you say otherwise.
+2. **How far back.** Any past date can be logged, which is useful for back-filling from
+   memory. Should there be a limit, such as one year? The plan ships with no limit.
+3. **Levels.** Some regions show extra tiers, such as "Fantastic Plus", or sub-scores like
    reliability. Are the four levels all you want, or should the check constraint allow
-   more? Adding a level later means a new migration to widen the check.
+   more? Adding a level later means a new migration to widen the check. The plan ships the
+   four levels.
