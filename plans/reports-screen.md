@@ -291,6 +291,18 @@ No change: "Import screenshot" already calls `showImportScreen(false)`.
 | `styles.css` | New rules; `.filter-panel` rules removed |
 | `sw.js` | `VERSIONED_ASSETS` |
 
+**Removed-elements checklist.** `app.js` looks its elements up once, at load, and several
+listeners are attached without a null check. A removed element that is still referenced
+throws at load and **stops the whole script**, which leaves the main page dead. For every
+element this plan removes, delete its `elements` entry and every use, including the error
+branch of `loadStatistics`:
+
+| Removed | References to delete at `eef0595` |
+|---|---|
+| `#importNavButton` | `elements.importNavButton` (line 6), its click listener (line ~229), and its entry in `setActiveNavigation` |
+| `#hourlyBreakdown` | `elements.hourlyBreakdown`, its assignment in `loadStatistics` (line ~865), and the error-branch list (line ~891) |
+| The old "Estimated net hourly" tile | Nothing: `#netHourly` stays as Avg hourly's second line |
+
 **Things that must keep working** (check these by hand, section 7):
 
 - **Swipe to edit, delete or duplicate** on history rows (`swipe.js`, bound to
@@ -380,7 +392,9 @@ about 17 worked blocks, 4 scheduled, 6 expenses, a $400 weekly goal and 25% tax.
     - Tab to the range button, press Enter, then Tab through the sheet: focus stays inside.
     - Escape closes it.
     - The arrow keys switch the tabs.
-13. **Offline.** Reports shows cached data, with the range sheet still usable. It reads
+13. **No script errors.** With DevTools' console open, load `/`, then open every screen
+    and the range sheet. The console shows **no errors**.
+14. **Offline.** Reports shows cached data, with the range sheet still usable. It reads
     cached responses, as the dashboard did.
 
 ## 8. Suggested commit message
