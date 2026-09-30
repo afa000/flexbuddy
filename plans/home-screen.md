@@ -163,10 +163,13 @@ rendering a banner: `<article … id="homeAttention" th:attr="data-backup-due=${
 stat line:
 
 ```html
-<p class="schedule-forfeits"><span id="forfeitsMonth">0</span> forfeits this month · <span id="forfeitsDetail"></span> <button class="text-link" id="standingLink" type="button">Log standing</button></p>
+<p class="schedule-forfeits"><span id="forfeitsMonth">0</span> forfeits this month · <span id="forfeitsDetail"></span> <span class="standing-pill is-hidden" id="standingPill" data-level=""></span> <button class="text-link" id="standingLink" type="button">Log standing</button></p>
 ```
 
-It keeps the ids, so `loadStatistics` and `standing.js` keep working.
+It keeps the ids, so `loadStatistics` and `standing.js` keep working. **`#standingPill` must
+come too:** `standing.js` calls `setPill(el.pill, …)` without a null check (line ~52), so
+leaving the pill behind would throw on every load. It also puts the current standing next
+to the forfeit count, which is where you'd want it.
 
 **The planned-next-7-days tile** (`#plannedWeek` and `#plannedWeekDetail`) is removed.
 Delete its two lines in `loadStatistics`.
@@ -319,6 +322,19 @@ Add a section `/* Home */`.
 | `styles.css` | Home section; old banner rules removed |
 | `sw.js` | `VERSIONED_ASSETS` |
 
+**Removed-elements checklist.** `app.js` looks its elements up once, at load, and several
+listeners are attached without a null check. A removed element that is still referenced
+throws at load and **stops the whole script**, which leaves the main page dead. For every
+element this plan removes, delete its `elements` entry and every use, including the error
+branch of `loadStatistics`:
+
+| Removed | References to delete at `eef0595` |
+|---|---|
+| `#nextShiftLink` | `elements.nextShiftLink` (line 140) and **its click listener (line ~231), which has no null check**. `schedule.js`'s `renderHints` already guards it with `if (el.nextShiftLink)`, so it's safe. |
+| `#plannedWeek`, `#plannedWeekDetail` | `elements` (lines 141–142), `loadStatistics` (lines ~881–882) **and** its error-branch list (lines ~893–894) |
+| `#rollingSevenDayTime`, moved into the week card | Nothing: the id is kept. Only `loadStatistics` stops writing it, and `home.js` writes it instead. |
+| `.hero`, `.install-banner`, `.backup-nudge` wrappers | No JavaScript refers to the wrappers. The ids inside are kept. |
+
 **Things that must keep working** (section 7):
 
 - Start block and Finish block from Home's next-block card.
@@ -401,7 +417,10 @@ Use the same local test account as plan 1: 17 blocks, 4 scheduled, a $400 goal, 
    - `scrollWidth === innerWidth`.
 10. **Offline.** Home shows the cached figures. The Start block, Finish and miles buttons
     follow 06b's rules.
-11. **Screen reader.** The greeting is the page's `h1`. The attention and recent sections
+11. **No script errors.** With DevTools' console open, load `/` and open every screen. The
+    console shows **no errors**. The standing pill beside the forfeits line shows the current
+    standing after one is logged.
+12. **Screen reader.** The greeting is the page's `h1`. The attention and recent sections
     have headings. The ring is `aria-hidden`, and the amount is text.
 
 ## 8. Suggested commit message
