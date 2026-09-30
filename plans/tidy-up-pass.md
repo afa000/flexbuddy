@@ -229,7 +229,7 @@ branch of `loadStatistics`:
 | Removed | References to delete at `eef0595` |
 |---|---|
 | `#dashboardButton` | `elements.dashboardButton` (line 4) and its listener (line ~240) |
-| `#logoutForm` | `elements.logoutForm` (line 166), its listener (line ~238), and `signOut` (line ~2170) |
+| `#logoutForm` | `elements.logoutForm` (line 166), its listener (line ~238), and `signOut` (line ~2158) |
 | `.account-name-link` and `.brand` | No JavaScript refers to them. Check again at implementation time. |
 
 **Tests that pin the old text or ids:** none at `eef0595`. A search of `src/test` for
