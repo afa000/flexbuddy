@@ -220,6 +220,18 @@ No change. No new files.
 | `app.js` | `dashboardButton`, `logoutForm` and `signOut` removed; `homeLink`; expense cost note text |
 | `styles.css` | Tokens, `.screen-title`, `.brand-mark`, `.account-button`, expense tiles, phone spacing. Remove `.brand small`, `.account-name` and `.screen-heading` rules **only if** nothing else uses them. The legal pages use `.auth-brand`, which is different. |
 
+**Removed-elements checklist.** `app.js` looks its elements up once, at load, and several
+listeners are attached without a null check. A removed element that is still referenced
+throws at load and **stops the whole script**, which leaves the main page dead. For every
+element this plan removes, delete its `elements` entry and every use, including the error
+branch of `loadStatistics`:
+
+| Removed | References to delete at `eef0595` |
+|---|---|
+| `#dashboardButton` | `elements.dashboardButton` (line 4) and its listener (line ~240) |
+| `#logoutForm` | `elements.logoutForm` (line 166), its listener (line ~238), and `signOut` (line ~2170) |
+| `.account-name-link` and `.brand` | No JavaScript refers to them. Check again at implementation time. |
+
 **Tests that pin the old text or ids:** none at `eef0595`. A search of `src/test` for
 `dashboardButton`, `logoutForm`, "YOUR SCHEDULE", "Explore expenses" and "Upcoming blocks"
 finds nothing. Search again at implementation time, in case plans 1–3 added any.
@@ -278,7 +290,9 @@ Use the local test account at **320×640**, **390×844** and **1280×800**, in *
 8. **Accessibility.**
    - Each screen has exactly one visible `h1`.
    - The logo link reads "FlexBuddy, go to Home". The account button reads "Account".
-9. **Before and after.** Take the same screenshots as in the design review. The full-page
+9. **No script errors.** With DevTools' console open, load `/` and `/account`, and open
+   every screen. The console shows **no errors**.
+10. **Before and after.** Take the same screenshots as in the design review. The full-page
    captures of Home, Reports, Schedule, Expenses and Account together should be **under
    half** of the original total (about 22,000 px at 390 wide).
 
