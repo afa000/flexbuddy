@@ -33,7 +33,9 @@ screens**, in this order:
    - "N blocks to confirm", which goes to Schedule, where the confirm strip is;
    - "N blocks have no miles", which expands the existing missing-miles list in place;
    - "No backup in 30 days", which goes to Account (`/account#backup`), and only shows when
-     the server's `backupDue` is true;
+     the server's `backupDue` is true. `#backup` is added by plan 3 (account sections).
+     Until plan 3 ships, the link opens the account page at the top, which is expected, not
+     a bug;
    - "Install FlexBuddy", with the existing install and not-now logic, only in a browser,
      never in the Play app.
 5. **Evaluate a block:** the existing calculator, unchanged and still folded.
