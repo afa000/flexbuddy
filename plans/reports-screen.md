@@ -300,7 +300,7 @@ branch of `loadStatistics`:
 | Removed | References to delete at `eef0595` |
 |---|---|
 | `#importNavButton` | `elements.importNavButton` (line 6), its click listener (line ~229), and its entry in `setActiveNavigation` |
-| `#hourlyBreakdown` | `elements.hourlyBreakdown`, its assignment in `loadStatistics` (line ~865), and the error-branch list (line ~891) |
+| `#hourlyBreakdown` | `elements.hourlyBreakdown` (line 44), its assignment in `loadStatistics` (line ~863), and the error-branch list (line ~891) |
 | The old "Estimated net hourly" tile | Nothing: `#netHourly` stays as Avg hourly's second line |
 
 **Things that must keep working** (check these by hand, section 7):
