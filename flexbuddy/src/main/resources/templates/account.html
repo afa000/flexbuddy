@@ -26,7 +26,7 @@
 <body>
 <div class="app-shell">
     <header class="topbar">
-        <a class="round-header-button" href="/" aria-label="Back to dashboard">
+        <a class="round-header-button" href="/" aria-label="Back to Home">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
         </a>
         <a class="brand" href="/" aria-label="FlexBuddy home"><strong>FlexBuddy</strong><small>Account data</small></a>
@@ -42,242 +42,297 @@
     <div class="offline-banner is-hidden" id="offlineBanner" role="status" aria-live="polite"></div>
 
     <main class="account-main">
-        <section class="hero account-hero">
-            <div><p class="eyebrow">ACCOUNT</p><h1>Export and recovery</h1><p class="hero-copy">Keep a copy of your history and restore it whenever you need to.</p></div>
-        </section>
+        <header class="account-heading" th:attr="data-name=${currentUser.displayName},data-email=${currentUser.email}">
+            <h1>Account</h1>
+            <p th:text="${currentUser.displayName + ' · ' + currentUser.email}">Angel · angel@example.com</p>
+        </header>
 
-        <section class="account-grid">
-            <article class="panel data-card">
-                <p class="step-label">DRIVER COSTS</p>
-                <h2>Net earnings settings</h2>
-                <p>Choose how FlexBuddy estimates vehicle costs. You can override the standard mileage rate at any time.</p>
-                <form class="settings-form" id="expenseSettingsForm">
-                    <label class="field"><span>Vehicle cost method</span><select id="vehicleCostMethod"><option value="STANDARD_MILEAGE">Standard mileage</option><option value="ACTUAL_EXPENSES">Actual fuel & maintenance</option></select></label>
-                    <label class="field"><span>Mileage rate per mile</span><input id="accountMileageRate" type="number" min="0" max="5.000" step="0.001" required></label>
-                    <small id="mileageRateHelp"></small>
-                    <div class="notice error-notice is-hidden" id="settingsError" role="alert"></div>
-                    <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
-                </form>
-            </article>
-            <article class="panel data-card tax-card" id="taxes">
-                <p class="step-label">TAXES</p>
-                <h2>Tax set-aside</h2>
-                <p>Choose a share of your net earnings to put aside for taxes, and record the estimated payments you make. These are estimates, not tax advice: FlexBuddy applies your percentage to its estimate of your net earnings and does not work out what you owe.</p>
-                <form class="settings-form" id="taxPercentForm">
-                    <label class="field"><span>Set aside (% of net earnings)</span>
-                        <input id="taxPercent" type="number" min="1" max="60" step="0.5" inputmode="decimal" placeholder="Off">
-                        <small class="field-hint">Many drivers use 25 to 30 percent. Leave it empty to turn this off.</small>
-                    </label>
-                    <label class="checkbox-row"><input id="remindTax" type="checkbox"> Remind me a week before and on each estimated tax due date</label>
-                    <small class="field-hint">A push notification at 9 in the morning, using the dates shown below. Estimates only.</small>
-                    <div class="notice error-notice is-hidden" id="taxPercentError" role="alert"></div>
-                    <div class="form-actions"><button class="primary-button" type="submit">Save tax settings</button></div>
-                </form>
-                <div class="tax-year-row">
-                    <label class="field"><span>Tax year</span><select id="taxYear"></select></label>
-                    <a class="secondary-button compact-button" id="taxCsvLink" href="/tax/summary.csv" download>Download year summary (CSV)</a>
-                    <a class="secondary-button compact-button" id="taxPrintLink" href="/tax/year-summary">View printable summary</a>
+        <div class="settings-sections">
+            <details class="settings-section" id="costs" aria-labelledby="costsTitle">
+                <summary>
+                    <span class="settings-section-title" id="costsTitle">Earnings &amp; costs</span>
+                    <span class="settings-section-summary" data-summary="costs">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                    <article class="panel data-card">
+                        <h3>Net earnings settings</h3>
+                        <p>Choose how FlexBuddy estimates vehicle costs.</p>
+                        <form class="settings-form" id="expenseSettingsForm">
+                            <label class="field"><span>Vehicle cost method</span><select id="vehicleCostMethod"><option value="STANDARD_MILEAGE">Standard mileage</option><option value="ACTUAL_EXPENSES">Actual fuel & maintenance</option></select></label>
+                            <label class="field"><span>Mileage rate per mile</span><input id="accountMileageRate" type="number" min="0" max="5.000" step="0.001" required></label>
+                            <small id="mileageRateHelp"></small>
+                            <div class="notice error-notice is-hidden" id="settingsError" role="alert"></div>
+                            <div class="form-actions"><button class="secondary-button" id="resetMileageRateButton" type="button">Use app default</button><button class="primary-button" id="saveSettingsButton" type="submit">Save settings</button></div>
+                        </form>
+                    </article>
+
+                    <article class="panel data-card" id="goals">
+                        <h3>Earnings goals</h3>
+                        <p>Set a target and the dashboard shows your progress, counting blocks you have scheduled.</p>
+                        <form class="settings-form" id="goalSettingsForm">
+                            <label class="field"><span>Weekly goal (Monday to Sunday)</span><span class="input-with-prefix"><b>$</b><input id="weeklyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
+                            <label class="field"><span>Monthly goal</span><span class="input-with-prefix"><b>$</b><input id="monthlyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
+                            <fieldset class="goal-basis">
+                                <legend>Count toward goals</legend>
+                                <label class="checkbox-row"><input type="radio" name="goalBasis" value="GROSS" checked> Pay before costs, as Flex shows it</label>
+                                <label class="checkbox-row"><input type="radio" name="goalBasis" value="NET"> Estimated net after vehicle costs and expenses</label>
+                            </fieldset>
+                            <div class="notice error-notice is-hidden" id="goalError" role="alert"></div>
+                            <div class="form-actions"><button class="primary-button" id="saveGoalsButton" type="submit">Save goals</button></div>
+                        </form>
+                    </article>
+
                 </div>
-                <dl class="tax-figures" id="taxFigures" aria-live="polite"></dl>
-                <div class="breakdown-scroll">
-                    <table class="breakdown-table tax-quarters" id="taxQuarters">
-                        <caption class="sr-only">Estimated tax by payment period</caption>
-                        <thead><tr><th>Period</th><th>Dates</th><th>Due</th><th>Net</th><th>Set aside</th><th>Paid</th></tr></thead>
-                        <tbody></tbody>
-                    </table>
+            </details>
+            <details class="settings-section" id="taxes-section" aria-labelledby="taxesTitle">
+                <summary>
+                    <span class="settings-section-title" id="taxesTitle">Taxes</span>
+                    <span class="settings-section-summary" data-summary="taxes">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                    <article class="panel data-card tax-card" id="taxes">
+                        <h3>Tax set-aside</h3>
+                        <p>Choose a share of your net earnings to put aside for taxes, and record the estimated payments you make. These are estimates, not tax advice: FlexBuddy applies your percentage to its estimate of your net earnings and does not work out what you owe.</p>
+                        <form class="settings-form" id="taxPercentForm">
+                            <label class="field"><span>Set aside (% of net earnings)</span>
+                                <input id="taxPercent" type="number" min="1" max="60" step="0.5" inputmode="decimal" placeholder="Off">
+                                <small class="field-hint">Many drivers use 25 to 30 percent. Leave it empty to turn this off.</small>
+                            </label>
+                            <label class="checkbox-row"><input id="remindTax" type="checkbox"> Remind me a week before and on each estimated tax due date</label>
+                            <small class="field-hint">A push notification at 9 in the morning, using the dates shown below. Estimates only.</small>
+                            <div class="notice error-notice is-hidden" id="taxPercentError" role="alert"></div>
+                            <div class="form-actions"><button class="primary-button" type="submit">Save tax settings</button></div>
+                        </form>
+                        <div class="tax-year-row">
+                            <label class="field"><span>Tax year</span><select id="taxYear"></select></label>
+                            <a class="secondary-button compact-button" id="taxCsvLink" href="/tax/summary.csv" download>Download year summary (CSV)</a>
+                            <a class="secondary-button compact-button" id="taxPrintLink" href="/tax/year-summary">View printable summary</a>
+                        </div>
+                        <dl class="tax-figures" id="taxFigures" aria-live="polite"></dl>
+                        <div class="breakdown-scroll">
+                            <table class="breakdown-table tax-quarters" id="taxQuarters">
+                                <caption class="sr-only">Estimated tax by payment period</caption>
+                                <thead><tr><th>Period</th><th>Dates</th><th>Due</th><th>Net</th><th>Set aside</th><th>Paid</th></tr></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <h3 class="tax-subheading">Payments you made</h3>
+                        <ul class="tax-payments" id="taxPayments"></ul>
+                        <form class="settings-form tax-payment-form" id="taxPaymentForm">
+                            <label class="field"><span>Paid on</span><input id="taxPaidOn" type="date" required></label>
+                            <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="taxPaymentAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
+                            <label class="field"><span>For period <small>(optional)</small></span><select id="taxPaymentQuarter">
+                                <option value="">Not specified</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option>
+                            </select></label>
+                            <label class="field"><span>Note <small>(optional)</small></span><input id="taxPaymentNote" type="text" maxlength="255"></label>
+                            <div class="notice error-notice is-hidden" id="taxPaymentError" role="alert"></div>
+                            <div class="form-actions"><button class="secondary-button" type="submit">Record payment</button></div>
+                        </form>
+                    </article>
+
                 </div>
-                <h3 class="tax-subheading">Payments you made</h3>
-                <ul class="tax-payments" id="taxPayments"></ul>
-                <form class="settings-form tax-payment-form" id="taxPaymentForm">
-                    <label class="field"><span>Paid on</span><input id="taxPaidOn" type="date" required></label>
-                    <label class="field money-field"><span>Amount</span><span class="input-with-prefix"><b>$</b><input id="taxPaymentAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
-                    <label class="field"><span>For period <small>(optional)</small></span><select id="taxPaymentQuarter">
-                        <option value="">Not specified</option><option value="1">Q1</option><option value="2">Q2</option><option value="3">Q3</option><option value="4">Q4</option>
-                    </select></label>
-                    <label class="field"><span>Note <small>(optional)</small></span><input id="taxPaymentNote" type="text" maxlength="255"></label>
-                    <div class="notice error-notice is-hidden" id="taxPaymentError" role="alert"></div>
-                    <div class="form-actions"><button class="secondary-button" type="submit">Record payment</button></div>
-                </form>
-            </article>
-            <article class="panel data-card" id="payouts">
-                <p class="step-label">PAYOUTS</p>
-                <h2>Payout schedule</h2>
-                <p>Used for the Next payout tile and the pay period filters. Flex pays twice a week in most areas, for blocks up to the day before.</p>
-                <form class="settings-form" id="payoutSettingsForm">
-                    <fieldset class="payout-days">
-                        <legend>Payout days</legend>
-                        <label class="checkbox-row"><input type="checkbox" value="MONDAY"> Monday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="TUESDAY"> Tuesday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="WEDNESDAY"> Wednesday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="THURSDAY"> Thursday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="FRIDAY"> Friday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="SATURDAY"> Saturday</label>
-                        <label class="checkbox-row"><input type="checkbox" value="SUNDAY"> Sunday</label>
-                    </fieldset>
-                    <label class="field"><span>Days between a block and its payout</span>
-                        <input id="payoutLagDays" type="number" min="0" max="14" step="1" inputmode="numeric" required>
-                        <small class="field-hint">With 1, a Monday block is paid on Tuesday and a Tuesday block on the next payout day.</small>
-                    </label>
-                    <div class="notice error-notice is-hidden" id="payoutError" role="alert"></div>
-                    <div class="form-actions"><button class="primary-button" id="savePayoutsButton" type="submit">Save payout schedule</button></div>
-                </form>
-            </article>
-            <article class="panel data-card" id="goals">
-                <p class="step-label">GOALS</p>
-                <h2>Earnings goals</h2>
-                <p>Set a target and the dashboard shows your progress, counting blocks you have scheduled.</p>
-                <form class="settings-form" id="goalSettingsForm">
-                    <label class="field"><span>Weekly goal (Monday to Sunday)</span><span class="input-with-prefix"><b>$</b><input id="weeklyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
-                    <label class="field"><span>Monthly goal</span><span class="input-with-prefix"><b>$</b><input id="monthlyGoal" type="number" min="1" step="1" inputmode="decimal" placeholder="Off"></span></label>
-                    <fieldset class="goal-basis">
-                        <legend>Count toward goals</legend>
-                        <label class="checkbox-row"><input type="radio" name="goalBasis" value="GROSS" checked> Pay before costs, as Flex shows it</label>
-                        <label class="checkbox-row"><input type="radio" name="goalBasis" value="NET"> Estimated net after vehicle costs and expenses</label>
-                    </fieldset>
-                    <div class="notice error-notice is-hidden" id="goalError" role="alert"></div>
-                    <div class="form-actions"><button class="primary-button" id="saveGoalsButton" type="submit">Save goals</button></div>
-                </form>
-            </article>
-            <article class="panel data-card reminders-card">
-                <p class="step-label">REMINDERS</p>
-                <h2>Reminders</h2>
-                <p>Your phone's calendar can remind you before every block. Push reminders are an optional extra.</p>
-                <form class="settings-form" id="reminderSettingsForm">
-                    <label class="field"><span>Time zone</span><select id="timeZoneSelect"></select></label>
-                    <label class="field"><span>Remind me before a block</span><select id="remindBefore">
-                        <option value="">Off</option>
-                        <option value="30">30 minutes before</option>
-                        <option value="60">1 hour before</option>
-                        <option value="120">2 hours before</option>
-                        <option value="720">The night before (12 hours)</option>
-                    </select></label>
-                    <label class="checkbox-row"><input id="remindConfirm" type="checkbox"> Nudge me to confirm blocks after they end</label>
-                    <label class="checkbox-row"><input id="remindMiles" type="checkbox"> Remind me to log miles 20 minutes after a block ends</label>
-                    <label class="field"><span>Forfeit cutoff (minutes before a block)</span>
-                        <input id="forfeitCutoff" type="number" min="0" max="720" step="5" inputmode="numeric" required>
-                        <small class="field-hint">Forfeits after this count as late. Flex uses 45 minutes in most areas.</small>
-                    </label>
-                    <div class="notice error-notice is-hidden" id="reminderError" role="alert"></div>
-                    <div class="form-actions"><button class="primary-button" id="saveRemindersButton" type="submit">Save reminders</button></div>
-                </form>
-                <section class="reminder-section">
-                    <h3>Calendar feed</h3>
-                    <p>Subscribe once in Google Calendar or iOS Calendar and your blocks appear with an alarm at your lead time. Anyone with this link can see your schedule, so keep it private.</p>
-                    <div class="feed-url-row">
-                        <input id="calendarFeedUrl" type="text" readonly placeholder="No link yet" aria-label="Calendar feed link">
-                        <button class="secondary-button compact-button" id="copyFeedButton" type="button" disabled>Copy</button>
-                    </div>
-                    <button class="text-button" id="regenerateFeedButton" type="button" data-online-only>Create calendar link</button>
-                    <small class="field-hint">Each block on the Schedule screen also has an Add to calendar button that downloads a single .ics file.</small>
-                </section>
-                <section class="reminder-section">
-                    <h3>Push reminders</h3>
-                    <p id="pushStatus">Checking push support…</p>
-                    <small class="field-hint">On iPhone, install FlexBuddy to your home screen first (iOS 16.4 or later). Push is best-effort and can arrive late if the server was asleep.</small>
-                    <button class="secondary-button compact-button" id="pushToggleButton" type="button" disabled>Turn on push on this device</button>
-                </section>
-                <section class="reminder-section is-hidden" id="installSection">
-                    <h3>Install the app</h3>
-                    <p id="installHelp"></p>
-                    <button class="primary-button compact-button is-hidden" id="installAppButton" type="button">Install FlexBuddy</button>
-                </section>
-            </article>
+            </details>
+            <details class="settings-section" id="payouts-section" aria-labelledby="payoutsTitle">
+                <summary>
+                    <span class="settings-section-title" id="payoutsTitle">Payouts</span>
+                    <span class="settings-section-summary" data-summary="payouts">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                    <article class="panel data-card" id="payouts">
+                        <h3>Payout schedule</h3>
+                        <p>Used for the Next payout tile and the pay period filters. Flex pays twice a week in most areas, for blocks up to the day before.</p>
+                        <form class="settings-form" id="payoutSettingsForm">
+                            <fieldset class="payout-days">
+                                <legend>Payout days</legend>
+                                <label class="checkbox-row"><input type="checkbox" value="MONDAY"> Monday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="TUESDAY"> Tuesday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="WEDNESDAY"> Wednesday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="THURSDAY"> Thursday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="FRIDAY"> Friday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="SATURDAY"> Saturday</label>
+                                <label class="checkbox-row"><input type="checkbox" value="SUNDAY"> Sunday</label>
+                            </fieldset>
+                            <label class="field"><span>Days between a block and its payout</span>
+                                <input id="payoutLagDays" type="number" min="0" max="14" step="1" inputmode="numeric" required>
+                                <small class="field-hint">With 1, a Monday block is paid on Tuesday and a Tuesday block on the next payout day.</small>
+                            </label>
+                            <div class="notice error-notice is-hidden" id="payoutError" role="alert"></div>
+                            <div class="form-actions"><button class="primary-button" id="savePayoutsButton" type="submit">Save payout schedule</button></div>
+                        </form>
+                    </article>
 
-            <article class="panel data-card">
-                <p class="step-label">BACKUP</p>
-                <h2>Download all account data</h2>
-                <p>Your backup contains shifts, expenses, driver cost settings, and recently deleted items. It never contains your password.</p>
-                <p class="backup-status" id="backupStatus" th:attr="data-last-backup=${currentUser.lastBackupAt}" th:text="${currentUser.lastBackupAt == null ? 'Last backup: Never' : 'Last backup recorded'}">Last backup: Never</p>
-                <a class="primary-button download-button" href="/account/backup" download>Download backup</a>
-                <div class="outbox-account-row" id="outboxAccountRow" hidden>
-                    <p class="outbox-status" id="outboxStatus" role="status">Changes waiting to sync</p>
-                    <div class="confirm-actions">
-                        <button class="secondary-button compact-button" id="outboxAccountSync" type="button">Sync now</button>
-                        <button class="text-button danger-text-button" id="outboxAccountDiscard" type="button">Discard all</button>
-                    </div>
                 </div>
-            </article>
+            </details>
+            <details class="settings-section" id="reminders" aria-labelledby="remindersTitle">
+                <summary>
+                    <span class="settings-section-title" id="remindersTitle">Reminders &amp; calendar</span>
+                    <span class="settings-section-summary" data-summary="reminders">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                    <article class="panel data-card reminders-card">
+                        <h3>Reminders</h3>
+                        <p>Your phone's calendar can remind you before every block. Push reminders are an optional extra.</p>
+                        <form class="settings-form" id="reminderSettingsForm">
+                            <label class="field"><span>Time zone</span><select id="timeZoneSelect"></select></label>
+                            <label class="field"><span>Remind me before a block</span><select id="remindBefore">
+                                <option value="">Off</option>
+                                <option value="30">30 minutes before</option>
+                                <option value="60">1 hour before</option>
+                                <option value="120">2 hours before</option>
+                                <option value="720">The night before (12 hours)</option>
+                            </select></label>
+                            <label class="checkbox-row"><input id="remindConfirm" type="checkbox"> Nudge me to confirm blocks after they end</label>
+                            <label class="checkbox-row"><input id="remindMiles" type="checkbox"> Remind me to log miles 20 minutes after a block ends</label>
+                            <label class="field"><span>Forfeit cutoff (minutes before a block)</span>
+                                <input id="forfeitCutoff" type="number" min="0" max="720" step="5" inputmode="numeric" required>
+                                <small class="field-hint">Forfeits after this count as late. Flex uses 45 minutes in most areas.</small>
+                            </label>
+                            <div class="notice error-notice is-hidden" id="reminderError" role="alert"></div>
+                            <div class="form-actions"><button class="primary-button" id="saveRemindersButton" type="submit">Save reminders</button></div>
+                        </form>
+                        <section class="reminder-section">
+                            <h3>Calendar feed</h3>
+                            <p>Subscribe once in Google Calendar or iOS Calendar and your blocks appear with an alarm at your lead time. Anyone with this link can see your schedule, so keep it private.</p>
+                            <div class="feed-url-row">
+                                <input id="calendarFeedUrl" type="text" readonly placeholder="No link yet" aria-label="Calendar feed link">
+                                <button class="secondary-button compact-button" id="copyFeedButton" type="button" disabled>Copy</button>
+                            </div>
+                            <button class="text-button" id="regenerateFeedButton" type="button" data-online-only>Create calendar link</button>
+                            <small class="field-hint">Each block on the Schedule screen also has an Add to calendar button that downloads a single .ics file.</small>
+                        </section>
+                        <section class="reminder-section">
+                            <h3>Push reminders</h3>
+                            <p id="pushStatus">Checking push support…</p>
+                            <small class="field-hint">On iPhone, install FlexBuddy to your home screen first (iOS 16.4 or later). Push is best-effort and can arrive late if the server was asleep.</small>
+                            <button class="secondary-button compact-button" id="pushToggleButton" type="button" disabled>Turn on push on this device</button>
+                        </section>
+                        <section class="reminder-section is-hidden" id="installSection">
+                            <h3>Install the app</h3>
+                            <p id="installHelp"></p>
+                            <button class="primary-button compact-button is-hidden" id="installAppButton" type="button">Install FlexBuddy</button>
+                        </section>
+                    </article>
 
-            <article class="panel data-card">
-                <p class="step-label">RESTORE</p>
-                <h2>Restore from a backup</h2>
-                <p>Upload a FlexBuddy JSON backup. You will see what it contains before anything changes.</p>
-                <input id="backupInput" type="file" accept="application/json,.json" hidden>
-                <button class="drop-zone compact-drop-zone" id="backupPicker" type="button">
-                    <strong>Choose backup file</strong><span>FlexBuddy JSON, up to 5 MB</span>
-                </button>
-                <div class="notice error-notice is-hidden" id="restoreError" role="alert"></div>
-
-                <section class="restore-preview is-hidden" id="restorePreview" aria-live="polite">
-                    <h3>Backup preview</h3>
-                    <div class="restore-counts">
-                        <div><strong id="previewTotal">0</strong><span>Total</span></div>
-                        <div><strong id="previewNew">0</strong><span>New</span><small id="previewNewNote"></small></div>
-                        <div><strong id="previewExisting">0</strong><span>Existing</span></div>
-                        <div><strong id="previewTrashed">0</strong><span>In Recently deleted</span></div>
-                        <div><strong id="previewDuplicates">0</strong><span>Duplicate rows</span></div>
-                        <div><strong id="previewInvalid">0</strong><span>Invalid</span></div>
-                        <div><strong id="previewExpenses">0</strong><span>Expenses</span><small id="previewExpenseNote"></small></div>
-                    </div>
-                    <p id="previewSource"></p>
-                    <ul class="restore-problems" id="restoreProblems"></ul>
-                    <fieldset class="restore-options">
-                        <legend>Restore method</legend>
-                        <label><input type="radio" name="restoreMode" value="MERGE" checked> <span><strong>Merge</strong><small>Add new shifts and expenses while keeping current history.</small></span></label>
-                        <label><input type="radio" name="restoreMode" value="REPLACE"> <span><strong>Replace</strong><small>Move current shifts and expenses to Recently deleted first.</small></span></label>
-                        <label class="checkbox-row"><input id="includeDeleted" type="checkbox"> Include recently deleted shifts and expenses from the backup</label>
-                        <label class="checkbox-row replace-ack is-hidden" id="replaceAckRow"><input id="replaceAck" type="checkbox"> I understand my current shifts and expenses will move to Recently deleted</label>
-                    </fieldset>
-                    <button class="primary-button" id="restoreButton" type="button">Restore account data</button>
-                </section>
-            </article>
-
-            <article class="panel data-card legal-summary-card">
-                <p class="step-label">LEGAL &amp; PRIVACY</p>
-                <h2>Your data and terms</h2>
-                <p>Read how FlexBuddy handles your information and the terms that apply when using the service.</p>
-                <div class="legal-card-actions">
-                    <a class="secondary-button" href="/privacy">Privacy Policy</a>
-                    <a class="secondary-button" href="/terms">Terms of Use</a>
                 </div>
-                <p class="legal-contact">Questions? Email <a href="mailto:flexbuddysupport@gmail.com">flexbuddysupport@gmail.com</a>.</p>
-            </article>
-            <article class="panel data-card security-card">
-                <p class="step-label">SECURITY</p>
-                <h2>Signed-in devices</h2>
-                <p>Remove every persistent sign-in for your account, including this device. You will need your password the next time you open FlexBuddy.</p>
-                <form th:action="@{/account/sign-out-everywhere}" method="post" id="signOutEverywhereForm">
-                    <button class="danger-button" type="submit">Sign out everywhere</button>
-                </form>
-            </article>
-            <article class="panel data-card delete-account-card">
-                <p class="step-label">DELETE ACCOUNT</p>
-                <h2>Permanently delete your account</h2>
-                <p>This immediately removes your FlexBuddy account and cannot be undone. <a href="/delete-account">Read how account deletion works</a>.</p>
-                <ul class="deletion-list">
-                    <li>Every shift, including Recently deleted shifts</li>
-                    <li>Every expense, including Recently deleted expenses</li>
-                    <li>Driver settings, reminders, calendar links, and push subscriptions</li>
-                    <li>Persistent sign-ins and your account</li>
-                </ul>
-                <p><strong>Download a backup first if you want to keep a copy.</strong></p>
-                <a class="secondary-button download-button" href="/account/backup" download>Download backup</a>
-                <form class="settings-form deletion-form" th:action="@{/account}" th:object="${deletion}" method="post">
-                    <input type="hidden" name="_method" value="delete">
-                    <label class="field">
-                        <span>Current password</span>
-                        <input th:field="*{password}" type="password" autocomplete="current-password" maxlength="72" required>
-                        <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
-                    </label>
-                    <label class="field">
-                        <span>Type <strong>delete</strong> to confirm</span>
-                        <input th:field="*{confirmation}" type="text" autocomplete="off" maxlength="6" required>
-                        <small class="field-error" th:if="${#fields.hasErrors('confirmation')}" th:errors="*{confirmation}"></small>
-                    </label>
-                    <button class="danger-button" type="submit">Delete account permanently</button>
-                </form>
-            </article>
-        </section>
+            </details>
+            <details class="settings-section" id="backup" aria-labelledby="backupTitle">
+                <summary>
+                    <span class="settings-section-title" id="backupTitle">Backup &amp; restore</span>
+                    <span class="settings-section-summary" data-summary="backup">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                    <article class="panel data-card">
+                        <h3>Download all account data</h3>
+                        <p>Your backup contains shifts, expenses, driver cost settings, and recently deleted items. It never contains your password.</p>
+                        <p class="backup-status" id="backupStatus" th:attr="data-last-backup=${currentUser.lastBackupAt}" th:text="${currentUser.lastBackupAt == null ? 'Last backup: Never' : 'Last backup recorded'}">Last backup: Never</p>
+                        <a class="primary-button download-button" href="/account/backup" download>Download backup</a>
+                        <div class="outbox-account-row" id="outboxAccountRow" hidden>
+                            <p class="outbox-status" id="outboxStatus" role="status">Changes waiting to sync</p>
+                            <div class="confirm-actions">
+                                <button class="secondary-button compact-button" id="outboxAccountSync" type="button">Sync now</button>
+                                <button class="text-button danger-text-button" id="outboxAccountDiscard" type="button">Discard all</button>
+                            </div>
+                        </div>
+                    </article>
+
+                    <article class="panel data-card">
+                        <h3>Restore from a backup</h3>
+                        <p>Upload a FlexBuddy JSON backup. You will see what it contains before anything changes.</p>
+                        <input id="backupInput" type="file" accept="application/json,.json" hidden>
+                        <button class="drop-zone compact-drop-zone" id="backupPicker" type="button">
+                            <strong>Choose backup file</strong><span>FlexBuddy JSON, up to 5 MB</span>
+                        </button>
+                        <div class="notice error-notice is-hidden" id="restoreError" role="alert"></div>
+
+                        <section class="restore-preview is-hidden" id="restorePreview" aria-live="polite">
+                            <h3>Backup preview</h3>
+                            <div class="restore-counts">
+                                <div><strong id="previewTotal">0</strong><span>Total</span></div>
+                                <div><strong id="previewNew">0</strong><span>New</span><small id="previewNewNote"></small></div>
+                                <div><strong id="previewExisting">0</strong><span>Existing</span></div>
+                                <div><strong id="previewTrashed">0</strong><span>In Recently deleted</span></div>
+                                <div><strong id="previewDuplicates">0</strong><span>Duplicate rows</span></div>
+                                <div><strong id="previewInvalid">0</strong><span>Invalid</span></div>
+                                <div><strong id="previewExpenses">0</strong><span>Expenses</span><small id="previewExpenseNote"></small></div>
+                            </div>
+                            <p id="previewSource"></p>
+                            <ul class="restore-problems" id="restoreProblems"></ul>
+                            <fieldset class="restore-options">
+                                <legend>Restore method</legend>
+                                <label><input type="radio" name="restoreMode" value="MERGE" checked> <span><strong>Merge</strong><small>Add new shifts and expenses while keeping current history.</small></span></label>
+                                <label><input type="radio" name="restoreMode" value="REPLACE"> <span><strong>Replace</strong><small>Move current shifts and expenses to Recently deleted first.</small></span></label>
+                                <label class="checkbox-row"><input id="includeDeleted" type="checkbox"> Include recently deleted shifts and expenses from the backup</label>
+                                <label class="checkbox-row replace-ack is-hidden" id="replaceAckRow"><input id="replaceAck" type="checkbox"> I understand my current shifts and expenses will move to Recently deleted</label>
+                            </fieldset>
+                            <button class="primary-button" id="restoreButton" type="button">Restore account data</button>
+                        </section>
+                    </article>
+
+                </div>
+            </details>
+            <details class="settings-section" id="account" aria-labelledby="accountTitle">
+                <summary>
+                    <span class="settings-section-title" id="accountTitle">Account &amp; privacy</span>
+                    <span class="settings-section-summary" data-summary="account" th:text="${currentUser.displayName + ' · ' + currentUser.email}">Loading…</span>
+                    <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <div class="settings-section-body">
+                        <form id="accountSignOutForm" th:action="@{/logout}" method="post">
+                            <button class="secondary-button" type="submit">Sign out</button>
+                        </form>
+
+                    <article class="panel data-card security-card">
+                        <h3>Signed-in devices</h3>
+                        <p>Remove every persistent sign-in for your account, including this device. You will need your password the next time you open FlexBuddy.</p>
+                        <form th:action="@{/account/sign-out-everywhere}" method="post" id="signOutEverywhereForm">
+                            <button class="danger-button" type="submit">Sign out everywhere</button>
+                        </form>
+                    </article>
+
+                    <article class="panel data-card legal-summary-card">
+                        <h3>Your data and terms</h3>
+                        <div class="legal-card-actions">
+                            <a class="secondary-button" href="/privacy">Privacy Policy</a>
+                            <a class="secondary-button" href="/terms">Terms of Use</a>
+                        </div>
+                        <p class="legal-contact">Questions? Email <a href="mailto:flexbuddysupport@gmail.com">flexbuddysupport@gmail.com</a>.</p>
+                    </article>
+
+                    <article class="panel data-card delete-account-card">
+                        <h3>Permanently delete your account</h3>
+                        <p>This immediately removes your FlexBuddy account and cannot be undone. <a href="/delete-account">Read how account deletion works</a>.</p>
+                        <ul class="deletion-list">
+                            <li>Every shift, including Recently deleted shifts</li>
+                            <li>Every expense, including Recently deleted expenses</li>
+                            <li>Driver settings, reminders, calendar links, and push subscriptions</li>
+                            <li>Persistent sign-ins and your account</li>
+                        </ul>
+                        <p><strong>Download a backup first if you want to keep a copy.</strong></p>
+                        <a class="secondary-button download-button" href="/account/backup" download>Download backup</a>
+                        <form class="settings-form deletion-form" th:action="@{/account}" th:object="${deletion}" method="post">
+                            <input type="hidden" name="_method" value="delete">
+                            <label class="field">
+                                <span>Current password</span>
+                                <input th:field="*{password}" type="password" autocomplete="current-password" maxlength="72" required>
+                                <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
+                            </label>
+                            <label class="field">
+                                <span>Type <strong>delete</strong> to confirm</span>
+                                <input th:field="*{confirmation}" type="text" autocomplete="off" maxlength="6" required>
+                                <small class="field-error" th:if="${#fields.hasErrors('confirmation')}" th:errors="*{confirmation}"></small>
+                            </label>
+                            <button class="danger-button" type="submit">Delete account permanently</button>
+                        </form>
+                    </article>
+
+                </div>
+            </details>
+        </div>
     </main>
 
     <div class="toast is-hidden" id="accountToast" role="status" aria-live="polite">
@@ -288,6 +343,7 @@
 <script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/outbox.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/account-sections.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/account.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/tax.js(v=${buildId})}" defer></script>
 </body>

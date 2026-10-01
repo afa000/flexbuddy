@@ -216,6 +216,47 @@ class AccountControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("/js/outbox.js?v=")));
     }
 
+    private String accountPage() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(angel));
+        return mockMvc.perform(get("/account").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void accountPageHasSixFoldedSections() throws Exception {
+        String page = accountPage();
+
+        for (String id : new String[] {"costs", "taxes-section", "payouts-section", "reminders", "backup", "account"}) {
+            // Each is a details element, and none starts open.
+            assertThat(page).containsPattern("<details class=\"settings-section\" id=\"" + id + "\"");
+            assertThat(page).doesNotContainPattern("<details[^>]*id=\"" + id + "\"[^>]* open");
+        }
+        // The anchors that links already use are still on the cards inside.
+        assertThat(page).contains("id=\"goals\"", "id=\"taxes\"", "id=\"payouts\"");
+        // No card keeps its small label, because the section title replaces it.
+        assertThat(page).doesNotContain("step-label");
+    }
+
+    @Test
+    void accountPageHasASignOutForm() throws Exception {
+        String page = accountPage();
+
+        assertThat(page).containsPattern("<form[^>]*id=\"accountSignOutForm\"[^>]*action=\"/logout\"[^>]*method=\"post\"");
+        assertThat(page).containsPattern("(?s)id=\"accountSignOutForm\".*?name=\"_csrf\"");
+    }
+
+    @Test
+    void theTitleBannerIsGone() throws Exception {
+        String page = accountPage();
+
+        assertThat(page).doesNotContain("Export and recovery", "class=\"hero");
+        assertThat(page).contains("<h1>Account</h1>", "Angel · angel@example.com", "data-summary=\"account\"");
+        assertThat(page).contains("aria-label=\"Back to Home\"", "/js/account-sections.js?v=");
+    }
+
     @Test
     void deleteAccount_requiresCsrf() throws Exception {
         mockMvc.perform(post("/account")

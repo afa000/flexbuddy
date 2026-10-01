@@ -107,6 +107,8 @@
             const reminders = `Due-date reminders are ${el.remind.checked ? 'on' : 'off'}.`;
             showToast('Tax settings saved', `${value === '' ? 'The set-aside estimate is off.' : `Setting aside ${value}% of net earnings.`} ${reminders}`);
             await load();
+            // The section's summary line reads the saved settings, so they are loaded again.
+            await loadSettings();
         } catch (error) {
             el.percentError.textContent = error.message;
             el.percentError.classList.remove('is-hidden');

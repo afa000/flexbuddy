@@ -202,14 +202,53 @@ async function loadSettings() {
     if (response.ok) renderSettings(await response.json());
 }
 
+let latestSettings = null;
+
 function renderSettings(settings) {
+    latestSettings = settings;
     document.querySelector('#vehicleCostMethod').value = settings.vehicleCostMethod;
     document.querySelector('#accountMileageRate').value = settings.mileageRate;
     document.querySelector('#mileageRateHelp').textContent = `App default: $${Number(settings.defaultMileageRate).toFixed(3)} per mile (${settings.mileageRateYear}). This is an estimate, not tax advice.`;
     renderReminders(settings);
     renderGoals(settings);
     renderPayouts(settings);
+    updateSectionSummaries();
 }
+
+/** Writes each folded section's one-line summary, so a save shows in its section's row straight away. */
+function updateSectionSummaries() {
+    const heading = document.querySelector('.account-heading');
+    const lines = window.flexbuddyAccountSections.summaries(latestSettings, {
+        lastBackupAt: document.querySelector('#backupStatus').dataset.lastBackup,
+        displayName: heading.dataset.name, email: heading.dataset.email, remindTax: latestSettings?.remindTax
+    });
+    document.querySelectorAll('[data-summary]').forEach(span => { span.textContent = lines[span.dataset.summary] ?? ''; });
+}
+
+const sectionList = [...document.querySelectorAll('.settings-section')];
+const phoneWidth = window.matchMedia('(max-width: 620px)');
+let applyingHash = false;
+
+/** Opens the section a link names, such as /account#goals, and brings the named card into view. */
+function openSectionFromHash() {
+    const id = window.flexbuddyAccountSections.sectionForHash(window.location.hash);
+    const section = id && document.getElementById(id);
+    if (!section) return;
+    applyingHash = true;
+    // The toggle events from this change arrive later, so they are ignored for a moment.
+    setTimeout(() => { applyingHash = false; }, 100);
+    if (phoneWidth.matches) sectionList.forEach(other => { if (other !== section) other.open = false; });
+    section.open = true;
+    const target = document.getElementById(window.location.hash.slice(1)) ?? section;
+    target.scrollIntoView({block: 'start'});
+}
+
+// On a phone one section is open at a time, so the page stays short; on a wider screen several can be.
+sectionList.forEach(section => section.addEventListener('toggle', () => {
+    if (!section.open || applyingHash || !phoneWidth.matches) return;
+    sectionList.forEach(other => { if (other !== section) other.open = false; });
+}));
+window.addEventListener('hashchange', openSectionFromHash);
 
 const payoutForm = document.querySelector('#payoutSettingsForm');
 
@@ -288,6 +327,8 @@ goalForm.addEventListener('submit', async event => {
     }
 });
 
+updateSectionSummaries();
+openSectionFromHash();
 loadSettings();
 
 
@@ -298,8 +339,11 @@ const pushToggleButton = document.querySelector('#pushToggleButton');
 const pushStatus = document.querySelector('#pushStatus');
 let pushConfig = {configured: false};
 
-// Signing out everywhere ends this device's session too, so unsent changes are confirmed first and then cleared.
-document.querySelector('#signOutEverywhereForm')?.addEventListener('submit', async event => {
+/**
+ * Signing out, on this device or everywhere, ends this device's session, so unsent changes are confirmed first. The
+ * unsent changes and the cached figures are then cleared, so the next person to sign in on this phone sees neither.
+ */
+async function guardedSignOut(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const waiting = window.flexbuddyOutbox?.count() ?? 0;
@@ -308,9 +352,13 @@ document.querySelector('#signOutEverywhereForm')?.addEventListener('submit', asy
     }
     try {
         await window.flexbuddyOutbox?.clear();
+        await window.flexbuddyPwa?.clearUserData();
     } finally {
         form.submit();
     }
+}
+['#accountSignOutForm', '#signOutEverywhereForm'].forEach(selector => {
+    document.querySelector(selector)?.addEventListener('submit', guardedSignOut);
 });
 
 function renderReminders(settings) {

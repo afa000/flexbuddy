@@ -341,7 +341,7 @@ button {
 .deletion-list { margin: 10px 0 0; padding-left: 22px; color: var(--muted); line-height: 1.65; }
 .deletion-steps li + li,
 .deletion-list li + li { margin-top: 5px; }
-.delete-account-card { grid-column: 1 / -1; border-color: var(--error-border); }
+.delete-account-card { border-color: var(--error-border); }
 .delete-account-card > p a { color: var(--cyan); font-weight: 750; }
 .delete-account-card > .secondary-button { width: fit-content; margin-top: 2px; }
 .deletion-form { max-width: 520px; margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--error-border); }
@@ -377,16 +377,6 @@ main {
     width: min(1160px, calc(100% - 48px));
     margin: 0 auto;
     padding: 48px 0 90px;
-}
-
-.hero {
-    padding: 35px 38px;
-    display: flex;
-    align-items: center;
-    gap: 32px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
 }
 
 .import-screen {
@@ -433,13 +423,6 @@ h1 {
     font-weight: 650;
     letter-spacing: -.025em;
     line-height: 1.08;
-}
-
-.hero-copy {
-    margin-bottom: 0;
-    color: var(--muted);
-    font-size: 16px;
-    line-height: 1.55;
 }
 
 .primary-button,
@@ -1589,15 +1572,6 @@ h1 {
         padding: 0 0 calc(112px + env(safe-area-inset-bottom));
     }
 
-    .hero {
-        padding: 31px 24px 28px;
-        display: block;
-        background: var(--page);
-        border: 0;
-        border-bottom: 8px solid var(--surface);
-        border-radius: 0;
-    }
-
     .import-screen {
         min-height: calc(100vh - 200px);
     }
@@ -1613,10 +1587,6 @@ h1 {
 
     h1 {
         font-size: 36px;
-    }
-
-    .hero-copy {
-        font-size: 15px;
     }
 
     .stats-grid {
@@ -1823,9 +1793,7 @@ h1 {
 .account-name-link { color: var(--header-text); text-decoration: none; }
 .account-name-link:hover { text-decoration: underline; }
 .account-main { padding-bottom: 50px; }
-.account-grid { max-width: 980px; margin: 20px auto; padding: 0 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .data-card { padding: 30px; }
-.data-card h2 { margin: 4px 0 10px; }
 .data-card > p:not(.step-label) { color: var(--muted); line-height: 1.6; }
 .backup-status { padding: 12px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 6px; }
 .download-button { display: inline-flex; text-decoration: none; }
@@ -1846,7 +1814,6 @@ h1 {
 .checkbox-row { font-size: 12px; color: var(--muted); }
 .replace-ack { padding: 10px; color: var(--error) !important; background: var(--error-surface); border-radius: 5px; }
 .toast-action { margin-left: auto; padding: 7px 10px; color: var(--cyan); background: transparent; border: 1px solid var(--cyan); border-radius: 4px; cursor: pointer; }
-@media (max-width: 760px) { .account-grid { grid-template-columns: 1fr; padding: 0; gap: 8px; } .data-card { border-radius: 0; } }
 
 .expenses-screen { max-width: 1180px; margin: 0 auto; padding: 36px 20px 120px; }
 .expense-layout { display: grid; grid-template-columns: minmax(280px, .72fr) minmax(420px, 1.28fr); gap: 18px; }
@@ -1989,7 +1956,6 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .install-banner > div:first-child { display: grid; gap: 3px; }
 .install-banner span { color: var(--muted); font-size: 12px; }
 .install-actions { display: flex; align-items: center; gap: 14px; }
-.reminders-card { grid-column: 1 / -1; }
 .reminder-section { margin-top: 22px; padding-top: 18px; display: grid; justify-items: start; gap: 10px; border-top: 1px solid var(--line-soft); }
 .reminder-section h3, .reminder-section p { margin: 0; }
 .reminder-section p { color: var(--muted); line-height: 1.55; }
@@ -2037,7 +2003,6 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .legal-links { margin-top: 32px; padding-top: 20px; display: flex; flex-wrap: wrap; gap: 18px; border-top: 1px solid var(--line); }
 .legal-links a { color: var(--cyan); font-weight: 750; text-decoration: none; }
 .legal-consent { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.legal-summary-card { grid-column: 1 / -1; }
 .legal-card-actions { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 10px; }
 .legal-contact { margin-bottom: 0; font-size: 13px; }
 
@@ -2208,9 +2173,6 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .payout-days legend { margin-bottom: 4px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
 
 /* Tax set-aside */
-.tax-card { grid-column: 1 / -1; }
-/* Cards may shrink below their widest content, such as the quarter table, which scrolls inside its own box. */
-.account-grid > * { min-width: 0; }
 .tax-year-row { margin: 22px 0 6px; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; }
 .tax-year-row .field { min-width: 140px; }
 .tax-figures { margin: 12px 0 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
@@ -2579,3 +2541,25 @@ body.is-offline .action-sheet-offline { display: block; }
     .home { padding: 16px 14px 0; }
     .home-greeting h1 { font-size: 28px; }
 }
+
+/* Account sections */
+.account-heading { width: min(760px, 100%); margin: 0 auto; padding: 20px 16px 8px; }
+.account-heading h1 { margin: 0 0 4px; font-size: 26px; }
+.account-heading p { margin: 0; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.settings-sections { width: min(760px, 100%); margin: 0 auto; padding: 0 16px calc(40px + env(safe-area-inset-bottom)); display: grid; gap: 10px; }
+/* A section may shrink below its widest content, such as the quarter table, which scrolls inside its own box. */
+.settings-section { min-width: 0; scroll-margin-top: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+.settings-section summary { min-height: 64px; padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) 20px; align-items: center; gap: 2px 10px; list-style: none; cursor: pointer; }
+.settings-section summary::-webkit-details-marker { display: none; }
+.settings-section summary:focus-visible { border-radius: 12px; outline: 2px solid var(--cyan); outline-offset: -2px; }
+.settings-section-title { grid-column: 1; font-size: 16px; font-weight: 750; }
+.settings-section-summary { min-width: 0; grid-column: 1; overflow: hidden; color: var(--muted); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.settings-section-chevron { width: 20px; grid-column: 2; grid-row: 1 / span 2; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .2s; }
+.settings-section[open] .settings-section-chevron { transform: rotate(180deg); }
+.settings-section-body { min-width: 0; padding: 0 16px 16px; display: grid; gap: 14px; }
+.settings-section-body > * { min-width: 0; scroll-margin-top: 12px; }
+.settings-section-body > * + * { padding-top: 14px; border-top: 1px solid var(--line-soft); }
+/* The cards give up their own panel, so a section is not a card inside a card. */
+.settings-section .data-card { padding: 0; background: none; border: 0; border-radius: 0; }
+.settings-section .data-card > h3 { margin: 4px 0 10px; font-size: 18px; }
+.settings-section .delete-account-card { border-top: 1px solid var(--error-border); }
