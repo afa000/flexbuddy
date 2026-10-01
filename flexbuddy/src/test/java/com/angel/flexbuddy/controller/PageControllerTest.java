@@ -178,6 +178,57 @@ class PageControllerTest {
     }
 
     @Test
+    void headerHasHomeLogoAndAccountButtonButNoSignOut() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        org.mockito.Mockito.when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(java.util.Optional.of(angel));
+
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"homeLink\"", "aria-label=\"FlexBuddy, go to Home\"");
+        assertThat(page).containsPattern("class=\"round-header-button account-button\"[^>]*>A</a>");
+        assertThat(page).doesNotContain("id=\"logoutForm\"", "id=\"dashboardButton\"", "<small>Shift tracker</small>", "account-name");
+    }
+
+    @Test
+    void screenTitlesAreOneLine() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).doesNotContain("class=\"screen-heading", "YOUR SCHEDULE", "IMPORT A SHIFT", "DRIVER EXPENSES");
+        assertThat(page).contains("<h1 id=\"schedule-title\">Schedule</h1>", "<h1 id=\"import-title\">Import a shift</h1>",
+                "<h1 id=\"expenses-title\">Expenses</h1>");
+        // The button sits on the title's line.
+        assertThat(page).containsPattern("(?s)<div class=\"screen-title\">\\s*<h1 id=\"schedule-title\">.*?id=\"addScheduledShiftButton\"");
+    }
+
+    @Test
+    void onlyMeaningfulLabelsRemain() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("STEP 1", "STEP 2", "BEFORE YOU ACCEPT", "SHIFT DETAILS", "FINISH BLOCK");
+        assertThat(page).doesNotContain("NEXT 14 DAYS", "QUICK ADD", "EXPENSE HISTORY", "NEEDS CONFIRMATION", "step-number");
+        assertThat(page).contains("Next 14 days", "Expense history");
+        // The standing promise stays, as a hint under the form.
+        assertThat(page).contains("FlexBuddy never guesses your standing.");
+    }
+
+    @Test
+    void expenseCostMethodIsANoteNotATile() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).containsPattern("(?s)class=\"expense-cost-note\">.*?id=\"expenseCostMethod\".*?href=\"/account#costs\"");
+        assertThat(page).doesNotContain("Vehicle cost method");
+    }
+
+    @Test
     void shiftsPageCarriesTheAccountIdAndTheOutbox() throws Exception {
         AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
         angel.setId(42L);

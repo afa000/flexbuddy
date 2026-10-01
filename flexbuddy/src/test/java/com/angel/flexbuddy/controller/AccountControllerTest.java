@@ -258,6 +258,15 @@ class AccountControllerTest {
     }
 
     @Test
+    void theAccountHeaderHasNoSubtitleOrAccountButton() throws Exception {
+        String page = accountPage();
+
+        assertThat(page).doesNotContain("Account data");
+        assertThat(page).contains("<title>Account | FlexBuddy</title>");
+        assertThat(page).doesNotContain("account-button");
+    }
+
+    @Test
     void deleteAccount_requiresCsrf() throws Exception {
         mockMvc.perform(post("/account")
                         .with(user("angel@example.com"))

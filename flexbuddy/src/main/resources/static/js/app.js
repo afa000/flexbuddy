@@ -1,7 +1,7 @@
 const elements = {
     screenshotInput: document.querySelector('#screenshotInput'),
     themeToggleButton: document.querySelector('#themeToggleButton'),
-    dashboardButton: document.querySelector('#dashboardButton'),
+    homeLink: document.querySelector('#homeLink'),
     dashboardNavButton: document.querySelector('#dashboardNavButton'),
     reportsNavButton: document.querySelector('#reportsNavButton'),
     expensesNavButton: document.querySelector('#expensesNavButton'),
@@ -168,7 +168,6 @@ const elements = {
     editStatusHint: document.querySelector('#editStatusHint'),
     editBasePayLabel: document.querySelector('#editBasePayLabel'),
     linkedExpensesSection: document.querySelector('#linkedExpensesSection'),
-    logoutForm: document.querySelector('#logoutForm'),
     installBanner: document.querySelector('#installBanner'),
     installBannerText: document.querySelector('#installBannerText'),
     installBannerButton: document.querySelector('#installBannerButton'),
@@ -240,9 +239,12 @@ elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
 elements.importStatus.addEventListener('change', applyImportStatusRules);
 elements.completeScheduledButton.addEventListener('click', completeScheduledShift);
 elements.editStatus.addEventListener('change', () => applyEditStatusRules(true));
-elements.logoutForm.addEventListener('submit', signOut);
 elements.expensesNavButton.addEventListener('click', showExpensesScreen);
-elements.dashboardButton.addEventListener('click', () => showDashboard());
+// The logo goes Home without a reload; its address still works for a middle-click or with scripts off.
+elements.homeLink.addEventListener('click', event => {
+    event.preventDefault();
+    showDashboard();
+});
 elements.dashboardNavButton.addEventListener('click', () => showDashboard());
 elements.dropZone.addEventListener('click', openFilePicker);
 elements.screenshotInput.addEventListener('change', event => {
@@ -2016,7 +2018,7 @@ async function loadExpenses() {
         renderExpenseSummary(await summaryResponse.json());
         const settings = await settingsResponse.json();
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
-            ? 'Actual expenses' : `Standard mileage · ${formatMoney(settings.mileageRate)}/mi`;
+            ? 'actual expenses' : `standard mileage at ${formatMoney(settings.mileageRate)}/mi`;
     } catch (error) {
         elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || 'Expenses could not be loaded.')}</p>`;
     }
@@ -2231,28 +2233,6 @@ async function takeSharedFile(id) {
         return new File([blob], name, {type: blob.type || response.headers.get('Content-Type') || ''});
     } catch {
         return null;
-    }
-}
-
-async function signOut(event) {
-    event.preventDefault();
-    const waiting = window.flexbuddyOutbox?.count() ?? 0;
-    if (waiting > 0) {
-        openConfirm(`${waiting} ${waiting === 1 ? "change hasn't" : "changes haven't"} synced`,
-            'Signing out now discards them. Stay signed in to let them sync first.',
-            finishSignOut, 'Sign out and discard');
-        return;
-    }
-    await finishSignOut();
-}
-
-async function finishSignOut() {
-    try {
-        // The next person to sign in on this device must never see this driver's cached data or unsent changes.
-        await window.flexbuddyOutbox?.clear();
-        await window.flexbuddyPwa?.clearUserData();
-    } finally {
-        elements.logoutForm.submit();
     }
 }
 
