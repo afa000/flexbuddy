@@ -10,6 +10,7 @@
     let trigger;
     let latest;
     let useOdometer = true;
+    let missing = 0;
 
     function init() {
         if (el) return;
@@ -271,7 +272,10 @@
         }
     }
 
-    /** The dashboard strip of recent completed blocks with no miles, minus any the driver put off for a day. */
+    /**
+     * Loads the recent completed blocks with no miles, minus any the driver put off for a day. Home's Needs attention
+     * card decides whether to show them, so this only renders the list and says the count changed.
+     */
     async function loadMissing() {
         const section = document.querySelector('#missingMiles');
         if (!section) return;
@@ -284,7 +288,7 @@
         }
         const skipped = snoozed();
         const visible = shifts.filter(shift => !skipped[shift.id]);
-        section.hidden = visible.length === 0;
+        missing = visible.length;
         document.querySelector('#missingMilesCount').textContent =
             `${visible.length} ${visible.length === 1 ? 'block' : 'blocks'} this week`;
         const offline = window.flexbuddyPwa?.isOffline() ?? false;
@@ -308,6 +312,12 @@
             });
             return row;
         }));
+        document.dispatchEvent(new CustomEvent('flexbuddy:attention'));
+    }
+
+    /** How many blocks the list holds, for the Needs attention card. */
+    function missingCount() {
+        return missing;
     }
 
     /** Records that the block had no driving to log, which also stops the reminders for it. */
@@ -328,5 +338,5 @@
         }
     }
 
-    window.flexbuddyFinish = {open, openById, loadMissing};
+    window.flexbuddyFinish = {open, openById, loadMissing, missingCount};
 })();

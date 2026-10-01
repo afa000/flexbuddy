@@ -62,108 +62,98 @@
     </section>
 
     <main>
-        <section class="hero" data-screen="dashboard" aria-labelledby="page-title">
-            <div>
-                <p class="eyebrow">YOUR DASHBOARD</p>
-                <h1 id="page-title">Shift earnings</h1>
-                <p class="hero-copy">Track every block, hour, and dollar in one place.</p>
-                <a class="next-shift-link is-hidden" id="nextShiftLink" href="/?screen=schedule">Next block</a>
+        <section class="home" id="homeScreen" data-screen="dashboard" aria-labelledby="homeGreeting">
+            <div class="home-greeting">
+                <h1 id="homeGreeting" th:text="${currentUser != null ? 'Hi, ' + currentUser.displayName : 'Hi'}">Hi</h1>
+                <span id="homeToday"></span>
             </div>
-        </section>
 
-        <aside class="install-banner" id="installBanner" data-screen="dashboard" aria-label="Install FlexBuddy">
-            <div><strong>Install FlexBuddy</strong><span id="installBannerText">Open it from your home screen like an app.</span></div>
-            <div class="install-actions">
-                <button class="primary-button compact-button" id="installBannerButton" type="button">Install</button>
-                <button class="text-button" id="dismissInstallBanner" type="button">Not now</button>
-            </div>
-        </aside>
-
-        <aside class="backup-nudge" data-screen="dashboard" th:if="${backupDue}">
-            <div><strong>Your shift history is worth keeping.</strong><span>Download a backup so you can recover it if the database is ever lost.</span></div>
-            <a class="secondary-button" href="/account">Back up now</a>
-        </aside>
-
-        <section class="panel missing-miles" id="missingMiles" data-screen="dashboard" aria-labelledby="missingMilesTitle" hidden>
-            <div class="missing-miles-heading">
-                <div><p class="step-label">LOG YOUR MILES</p><h2 id="missingMilesTitle">Blocks without miles</h2></div>
-                <small id="missingMilesCount"></small>
-            </div>
-            <div class="missing-miles-list" id="missingMilesList"></div>
-        </section>
-
-        <details class="panel evaluate-panel" id="evaluatePanel" data-screen="dashboard">
-            <summary class="evaluate-summary">
-                <span class="evaluate-title"><span class="step-label">BEFORE YOU ACCEPT</span><strong>Evaluate a block</strong></span>
-                <span class="evaluate-summary-result" id="evaluateSummary">What it nets you per hour</span>
-            </summary>
-            <form class="evaluate-form" id="evaluateForm" novalidate>
-                <label class="field"><span>Station</span><input id="evaluateStation" list="evaluateStations" autocomplete="off" autocapitalize="characters" maxlength="255" enterkeyhint="next"></label>
-                <datalist id="evaluateStations"></datalist>
-                <div class="field evaluate-hours" role="group" aria-labelledby="evaluateHoursLabel">
-                    <span id="evaluateHoursLabel">Hours</span>
-                    <div class="hour-choices" id="evaluateHourChoices">
-                        <button type="button" data-hours="2">2</button>
-                        <button type="button" data-hours="3">3</button>
-                        <button type="button" data-hours="3.5">3.5</button>
-                        <button type="button" data-hours="4">4</button>
-                        <button type="button" data-hours="4.5">4.5</button>
-                        <button type="button" data-hours="5">5</button>
-                        <input id="evaluateHours" type="number" min="0.5" max="12" step="0.25" inputmode="decimal" placeholder="Other" aria-label="Hours">
+            <article class="home-week" id="goalCard" data-state="none">
+                <span class="home-label" id="homeWeekLabel">This week</span>
+                <div class="home-week-top">
+                    <div class="goal-ring-wrap">
+                        <svg class="goal-ring" viewBox="0 0 36 36" aria-hidden="true">
+                            <circle class="goal-ring-track" cx="18" cy="18" r="15.9"/>
+                            <circle class="goal-ring-fill" id="goalRingFill" cx="18" cy="18" r="15.9" pathLength="100" stroke-dasharray="0 100"/>
+                            <path class="goal-ring-tick" d="m12.5 18.5 3.8 3.7 7.2-8"/>
+                        </svg>
+                        <span class="goal-ring-percent" id="goalPercent" aria-hidden="true"></span>
+                    </div>
+                    <div class="home-week-text">
+                        <strong class="home-week-amount" id="goalProgress">—</strong>
+                        <p class="home-sub" id="goalSentence"></p>
                     </div>
                 </div>
-                <label class="field money-field"><span>Offered pay</span><span class="input-with-prefix"><b>$</b><input id="evaluatePay" type="number" min="0.01" step="0.01" inputmode="decimal" enterkeyhint="next"></span></label>
-                <label class="field money-field"><span>Tips <small>(optional)</small></span><span class="input-with-prefix"><b>$</b><input id="evaluateTips" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Your average" enterkeyhint="done"></span></label>
-            </form>
-            <div class="evaluate-result" id="evaluateResult" aria-live="polite">
-                <p class="evaluate-empty">Enter the station, hours, and pay from the offer to see what it nets you.</p>
-            </div>
-        </details>
-
-        <section class="stats-grid" data-screen="dashboard" aria-label="Shift statistics">
-            <article class="stat-card goal-card" id="goalCard" data-state="none">
-                <span>This week's goal</span>
-                <div class="goal-body">
-                    <svg class="goal-ring" viewBox="0 0 36 36" aria-hidden="true">
-                        <circle class="goal-ring-track" cx="18" cy="18" r="15.9"/>
-                        <circle class="goal-ring-fill" id="goalRingFill" cx="18" cy="18" r="15.9" pathLength="100" stroke-dasharray="0 100"/>
-                        <path class="goal-ring-tick" d="m12.5 18.5 3.8 3.7 7.2-8"/>
-                    </svg>
-                    <div class="goal-text">
-                        <strong id="goalProgress">No goal yet</strong>
-                        <small id="goalSentence">Set a weekly target to see your progress here.</small>
-                    </div>
+                <div class="home-figures">
+                    <div><span>Last 7 days</span><b id="rollingSevenDayTime">—</b><small id="lastSevenDetail"></small></div>
+                    <div><span>Est. net / hr</span><b id="weekNetHourly">—</b><small>estimate</small></div>
+                    <div><span>Set aside</span><b id="taxWeekAmount">—</b><small id="taxWeekDetail">tax estimate</small></div>
                 </div>
-                <small class="goal-month" id="goalMonth"></small>
+                <p class="goal-month" id="goalMonth"></p>
                 <a class="text-link goal-link" id="goalLink" href="/account#goals">Set a goal</a>
             </article>
-            <article class="stat-card stat-card-accent" id="payoutCard">
-                <span>Next payout</span>
-                <strong id="nextPayoutAmount">—</strong>
-                <small id="nextPayoutDetail">Estimate from your logged blocks</small>
-                <button class="text-link payout-check" id="payoutCheckButton" type="button">Payout history</button>
+
+            <div class="home-pair">
+                <article class="home-card home-next" id="homeNextBlock" aria-live="polite"></article>
+                <article class="home-card home-payout" id="payoutCard">
+                    <span class="home-label">Next payout</span>
+                    <strong id="nextPayoutAmount">—</strong>
+                    <small id="nextPayoutDetail">Estimate from your logged blocks</small>
+                    <button class="text-link payout-check" id="payoutCheckButton" type="button">Payout history</button>
+                </article>
+            </div>
+
+            <article class="home-card home-attention" id="homeAttention" hidden aria-labelledby="homeAttentionTitle" th:attr="data-backup-due=${backupDue}">
+                <h2 class="home-label" id="homeAttentionTitle">Needs attention</h2>
+                <ul class="attention-list" id="attentionList"></ul>
+                <div class="missing-miles" id="missingMiles" hidden>
+                    <div class="missing-miles-heading">
+                        <h3 id="missingMilesTitle">Blocks without miles</h3>
+                        <small id="missingMilesCount"></small>
+                    </div>
+                    <div class="missing-miles-list" id="missingMilesList"></div>
+                </div>
+                <div class="install-banner" id="installBanner" hidden aria-label="Install FlexBuddy">
+                    <div><strong>Install FlexBuddy</strong><span id="installBannerText">Open it from your home screen like an app.</span></div>
+                    <div class="install-actions">
+                        <button class="primary-button compact-button" id="installBannerButton" type="button">Install</button>
+                        <button class="text-button" id="dismissInstallBanner" type="button">Not now</button>
+                    </div>
+                </div>
             </article>
-            <article class="stat-card" id="taxCard">
-                <span>Set aside this week · estimate</span>
-                <strong id="taxWeekAmount">—</strong>
-                <small id="taxWeekDetail"><a class="text-link" href="/account#taxes">Set up a tax reserve</a></small>
-            </article>
-            <article class="stat-card stat-card-accent">
-                <span>Rolling 7-day hours</span>
-                <strong id="rollingSevenDayTime">0h 0m</strong>
-                <small>Today and previous 6 days</small>
-            </article>
-            <article class="stat-card">
-                <span>Planned · next 7 days</span>
-                <strong id="plannedWeek">0h 0m</strong>
-                <small id="plannedWeekDetail">$0.00 expected · 0 blocks</small>
-            </article>
-            <article class="stat-card">
-                <span>Forfeits this month</span>
-                <strong id="forfeitsMonth">0</strong>
-                <small id="forfeitsDetail">0 cancelled in this view</small>
-                <span class="standing-pill is-hidden" id="standingPill" data-level=""></span>
-                <button class="text-link payout-check" id="standingLink" type="button">Log standing</button>
+
+            <details class="panel evaluate-panel" id="evaluatePanel">
+                <summary class="evaluate-summary">
+                    <span class="evaluate-title"><span class="step-label">BEFORE YOU ACCEPT</span><strong>Evaluate a block</strong></span>
+                    <span class="evaluate-summary-result" id="evaluateSummary">What it nets you per hour</span>
+                </summary>
+                <form class="evaluate-form" id="evaluateForm" novalidate>
+                    <label class="field"><span>Station</span><input id="evaluateStation" list="evaluateStations" autocomplete="off" autocapitalize="characters" maxlength="255" enterkeyhint="next"></label>
+                    <datalist id="evaluateStations"></datalist>
+                    <div class="field evaluate-hours" role="group" aria-labelledby="evaluateHoursLabel">
+                        <span id="evaluateHoursLabel">Hours</span>
+                        <div class="hour-choices" id="evaluateHourChoices">
+                            <button type="button" data-hours="2">2</button>
+                            <button type="button" data-hours="3">3</button>
+                            <button type="button" data-hours="3.5">3.5</button>
+                            <button type="button" data-hours="4">4</button>
+                            <button type="button" data-hours="4.5">4.5</button>
+                            <button type="button" data-hours="5">5</button>
+                            <input id="evaluateHours" type="number" min="0.5" max="12" step="0.25" inputmode="decimal" placeholder="Other" aria-label="Hours">
+                        </div>
+                    </div>
+                    <label class="field money-field"><span>Offered pay</span><span class="input-with-prefix"><b>$</b><input id="evaluatePay" type="number" min="0.01" step="0.01" inputmode="decimal" enterkeyhint="next"></span></label>
+                    <label class="field money-field"><span>Tips <small>(optional)</small></span><span class="input-with-prefix"><b>$</b><input id="evaluateTips" type="number" min="0" step="0.01" inputmode="decimal" placeholder="Your average" enterkeyhint="done"></span></label>
+                </form>
+                <div class="evaluate-result" id="evaluateResult" aria-live="polite">
+                    <p class="evaluate-empty">Enter the station, hours, and pay from the offer to see what it nets you.</p>
+                </div>
+            </details>
+
+            <article class="home-card home-recent" aria-labelledby="recentTitle">
+                <h2 class="home-label" id="recentTitle">Recent blocks</h2>
+                <div class="recent-list" id="recentList"></div>
+                <button class="text-link recent-all" id="recentAllButton" type="button">See all blocks in Reports</button>
             </article>
         </section>
 
@@ -370,6 +360,8 @@
                     <section class="day-panel" id="dayPanel" aria-live="polite"><p class="day-panel-empty">Choose a day to see its shifts.</p></section>
                 </article>
             </div>
+
+            <p class="schedule-forfeits"><span id="forfeitsMonth">0</span> forfeits this month · <span id="forfeitsDetail"></span> <span class="standing-pill is-hidden" id="standingPill" data-level=""></span> <button class="text-link" id="standingLink" type="button">Log standing</button></p>
 
             <section class="panel standing-panel" id="standingPanel" aria-labelledby="standingTitle">
                 <div class="panel-heading">
@@ -833,8 +825,8 @@
 
     <nav class="mobile-nav" aria-label="Primary navigation">
         <button class="mobile-nav-item is-active" id="dashboardNavButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm10 0h6v6h-6v-6Z"/></svg>
-            <span>Dashboard</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 11 12 4l8 7v8a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-8Z"/></svg>
+            <span>Home</span>
         </button>
         <button class="mobile-nav-item" id="scheduleNavButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Zm3 8h3m2 0h3m-8 4h3"/></svg>
@@ -900,6 +892,7 @@
 <script th:src="@{/js/reports.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/charts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/calendar.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/home.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>

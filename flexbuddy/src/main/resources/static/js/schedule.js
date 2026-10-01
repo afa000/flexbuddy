@@ -8,7 +8,7 @@
     const DEADLINE_WARNING_MS = 15 * 60000;
     const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>';
     const calendar = window.flexbuddyCalendar;
-    const state = {upcoming: null, fetchedAt: 0, month: null, monthDays: [], selected: null, focusDate: null, countdownTimer: undefined};
+    const state = {upcoming: null, fetchedAt: 0, month: null, monthDays: [], selected: null, focusDate: null, countdownTimers: new Map()};
     let el;
 
     function init() {
@@ -19,12 +19,12 @@
             confirmStrip: document.querySelector('#confirmStrip'),
             confirmList: document.querySelector('#confirmList'),
             nextUp: document.querySelector('#nextUpCard'),
+            homeNext: document.querySelector('#homeNextBlock'),
             upcomingList: document.querySelector('#upcomingList'),
             weekStrip: document.querySelector('#weekStrip'),
             grid: document.querySelector('#calendarGrid'),
             monthLabel: document.querySelector('#calendarMonthLabel'),
             dayPanel: document.querySelector('#dayPanel'),
-            nextShiftLink: document.querySelector('#nextShiftLink'),
             badge: document.querySelector('#scheduleBadge')
         };
         document.querySelector('#prevMonthButton').addEventListener('click', () => changeMonth(-1));
@@ -65,9 +65,11 @@
             state.fetchedAt = Date.now();
             hideMessage(el.error);
             renderHints();
+            // Home shows the next block too, so it is drawn whether or not the Schedule screen is open.
+            if (el.homeNext) renderNextInto(el.homeNext);
             if (isVisible()) {
                 renderConfirmStrip();
-                renderNextUp();
+                renderNextInto(el.nextUp);
                 renderUpcomingList();
             }
         } catch (error) {
@@ -76,11 +78,7 @@
     }
 
     function renderHints() {
-        const {next, needsConfirmation} = state.upcoming;
-        if (el.nextShiftLink) {
-            el.nextShiftLink.classList.toggle('is-hidden', !next);
-            if (next) el.nextShiftLink.textContent = `Next: ${next.station} · ${weekday(next.date)} ${formatTime(next.startTime)}`;
-        }
+        const {needsConfirmation} = state.upcoming;
         if (el.badge) {
             el.badge.textContent = needsConfirmation.length;
             el.badge.classList.toggle('is-hidden', needsConfirmation.length === 0);
@@ -107,11 +105,16 @@
         }));
     }
 
-    function renderNextUp() {
+    /**
+     * Draws the next block into a container: the Schedule screen's card and Home's. Each container keeps its own
+     * countdown timer, so drawing one never stops the other, and a timer does nothing while its card is out of sight.
+     */
+    function renderNextInto(container) {
         const shift = state.upcoming.next;
-        window.clearInterval(state.countdownTimer);
+        window.clearInterval(state.countdownTimers.get(container));
+        state.countdownTimers.delete(container);
         if (!shift) {
-            el.nextUp.innerHTML = `
+            container.innerHTML = `
                 <div class="next-up-main">
                     <p class="step-label">NEXT UP</p>
                     <h2>No upcoming blocks</h2>
@@ -125,7 +128,7 @@
             : started ? '<button class="primary-button compact-button" type="button" data-action="finish">Finish block</button>'
             : `<button class="primary-button compact-button" type="button" data-action="start">Start block</button>
                <button class="secondary-button compact-button" type="button" data-action="finish">Finish block</button>`;
-        el.nextUp.innerHTML = `
+        container.innerHTML = `
             <div class="next-up-main">
                 <p class="step-label">${started ? 'IN PROGRESS' : 'NEXT UP'}</p>
                 <h2>${escapeHtml(shift.station)}</h2>
@@ -141,19 +144,21 @@
                 <button class="danger-text-button" type="button" data-action="forfeited">Forfeit</button>
                 <button class="text-button" type="button" data-action="edit">Edit</button>
             </div>`;
-        bindActions(el.nextUp, shift);
-        const countdown = el.nextUp.querySelector('.next-up-countdown');
-        const deadline = el.nextUp.querySelector('.forfeit-deadline');
-        const tick = () => {
-            if (!isVisible()) return;
+        bindActions(container, shift);
+        const countdown = container.querySelector('.next-up-countdown');
+        const deadline = container.querySelector('.forfeit-deadline');
+        const update = () => {
             countdown.textContent = countdownText(shift);
             const {text, state: deadlineState} = deadlineText(shift);
             deadline.textContent = text;
             deadline.dataset.state = deadlineState;
             deadline.hidden = !text;
         };
-        tick();
-        state.countdownTimer = window.setInterval(tick, 30000);
+        // Drawn once even when hidden, so the text is there the moment the screen opens; the timer only ticks in view.
+        update();
+        state.countdownTimers.set(container, window.setInterval(() => {
+            if (container.getClientRects().length) update();
+        }, 30000));
     }
 
     function renderUpcomingList() {
@@ -464,10 +469,6 @@
         return `${escapeHtml(formatTime(shift.startTime))}–${escapeHtml(formatTime(shift.endTime))}`;
     }
 
-    function weekday(date) {
-        return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'short'});
-    }
-
     function dayLabel(date) {
         return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
     }
@@ -480,6 +481,6 @@
         return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
     }
 
-    window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock,
+    window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock, renderNextInto,
         add: trigger => addScheduled(state.selected || today(), trigger)};
 })();

@@ -47,7 +47,6 @@ const elements = {
     totalShifts: document.querySelector('#totalShifts'),
     totalShiftsDetail: document.querySelector('#totalShiftsDetail'),
     totalTime: document.querySelector('#totalTime'),
-    rollingSevenDayTime: document.querySelector('#rollingSevenDayTime'),
     averagePay: document.querySelector('#averagePay'),
     averageHourly: document.querySelector('#averageHourly'),
     baseTipsTotal: document.querySelector('#baseTipsTotal'),
@@ -145,9 +144,6 @@ const elements = {
     expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton'),
     scheduleNavButton: document.querySelector('#scheduleNavButton'),
     scheduleScreen: document.querySelector('#scheduleScreen'),
-    nextShiftLink: document.querySelector('#nextShiftLink'),
-    plannedWeek: document.querySelector('#plannedWeek'),
-    plannedWeekDetail: document.querySelector('#plannedWeekDetail'),
     forfeitsMonth: document.querySelector('#forfeitsMonth'),
     goalCard: document.querySelector('#goalCard'),
     nextPayoutAmount: document.querySelector('#nextPayoutAmount'),
@@ -156,6 +152,7 @@ const elements = {
     nextPayoutDetail: document.querySelector('#nextPayoutDetail'),
     payoutCheckButton: document.querySelector('#payoutCheckButton'),
     goalRingFill: document.querySelector('#goalRingFill'),
+    goalPercent: document.querySelector('#goalPercent'),
     goalProgress: document.querySelector('#goalProgress'),
     goalSentence: document.querySelector('#goalSentence'),
     goalMonth: document.querySelector('#goalMonth'),
@@ -240,10 +237,6 @@ Object.values(previewFields).forEach(input => input.addEventListener('focus', ()
 elements.themeToggleButton.addEventListener('click', toggleTheme);
 elements.reportsNavButton.addEventListener('click', () => showReportsScreen());
 elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
-elements.nextShiftLink.addEventListener('click', event => {
-    event.preventDefault();
-    showScheduleScreen();
-});
 elements.importStatus.addEventListener('change', applyImportStatusRules);
 elements.completeScheduledButton.addEventListener('click', completeScheduledShift);
 elements.editStatus.addEventListener('change', () => applyEditStatusRules(true));
@@ -437,6 +430,7 @@ function showScreen(name, smooth = true) {
 
 function showDashboard(smooth = true) {
     showScreen('dashboard', smooth);
+    window.flexbuddyHome?.renderToday();
 }
 
 function showScheduleScreen(smooth = true) {
@@ -789,6 +783,7 @@ async function loadDashboard() {
     loadGoals();
     loadPayPeriods();
     loadTaxTile();
+    window.flexbuddyHome?.load();
 }
 
 /** "Set aside this week": the driver's own percentage of this week's estimated net, once they choose one. */
@@ -804,11 +799,12 @@ async function loadTaxTile() {
     }
     if (summary.percent == null) {
         elements.taxWeekAmount.textContent = 'Not set up';
-        elements.taxWeekDetail.innerHTML = '<a class="text-link" href="/account#taxes">Set up a tax reserve</a>';
+        elements.taxWeekDetail.innerHTML = '<a class="text-link" href="/account#taxes">Set up</a>';
         return;
     }
     elements.taxWeekAmount.textContent = formatMoney(summary.thisWeekSetAside);
-    elements.taxWeekDetail.textContent = `${Number(summary.percent)}% of ${formatMoney(summary.thisWeekNet)} net`
+    elements.taxWeekDetail.textContent = `${Number(summary.percent)}% of net · estimate`;
+    elements.taxWeekDetail.title = `${Number(summary.percent)}% of ${formatMoney(summary.thisWeekNet)} estimated net`
         + ` · ${formatMoney(summary.remaining)} still to set aside this year`;
 }
 
@@ -888,10 +884,12 @@ async function loadGoals() {
     elements.goalLink.textContent = week || month ? 'Change goals' : 'Set a goal';
     // A round line cap would draw a dot for an empty ring, so the fill is hidden until there is progress.
     elements.goalRingFill.classList.toggle('is-empty', !week || Number(week.percent) <= 0);
+    elements.goalPercent.textContent = week ? `${Math.round(Number(week.percent))}%` : '';
     if (!week) {
         elements.goalCard.dataset.state = 'none';
         elements.goalRingFill.setAttribute('stroke-dasharray', '0 100');
-        elements.goalProgress.textContent = month ? 'No weekly goal' : 'No goal yet';
+        // Home knows what was earned this week, which reads better than "No goal yet" beside an empty ring.
+        elements.goalProgress.textContent = window.flexbuddyHome?.noGoalText() ?? (month ? 'No weekly goal' : 'No goal yet');
         elements.goalSentence.textContent = month ? 'Your monthly goal is below.' : 'Set a weekly target to see your progress here.';
         return;
     }
@@ -933,7 +931,6 @@ async function loadStatistics(query, signal) {
         elements.totalEarnings.textContent = formatMoney(statistics.totalEarnings);
         elements.totalShifts.textContent = statistics.totalShifts ?? 0;
         elements.totalTime.textContent = formatMinutes(statistics.totalTimeWorked);
-        elements.rollingSevenDayTime.textContent = formatMinutes(statistics.rollingSevenDayMinutes);
         elements.averagePay.textContent = formatMoney(statistics.averagePayPerShift);
         elements.averageHourly.textContent = formatMoney(statistics.averageHourlyEarnings);
         const timed = statistics.timedShifts > 0;
@@ -952,9 +949,6 @@ async function loadStatistics(query, signal) {
         elements.expenseTotal.textContent = formatMoney(statistics.totalExpenses);
         elements.totalMiles.textContent = `${Number(statistics.totalMiles || 0).toFixed(1)} mi`;
         elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
-        const planned = statistics.scheduledShifts ?? 0;
-        elements.plannedWeek.textContent = formatMinutes(statistics.scheduledMinutes);
-        elements.plannedWeekDetail.textContent = `${formatMoney(statistics.expectedPay)} expected · ${planned} ${planned === 1 ? 'block' : 'blocks'}`;
         const lateThisMonth = statistics.lateForfeitedThisMonth ?? 0;
         elements.forfeitsMonth.textContent = `${statistics.forfeitedThisMonth ?? 0}${lateThisMonth ? ` (${lateThisMonth} late)` : ''}`;
         elements.forfeitsDetail.textContent = statistics.needsConfirmation
@@ -962,11 +956,11 @@ async function loadStatistics(query, signal) {
             : `${statistics.cancelledShifts ?? 0} cancelled in this view`;
     } catch (error) {
         if (error?.name === 'AbortError') return;
-        [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.rollingSevenDayTime, elements.averagePay,
+        [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
             elements.averageHourly, elements.totalShiftsDetail, elements.timeWorkedDetail, elements.baseTipsTotal,
             elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
-            elements.expenseTotal, elements.totalMiles, elements.mileageCost, elements.plannedWeek,
-            elements.plannedWeekDetail, elements.forfeitsMonth, elements.forfeitsDetail].forEach(element => element.textContent = '—');
+            elements.expenseTotal, elements.totalMiles, elements.mileageCost,
+            elements.forfeitsMonth, elements.forfeitsDetail].forEach(element => element.textContent = '—');
         elements.baseShareBar.style.width = '0%';
         elements.tipsShareBar.style.width = '0%';
     }
@@ -2194,6 +2188,7 @@ function openInitialScreen() {
     const screen = params.get('screen');
     // Filter settings in the address belong to Reports, so an older bookmark such as /?preset=month opens it.
     const hasReportParams = ['preset', 'from', 'to', 'station', 'groupBy'].some(key => params.has(key));
+    // ?screen=home is the dashboard under its new name, and the same as no screen at all.
     if (screen === 'reports' || (!screen && hasReportParams)) showReportsScreen(false);
     else if (screen === 'schedule') showScheduleScreen(false);
     else if (screen === 'import') showImportScreen(false);
@@ -2307,7 +2302,8 @@ function setupInstallBanner() {
     elements.installBannerButton.addEventListener('click', () => window.flexbuddyPwa.promptInstall());
     elements.dismissInstallBanner.addEventListener('click', () => {
         dismissed = true;
-        elements.installBanner.classList.remove('is-available');
+        elements.installBanner.dataset.available = 'false';
+        document.dispatchEvent(new CustomEvent('flexbuddy:attention'));
         try {
             localStorage.setItem('flexbuddy-install-dismissed', 'true');
         } catch {
@@ -2316,7 +2312,9 @@ function setupInstallBanner() {
     });
     window.flexbuddyPwa?.onInstallChange(state => {
         const available = visits >= 3 && !dismissed && (state === 'prompt' || state === 'ios');
-        elements.installBanner.classList.toggle('is-available', available);
+        // Home's Needs attention card lists the prompt and opens this banner; it is only ever offered in a browser.
+        elements.installBanner.dataset.available = String(available);
+        document.dispatchEvent(new CustomEvent('flexbuddy:attention'));
         elements.installBannerButton.classList.toggle('is-hidden', state !== 'prompt');
         elements.installBannerText.textContent = state === 'ios'
             ? 'In Safari, tap Share, then Add to Home Screen, to open FlexBuddy like an app.'

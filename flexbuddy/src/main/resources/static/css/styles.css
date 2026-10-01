@@ -1213,10 +1213,6 @@ h1 {
 .history-actions { display: flex; align-items: center; gap: 18px; }
 .export-link { text-decoration: none; }
 .export-link.is-disabled { color: var(--faint); pointer-events: none; }
-.backup-nudge { max-width: 1160px; margin: 18px auto 0; padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; color: var(--text); background: var(--warning-surface); border: 1px solid var(--warning-border); border-radius: var(--radius); }
-.backup-nudge div { display: grid; gap: 3px; }
-.backup-nudge span { color: var(--muted); font-size: 12px; }
-.backup-nudge a { text-decoration: none; white-space: nowrap; }
 
 .text-button {
     padding: 8px 0;
@@ -1989,7 +1985,7 @@ button.calendar-day:hover { border-color: var(--cyan); }
 
 .offline-banner { padding: 9px 18px; color: var(--text); background: var(--warning-surface); border-bottom: 1px solid var(--warning-border); font-size: 13px; font-weight: 700; text-align: center; }
 .install-banner { max-width: 1160px; margin: 18px auto 0; padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; background: var(--primary-soft); border: 1px solid var(--cyan); border-radius: var(--radius); }
-.install-banner:not(.is-available) { display: none; }
+.install-banner[hidden] { display: none; }
 .install-banner > div:first-child { display: grid; gap: 3px; }
 .install-banner span { color: var(--muted); font-size: 12px; }
 .install-actions { display: flex; align-items: center; gap: 14px; }
@@ -2014,7 +2010,7 @@ button.calendar-day:hover { border-color: var(--cyan); }
 
 @media (max-width: 620px) {
     .schedule-screen { padding-bottom: calc(110px + env(safe-area-inset-bottom)); }
-    .install-banner { margin: 0; flex-direction: column; align-items: flex-start; border-radius: 0; }
+    .install-banner { flex-direction: column; align-items: flex-start; }
     .week-strip { display: grid; }
     .calendar-grid, .calendar-row { gap: 2px; }
     .calendar-day { min-height: 44px; padding: 4px 2px; align-items: center; }
@@ -2135,33 +2131,21 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .route-counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 
 /* Weekly goal tile */
-.goal-card { gap: 8px; justify-content: flex-start; }
-.goal-body { margin-top: 6px; display: flex; align-items: center; gap: 14px; }
 .goal-ring { width: 64px; height: 64px; flex: none; }
 .goal-ring circle { fill: none; stroke-width: 3.6; }
 .goal-ring-track { stroke: var(--line-soft); }
 .goal-ring-fill { stroke: var(--cyan); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dasharray .6s ease; }
-.goal-card[data-state="behind"] .goal-ring-fill { stroke: var(--warning); }
+#goalCard[data-state="behind"] .goal-ring-fill { stroke: var(--warning); }
 .goal-ring-tick { fill: none; stroke: var(--cyan); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
-.goal-card[data-state="reached"] .goal-ring-tick { opacity: 1; }
-.goal-text { min-width: 0; display: grid; gap: 4px; }
-.goal-card .goal-text strong { margin: 0; font-size: 20px; }
-.goal-card .goal-text small { color: var(--muted); font-size: 12px; line-height: 1.4; }
-.goal-card .goal-month { color: var(--muted); }
+#goalCard[data-state="reached"] .goal-ring-tick { opacity: 1; }
 .goal-link { font-size: 12px; font-weight: 750; }
 .goal-basis { margin: 0; padding: 0; display: grid; gap: 8px; border: 0; }
 .goal-basis legend { margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 750; letter-spacing: .035em; text-transform: uppercase; }
 
-@media (max-width: 620px) {
-    .goal-card { grid-column: 1 / -1; }
-}
-
 /* Blocks without miles */
-.missing-miles { margin-top: 18px; padding: 20px 29px; border-left: 5px solid var(--cyan); }
 .missing-miles[hidden] { display: none; }
 .missing-miles-heading { margin-bottom: 14px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; }
-.missing-miles-heading h2 { margin: 0; font-size: 20px; }
-.missing-miles-heading .step-label { margin-bottom: 4px; }
+.missing-miles-heading h3 { margin: 0; font-size: 16px; }
 .missing-miles-heading small { color: var(--muted); font-size: 12px; font-weight: 700; }
 .missing-miles-list { display: grid; gap: 8px; }
 .missing-row { padding: 12px 14px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 18px; background: var(--surface-deep); border: 1px solid var(--line-soft); border-radius: 6px; }
@@ -2169,7 +2153,6 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .missing-row span { color: var(--muted); font-size: 12px; }
 
 @media (max-width: 620px) {
-    .missing-miles { margin-top: 0; padding: 18px; border-width: 0 0 8px; border-color: var(--surface-raised); border-radius: 0; }
     .missing-row .confirm-actions { width: 100%; }
 }
 
@@ -2512,4 +2495,87 @@ body.is-offline .action-sheet-offline { display: block; }
     .tile-group-title { margin: 18px 16px 8px; }
     .report-stats .stat-card { min-height: 0; padding: 14px; }
     .history-actions { width: 100%; justify-content: flex-start; gap: 4px 14px; }
+}
+
+/* Home */
+.home { max-width: 1160px; margin: 0 auto; padding: 24px 0 0; display: grid; gap: 12px; }
+.home > *, .home-pair > * { min-width: 0; }
+.home-greeting { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 14px; }
+.home-greeting h1 { margin: 0; font-size: 30px; }
+.home-greeting span { color: var(--muted); font-size: 14px; font-weight: 700; }
+.home-label { margin: 0 0 8px; display: block; color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.home-card, .home-week { padding: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.home-week { display: grid; gap: 12px; border-top: 4px solid var(--cyan); }
+.home-week .home-label { margin: 0; }
+.home-week-top { display: flex; align-items: center; gap: 14px; }
+.goal-ring-wrap { position: relative; width: 72px; height: 72px; flex: none; }
+.goal-ring-wrap .goal-ring { width: 100%; height: 100%; }
+.goal-ring-percent { position: absolute; inset: 0; display: grid; place-items: center; font-size: 15px; font-weight: 800; }
+.goal-ring-percent:empty, #goalCard[data-state="reached"] .goal-ring-percent { display: none; }
+.home-week-text { min-width: 0; display: grid; gap: 4px; }
+.home-week-amount { font-size: 30px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; overflow-wrap: anywhere; }
+.home-sub { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; }
+.home-sub:empty { display: none; }
+.home-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.home-figures > div { min-width: 0; padding: 10px; display: grid; align-content: start; gap: 2px; background: var(--surface-deep); border-radius: 10px; }
+.home-figures span, .home-figures small { color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+.home-figures small:empty { display: none; }
+.home-figures b { font-size: 17px; overflow-wrap: anywhere; }
+.home-figures .text-link { font-size: 11px; }
+.home-week .goal-month { margin: 0; color: var(--muted); font-size: 13px; }
+.home-week .goal-link { min-height: 44px; margin: -6px 0 -8px; justify-self: start; display: inline-flex; align-items: center; }
+.home .evaluate-panel { margin: 0; border-width: 1px; border-radius: var(--radius); }
+.home-pair { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 12px; }
+.home-next { display: grid; align-content: start; gap: 8px; }
+.home-next .step-label { margin: 0 0 4px; }
+.home-next h2 { margin: 0; font-size: 22px; }
+.home-next p { margin: 0; }
+.home-next .next-up-pay { text-align: left; }
+.home-next .next-up-pay strong { font-size: 20px; }
+.home-next .next-up-actions { gap: 6px 10px; }
+/* The other block actions (calendar, cancel, forfeit) stay on the Schedule screen. */
+.home-next .next-up-actions > :not([data-action="start"]):not([data-action="finish"]):not([data-action="edit"]) { display: none; }
+.home-payout { display: grid; align-content: start; gap: 4px; }
+.home-payout .home-label { margin: 0; }
+.home-payout strong { color: var(--cyan); font-size: 24px; font-weight: 650; }
+.home-payout small { color: var(--faint); font-size: 11px; }
+.home-attention { background: var(--warning-surface); border-color: var(--warning-border); }
+.home-attention[hidden] { display: none; }
+.attention-list { margin: 0; padding: 0; list-style: none; }
+.attention-row { width: 100%; min-height: 48px; padding: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--text); background: none; border: 0; border-top: 1px solid var(--warning-border); font: inherit; text-align: left; cursor: pointer; }
+.attention-list li:first-child .attention-row { border-top: 0; }
+.attention-row b { min-height: 44px; display: inline-flex; align-items: center; color: var(--warning); font-size: 13px; white-space: nowrap; }
+.home-attention .missing-miles { margin: 4px 0 0; padding: 12px 0 0; border-top: 1px solid var(--warning-border); }
+.home-attention .install-banner { max-width: none; margin: 4px 0 0; }
+.recent-list { display: grid; }
+.recent-row { width: 100%; min-height: 58px; padding: 6px 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; color: var(--text); background: none; border: 0; border-top: 1px solid var(--line-soft); font: inherit; text-align: left; cursor: pointer; }
+.recent-row:first-child { border-top: 0; }
+.recent-row:focus-visible, .attention-row:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+.recent-main { min-width: 0; display: grid; }
+.recent-main strong, .recent-pay strong { font-size: 15px; }
+.recent-main span, .recent-pay span { color: var(--muted); font-size: 12px; }
+.recent-pay { display: grid; text-align: right; }
+.recent-all { min-height: 44px; margin-top: 4px; padding: 0; background: none; border: 0; font: inherit; font-weight: 750; cursor: pointer; }
+.schedule-forfeits { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0 6px; color: var(--muted); font-size: 14px; }
+.schedule-forfeits .text-link { min-height: 44px; padding: 0 4px; background: none; border: 0; font: inherit; font-weight: 750; cursor: pointer; }
+
+@media (min-width: 900px) {
+    .home { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; }
+    /* Placed explicitly, so the page order stays the phone order. */
+    .home-greeting { grid-column: 1 / -1; grid-row: 1; }
+    .home-week { grid-column: 1; grid-row: 2; }
+    .home-pair { grid-column: 2; grid-row: 2; grid-template-columns: minmax(0, 1fr); }
+    .home-attention { grid-column: 2; grid-row: 3; }
+    .evaluate-panel { grid-column: 2; grid-row: 4; }
+    /* Spans the rows beside the attention card and the calculator, so the left column has no gap under the week. */
+    .home-recent { grid-column: 1; grid-row: 3 / span 2; }
+}
+
+@media (max-width: 760px) {
+    .schedule-forfeits { padding: 0 18px; }
+}
+
+@media (max-width: 620px) {
+    .home { padding: 16px 14px 0; }
+    .home-greeting h1 { font-size: 28px; }
 }

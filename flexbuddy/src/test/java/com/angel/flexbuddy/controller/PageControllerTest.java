@@ -107,19 +107,74 @@ class PageControllerTest {
     }
 
     @Test
-    void dashboardKeepsOnlyTheFixedWindowTiles() throws Exception {
+    void homeReplacesTheTitleBannerAndTiles() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
+        assertThat(page).contains("id=\"homeScreen\"", "id=\"goalCard\"", "id=\"homeNextBlock\"", "id=\"homeAttention\"",
+                "id=\"recentList\"", "id=\"evaluatePanel\"", "/js/home.js?v=");
+        assertThat(page).doesNotContain("Track every block, hour, and dollar", "id=\"plannedWeek\"", "id=\"nextShiftLink\"",
+                "class=\"backup-nudge\"");
+        // The dashboard's own title banner is gone; the account page keeps the .hero style for itself.
+        assertThat(page).doesNotContain("class=\"hero\"");
+        // The week, payout and recent blocks come before Reports, whose tiles follow a range.
         int reports = page.indexOf("id=\"reportsScreen\"");
-        for (String tile : new String[] {"goalCard", "payoutCard", "taxCard", "rollingSevenDayTime", "plannedWeek", "forfeitsMonth"}) {
-            assertThat(page.indexOf("id=\"" + tile + "\"")).as(tile).isPositive().isLessThan(reports);
+        for (String id : new String[] {"goalCard", "payoutCard", "rollingSevenDayTime", "taxWeekAmount", "recentList"}) {
+            assertThat(page.indexOf("id=\"" + id + "\"")).as(id).isPositive().isLessThan(reports);
         }
-        // The tiles that follow the range moved to Reports.
-        for (String tile : new String[] {"totalEarnings", "totalShifts", "expenseTotal"}) {
-            assertThat(page.indexOf("id=\"" + tile + "\"")).as(tile).isGreaterThan(reports);
-        }
+        assertThat(page.indexOf("id=\"totalEarnings\"")).isGreaterThan(reports);
+    }
+
+    @Test
+    void theGreetingUsesTheDisplayName() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        org.mockito.Mockito.when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(java.util.Optional.of(angel));
+
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("Hi, Angel");
+    }
+
+    @Test
+    void backupDueIsAnAttributeOnTheAttentionCard() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setId(42L);
+        org.mockito.Mockito.when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(java.util.Optional.of(angel));
+        org.mockito.Mockito.when(shiftRepository.countByOwnerEmailIgnoreCase("angel@example.com")).thenReturn(11L);
+
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).containsPattern("<article[^>]*id=\"homeAttention\"[^>]*data-backup-due=\"true\"");
+        // The old banner is not rendered any more; Home's card lists the row instead.
+        assertThat(page).doesNotContain("Download a backup so you can recover it");
+    }
+
+    @Test
+    void forfeitsMovedToSchedule() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        int schedule = page.indexOf("id=\"scheduleScreen\"");
+        assertThat(page.indexOf("id=\"forfeitsMonth\"")).isGreaterThan(schedule);
+        // The pill comes with it, because standing.js reads it without a null check.
+        assertThat(page.indexOf("id=\"standingPill\"")).isGreaterThan(schedule);
+        assertThat(page.indexOf("id=\"standingPill\"")).isLessThan(page.indexOf("id=\"standingPanel\""));
+    }
+
+    @Test
+    void theFirstNavItemReadsHome() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).containsPattern("id=\"dashboardNavButton\"[^>]*>\\s*<svg[^>]*>.*?</svg>\\s*<span>Home</span>");
     }
 
     @Test
