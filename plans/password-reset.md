@@ -451,13 +451,12 @@ and when the account is deleted, and the privacy policy says how reset
 emails are sent.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Email provider.** Is Gmail SMTP from `flexbuddysupport@gmail.com` with an app
-   password all right? It's free and needs no domain. The alternative is a provider such
-   as Brevo or Resend, which needs a domain you own.
-2. **Other devices' open sessions.** A reset signs out *remembered* devices, but a browser
-   tab that's open right now stays signed in until its session ends (about 30 minutes idle
-   by default). Fixing that means tracking every session, which is a bigger change. Is
-   that acceptable for now?
-3. **Link lifetime.** Is 30 minutes all right? Some services use 15 minutes, some an hour.
+All questions are settled. Nothing is left open.
+
+- **Email provider:** Gmail SMTP from `flexbuddysupport@gmail.com`, with a Google app
+  password stored only in Render's environment settings.
+- **Open browser sessions:** a reset signs out remembered devices straight away. A browser
+  tab that's open right now ends after about 30 minutes idle. That's acceptable for now.
+- **Link lifetime:** 30 minutes.
