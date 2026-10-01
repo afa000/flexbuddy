@@ -2535,7 +2535,7 @@ body.is-offline .action-sheet-offline { display: block; }
 .expense-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .expense-cost-note { margin: 0 0 var(--space-3); color: var(--muted); font-size: 13px; }
 /* The link's tap area is 44px tall without changing the line it sits in. */
-.expense-cost-note .text-link { display: inline-block; margin: -12px 0; padding: 12px 4px; }
+.expense-cost-note .text-link { min-height: 44px; margin: -15px 0; padding: 0 4px; display: inline-flex; align-items: center; vertical-align: middle; }
 .screen-title .compact-button { min-height: 44px; }
 
 @media (max-width: 620px) {
