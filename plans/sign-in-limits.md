@@ -313,10 +313,11 @@ are kept in memory, which suits the single server the app runs on;
 they reset when it restarts.
 ```
 
-## 9. Open questions
+## 9. Decisions
 
-1. **Are the limits right?** 5 tries per email and 20 per connection, per 15 minutes, with
-   a 15-minute lock. Stricter means more protection but more locked-out drivers who mistype.
-2. **Sign-up limit of 10 an hour per connection.** Several drivers signing up on the same
-   Wi-Fi at once, for example at a station or during a tester drive, would share one
-   count. Is 10 enough?
+All questions are settled. Nothing is left open.
+
+- **The limits as written:** 5 failed sign-ins per email and 20 per connection within 15
+  minutes, each giving a 15-minute lock.
+- **Sign-ups:** 10 an hour per connection is enough, even for drivers signing up together
+  on shared station Wi-Fi.
