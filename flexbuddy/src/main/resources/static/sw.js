@@ -8,7 +8,7 @@ const SHARE_CACHE = 'flexbuddy-share-inbox';
 const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const VERSIONED_ASSETS = [
-    '/css/styles.css', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/outbox.js', '/js/calendar.js',
+    '/css/styles.css', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/outbox.js', '/js/reports.js', '/js/calendar.js',
     '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/payouts.js', '/js/standing.js', '/js/swipe.js', '/js/quick-actions.js', '/js/app.js', '/js/account.js', '/js/tax.js'
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [

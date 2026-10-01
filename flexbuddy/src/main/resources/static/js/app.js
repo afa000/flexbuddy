@@ -3,10 +3,18 @@ const elements = {
     themeToggleButton: document.querySelector('#themeToggleButton'),
     dashboardButton: document.querySelector('#dashboardButton'),
     dashboardNavButton: document.querySelector('#dashboardNavButton'),
-    importNavButton: document.querySelector('#importNavButton'),
+    reportsNavButton: document.querySelector('#reportsNavButton'),
     expensesNavButton: document.querySelector('#expensesNavButton'),
     dashboardScreens: [...document.querySelectorAll('[data-screen="dashboard"]')],
     importScreen: document.querySelector('#importScreen'),
+    reportsScreen: document.querySelector('#reportsScreen'),
+    rangeChip: document.querySelector('#rangeChip'),
+    rangeSheet: document.querySelector('#rangeSheet'),
+    rangeDoneButton: document.querySelector('#rangeDoneButton'),
+    chartsTab: document.querySelector('#chartsTab'),
+    historyTab: document.querySelector('#historyTab'),
+    chartsPanel: document.querySelector('#chartsPanel'),
+    historyPanel: document.querySelector('#historyPanel'),
     expensesScreen: document.querySelector('#expensesScreen'),
     dropZone: document.querySelector('#dropZone'),
     fileCard: document.querySelector('#fileCard'),
@@ -37,11 +45,11 @@ const elements = {
     saveError: document.querySelector('#saveError'),
     totalEarnings: document.querySelector('#totalEarnings'),
     totalShifts: document.querySelector('#totalShifts'),
+    totalShiftsDetail: document.querySelector('#totalShiftsDetail'),
     totalTime: document.querySelector('#totalTime'),
     rollingSevenDayTime: document.querySelector('#rollingSevenDayTime'),
     averagePay: document.querySelector('#averagePay'),
     averageHourly: document.querySelector('#averageHourly'),
-    hourlyBreakdown: document.querySelector('#hourlyBreakdown'),
     baseTipsTotal: document.querySelector('#baseTipsTotal'),
     baseShareBar: document.querySelector('#baseShareBar'),
     tipsShareBar: document.querySelector('#tipsShareBar'),
@@ -181,6 +189,10 @@ let dashboardAbort;
 let reportAbort;
 let filterState = readFilterState();
 let reportGroupBy = new URLSearchParams(window.location.search).get('groupBy') || 'month';
+let reportTab = window.flexbuddyReports.parseReportParams(window.location.search).tab;
+let currentScreen = 'dashboard';
+// The address follows the screen only once startup has read it, so a shared screenshot's id is not overwritten first.
+let urlSyncEnabled = false;
 let editingExpenseId;
 let editMode = 'edit';
 let editOriginalStatus;
@@ -226,7 +238,7 @@ Object.values(previewFields).forEach(input => input.addEventListener('focus', ()
 }));
 
 elements.themeToggleButton.addEventListener('click', toggleTheme);
-elements.importNavButton.addEventListener('click', showImportScreen);
+elements.reportsNavButton.addEventListener('click', () => showReportsScreen());
 elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
 elements.nextShiftLink.addEventListener('click', event => {
     event.preventDefault();
@@ -256,6 +268,15 @@ elements.showMoreButton.addEventListener('click', () => {
     renderShifts(currentShifts);
 });
 elements.clearFiltersButton.addEventListener('click', clearFilters);
+elements.rangeChip.addEventListener('click', openRangeSheet);
+elements.rangeDoneButton.addEventListener('click', closeRangeSheet);
+elements.rangeSheet.addEventListener('click', event => {
+    if (event.target === elements.rangeSheet) closeRangeSheet();
+});
+[elements.chartsTab, elements.historyTab].forEach(tab => {
+    tab.addEventListener('click', () => selectReportTab(tab === elements.historyTab ? 'history' : 'charts'));
+    tab.addEventListener('keydown', handleReportTabKeys);
+});
 elements.sortDirectionButton.addEventListener('click', () => {
     filterState.dir = filterState.dir === 'asc' ? 'desc' : 'asc';
     syncFilterControls();
@@ -352,10 +373,16 @@ document.addEventListener('keydown', event => {
         closeEditModal();
         return;
     }
+    if (event.key === 'Escape' && !elements.rangeSheet.classList.contains('is-hidden')) {
+        closeRangeSheet();
+        return;
+    }
     if (event.key === 'Tab' && !elements.confirmModal.classList.contains('is-hidden')) {
         trapFocus(elements.confirmModal, event);
     } else if (event.key === 'Tab' && !elements.editModal.classList.contains('is-hidden')) {
         trapFocus(elements.editModal, event);
+    } else if (event.key === 'Tab' && !elements.rangeSheet.classList.contains('is-hidden')) {
+        trapFocus(elements.rangeSheet, event);
     }
 });
 
@@ -397,11 +424,14 @@ function updateThemeToggle(theme) {
 }
 
 function showScreen(name, smooth = true) {
+    currentScreen = name;
     elements.dashboardScreens.forEach(section => section.classList.toggle('is-hidden', name !== 'dashboard'));
+    elements.reportsScreen.classList.toggle('is-hidden', name !== 'reports');
     elements.scheduleScreen.classList.toggle('is-hidden', name !== 'schedule');
     elements.importScreen.classList.toggle('is-hidden', name !== 'import');
     elements.expensesScreen.classList.toggle('is-hidden', name !== 'expenses');
     setActiveNavigation(name);
+    persistFilterState();
     window.scrollTo({top: 0, behavior: smooth ? 'smooth' : 'auto'});
 }
 
@@ -416,6 +446,11 @@ function showScheduleScreen(smooth = true) {
     return window.flexbuddySchedule.show();
 }
 
+function showReportsScreen(smooth = true, tab = reportTab) {
+    showScreen('reports', smooth);
+    selectReportTab(tab);
+}
+
 function showImportScreen(smooth = true) {
     showScreen('import', smooth);
 }
@@ -427,8 +462,9 @@ function showExpensesScreen(smooth = true) {
 }
 
 function setActiveNavigation(activeItem) {
+    // The import screen belongs to no item: it opens from the + button, so none is highlighted there.
     [['dashboard', elements.dashboardNavButton], ['schedule', elements.scheduleNavButton],
-        ['import', elements.importNavButton], ['expenses', elements.expensesNavButton]].forEach(([name, button]) => {
+        ['reports', elements.reportsNavButton], ['expenses', elements.expensesNavButton]].forEach(([name, button]) => {
         button.classList.toggle('is-active', activeItem === name);
         setCurrentPage(button, activeItem === name);
     });
@@ -437,6 +473,45 @@ function setActiveNavigation(activeItem) {
 function setCurrentPage(button, current) {
     if (current) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
+}
+
+/** Shows Charts or History on the Reports screen; both stay loaded, so switching never fetches anything. */
+function selectReportTab(tab) {
+    reportTab = tab === 'history' ? 'history' : 'charts';
+    const showHistory = reportTab === 'history';
+    [[elements.chartsTab, elements.chartsPanel, !showHistory], [elements.historyTab, elements.historyPanel, showHistory]]
+        .forEach(([button, panel, active]) => {
+            button.classList.toggle('is-active', active);
+            button.setAttribute('aria-selected', String(active));
+            button.tabIndex = active ? 0 : -1;
+            panel.hidden = !active;
+        });
+    persistFilterState();
+}
+
+/** The WAI-ARIA tabs pattern: the arrow keys, Home and End move between the two tabs and select them. */
+function handleReportTabKeys(event) {
+    const tabs = [elements.chartsTab, elements.historyTab];
+    let next;
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') next = tabs[(tabs.indexOf(event.currentTarget) + 1) % tabs.length];
+    else if (event.key === 'Home') next = tabs[0];
+    else if (event.key === 'End') next = tabs.at(-1);
+    if (!next) return;
+    event.preventDefault();
+    selectReportTab(next === elements.historyTab ? 'history' : 'charts');
+    next.focus();
+}
+
+function openRangeSheet() {
+    elements.rangeSheet.classList.remove('is-hidden');
+    document.body.classList.add('modal-open');
+    (elements.presetChips.find(chip => chip.classList.contains('is-active')) ?? elements.presetChips[0]).focus();
+}
+
+function closeRangeSheet() {
+    elements.rangeSheet.classList.add('is-hidden');
+    document.body.classList.remove('modal-open');
+    elements.rangeChip.focus();
 }
 
 async function processScreenshot(file) {
@@ -693,6 +768,8 @@ async function saveShift(event) {
     }
 }
 
+// Reports and history load with everything else, so every "reload after save" call keeps working unchanged. Loading them
+// only once Reports opens would save requests on the dashboard; it is left for later.
 async function loadDashboard() {
     if (!validateDateRange()) return;
     const query = buildQuery();
@@ -860,9 +937,7 @@ async function loadStatistics(query, signal) {
         elements.averagePay.textContent = formatMoney(statistics.averagePayPerShift);
         elements.averageHourly.textContent = formatMoney(statistics.averageHourlyEarnings);
         const timed = statistics.timedShifts > 0;
-        elements.hourlyBreakdown.textContent = timed
-            ? `${formatMoney(statistics.clockedHourlyRate)}/hr on the clock`
-            : `${formatMoney(statistics.averageHourlyBasePay)} base · ${formatMoney(statistics.averageHourlyTips)} tips`;
+        elements.totalShiftsDetail.textContent = flexbuddyReports.rangeLabel(filterState).replace(/ ▾$/, '');
         elements.timeWorkedDetail.textContent = timed
             ? `${formatMinutes(statistics.clockedMinutes)} on the clock · ${paceText(statistics.averageFinishedEarlyMinutes)}`
             : 'Across every shift';
@@ -872,9 +947,9 @@ async function loadStatistics(query, signal) {
         elements.tipsShareBar.style.width = `${tipShare}%`;
         elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
         elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
-        elements.netHourly.textContent = `${formatMoney(statistics.netHourlyRate)}/hr`;
+        elements.netHourly.textContent = `${formatMoney(statistics.netHourlyRate)}/hr est. net`;
         elements.netMargin.textContent = `After deductions · ${Number(statistics.netMargin || 0).toFixed(1)}% margin`;
-        elements.expenseTotal.textContent = `${formatMoney(statistics.totalExpenses)} cash expenses`;
+        elements.expenseTotal.textContent = formatMoney(statistics.totalExpenses);
         elements.totalMiles.textContent = `${Number(statistics.totalMiles || 0).toFixed(1)} mi`;
         elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
         const planned = statistics.scheduledShifts ?? 0;
@@ -888,7 +963,7 @@ async function loadStatistics(query, signal) {
     } catch (error) {
         if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.rollingSevenDayTime, elements.averagePay,
-            elements.averageHourly, elements.hourlyBreakdown, elements.timeWorkedDetail, elements.baseTipsTotal,
+            elements.averageHourly, elements.totalShiftsDetail, elements.timeWorkedDetail, elements.baseTipsTotal,
             elements.tipsShare, elements.netEarnings, elements.netHourly, elements.netMargin,
             elements.expenseTotal, elements.totalMiles, elements.mileageCost, elements.plannedWeek,
             elements.plannedWeekDetail, elements.forfeitsMonth, elements.forfeitsDetail].forEach(element => element.textContent = '—');
@@ -911,6 +986,7 @@ async function loadShifts(query, signal) {
         elements.historyList.innerHTML = '<div class="history-empty">Shifts could not be loaded.</div>';
         elements.showMoreButton.classList.add('is-hidden');
         elements.resultsSummary.textContent = 'Shift results unavailable.';
+        elements.activeFilterSummary.textContent = 'Shifts could not be loaded.';
         elements.exportCsvButton.classList.add('is-disabled');
         elements.exportCsvButton.setAttribute('aria-disabled', 'true');
         elements.exportCsvButton.title = 'Shift results are unavailable';
@@ -1691,8 +1767,7 @@ function syncFilterControls() {
     elements.sortDirectionButton.setAttribute('aria-label', `Sort ${filterState.dir === 'asc' ? 'ascending' : 'descending'}`);
     elements.presetChips.forEach(chip => chip.classList.toggle('is-active', chip.dataset.preset === filterState.preset));
     elements.groupButtons.forEach(button => button.classList.toggle('is-active', button.dataset.group === reportGroupBy));
-    const presetLabel = elements.presetChips.find(chip => chip.dataset.preset === filterState.preset)?.textContent || 'Custom';
-    elements.activeFilterSummary.textContent = `Showing: ${presetLabel}`;
+    elements.rangeChip.textContent = flexbuddyReports.rangeLabel(filterState);
 }
 
 async function applyPreset(preset) {
@@ -1783,11 +1858,16 @@ function buildQuery(includeSort = true) {
     return params;
 }
 
+/**
+ * Keeps the address matching the screen, so a reload comes back to it. Reports also carries its range, sort, grouping and
+ * tab; every other screen has a plain address, so saving a shift elsewhere never leaves filter settings in it.
+ */
 function persistFilterState() {
-    const params = buildQuery();
-    params.set('preset', filterState.preset);
-    params.set('groupBy', reportGroupBy);
-    window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
+    if (!urlSyncEnabled) return;
+    let query = '';
+    if (currentScreen === 'reports') query = flexbuddyReports.reportParams(filterState, reportGroupBy, reportTab).toString();
+    else if (currentScreen !== 'dashboard') query = `screen=${currentScreen}`;
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
 }
 
 async function loadStations() {
@@ -1821,6 +1901,7 @@ function updateResultSummary(shifts) {
         ? 'expenses linked to these shifts only'
         : 'expenses included by date';
     elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station} · ${expenseScope} · export includes these`;
+    elements.activeFilterSummary.textContent = flexbuddyReports.summaryLine(shifts);
     elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
     elements.exportCsvButton.classList.toggle('is-disabled', count === 0);
     elements.exportCsvButton.setAttribute('aria-disabled', String(count === 0));
@@ -1839,7 +1920,7 @@ function drillIntoBucket(bucket, groupBy) {
     }
     syncFilterControls();
     applyFilters();
-    document.querySelector('.filter-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+    window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 /** "Sep 29": a day without its year, for the short lines in the Waiting to sync strip. */
@@ -2111,7 +2192,10 @@ function openInitialScreen() {
         return;
     }
     const screen = params.get('screen');
-    if (screen === 'schedule') showScheduleScreen(false);
+    // Filter settings in the address belong to Reports, so an older bookmark such as /?preset=month opens it.
+    const hasReportParams = ['preset', 'from', 'to', 'station', 'groupBy'].some(key => params.has(key));
+    if (screen === 'reports' || (!screen && hasReportParams)) showReportsScreen(false);
+    else if (screen === 'schedule') showScheduleScreen(false);
     else if (screen === 'import') showImportScreen(false);
     else if (screen === 'expenses') showExpensesScreen(false);
     else if (screen === 'evaluate') {
@@ -2248,6 +2332,7 @@ updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
 openInitialScreen();
 importSharedScreenshot();
+urlSyncEnabled = true;
 loadStations();
 loadDashboard();
 reportTimeZone();

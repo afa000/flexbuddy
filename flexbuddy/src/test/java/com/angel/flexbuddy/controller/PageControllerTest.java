@@ -83,6 +83,46 @@ class PageControllerTest {
     }
 
     @Test
+    void bottomBarHasReportsAndNoImport() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"reportsNavButton\"").doesNotContain("id=\"importNavButton\"");
+        // Import stays one tap away in the + button.
+        assertThat(page).contains("id=\"qaImport\"");
+    }
+
+    @Test
+    void reportsScreenHoldsTheRangeTabsAndHistory() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"reportsScreen\"", "id=\"rangeChip\"", "id=\"rangeSheet\"", "role=\"tablist\"",
+                "id=\"historyList\"", "id=\"earningsChart\"", "/js/reports.js?v=");
+        // The history and the charts sit inside the Reports screen, which is what moved them off the dashboard.
+        assertThat(page.indexOf("id=\"historyList\"")).isGreaterThan(page.indexOf("id=\"reportsScreen\""));
+        assertThat(page.indexOf("id=\"earningsChart\"")).isGreaterThan(page.indexOf("id=\"reportsScreen\""));
+    }
+
+    @Test
+    void dashboardKeepsOnlyTheFixedWindowTiles() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        int reports = page.indexOf("id=\"reportsScreen\"");
+        for (String tile : new String[] {"goalCard", "payoutCard", "taxCard", "rollingSevenDayTime", "plannedWeek", "forfeitsMonth"}) {
+            assertThat(page.indexOf("id=\"" + tile + "\"")).as(tile).isPositive().isLessThan(reports);
+        }
+        // The tiles that follow the range moved to Reports.
+        for (String tile : new String[] {"totalEarnings", "totalShifts", "expenseTotal"}) {
+            assertThat(page.indexOf("id=\"" + tile + "\"")).as(tile).isGreaterThan(reports);
+        }
+    }
+
+    @Test
     void shiftsPageCarriesTheAccountIdAndTheOutbox() throws Exception {
         AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
         angel.setId(42L);
