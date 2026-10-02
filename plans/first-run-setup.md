@@ -544,10 +544,10 @@ first. New drivers now see a Get set up card at the top of Home: add
 a first block, set a weekly goal, and check the vehicle cost method
 and payout days that FlexBuddy assumes, and optionally turn on a tax
 set-aside, shown as an estimate and not advice. The first two tick
-themselves off from real data, and only they are counted. Hide or Done dismisses
-it on the server so it stays gone on every device, and a dismissal
-made offline is retried. Drivers who already logged blocks are marked
-as set up by the migration and never see it.
+themselves off from real data, and only they are counted. Hide or
+Done dismisses it on the server so it stays gone on every device,
+and a dismissal made offline is retried. Drivers who already logged
+blocks are marked as set up by the migration and never see it.
 
 Feedback took effort to send, so most of it never was. A Send
 feedback link on Home, in the setup card and in Account opens an
