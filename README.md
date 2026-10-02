@@ -61,6 +61,8 @@ cd flexbuddy
 .\mvnw.cmd test
 ```
 
+GitHub Actions runs both suites, including the PostgreSQL migration test against Postgres 18, on every push to `main` and every pull request.
+
 The PostgreSQL migration test is skipped unless a test database is configured. It creates
 and removes its own isolated schema:
 
@@ -84,7 +86,7 @@ functions they export.
 
 ## Deployment
 
-The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Pushes to `main` are automatically deployed through the connected Render Blueprint.
+The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Render deploys a push to `main` once its GitHub checks pass. A commit with a failing test is never deployed.
 
 ## Reporting API
 

@@ -14,7 +14,9 @@ import java.util.Map;
 import java.util.UUID;
 
 import org.flywaydb.core.Flyway;
+import org.flywaydb.core.api.MigrationInfo;
 import org.flywaydb.core.api.MigrationVersion;
+import org.flywaydb.core.api.output.MigrateResult;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.StandardServiceRegistry;
@@ -31,8 +33,13 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
+import com.angel.flexbuddy.model.PasswordResetToken;
+import com.angel.flexbuddy.model.PayoutDeposit;
 import com.angel.flexbuddy.model.PushSubscription;
 import com.angel.flexbuddy.model.ReminderLog;
+import com.angel.flexbuddy.model.StandingEntry;
+import com.angel.flexbuddy.model.TaxPayment;
+import com.angel.flexbuddy.model.TaxReminderLog;
 
 @Tag("postgres")
 @EnabledIfEnvironmentVariable(named = "FLEXBUDDY_TEST_POSTGRES_URL", matches = "jdbc:postgresql://.+")
@@ -52,7 +59,12 @@ class PostgresMigrationTest {
             throughV3.migrate();
             insertLegacyRow(schema);
 
-            assertThat(latest.migrate().migrationsExecuted).isEqualTo(5);
+            // Every migration after V3 applies on top of real V3 data and none is left pending, without this test
+            // needing an edit each time a migration is added.
+            MigrationInfo[] pending = latest.info().pending();
+            MigrateResult result = latest.migrate();
+            assertThat(result.migrationsExecuted).isEqualTo(pending.length).isGreaterThan(0);
+            assertThat(latest.info().pending()).isEmpty();
             assertBackfilledValues(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
@@ -163,7 +175,9 @@ class PostgresMigrationTest {
         StandardServiceRegistry registry = new StandardServiceRegistryBuilder().applySettings(settings).build();
         try {
             Metadata metadata = new MetadataSources(registry)
-                    .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class)
+                    .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class,
+                            PayoutDeposit.class, StandingEntry.class, TaxPayment.class, TaxReminderLog.class,
+                            PasswordResetToken.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }
