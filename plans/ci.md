@@ -205,9 +205,8 @@ None.
   Rulesets → New branch ruleset, target `main`, tick "Restrict
   deletions" and "Block force pushes", with no bypass list needed. This
   is a manual step and not part of the commit.
-- **Actions minutes:** each run uses about 3–4 runner minutes. Public
-  repos are free. Private repos get 2,000 free minutes a month on GitHub
-  Free, which is roughly 500 pushes.
+- **Actions minutes:** the repo is public, so standard runners are free
+  with no monthly limit. Each run takes about 3–4 minutes.
 - **Plan branches:** pushes to `plan/*` don't run CI, because only `main`
   and pull requests trigger it. That's intended.
 - **Shared records:** none of `AccountSettingsResponse`, the backup
@@ -273,8 +272,8 @@ of five.
 
 ## 9. Open questions
 
-1. **Is the repo public or private?** This only matters for Actions
-   minutes (section 5). Nothing in the plan changes either way.
+1. ~~Is the repo public or private?~~ **Decided:** public, so Actions
+   minutes are free and unlimited for these jobs.
 2. **Do you want the force-push and deletion ruleset on `main`?** I
    recommend it. It's a manual setting and not part of this commit.
 3. **Should CI also build the Docker image?** That would be a weekly or
