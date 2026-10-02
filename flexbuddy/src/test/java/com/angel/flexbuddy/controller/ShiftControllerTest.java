@@ -411,6 +411,32 @@ class ShiftControllerTest {
     }
 
     @Test
+    void aFailedScreenshotReadStillAnswers500WithTheSameBodyAndNowLogsAnError() throws Exception {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
+                .getLogger("com.angel.flexbuddy.exception.GlobalExceptionHandler");
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs = new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            when(shiftImportService.createPreview(any(), any())).thenThrow(new com.angel.flexbuddy.exception.ScreenshotOcrException(
+                    "The screenshot could not be read.", new RuntimeException("tesseract failed")));
+
+            mockMvc.perform(multipart("/shifts/import-preview")
+                            .file(new org.springframework.mock.web.MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1, 2, 3}))
+                            .with(user("angel@example.com"))
+                            .with(csrf()))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().string("The screenshot could not be read."));
+
+            org.assertj.core.api.Assertions.assertThat(logs.list).hasSize(1);
+            org.assertj.core.api.Assertions.assertThat(logs.list.get(0).getLevel()).isEqualTo(ch.qos.logback.classic.Level.ERROR);
+            org.assertj.core.api.Assertions.assertThat(logs.list.get(0).getThrowableProxy()).isNotNull();
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
+
+    @Test
     void importPreview_returnsBadRequestForInvalidScreenshot() throws Exception {
         MockMultipartFile screenshot = new MockMultipartFile(
                 "screenshot",

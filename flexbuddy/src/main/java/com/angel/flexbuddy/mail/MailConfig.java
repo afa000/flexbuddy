@@ -25,4 +25,17 @@ public class MailConfig {
         }
         return new LoggingPasswordResetMailer(logLinks);
     }
+
+    /** Operator alerts follow the same host rule: with no mail server they are logged, not sent. */
+    @Bean
+    ErrorAlertMailer errorAlertMailer(
+            @Value("${spring.mail.host:}") String host,
+            ObjectProvider<JavaMailSender> senderProvider,
+            @Value("${flexbuddy.mail.from}") String from,
+            @Value("${flexbuddy.alerts.to:flexbuddysupport@gmail.com}") String to) {
+        if (StringUtils.hasText(host)) {
+            return new SmtpErrorAlertMailer(senderProvider.getObject(), from, to);
+        }
+        return new LoggingErrorAlertMailer();
+    }
 }

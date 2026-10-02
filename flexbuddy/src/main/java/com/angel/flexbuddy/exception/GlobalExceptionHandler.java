@@ -1,6 +1,8 @@
 package com.angel.flexbuddy.exception;
 
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -8,6 +10,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 @RestControllerAdvice 
 public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(ShiftNotFoundException.class)
     public ResponseEntity<String> handleShiftNotFoundException(ShiftNotFoundException exception) {
@@ -31,6 +35,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ScreenshotOcrException.class)
     public ResponseEntity<String> handleScreenshotOcrException(ScreenshotOcrException exception) {
+        // This answered 500 without a log line, so it never reached the logs or the alerts.
+        log.error("screenshot text extraction failed", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(exception.getMessage());
     }
 
@@ -81,6 +87,7 @@ public class GlobalExceptionHandler {
         if (message.contains("uk_shift_owner_create_request") || message.contains("uk_expense_owner_create_request")) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(new com.angel.flexbuddy.dto.ConflictResponse("DUPLICATE", null));
         }
+        log.error("a change could not be saved", exception);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("The change could not be saved.");
     }
 

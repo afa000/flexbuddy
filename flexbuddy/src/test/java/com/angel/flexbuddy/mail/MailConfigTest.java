@@ -94,6 +94,39 @@ class MailConfigTest {
     }
 
     @Test
+    void theAlertMailerFollowsTheSameHostRule() {
+        runner.run(context -> assertThat(context.getBean(ErrorAlertMailer.class)).isInstanceOf(LoggingErrorAlertMailer.class));
+        runner.withPropertyValues("spring.mail.host=smtp.example.com")
+                .withBean(JavaMailSender.class, () -> mock(JavaMailSender.class))
+                .run(context -> assertThat(context.getBean(ErrorAlertMailer.class)).isInstanceOf(SmtpErrorAlertMailer.class));
+    }
+
+    @Test
+    void theAlertMailerSendsToTheConfiguredAddress() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        new SmtpErrorAlertMailer(sender, "FlexBuddy <flexbuddysupport@gmail.com>", "ops@example.com")
+                .send("[FlexBuddy] Server error: X at Y", "body text");
+
+        ArgumentCaptor<SimpleMailMessage> sent = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(sender).send(sent.capture());
+        assertThat(sent.getValue().getTo()).containsExactly("ops@example.com");
+        assertThat(sent.getValue().getSubject()).isEqualTo("[FlexBuddy] Server error: X at Y");
+        assertThat(sent.getValue().getText()).isEqualTo("body text");
+    }
+
+    @Test
+    void aFailedAlertSendLogsOneWarnWithTheClassNameAndNotTheAddress() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        doThrow(new MailSendException("550 mailbox ops@example.com unavailable")).when(sender).send(any(SimpleMailMessage.class));
+
+        new SmtpErrorAlertMailer(sender, "FlexBuddy <flexbuddysupport@gmail.com>", "ops@example.com").send("subject", "body");
+
+        assertThat(messages()).hasSize(1);
+        assertThat(messages().get(0)).contains("could not be sent").contains("MailSendException").doesNotContain("ops@example.com");
+        assertThat(logs.list.get(0).getLevel()).isEqualTo(Level.WARN);
+    }
+
+    @Test
     void theSmtpMailerSendsAPlainTextMessageWithTheLink() {
         JavaMailSender sender = mock(JavaMailSender.class);
         new SmtpPasswordResetMailer(sender, "FlexBuddy <flexbuddysupport@gmail.com>")
