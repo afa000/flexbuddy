@@ -93,7 +93,8 @@ keeps the app outside the Families policy.
 | Link for users to request account and data deletion | `https://flexbuddy.onrender.com/delete-account` |
 | Can users request deletion of some data without deleting their account? | Optional; left unanswered. Answering Yes requires a second URL describing partial deletion, and `/delete-account` covers only full account deletion. Individual shifts and expenses can already be deleted in the app, so add a section to that page before answering Yes |
 
-Data is **not shared**. Render (hosting and database) and browser push services (which deliver
+Data is **not shared**. Render (hosting and database), Google's Gmail service (which sends
+password-reset emails and the developer's error alerts) and browser push services (which deliver
 encrypted notifications) act as service providers on FlexBuddy's behalf, which Play does not count
 as sharing.
 
@@ -106,20 +107,28 @@ another purpose is listed.
 |---|---|---|---|---|---|
 | Personal info | Name | No | Required | App functionality, Account management | Display name entered at registration |
 | Personal info | Email address | No | Required | App functionality, Account management | Sign-in email; also where a password-reset link is sent (through Gmail's mail service) |
+| Personal info | User IDs | No | Required | App functionality | The account number, which a page error report carries so the developer can tell which account hit a problem. Added with error reports |
 | Financial info | Other financial info | No | Required | App functionality | Base pay, tips, cancellation pay, expense amounts, mileage rate, and vehicle-cost settings |
 | Photos and videos | Photos | **Yes** | Optional | App functionality | Screenshots uploaded for shift import; processed in memory and discarded |
 | Files and docs | Files and docs | No | Optional | App functionality | Backup files uploaded for restore; held in the server session for up to 15 minutes before import |
 | App activity | Other user-generated content | No | Required | App functionality | Shift dates, times, stations, statuses, miles, and expense notes |
 | Device or other IDs | Device or other IDs | No | Optional | App functionality | Browser push endpoint, keys, and user agent, stored only when reminders are enabled |
+| App info and performance | Crash logs | No | Required | App functionality | Error reports: the kind of error and where in FlexBuddy's code it happened, for server errors and for script errors on the app's pages. Never exception messages, shifts, earnings, expenses, passwords or email addresses. Emailed to the developer's support mailbox, where it stays; FlexBuddy's own database does not store it |
+| App info and performance | Diagnostics | No | Required | App functionality | The app version and the screen the driver was on, sent with the error report |
 
 Photos are declared but processed ephemerally, so Play does not show them on the store listing
 preview; that is expected.
 
+Error reports (crash logs, diagnostics and the account number) were added with the error-alert
+feature. They are sent to FlexBuddy's own support mailbox through Gmail, are required because a driver
+cannot turn them off, and are not ephemeral because the alert email stays in the support mailbox. They
+carry no exception messages or driver data.
+
 Do **not** select these types: approximate or precise location (station names are typed by the
 user, and the app never reads device location), contacts, calendar (the app provides a calendar
 feed but never reads the device calendar), messages, audio, health and fitness, web browsing,
-app interactions, in-app search history, installed apps, crash logs, diagnostics, or other app
-performance data. FlexBuddy has no analytics or crash reporting.
+app interactions, in-app search history, installed apps, or other app performance data.
+FlexBuddy has no analytics service; the only reporting is the error reports above.
 
 Passwords are stored only as one-way hashes and remember-me tokens are authentication state; Play
 has no data type for either.
