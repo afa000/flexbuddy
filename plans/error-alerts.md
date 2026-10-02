@@ -568,10 +568,8 @@ describes the reports.
 1. **Recipient:** alerts go to `flexbuddysupport@gmail.com`, the same
    address that sends them, by default. Set `FLEXBUDDY_ALERT_TO` in
    Render if you'd rather get them elsewhere.
-2. **Account number in browser reports:** this makes it possible to look
-   up a tester's data when reproducing a crash. Drop it if you'd rather
-   reports were anonymous; the plan then removes the `Account:` line and
-   the privacy wording about it.
+2. ~~Account number in browser reports?~~ **Decided:** keep it. The
+   `Account: #<id>` line and the privacy wording stay as planned.
 3. **Quiet period and daily cap:** 6 hours and 20 a day are my defaults.
    Both are properties and can be changed without a code change.
 4. **Sentry instead:** if you later want grouped stack traces with full
