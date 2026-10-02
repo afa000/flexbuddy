@@ -2,6 +2,8 @@ package com.angel.flexbuddy.service;
 
 import java.math.BigDecimal;
 import java.security.SecureRandom;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -23,13 +25,25 @@ public class AccountSettingsService {
     private final AppUserRepository userRepository;
     private final BigDecimal defaultMileageRate;
     private final int mileageRateYear;
+    private final Clock clock;
 
     public AccountSettingsService(AppUserRepository userRepository,
             @Value("${flexbuddy.mileage.default-rate:${flexbuddy.mileage-rate:0.70}}") BigDecimal defaultMileageRate,
-            @Value("${flexbuddy.mileage.default-rate-year:${flexbuddy.mileage-rate-year:2025}}") int mileageRateYear) {
+            @Value("${flexbuddy.mileage.default-rate-year:${flexbuddy.mileage-rate-year:2025}}") int mileageRateYear,
+            Clock clock) {
         this.userRepository = userRepository;
         this.defaultMileageRate = defaultMileageRate;
         this.mileageRateYear = mileageRateYear;
+        this.clock = clock;
+    }
+
+    /** Dismisses Home's setup card for good. Asking again keeps the first time. */
+    @Transactional
+    public void dismissSetup(String email) {
+        AppUser user = user(email);
+        if (user.getSetupDismissedAt() == null) {
+            user.setSetupDismissedAt(Instant.now(clock));
+        }
     }
 
     @Transactional(readOnly = true)

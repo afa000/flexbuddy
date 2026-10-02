@@ -69,3 +69,9 @@ test('account summary is the name and email, and unloaded settings say so', () =
     assert.strictEqual(result.costs, 'Loading…');
     assert.strictEqual(result.backup, 'Never backed up');
 });
+
+test('costMethod is the method part of the costs summary on its own', () => {
+    assert.strictEqual(sections.costMethod({vehicleCostMethod: 'STANDARD_MILEAGE', mileageRate: 0.7}), 'Standard mileage · $0.70/mi');
+    assert.strictEqual(sections.costMethod({vehicleCostMethod: 'ACTUAL_EXPENSES', mileageRate: 0.7}), 'Actual expenses');
+    assert.strictEqual(typeof sections.payouts, 'function');
+});

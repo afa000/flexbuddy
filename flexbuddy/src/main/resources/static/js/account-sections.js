@@ -23,9 +23,14 @@
         return dollars.format(Number(value)).replace(/\.00$/, '');
     }
 
-    function costs(settings) {
-        const method = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
+    /** "Standard mileage · $0.70/mi" or "Actual expenses". */
+    function costMethod(settings) {
+        return settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
             ? 'Actual expenses' : `Standard mileage · ${rate.format(Number(settings.mileageRate))}/mi`;
+    }
+
+    function costs(settings) {
+        const method = costMethod(settings);
         if (settings.weeklyGoal != null) return `${method} · Goal ${goalAmount(settings.weeklyGoal)}/wk`;
         if (settings.monthlyGoal != null) return `${method} · Goal ${goalAmount(settings.monthlyGoal)}/mo`;
         return method;
@@ -78,5 +83,5 @@
         };
     }
 
-    window.flexbuddyAccountSections = {sectionForHash, summaries};
+    window.flexbuddyAccountSections = {sectionForHash, summaries, costMethod, payouts};
 })();

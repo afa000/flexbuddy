@@ -57,9 +57,23 @@
     <main>
         <section class="home" id="homeScreen" data-screen="dashboard" aria-labelledby="homeGreeting">
             <div class="home-greeting">
-                <h1 id="homeGreeting" th:text="${currentUser != null ? 'Hi, ' + currentUser.displayName : 'Hi'}">Hi</h1>
+                <h1 id="homeGreeting" tabindex="-1" th:text="${currentUser != null ? 'Hi, ' + currentUser.displayName : 'Hi'}">Hi</h1>
                 <span id="homeToday"></span>
             </div>
+
+            <article class="home-card home-setup" id="setupCard" th:if="${setupDue}"
+                     th:attr="data-has-blocks=${hasBlocks}" aria-labelledby="setupTitle">
+                <div class="setup-heading">
+                    <h2 class="home-label" id="setupTitle">Get set up</h2>
+                    <span class="setup-progress" id="setupProgress"></span>
+                </div>
+                <ul class="setup-list" id="setupList"></ul>
+                <div class="setup-actions">
+                    <button class="primary-button compact-button" id="setupDone" type="button" hidden>Done</button>
+                    <button class="text-button" id="setupHide" type="button">Hide</button>
+                    <a class="text-link" href="mailto:flexbuddysupport@gmail.com" data-feedback>Send feedback</a>
+                </div>
+            </article>
 
             <article class="home-week" id="goalCard" data-state="none">
                 <span class="home-label" id="homeWeekLabel">This week</span>
@@ -148,6 +162,8 @@
                 <div class="recent-list" id="recentList"></div>
                 <button class="text-link recent-all" id="recentAllButton" type="button">See all blocks in Reports</button>
             </article>
+
+            <p class="home-feedback"><a class="text-link" href="mailto:flexbuddysupport@gmail.com" data-feedback>Send feedback</a></p>
         </section>
 
         <section class="reports-screen is-hidden" id="reportsScreen" aria-labelledby="reports-title">
@@ -868,6 +884,9 @@
 <script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/outbox.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/account-sections.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/feedback.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/setup.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/reports.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/charts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/calendar.js(v=${buildId})}" defer></script>

@@ -96,7 +96,10 @@ class AccountDeletionJpaTest {
 
     @Test
     void deleteAccountLeavesNoOwnedOrOrphanRowsIncludingTrash() {
-        AppUser owner = userRepository.save(new AppUser("Angel", "angel@example.com", "stored-hash"));
+        AppUser owner = new AppUser("Angel", "angel@example.com", "stored-hash");
+        // A driver who dismissed the setup card is deleted like any other.
+        owner.setSetupDismissedAt(NOW);
+        owner = userRepository.save(owner);
         Shift activeShift = shiftRepository.save(shift(owner, "VEA7"));
         Shift trashedShift = shift(owner, "DOB2");
         trashedShift.setDeletedAt(NOW.minusSeconds(60));

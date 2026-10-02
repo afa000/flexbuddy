@@ -2477,6 +2477,26 @@ body.is-offline .action-sheet-offline { display: block; }
 .attention-row b { min-height: 44px; display: inline-flex; align-items: center; color: var(--warning); font-size: 13px; white-space: nowrap; }
 .home-attention .missing-miles { margin: 4px 0 0; padding: 12px 0 0; border-top: 1px solid var(--warning-border); }
 .home-attention .install-banner { max-width: none; margin: 4px 0 0; }
+.home-setup { background: var(--primary-soft); border-color: var(--cyan-dark); }
+.setup-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.setup-heading .home-label { margin: 0; }
+.setup-progress { color: var(--muted); font-size: 13px; }
+.setup-list { margin: 8px 0 0; padding: 0; list-style: none; }
+.setup-row { width: 100%; min-height: 48px; padding: 6px 0; display: flex; align-items: center; gap: 12px; color: var(--text); background: none; border: 0; border-top: 1px solid var(--line-soft); font: inherit; text-align: left; cursor: pointer; }
+.setup-list li:first-child .setup-row { border-top: 0; }
+.setup-row > span { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.setup-row small { color: var(--muted); overflow-wrap: anywhere; }
+.setup-row b { min-height: 44px; display: inline-flex; align-items: center; color: var(--cyan); font-size: 13px; white-space: nowrap; }
+.setup-row.is-done { cursor: default; color: var(--muted); }
+.setup-mark { width: 20px; flex: none !important; text-align: center; color: var(--cyan); font-size: 18px; }
+.setup-actions { margin-top: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.setup-actions > * { min-height: 44px; }
+.setup-actions a { display: inline-flex; align-items: center; }
+.setup-actions .text-link, .setup-actions .text-button { font-size: 14px; font-weight: 750; }
+/* The buttons set their own display, which would otherwise win over the hidden attribute. */
+.setup-actions [hidden] { display: none; }
+.home-feedback { margin: 4px 0 0; text-align: center; }
+.home-feedback a, .legal-contact a[data-feedback] { min-height: 44px; display: inline-flex; align-items: center; }
 .recent-list { display: grid; }
 .recent-row { width: 100%; min-height: 58px; padding: 6px 0; display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; align-items: center; gap: 12px; color: var(--text); background: none; border: 0; border-top: 1px solid var(--line-soft); font: inherit; text-align: left; cursor: pointer; }
 .recent-row:first-child { border-top: 0; }

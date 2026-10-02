@@ -66,6 +66,7 @@ class PostgresMigrationTest {
             assertThat(result.migrationsExecuted).isEqualTo(pending.length).isGreaterThan(0);
             assertThat(latest.info().pending()).isEmpty();
             assertBackfilledValues(schema);
+            assertSetupBackfill(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -126,6 +127,28 @@ class PostgresMigrationTest {
                     insert.setLong(1, ownerId);
                     assertThat(insert.executeUpdate()).isEqualTo(1);
                 }
+            }
+            // A second driver with no blocks at all, who should still see the setup card.
+            statement.execute("""
+                    insert into app_users (created_at, display_name, email, password_hash)
+                    values (timestamp with time zone '2026-09-01 12:00:00+00', 'No blocks',
+                            'noblocks@example.com', 'hash')
+                    """);
+        }
+    }
+
+    /** Drivers who had already logged a block are marked as set up; a driver with none is not. */
+    private void assertSetupBackfill(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery(
+                    "select email, setup_dismissed_at from app_users order by email")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("email")).isEqualTo("migration@example.com");
+                assertThat(result.getTimestamp("setup_dismissed_at")).isNotNull();
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("email")).isEqualTo("noblocks@example.com");
+                assertThat(result.getTimestamp("setup_dismissed_at")).isNull();
             }
         }
     }

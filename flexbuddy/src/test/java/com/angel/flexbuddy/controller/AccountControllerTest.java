@@ -152,6 +152,24 @@ class AccountControllerTest {
     }
 
     @Test
+    void dismissingTheSetupCardReturns204AndNamesTheSignedInUser() throws Exception {
+        mockMvc.perform(post("/account/setup/dismiss")
+                        .with(user("angel@example.com"))
+                        .with(csrf()))
+                .andExpect(status().isNoContent());
+
+        verify(settingsService).dismissSetup("angel@example.com");
+    }
+
+    @Test
+    void dismissingTheSetupCardNeedsCsrf() throws Exception {
+        mockMvc.perform(post("/account/setup/dismiss").with(user("angel@example.com")))
+                .andExpect(status().isForbidden());
+
+        verify(settingsService, never()).dismissSetup(any());
+    }
+
+    @Test
     void registerShowsTheLimitMessageWhenLocked() throws Exception {
         when(attemptLimiter.isLocked(eq("register-ip"), any())).thenReturn(true);
 
@@ -317,6 +335,14 @@ class AccountControllerTest {
         assertThat(page).doesNotContain("Account data");
         assertThat(page).contains("<title>Account | FlexBuddy</title>");
         assertThat(page).doesNotContain("account-button");
+    }
+
+    @Test
+    void theAccountPageOffersFeedbackThatKnowsItsScreen() throws Exception {
+        String page = accountPage();
+
+        assertThat(page).containsPattern("<a[^>]*href=\"mailto:flexbuddysupport@gmail.com\"[^>]*data-feedback[^>]*>Send feedback</a>");
+        assertThat(page).contains("/js/feedback.js?v=");
     }
 
     @Test

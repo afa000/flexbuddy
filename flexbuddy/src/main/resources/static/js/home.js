@@ -1,7 +1,7 @@
 // Home: the first screen. This week's earnings and goal, the last seven days, the next block and payout, what needs
 // attention, and the last few blocks. Loaded before app.js and uses its shared helpers (apiFetch, formatMoney,
-// formatMinutes, formatTime, formatDate, escapeHtml, openEditModal, showReportsScreen, showScheduleScreen) at call
-// time. The pure helpers touch no page elements, so they run under `node --test`.
+// formatMinutes, formatTime, formatDate, escapeHtml, openEditModal, showReportsScreen, showScheduleScreen) and the
+// helpers of setup.js (flexbuddySetup) at call time. The pure helpers touch no page elements, so they run under `node --test`.
 (() => {
     const calendar = window.flexbuddyCalendar;
     const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -123,6 +123,8 @@
         }
 
         renderRecent(shifts.status === 'fulfilled' ? shifts.value : null);
+        // Adding a first block ticks its row in the setup card on the next refresh, with no page reload.
+        if (shifts.status === 'fulfilled') window.flexbuddySetup?.update({hasBlocks: shifts.value.length > 0});
         renderAttention();
     }
 

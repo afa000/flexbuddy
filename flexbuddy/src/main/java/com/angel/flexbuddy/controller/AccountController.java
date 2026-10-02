@@ -224,6 +224,13 @@ public class AccountController {
         return settingsService.updateTimeZone(principal.getName(), request);
     }
 
+    /** Hides Home's setup card on every device. Idempotent, and needs sign-in and CSRF like any other write. */
+    @PostMapping("/account/setup/dismiss")
+    public ResponseEntity<Void> dismissSetup(Principal principal) {
+        settingsService.dismissSetup(principal.getName());
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/account/calendar-token")
     @ResponseBody
     public AccountSettingsResponse regenerateCalendarToken(Principal principal) {

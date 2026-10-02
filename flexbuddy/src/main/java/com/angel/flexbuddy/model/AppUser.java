@@ -56,6 +56,9 @@ public class AppUser {
 
     private Instant lastBackupAt;
 
+    /** When the driver dismissed Home's setup card; null while it should still show. Screen state, so it is not backed up. */
+    private Instant setupDismissedAt;
+
     @Column(precision = 6, scale = 3)
     private BigDecimal mileageRate;
 

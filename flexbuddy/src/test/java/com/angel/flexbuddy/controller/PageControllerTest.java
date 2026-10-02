@@ -177,6 +177,49 @@ class PageControllerTest {
         assertThat(page).containsPattern("id=\"dashboardNavButton\"[^>]*>\\s*<svg[^>]*>.*?</svg>\\s*<span>Home</span>");
     }
 
+    private String pageFor(AppUser user, long shiftCount) throws Exception {
+        org.mockito.Mockito.when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(java.util.Optional.of(user));
+        org.mockito.Mockito.when(shiftRepository.countByOwnerEmailIgnoreCase("angel@example.com")).thenReturn(shiftCount);
+        return mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+    }
+
+    @Test
+    void aNewDriverSeesTheSetupCardWithNoBlocks() throws Exception {
+        String page = pageFor(new AppUser("Angel", "angel@example.com", "hash"), 0);
+
+        assertThat(page).containsPattern("<article[^>]*id=\"setupCard\"[^>]*data-has-blocks=\"false\"");
+        assertThat(page).contains("id=\"setupList\"", "id=\"setupDone\"", "id=\"setupHide\"", "/js/setup.js?v=", "/js/feedback.js?v=");
+        // The card comes before the week card.
+        assertThat(page.indexOf("id=\"setupCard\"")).isLessThan(page.indexOf("id=\"goalCard\""));
+    }
+
+    @Test
+    void aDriverWhoDismissedTheCardDoesNotSeeIt() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setSetupDismissedAt(java.time.Instant.parse("2026-10-01T12:00:00Z"));
+
+        assertThat(pageFor(angel, 0)).doesNotContain("id=\"setupCard\"");
+    }
+
+    @Test
+    void theSetupCardKnowsWhenThereAreBlocks() throws Exception {
+        String page = pageFor(new AppUser("Angel", "angel@example.com", "hash"), 3);
+
+        assertThat(page).containsPattern("<article[^>]*id=\"setupCard\"[^>]*data-has-blocks=\"true\"");
+    }
+
+    @Test
+    void homeAlwaysOffersFeedbackThatOpensTheEmailApp() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        angel.setSetupDismissedAt(java.time.Instant.parse("2026-10-01T12:00:00Z"));
+
+        String page = pageFor(angel, 5);
+
+        assertThat(page).containsPattern("<p class=\"home-feedback\"><a[^>]*href=\"mailto:flexbuddysupport@gmail.com\"[^>]*data-feedback");
+    }
+
     @Test
     void headerHasHomeLogoAndAccountButtonButNoSignOut() throws Exception {
         AppUser angel = new AppUser("Angel", "angel@example.com", "hash");

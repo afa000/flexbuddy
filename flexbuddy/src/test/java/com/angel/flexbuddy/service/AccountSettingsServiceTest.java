@@ -5,6 +5,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +19,7 @@ import com.angel.flexbuddy.dto.ReminderSettingsRequest;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.VehicleCostMethod;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.MutableClock;
 
 @ExtendWith(MockitoExtension.class)
 class AccountSettingsServiceTest {
@@ -27,12 +29,25 @@ class AccountSettingsServiceTest {
 
     private AccountSettingsService service;
     private AppUser user;
+    private MutableClock clock;
 
     @BeforeEach
     void setUp() {
-        service = new AccountSettingsService(userRepository, new BigDecimal("0.700"), 2025);
+        clock = new MutableClock(Instant.parse("2026-10-02T12:00:00Z"));
+        service = new AccountSettingsService(userRepository, new BigDecimal("0.700"), 2025, clock);
         user = new AppUser("Angel", EMAIL, "hash");
         when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(user));
+    }
+
+    @Test
+    void dismissSetupStampsTheClocksInstantAndKeepsTheFirstOne() {
+        service.dismissSetup(EMAIL);
+        assertThat(user.getSetupDismissedAt()).isEqualTo(Instant.parse("2026-10-02T12:00:00Z"));
+
+        clock.advance(java.time.Duration.ofDays(3));
+        service.dismissSetup(EMAIL);
+
+        assertThat(user.getSetupDismissedAt()).isEqualTo(Instant.parse("2026-10-02T12:00:00Z"));
     }
 
     @Test

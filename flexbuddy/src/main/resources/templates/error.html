@@ -38,7 +38,9 @@
 
         <div class="error-actions">
             <a class="primary-button auth-submit info-action" href="/">Return to FlexBuddy</a>
-            <a class="secondary-button error-support-link" href="mailto:flexbuddysupport@gmail.com">Contact support</a>
+            <a class="secondary-button error-support-link"
+               th:href="|mailto:flexbuddysupport@gmail.com?subject=${#uris.escapeQueryParam('FlexBuddy problem report')}&body=${#uris.escapeQueryParam('What were you doing when this happened? (error ' + (status ?: 'unknown') + ')')}|"
+               href="mailto:flexbuddysupport@gmail.com">Contact support</a>
         </div>
     </article>
 </main>
