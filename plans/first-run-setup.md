@@ -30,12 +30,16 @@ hard-coded `5` is wrong either way.
 
 **Goal:**
 - A brand-new driver sees a **Get set up** card at the top of Home with
-  four rows:
+  five rows:
   1. **Add your first block** (to do / done). It opens the + menu, which
      offers import, add by hand, and so on.
   2. **Set a weekly goal** (to do / done). It opens `/account#goals`.
   3. **Vehicle costs**, showing the current method, with a link to Change.
   4. **Payouts**, showing the current days, with a link to Change.
+  5. **Taxes (optional)**, showing `Off` or the current set-aside
+     percentage, with a link to Set up or Change. It's labelled as an
+     estimate and not tax advice, and never counts towards "N of 2
+     done".
 - The card counts "N of 2 done". When both are done it says "You're set
   up" with a Done button.
 - **Hide** or **Done** dismisses it for good, on every device, because
@@ -54,8 +58,9 @@ hard-coded `5` is wrong either way.
 **Out of scope:**
 - A multi-page onboarding wizard or tour.
 - A sample-data mode.
-- A tax set-aside step. Tax is optional and stays in Account, so taxes
-  aren't pushed on new drivers.
+- Counting taxes as a step, or nudging a percentage. The taxes row only
+  shows the setting and links to it; leaving it Off is a valid finished
+  state.
 - An in-app feedback form or storing feedback on the server.
 - Screenshots in feedback emails.
 - Changing any default setting value.
@@ -265,7 +270,8 @@ Pure helpers first, then wiring:
       {key: 'block', text: 'Add your first block', detail: 'Import a screenshot, add one by hand, or restore a backup in Account', done: hasBlocks, action: hasBlocks ? null : 'Add'},
       {key: 'goal', text: 'Set a weekly goal', detail: 'See your progress on Home each week', done: goalSet, action: goalSet ? null : 'Set goal'},
       {key: 'costs', text: 'Vehicle costs', detail: costMethod(settings) /* or 'Loading…' */, review: true, action: 'Change'},
-      {key: 'payouts', text: 'Payouts', detail: payouts(settings) /* or 'Loading…' */, review: true, action: 'Change'}
+      {key: 'payouts', text: 'Payouts', detail: payouts(settings) /* or 'Loading…' */, review: true, action: 'Change'},
+      {key: 'taxes', text: 'Taxes (optional)', detail: taxDetail(settings), review: true, action: taxOn ? 'Change' : 'Set up'}
     ],
     doneCount, total: 2, complete: doneCount === 2,
     progress: complete ? "You're set up" : `${doneCount} of 2 done`
@@ -275,6 +281,18 @@ Pure helpers first, then wiring:
   `goalSet` is `settings?.weeklyGoal != null || settings?.monthlyGoal != null`.
   A monthly goal counts as a goal. While `settings` is null, `goalSet` is
   false and the review rows say `Loading…`.
+
+  `taxOn` is `settings?.taxSetAsidePercent != null`. Pure helper
+  `taxDetail(settings)` returns:
+  - `'Loading…'` while `settings` is null;
+  - `'Off · an estimate to help you save, not tax advice'` when off;
+  - `` `${Number(settings.taxSetAsidePercent)}% set aside · estimate, not tax advice` ``
+    when on, for example `25% set aside · estimate, not tax advice`.
+
+  Keep `taxDetail` local to `setup.js` rather than reusing
+  `account-sections.js`'s `taxes()`. That one adds the reminder state and
+  leaves out the not-advice wording this row needs. The taxes row never
+  changes `doneCount`, `total` or `complete`.
 - **Wiring** (only when `#setupCard` exists):
   - If `localStorage['flexbuddy-setup-hidden'] === '1'` (read inside
     try/catch), remove the card and retry the dismiss POST quietly when
@@ -296,7 +314,9 @@ Pure helpers first, then wiring:
     - `block` calls `window.flexbuddyQuickActions.open()`;
     - `goal` goes to `/account#goals`;
     - `costs` goes to `/account#costs`;
-    - `payouts` goes to `/account#payouts-section`.
+    - `payouts` goes to `/account#payouts-section`;
+    - `taxes` goes to `/account#taxes`, which `sectionForHash` already
+      maps to the Taxes section.
 
     Those three hashes already open the right section through
     `sectionForHash`.
@@ -373,12 +393,17 @@ in `DATA_PATHS`. The dismiss POST isn't intercepted.
   - every action is at least 44px tall, and rows are at least 48px;
   - long details wrap (`overflow-wrap: anywhere`, `min-width: 0` on the
     text span), so nothing widens the page at 375px;
-  - the card adds about 260px above the week card for new drivers only.
+  - the card adds about 310px above the week card, for new drivers only.
 - **Dates:** the feedback date is the device's local date and never comes
   from `toISOString()`. The server stamps `setup_dismissed_at` with the
   `Clock` as an instant.
-- **Money and tax:** the costs row shows the existing rate text. It isn't
-  advice and adds no new figures.
+- **Money and tax:**
+  - The costs row shows the existing rate text.
+  - The taxes row shows only the driver's own percentage, or Off, with
+    "estimate, not tax advice" in its text.
+  - No percentage is suggested or pre-filled, and no new figures are
+    calculated.
+  - Leaving taxes Off never blocks "You're set up".
 - **The CI migration test:** with `plan/ci` shipped, V22 is picked up
   automatically. Add a V22 assertion (section 6).
 
@@ -415,6 +440,15 @@ in `DATA_PATHS`. The dismiss POST isn't intercepted.
     - the costs detail is `Standard mileage · $0.70/mi`;
     - the payouts detail is `Tue & Fri · paid 1 day after`.
   - `monthlyGoal: 1600` alone counts as goal set.
+  - The taxes row:
+    - With `taxSetAsidePercent: null`, its detail is
+      `Off · an estimate to help you save, not tax advice` and its action
+      is `Set up`.
+    - With `25`, its detail is
+      `25% set aside · estimate, not tax advice` and its action is
+      `Change`.
+    - In both cases `total` stays 2. With block and goal done and tax
+      Off, `complete` is true.
   - `ACTUAL_EXPENSES` shows `Actual expenses`.
 - **`src/test/js/feedback.test.js`**, new:
   - `feedbackMailto` starts with
@@ -444,9 +478,11 @@ Start with a fresh account and no blocks.
 1. Register a new account. Home shows **Get set up** above the week card,
    with:
    - `0 of 2 done`;
-   - four rows: Add your first block / Set a weekly goal / Vehicle costs
+   - five rows: Add your first block / Set a weekly goal / Vehicle costs
      `Standard mileage · $0.70/mi` (or the current default rate) /
-     Payouts `Tue & Fri · paid 1 day after`;
+     Payouts `Tue & Fri · paid 1 day after` / Taxes (optional)
+     `Off · an estimate to help you save, not tax advice` with
+     **Set up**;
    - Hide and Send feedback underneath.
 2. Click **Add**. The + menu opens. Add a block by hand with today's date,
    09:00–13:00, $80. Back on Home, the first row shows ✓ and the card says
@@ -454,43 +490,48 @@ Start with a fresh account and no blocks.
 3. Click **Set goal**. Account opens with Earnings & costs unfolded. Set a
    weekly goal of $400, then go back to Home. The card says
    `You're set up` and shows **Done** instead of Hide.
-4. Click **Done**. The card disappears and focus lands on the greeting.
+4. Before clicking Done, click **Set up** on the taxes row. Account opens
+   with Taxes unfolded. Set 25% and go back to Home. The row reads
+   `25% set aside · estimate, not tax advice` with **Change**, and the
+   count still says `You're set up`. (Leaving taxes Off also reaches
+   `You're set up`, as step 3 shows.)
+5. Click **Done**. The card disappears and focus lands on the greeting.
    Reload: it stays gone. Sign in on another browser: it's gone there
    too.
-5. An existing account that had blocks before the deploy never shows the
+6. An existing account that had blocks before the deploy never shows the
    card.
-6. Click **Send feedback** at the bottom of Home while on Reports
+7. Click **Send feedback** at the bottom of Home while on Reports
    (`?screen=reports`). The mail client opens a message to
    flexbuddysupport@gmail.com with:
    - subject `FlexBuddy feedback`;
    - a body ending with `App version: <the build id in the page's script URLs>`,
      `Screen: Reports`, `Device: Windows · browser` (or Mac) and
      `Date: <today>`.
-7. Account → Account & privacy shows "Questions or ideas? Send feedback …".
+8. Account → Account & privacy shows "Questions or ideas? Send feedback …".
    The link works the same way, with `Screen: Account`.
-8. Open `/does-not-exist`. On the 404 page, **Contact support** opens an
+9. Open `/does-not-exist`. On the 404 page, **Contact support** opens an
    email with the subject `FlexBuddy problem report`.
 
 ### Phone (375×667 and 430×932 in dev tools, then a real Android phone in the Play app)
 
-9. On a new account, the setup card fits with no horizontal scroll:
+10. On a new account, the setup card fits with no horizontal scroll:
    `document.documentElement.scrollWidth` equals `innerWidth` at both
    widths.
-10. Check sizes in dev tools:
+11. Check sizes in dev tools:
     - each row is at least 48px tall;
     - Add, Set goal and Change are at least 44px tall;
     - Hide and Send feedback are each at least 44px tall.
-11. At 375px, the payout detail wraps within the card rather than pushing
-    Change off-screen.
-12. In the Play app on Android, tap **Send feedback**. Gmail opens a
+12. At 375px, the payout and taxes details wrap within the card rather
+    than pushing Change or Set up off-screen.
+13. In the Play app on Android, tap **Send feedback**. Gmail opens a
     compose screen with the subject and body filled in, with
     `Device: Android · installed app`.
-13. Turn on airplane mode and tap **Hide**. The card disappears. Close and
+14. Turn on airplane mode and tap **Hide**. The card disappears. Close and
     reopen the app, still offline: the card stays hidden. Go back online
     and reopen: the card stays hidden, and on desktop, with the same
     account, it's gone too, which shows the queued dismiss reached the
     server.
-14. In light mode, the card's border and text are readable. Compare with
+15. In light mode, the card's border and text are readable. Compare with
     the Needs attention card.
 
 ## 8. Commit message
@@ -501,8 +542,9 @@ feat(home): add a setup card for new drivers and a feedback link
 A new account opened on an empty Home with nothing saying what to do
 first. New drivers now see a Get set up card at the top of Home: add
 a first block, set a weekly goal, and check the vehicle cost method
-and payout days that FlexBuddy assumes. The first two tick themselves
-off from real data, and the card counts them. Hide or Done dismisses
+and payout days that FlexBuddy assumes, and optionally turn on a tax
+set-aside, shown as an estimate and not advice. The first two tick
+themselves off from real data, and only they are counted. Hide or Done dismisses
 it on the server so it stays gone on every device, and a dismissal
 made offline is retried. Drivers who already logged blocks are marked
 as set up by the migration and never see it.
@@ -517,14 +559,11 @@ saves the device's zone on its own.
 
 ## 9. Open questions
 
-1. **Are the four rows right?** I left out time zone (it's already
-   automatic) and tax set-aside (it's optional). Say if you want
-   "Set aside for taxes (optional)" as a fifth review row.
-2. **Should feedback be its own commit?** The two are small and serve
-   the same goal, getting new testers going, so this plan ships them
-   together. If you'd rather keep strictly one feature per commit, I can
-   split out `plan/feedback-link`. The setup card would then lose its
-   Send feedback link until that ships.
+1. ~~Are the four rows right?~~ **Decided:** five rows. Taxes is an
+   optional review row, never counted, labelled as an estimate and not
+   advice.
+2. ~~Should feedback be its own commit?~~ **Decided:** bundled with the
+   setup card in one commit.
 3. **Placement of the Home feedback link:** it's at the very bottom of
    Home. A link in the header would be more visible but adds a third
    round button next to the theme toggle and account. I'd keep the header
