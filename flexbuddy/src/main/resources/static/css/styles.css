@@ -2548,3 +2548,8 @@ body.is-offline .action-sheet-offline { display: block; }
     .expense-stats .stat-card strong { margin: 6px 0 2px; font-size: 18px; overflow-wrap: anywhere; }
     .expense-stats .stat-card span, .expense-stats .stat-card small { font-size: 11px; }
 }
+
+/* Forgotten password */
+.forgot-link { min-height: 44px; justify-self: end; display: inline-flex; align-items: center; }
+.auth-notice .text-link { display: inline; min-height: 0; text-decoration: underline; }
+a.auth-submit { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }

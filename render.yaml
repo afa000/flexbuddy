@@ -26,6 +26,16 @@ services:
           property: password
       - key: FLEXBUDDY_REMEMBER_ME_KEY
         generateValue: true
+      # Password-reset email goes out through Gmail's SMTP server. The two secrets are asked for in Render's dashboard
+      # and never stored in this file.
+      - key: FLEXBUDDY_MAIL_HOST
+        value: smtp.gmail.com
+      - key: FLEXBUDDY_MAIL_PORT
+        value: "587"
+      - key: FLEXBUDDY_MAIL_USERNAME
+        sync: false
+      - key: FLEXBUDDY_MAIL_PASSWORD
+        sync: false
 
 databases:
   - name: flexbuddy-postgres

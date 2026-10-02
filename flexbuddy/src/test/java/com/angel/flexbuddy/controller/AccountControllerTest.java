@@ -136,6 +136,22 @@ class AccountControllerTest {
     }
 
     @Test
+    void theSignInPageOffersAPasswordResetAndConfirmsOne() throws Exception {
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/forgot-password\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Forgot password?")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("Your password was changed"))));
+
+        mockMvc.perform(get("/login").param("reset", ""))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "Your password was changed. Sign in with your new password.")));
+        mockMvc.perform(get("/login").param("locked", ""))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("reset your password")));
+    }
+
+    @Test
     void registerShowsTheLimitMessageWhenLocked() throws Exception {
         when(attemptLimiter.isLocked(eq("register-ip"), any())).thenReturn(true);
 

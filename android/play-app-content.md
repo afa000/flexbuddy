@@ -105,7 +105,7 @@ another purpose is listed.
 | Play category | Data type | Ephemeral? | Required or optional | Purposes | What it is |
 |---|---|---|---|---|---|
 | Personal info | Name | No | Required | App functionality, Account management | Display name entered at registration |
-| Personal info | Email address | No | Required | App functionality, Account management | Sign-in email |
+| Personal info | Email address | No | Required | App functionality, Account management | Sign-in email; also where a password-reset link is sent (through Gmail's mail service) |
 | Financial info | Other financial info | No | Required | App functionality | Base pay, tips, cancellation pay, expense amounts, mileage rate, and vehicle-cost settings |
 | Photos and videos | Photos | **Yes** | Optional | App functionality | Screenshots uploaded for shift import; processed in memory and discarded |
 | Files and docs | Files and docs | No | Optional | App functionality | Backup files uploaded for restore; held in the server session for up to 15 minutes before import |

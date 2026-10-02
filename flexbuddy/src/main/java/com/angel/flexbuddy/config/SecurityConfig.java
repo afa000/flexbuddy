@@ -95,6 +95,8 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/login",
                                 "/register",
+                                "/forgot-password",
+                                "/reset-password",
                                 "/privacy",
                                 "/terms",
                                 "/delete-account",

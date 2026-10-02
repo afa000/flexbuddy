@@ -12,6 +12,7 @@ import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
+import com.angel.flexbuddy.repository.PasswordResetTokenRepository;
 import com.angel.flexbuddy.repository.PushSubscriptionRepository;
 import com.angel.flexbuddy.repository.ReminderLogRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -31,6 +32,7 @@ public class AccountService {
     private final com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository;
     private final com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
     private final com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
@@ -38,7 +40,8 @@ public class AccountService {
             PersistentTokenRepository persistentTokenRepository, TaxPaymentRepository taxPaymentRepository,
             com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
             com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository,
-            com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository) {
+            com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository,
+            PasswordResetTokenRepository passwordResetTokenRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -50,6 +53,7 @@ public class AccountService {
         this.payoutDepositRepository = payoutDepositRepository;
         this.standingEntryRepository = standingEntryRepository;
         this.taxReminderLogRepository = taxReminderLogRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
     public boolean emailIsRegistered(String email) {
@@ -85,6 +89,7 @@ public class AccountService {
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);
         persistentTokenRepository.removeUserTokens(user.getEmail());
+        passwordResetTokenRepository.deleteAllByOwnerId(ownerId);
         userRepository.deleteAccountById(ownerId);
     }
 }

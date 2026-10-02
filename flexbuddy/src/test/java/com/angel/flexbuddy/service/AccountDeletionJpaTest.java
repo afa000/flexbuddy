@@ -71,6 +71,9 @@ class AccountDeletionJpaTest {
     private com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
 
     @Autowired
+    private com.angel.flexbuddy.repository.PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -121,6 +124,12 @@ class AccountDeletionJpaTest {
         standingEntryRepository.save(standing);
         taxReminderLogRepository.save(new com.angel.flexbuddy.model.TaxReminderLog(owner.getId(),
                 LocalDate.of(2026, 9, 15), com.angel.flexbuddy.model.TaxReminderKind.WEEK_BEFORE, NOW));
+        com.angel.flexbuddy.model.PasswordResetToken resetLink = new com.angel.flexbuddy.model.PasswordResetToken();
+        resetLink.setOwner(owner);
+        resetLink.setTokenHash("a".repeat(64));
+        resetLink.setCreatedAt(NOW);
+        resetLink.setExpiresAt(NOW.plusSeconds(1800));
+        passwordResetTokenRepository.save(resetLink);
         entityManager.flush();
         when(passwordEncoder.matches("correct-password", "stored-hash")).thenReturn(true);
 
@@ -134,6 +143,7 @@ class AccountDeletionJpaTest {
         assertThat(rowCount("reminder_log")).isZero();
         assertThat(rowCount("standing_entry")).isZero();
         assertThat(rowCount("tax_reminder_log")).isZero();
+        assertThat(rowCount("password_reset_token")).isZero();
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
     }
 

@@ -49,9 +49,12 @@
         <div class="notice error-notice auth-notice" th:if="${param.error}">
             The email or password was incorrect.
         </div>
-        <div class="notice error-notice auth-notice" th:if="${param.locked}" role="alert"
-             th:text="'Too many sign-in attempts. Wait ' + ${lockMinutes} + ' minutes, then try again.'">
-            Too many sign-in attempts. Wait 15 minutes, then try again.
+        <div class="notice error-notice auth-notice" th:if="${param.locked}" role="alert">
+            Too many sign-in attempts. Wait <span th:text="${lockMinutes}">15</span> minutes, or
+            <a class="text-link" href="/forgot-password">reset your password</a>.
+        </div>
+        <div class="notice success-notice" th:if="${param.reset}">
+            Your password was changed. Sign in with your new password.
         </div>
         <div class="notice error-notice auth-notice" th:if="${param.expired}">
             Your session expired. Sign in again.
@@ -75,6 +78,7 @@
                 <span>Password</span>
                 <input name="password" type="password" autocomplete="current-password" required>
             </label>
+            <a class="text-link forgot-link" href="/forgot-password">Forgot password?</a>
             <label class="remember-me-row">
                 <input id="rememberMe" name="remember-me" type="checkbox">
                 <span><strong>Keep me signed in</strong><small>Stay signed in on this device for 30 days.</small></span>
