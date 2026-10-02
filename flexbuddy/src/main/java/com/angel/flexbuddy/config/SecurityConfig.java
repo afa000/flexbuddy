@@ -6,6 +6,7 @@ import javax.sql.DataSource;
 
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -15,15 +16,21 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
 
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.AttemptLimiter;
+import com.angel.flexbuddy.security.LockAwareFailureHandler;
+import com.angel.flexbuddy.security.LoginAttemptFilter;
+import com.angel.flexbuddy.security.SecurityLimitsProperties;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(SecurityLimitsProperties.class)
 public class SecurityConfig {
 
     public static final String REMEMBER_ME_COOKIE = "FLEXBUDDY_REMEMBER_ME";
@@ -79,7 +86,10 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
-            PersistentTokenBasedRememberMeServices rememberMeServices) throws Exception {
+            PersistentTokenBasedRememberMeServices rememberMeServices,
+            ObjectProvider<AttemptLimiter> limiterProvider) throws Exception {
+        // The limiter is always there in the running app; slice tests that do not load it simply sign in without limits.
+        AttemptLimiter limiter = limiterProvider.getIfAvailable();
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
@@ -102,11 +112,14 @@ public class SecurityConfig {
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .defaultSuccessUrl("/", true)
-                        .permitAll()
-                )
+                .formLogin(form -> {
+                    form.loginPage("/login")
+                            .defaultSuccessUrl("/", true)
+                            .permitAll();
+                    if (limiter != null) {
+                        form.failureHandler(new LockAwareFailureHandler(limiter));
+                    }
+                })
                 // Shares arrive from another app without a token; the endpoint only redirects.
                 .csrf(csrf -> csrf.ignoringRequestMatchers("/share-import"))
                 .rememberMe(remember -> remember
@@ -115,6 +128,9 @@ public class SecurityConfig {
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                 );
+        if (limiter != null) {
+            http.addFilterBefore(new LoginAttemptFilter(limiter), UsernamePasswordAuthenticationFilter.class);
+        }
 
         return http.build();
     }

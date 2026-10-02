@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.AttemptLimiter;
 
 @SpringBootTest(properties = "flexbuddy.security.remember-me-key=integration-test-key")
 @AutoConfigureMockMvc
@@ -47,8 +48,13 @@ class PersistentSignInIntegrationTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private AttemptLimiter attemptLimiter;
+
     @BeforeEach
     void setUp() {
+        // The counts are in memory and shared by every test in this Spring context, so one test's failures must not lock another.
+        attemptLimiter.clearAll();
         jdbcTemplate.execute("drop table if exists persistent_logins");
         jdbcTemplate.execute("""
                 create table persistent_logins (

@@ -49,6 +49,10 @@
         <div class="notice error-notice auth-notice" th:if="${param.error}">
             The email or password was incorrect.
         </div>
+        <div class="notice error-notice auth-notice" th:if="${param.locked}" role="alert"
+             th:text="'Too many sign-in attempts. Wait ' + ${lockMinutes} + ' minutes, then try again.'">
+            Too many sign-in attempts. Wait 15 minutes, then try again.
+        </div>
         <div class="notice error-notice auth-notice" th:if="${param.expired}">
             Your session expired. Sign in again.
         </div>

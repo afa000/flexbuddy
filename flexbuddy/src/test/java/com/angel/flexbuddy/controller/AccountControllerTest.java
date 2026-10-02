@@ -2,6 +2,7 @@ package com.angel.flexbuddy.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -32,6 +33,7 @@ import com.angel.flexbuddy.dto.RegistrationRequest;
 import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.AttemptLimiter;
 import com.angel.flexbuddy.service.AccountService;
 import com.angel.flexbuddy.service.AccountBackupService;
 import com.angel.flexbuddy.service.AccountRestoreService;
@@ -69,6 +71,10 @@ class AccountControllerTest {
 
     @MockitoBean
     private AppUserRepository userRepository;
+
+    // Not locked unless a test says so: a mock answers false.
+    @MockitoBean
+    private AttemptLimiter attemptLimiter;
 
     @Test
     void loginAndRegistrationPagesArePublic() throws Exception {
@@ -127,6 +133,37 @@ class AccountControllerTest {
                 .andExpect(redirectedUrl("/login?registered"));
 
         verify(accountService).register(any(RegistrationRequest.class));
+    }
+
+    @Test
+    void registerShowsTheLimitMessageWhenLocked() throws Exception {
+        when(attemptLimiter.isLocked(eq("register-ip"), any())).thenReturn(true);
+
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("displayName", "Angel")
+                        .param("email", "angel@example.com")
+                        .param("password", "password123"))
+                .andExpect(status().isTooManyRequests())
+                .andExpect(view().name("register"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "Too many sign-ups from this connection. Try again in an hour.")));
+
+        verify(accountService, never()).register(any(RegistrationRequest.class));
+        verify(attemptLimiter, never()).record(eq("register-ip"), any());
+    }
+
+    @Test
+    void registerCountsEveryAttemptFromAConnection() throws Exception {
+        mockMvc.perform(post("/register")
+                        .with(csrf())
+                        .param("displayName", "")
+                        .param("email", "not-an-email")
+                        .param("password", "short"))
+                .andExpect(status().isOk());
+
+        // Even a form that fails validation counts, so it cannot be used to test emails quickly.
+        verify(attemptLimiter).record(eq("register-ip"), any());
     }
 
     @Test

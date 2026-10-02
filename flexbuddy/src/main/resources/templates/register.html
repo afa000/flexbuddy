@@ -36,6 +36,9 @@
         <p class="auth-copy">Your shifts and statistics will belong only to your account.</p>
 
         <form class="auth-form" th:action="@{/register}" th:object="${registration}" method="post">
+            <div class="notice error-notice auth-notice" role="alert" th:if="${#fields.hasGlobalErrors()}">
+                <span th:each="message : ${#fields.globalErrors()}" th:text="${message}"></span>
+            </div>
             <label class="field">
                 <span>Name</span>
                 <input th:field="*{displayName}" type="text" autocomplete="name" maxlength="80" required autofocus>

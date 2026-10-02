@@ -41,6 +41,7 @@ import com.angel.flexbuddy.dto.ReminderSettingsRequest;
 import com.angel.flexbuddy.dto.TimeZoneRequest;
 import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.AttemptLimiter;
 import tools.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -60,11 +61,12 @@ public class AccountController {
     private final Clock clock;
     private final AccountSettingsService settingsService;
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
+    private final AttemptLimiter attemptLimiter;
 
     public AccountController(AccountService accountService, AccountBackupService backupService,
             AccountRestoreService restoreService, AppUserRepository userRepository, ObjectMapper objectMapper,
             Clock clock, AccountSettingsService settingsService,
-            PersistentTokenBasedRememberMeServices rememberMeServices) {
+            PersistentTokenBasedRememberMeServices rememberMeServices, AttemptLimiter attemptLimiter) {
         this.accountService = accountService;
         this.backupService = backupService;
         this.restoreService = restoreService;
@@ -73,10 +75,12 @@ public class AccountController {
         this.clock = clock;
         this.settingsService = settingsService;
         this.rememberMeServices = rememberMeServices;
+        this.attemptLimiter = attemptLimiter;
     }
 
     @GetMapping("/login")
-    public String loginPage() {
+    public String loginPage(Model model) {
+        model.addAttribute("lockMinutes", attemptLimiter.lockMinutes(AttemptLimiter.LOGIN_EMAIL));
         return "login";
     }
 
@@ -89,8 +93,19 @@ public class AccountController {
     @PostMapping("/register")
     public String register(
             @Valid @ModelAttribute("registration") RegistrationRequest registration,
-            BindingResult bindingResult
+            BindingResult bindingResult,
+            HttpServletRequest request,
+            HttpServletResponse response
     ) {
+        String address = request.getRemoteAddr();
+        if (attemptLimiter.isLocked(AttemptLimiter.REGISTER_IP, address)) {
+            bindingResult.reject("register.limit", "Too many sign-ups from this connection. Try again in an hour.");
+            response.setStatus(429);
+            return "register";
+        }
+        // Every attempt counts, even one that fails validation, so the form cannot be used to test emails quickly.
+        attemptLimiter.record(AttemptLimiter.REGISTER_IP, address);
+
         if (accountService.emailIsRegistered(registration.getEmail())) {
             bindingResult.rejectValue("email", "email.registered", "An account already uses this email.");
         }
