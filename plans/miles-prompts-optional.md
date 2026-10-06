@@ -332,9 +332,7 @@ choice and is unchanged.
 
 ## 9. Open questions
 
-1. **Default for new accounts:** on. A new driver probably benefits from
-   the nudge, and can stop it with one tap. Say if you'd rather new
-   accounts start with it off.
+1. ~~Default for new accounts?~~ **Decided:** on, as planned.
 2. **The confirm prompts:** you only asked about miles. The Needs
    attention card's "N blocks to confirm" row and the Schedule's confirm
    strip stay as they are. The same setting pattern could cover them
