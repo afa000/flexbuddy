@@ -1047,7 +1047,7 @@ h1 {
 
 .preview-form {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     gap: 17px;
 }
 
@@ -1055,6 +1055,10 @@ h1 {
     display: grid;
     gap: 7px;
 }
+
+/* A grid item grows to fit its content by default, which let a wide date box widen the whole column. */
+.field,
+.filter-field { min-width: 0; }
 
 .field-wide {
     grid-column: 1 / -1;
@@ -1105,6 +1109,28 @@ h1 {
 .field select:focus {
     border-color: var(--cyan);
     box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* iOS draws date and time inputs as native controls with their own minimum width and centred text; these
+   rules make them size and align like every other input while still opening the native picker on tap. */
+.field input[type="date"],
+.field input[type="time"],
+.filter-field input[type="date"],
+.filter-field input[type="time"] {
+    min-width: 0;
+    max-width: 100%;
+    display: block;
+    -webkit-appearance: none;
+    appearance: none;
+    text-align: left;
+}
+
+.field input[type="date"]::-webkit-date-and-time-value,
+.field input[type="time"]::-webkit-date-and-time-value,
+.filter-field input[type="date"]::-webkit-date-and-time-value,
+.filter-field input[type="time"]::-webkit-date-and-time-value {
+    margin: 0;
+    text-align: left;
 }
 
 .input-with-prefix {
@@ -1620,7 +1646,7 @@ h1 {
     }
 
     .preview-form {
-        grid-template-columns: 1fr;
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .field-wide,

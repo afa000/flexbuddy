@@ -38,4 +38,16 @@ class StaticAssetsTest {
         }
         assertThat(missing).as("scripts a page loads that sw.js VERSIONED_ASSETS does not list").isEmpty();
     }
+
+    @Test
+    void dateAndTimeInputsAreNormalisedForIos() throws Exception {
+        String css = new ClassPathResource("static/css/styles.css").getContentAsString(StandardCharsets.UTF_8);
+        String why = "iOS draws date and time inputs wider than their column without these rules";
+
+        assertThat(css).as(why).contains("input[type=\"date\"]::-webkit-date-and-time-value");
+        Matcher block = Pattern.compile("\\.field input\\[type=\"date\"\\][^{]*\\{[^}]*}").matcher(css);
+        assertThat(block.find()).as(why).isTrue();
+        assertThat(block.group()).as(why).contains("-webkit-appearance: none");
+        assertThat(css).as(why).containsPattern("\\.preview-form \\{[^}]*minmax\\(0, 1fr\\)");
+    }
 }
