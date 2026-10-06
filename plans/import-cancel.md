@@ -300,15 +300,9 @@ saying so.
 
 ## 9. Open questions
 
-1. **Pick in the gallery before leaving it.** iOS shows a selection
-   screen with an **Add** button, instead of closing on the first tap,
-   when the input allows several files (`multiple`). That would let a
-   driver change their mind *inside* the gallery. The cost: every import
-   needs one more tap, and drivers could select two photos, of which
-   only the first would be read. I recommend the button in this plan
-   first. Say if you'd also like `multiple` with first-photo-only
-   handling.
-
+1. ~~Pick in the gallery before leaving it (`multiple`)?~~ **Decided:**
+   no. The Choose a different screenshot button is enough, and the input
+   stays single-file.
 2. **iOS swipe-back between screens.** FlexBuddy switches screens with
    `history.replaceState`, so swiping back from the right edge on an
    iPhone never returns to Home. Changing that to `pushState` affects
