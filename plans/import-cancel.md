@@ -1,4 +1,4 @@
-# Plan: let drivers cancel a screenshot import and pick another
+# Plan: let drivers go back to the photo gallery and pick another screenshot
 
 Planned against `origin/main` at 6e56508. This is independent of
 `plan/import-memory-limits`, but ship that one first: it stops the long
@@ -6,8 +6,19 @@ hangs that make this bug hurt most.
 
 ## What goes wrong today
 
-On iPhone, picking the wrong photo leaves the driver stuck on the Import
-screen. In the code:
+**As reported:** on iPhone, after tapping a photo, there's no way back to
+the gallery to pick a different one.
+
+Two things combine to cause this.
+
+**iOS commits on the first tap.** For a single-file
+`<input type="file">` (`#screenshotInput`, `shifts.html` line 419), the
+iOS photo picker has no "Done" step. Tapping a photo selects it, closes
+the gallery and fires `change` immediately. A mis-tap is final as far as
+iOS is concerned. The website can't change that behaviour; it can only
+offer an easy way to reopen the gallery.
+
+**FlexBuddy then offers no way to reopen it.** In the code:
 
 - Choosing a file calls `processScreenshot(file)` (`app.js` line 513).
   It hides the drop zone, shows the file card, and calls
@@ -24,6 +35,9 @@ screen. In the code:
   no back button. The app uses `history.replaceState` for its screens, so
   swiping back doesn't help either. The driver has to wait it out or
   close the app.
+- Even after the read finishes, getting back to the gallery takes two
+  steps: tap the small X, which brings back the drop zone, then tap the
+  drop zone. Nothing on the screen says "pick another photo".
 - The X is only an icon. The app-wide tap-target rule (`styles.css`
   line 2106) makes it 44px, but the file card gives it a 36px column, so
   it overflows and is easy to miss next to the thumbnail.
@@ -31,10 +45,14 @@ screen. In the code:
 ## 1. Goal and out-of-scope
 
 **Goal:**
-- While a screenshot is being read, the driver can tap **Cancel**
-  (always enabled) to stop and return to the drop zone straight away.
-- Once a screenshot is chosen, a visible **Choose a different screenshot**
-  button resets the screen and opens the photo picker in one tap.
+- **The main fix:** as soon as a photo is chosen, a full-width **Choose a
+  different screenshot** button appears under it. One tap stops any read
+  in progress, clears the chosen photo, and **reopens the gallery**. It
+  works while the screenshot is being read, after a preview appears, and
+  after an error.
+- While a screenshot is being read, the driver can also tap **Cancel**,
+  which is always enabled, to stop and return to the drop zone without
+  opening the gallery.
 - An upload that takes longer than 60 s stops on its own with a clear
   message.
 - A cancelled or timed-out response that arrives late never fills in the
@@ -247,27 +265,34 @@ works.
    - "Choose a different screenshot" spans the panel and is at least 44px
      tall;
    - Cancel is at least 44×44.
-8. **The reported bug, on the iPhone:** pick a wrong photo from the camera
-   roll. Tap **Cancel**, or **Choose a different screenshot**, while it
-   reads. You're back at the drop zone, or in the photo picker, within a
-   second.
-9. On Android in the Play app, steps 8 and 3 behave the same. The system
+8. **The reported bug, on the iPhone:** Import → tap the drop zone → tap
+   the wrong photo. The gallery closes and the read starts. Under the
+   thumbnail, tap **Choose a different screenshot**. The gallery opens
+   again straight away: no extra tap, and no waiting for the read to
+   finish. Pick the right photo: only its details appear in the form. Do
+   this both in Safari and from the Home Screen app.
+9. Repeat step 8, but wait for the wrong photo's preview to appear first,
+   then tap **Choose a different screenshot**. The gallery opens the same
+   way, and the old preview is cleared.
+10. On Android in the Play app, steps 8 and 3 behave the same. The system
    back button still leaves the Import screen as before.
 
 ## 8. Commit message
 
 ```
-fix(import): let drivers cancel a screenshot read and choose another
+fix(import): let drivers reopen the gallery after a wrong photo
 
-Picking the wrong photo on an iPhone left the driver stuck: the
-remove button was disabled for as long as the server took to read
-the image, Start over only appears once a preview exists, and iOS
-has no back button to leave the screen. A slow read or a large photo
-could keep the spinner going for over a minute.
+On an iPhone the photo picker closes as soon as a photo is tapped,
+so a mis-tap could not be undone there, and FlexBuddy gave no way
+back to the gallery: the remove button was disabled for as long as
+the server took to read the image, Start over only appears once a
+preview exists, and a slow read could keep the spinner going for
+over a minute.
 
-The remove button now stays enabled, the reading row has a Cancel
-button, and a Choose a different screenshot button resets the screen
-and opens the photo picker in the same tap. Each upload can be
+A Choose a different screenshot button now appears as soon as a
+photo is picked. It stops any read in progress and reopens the
+gallery in the same tap. The remove button stays enabled and the
+reading row has a Cancel button. Each upload can be
 aborted, a response that arrives after a cancel or a newer pick is
 ignored, and a read that takes over a minute stops with a message
 saying so.
@@ -275,11 +300,20 @@ saying so.
 
 ## 9. Open questions
 
-1. **iOS swipe-back between screens.** FlexBuddy switches screens with
+1. **Pick in the gallery before leaving it.** iOS shows a selection
+   screen with an **Add** button, instead of closing on the first tap,
+   when the input allows several files (`multiple`). That would let a
+   driver change their mind *inside* the gallery. The cost: every import
+   needs one more tap, and drivers could select two photos, of which
+   only the first would be read. I recommend the button in this plan
+   first. Say if you'd also like `multiple` with first-photo-only
+   handling.
+
+2. **iOS swipe-back between screens.** FlexBuddy switches screens with
    `history.replaceState`, so swiping back from the right edge on an
    iPhone never returns to Home. Changing that to `pushState` affects
    every screen and the Android back button, so it should be its own
    plan. Do you want it?
-2. **Timeout length.** 60 s is generous for Render's single CPU after
+3. **Timeout length.** 60 s is generous for Render's single CPU after
    `plan/import-memory-limits`, where a read usually takes 3–10 s. Say if
    you'd prefer 30 s.
