@@ -303,9 +303,6 @@ saying so.
 1. ~~Pick in the gallery before leaving it (`multiple`)?~~ **Decided:**
    no. The Choose a different screenshot button is enough, and the input
    stays single-file.
-2. **iOS swipe-back between screens.** FlexBuddy switches screens with
-   `history.replaceState`, so swiping back from the right edge on an
-   iPhone never returns to Home. Changing that to `pushState` affects
-   every screen and the Android back button, so it should be its own
-   plan. Do you want it?
+2. ~~iOS swipe-back between screens?~~ **Decided:** skipped for now. No
+   swipe-back plan; screens keep using `history.replaceState`.
 3. ~~Timeout length?~~ **Decided:** 60 s.
