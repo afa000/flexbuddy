@@ -23,6 +23,9 @@ const elements = {
     fileSize: document.querySelector('#fileSize'),
     processingRow: document.querySelector('#processingRow'),
     removeFileButton: document.querySelector('#removeFileButton'),
+    fileActions: document.querySelector('#fileActions'),
+    chooseAgainButton: document.querySelector('#chooseAgainButton'),
+    cancelImportButton: document.querySelector('#cancelImportButton'),
     uploadError: document.querySelector('#uploadError'),
     ocrDetails: document.querySelector('#ocrDetails'),
     rawText: document.querySelector('#rawText'),
@@ -175,6 +178,10 @@ const elements = {
 };
 
 let selectedFileUrl;
+// The read in flight: aborting it, or replacing it with a newer pick, makes its late answer harmless.
+let importAbort;
+let importTimer;
+const IMPORT_TIMEOUT_MS = 60000;
 let editingShiftId;
 let editSnapshot;
 let pendingConfirmAction;
@@ -252,6 +259,12 @@ elements.screenshotInput.addEventListener('change', event => {
     if (file) processScreenshot(file);
 });
 elements.removeFileButton.addEventListener('click', resetImport);
+elements.cancelImportButton.addEventListener('click', resetImport);
+elements.chooseAgainButton.addEventListener('click', () => {
+    resetImport();
+    // iOS only opens the picker from inside the tap itself, so nothing may be awaited before this.
+    openFilePicker();
+});
 elements.resetButton.addEventListener('click', resetImport);
 elements.previewForm.addEventListener('submit', saveShift);
 elements.refreshButton.addEventListener('click', loadDashboard);
@@ -523,17 +536,27 @@ async function processScreenshot(file) {
         return;
     }
 
+    cancelImportRequest();
     showSelectedFile(file);
     setProcessing(true);
 
     const formData = new FormData();
     formData.append('screenshot', file);
 
+    const abort = new AbortController();
+    importAbort = abort;
+    let timedOut = false;
+    importTimer = setTimeout(() => {
+        timedOut = true;
+        abort.abort();
+    }, IMPORT_TIMEOUT_MS);
+
     try {
         const response = await apiFetch('/shifts/import-preview', {
             method: 'POST',
             headers: csrfHeaders(),
-            body: formData
+            body: formData,
+            signal: abort.signal
         });
 
         if (!response.ok) {
@@ -541,14 +564,31 @@ async function processScreenshot(file) {
         }
 
         const preview = await response.json();
+        if (importAbort !== abort) return;
         populatePreview(preview);
     } catch (error) {
-        showMessage(elements.uploadError, error.message || 'The screenshot could not be processed.');
+        // A cancel or a newer pick already reset the screen, and this answer must not touch it.
+        if (importAbort !== abort && !timedOut) return;
+        if (error.name === 'AbortError' && !timedOut) return;
+        showMessage(elements.uploadError, timedOut
+            ? 'Reading this screenshot took too long. Try again, or choose a different screenshot.'
+            : error.message || 'The screenshot could not be processed.');
         elements.emptyPreview.classList.remove('is-hidden');
         elements.previewForm.classList.add('is-hidden');
     } finally {
-        setProcessing(false);
+        if (importAbort === abort) {
+            clearTimeout(importTimer);
+            importAbort = undefined;
+            setProcessing(false);
+        }
     }
+}
+
+function cancelImportRequest() {
+    clearTimeout(importTimer);
+    const abort = importAbort;
+    importAbort = undefined;
+    abort?.abort();
 }
 
 function showSelectedFile(file) {
@@ -559,6 +599,7 @@ function showSelectedFile(file) {
     elements.fileSize.textContent = formatFileSize(file.size);
     elements.dropZone.classList.add('is-hidden');
     elements.fileCard.classList.remove('is-hidden');
+    elements.fileActions.classList.remove('is-hidden');
 }
 
 function populatePreview(preview) {
@@ -1604,6 +1645,8 @@ function trapFocus(container, event) {
 }
 
 function resetImport() {
+    cancelImportRequest();
+    setProcessing(false);
     if (selectedFileUrl) {
         URL.revokeObjectURL(selectedFileUrl);
         selectedFileUrl = undefined;
@@ -1611,6 +1654,7 @@ function resetImport() {
     elements.screenshotInput.value = '';
     elements.previewForm.reset();
     elements.fileCard.classList.add('is-hidden');
+    elements.fileActions.classList.add('is-hidden');
     elements.dropZone.classList.remove('is-hidden');
     elements.previewForm.classList.add('is-hidden');
     elements.emptyPreview.classList.remove('is-hidden');
@@ -1637,7 +1681,6 @@ function resetImport() {
 
 function setProcessing(processing) {
     elements.processingRow.classList.toggle('is-hidden', !processing);
-    elements.removeFileButton.disabled = processing;
 }
 
 function setSaving(saving) {

@@ -221,6 +221,16 @@ class PageControllerTest {
     }
 
     @Test
+    void importScreenOffersCancelAndChooseAgain() throws Exception {
+        String page = pageFor(new AppUser("Angel", "angel@example.com", "hash"), 3);
+
+        assertThat(page).containsPattern("(?s)id=\"processingRow\".*?id=\"cancelImportButton\"");
+        assertThat(page).containsPattern("id=\"chooseAgainButton\"[^>]*>Choose a different screenshot<");
+        // The remove button used to be disabled for as long as the server took to read the image.
+        assertThat(page).doesNotContainPattern("id=\"removeFileButton\"[^>]*disabled");
+    }
+
+    @Test
     void headerHasHomeLogoAndAccountButtonButNoSignOut() throws Exception {
         AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
         angel.setId(42L);
