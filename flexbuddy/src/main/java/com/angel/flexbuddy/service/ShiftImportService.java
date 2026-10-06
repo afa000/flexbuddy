@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.List;
 
 import javax.imageio.ImageIO;
+import javax.imageio.ImageReadParam;
 import javax.imageio.ImageReader;
 import javax.imageio.stream.ImageInputStream;
 
@@ -28,6 +29,8 @@ import com.angel.flexbuddy.model.ShiftStatus;
 public class ShiftImportService {
 
     private static final int MAX_SIDE = 12_000;
+    /** Bigger images are decoded at a reduced size; Render's small instance cannot hold a camera photo at full size. */
+    static final long DECODE_MAX_PIXELS = 5_000_000;
 
     private final ScreenshotTextExtractor textExtractor;
     private final ShiftScreenshotParser screenshotParser;
@@ -154,6 +157,13 @@ public class ShiftImportService {
         return future ? ShiftStatus.SCHEDULED : ShiftStatus.COMPLETED;
     }
 
+    /** The smallest whole-number step that brings the image to at most DECODE_MAX_PIXELS. */
+    static int subsampleFactor(int width, int height) {
+        long pixels = (long) width * height;
+        if (pixels <= DECODE_MAX_PIXELS) return 1;
+        return (int) Math.ceil(Math.sqrt((double) pixels / DECODE_MAX_PIXELS));
+    }
+
     private BufferedImage readWithinLimits(ImageReader reader) throws IOException {
         int width = reader.getWidth(0);
         int height = reader.getHeight(0);
@@ -171,7 +181,11 @@ public class ShiftImportService {
             );
         }
 
-        BufferedImage image = reader.read(0);
+        // Photos over the decode limit are subsampled inside the decoder, so the full-size picture is never in memory.
+        ImageReadParam param = reader.getDefaultReadParam();
+        int factor = subsampleFactor(width, height);
+        if (factor > 1) param.setSourceSubsampling(factor, factor, 0, 0);
+        BufferedImage image = reader.read(0, param);
 
         if (image == null) {
             throw new InvalidScreenshotException(

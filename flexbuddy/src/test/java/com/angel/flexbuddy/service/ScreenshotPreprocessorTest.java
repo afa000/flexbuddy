@@ -23,6 +23,24 @@ class ScreenshotPreprocessorTest {
     }
 
     @Test
+    void upscale_neverReturnsMoreThanFiveMegapixels() {
+        // A long scrolling screenshot would otherwise be tripled to 1755 x 15000.
+        BufferedImage strip = new BufferedImage(585, 5000, BufferedImage.TYPE_BYTE_GRAY);
+
+        BufferedImage result = preprocessor.upscale(strip);
+
+        assertThat((long) result.getWidth() * result.getHeight()).isLessThanOrEqualTo(5_000_000L);
+        assertThat(result.getHeight()).isGreaterThan(5000);
+    }
+
+    @Test
+    void upscale_returnsTheSameImageWhenNoScalingIsNeeded() {
+        BufferedImage source = solidImage(1300, 2600, Color.WHITE);
+
+        assertThat(preprocessor.upscale(source)).isSameAs(source);
+    }
+
+    @Test
     void invertIfDark_turnsDarkBackgroundIntoLightBackground() {
         BufferedImage dark = solidImage(20, 20, new Color(20, 20, 20));
         BufferedImage grayscale = preprocessor.grayscale(dark);

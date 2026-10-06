@@ -437,6 +437,30 @@ class ShiftControllerTest {
     }
 
     @Test
+    void aBusyScreenshotReaderAnswers503WithItsMessageAndLogsNoError() throws Exception {
+        ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
+                .getLogger("com.angel.flexbuddy.exception.GlobalExceptionHandler");
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs = new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        logger.addAppender(logs);
+        try {
+            when(shiftImportService.createPreview(any(), any())).thenThrow(
+                    new com.angel.flexbuddy.exception.ScreenshotBusyException("Another screenshot is being read. Try again in a moment."));
+
+            mockMvc.perform(multipart("/shifts/import-preview")
+                            .file(new org.springframework.mock.web.MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1, 2, 3}))
+                            .with(user("angel@example.com"))
+                            .with(csrf()))
+                    .andExpect(status().isServiceUnavailable())
+                    .andExpect(content().string("Another screenshot is being read. Try again in a moment."));
+
+            org.assertj.core.api.Assertions.assertThat(logs.list).isEmpty();
+        } finally {
+            logger.detachAppender(logs);
+        }
+    }
+
+    @Test
     void importPreview_returnsBadRequestForInvalidScreenshot() throws Exception {
         MockMultipartFile screenshot = new MockMultipartFile(
                 "screenshot",

@@ -8,10 +8,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.TimeUnit;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import com.angel.flexbuddy.exception.ScreenshotBusyException;
 import com.angel.flexbuddy.exception.ScreenshotOcrException;
 
 import net.sourceforge.tess4j.Tesseract;
@@ -23,14 +28,43 @@ public class TesseractScreenshotTextExtractor implements ScreenshotTextExtractor
 
     private final Path tessdataDirectory;
     private final ScreenshotPreprocessor preprocessor;
+    private final Semaphore ocrPermit = new Semaphore(1, true);
+    private final Duration ocrWait;
 
-    public TesseractScreenshotTextExtractor(ScreenshotPreprocessor preprocessor) {
+    public TesseractScreenshotTextExtractor(
+            ScreenshotPreprocessor preprocessor,
+            @Value("${flexbuddy.import.ocr-wait:20s}") Duration ocrWait
+    ) {
         this.preprocessor = preprocessor;
+        this.ocrWait = ocrWait;
         tessdataDirectory = prepareTessdata();
     }
 
+    /** Text extraction runs one at a time, so two imports never hold their images and Tesseract's memory together. */
     @Override
     public OcrResult extract(BufferedImage image) {
+        try {
+            if (!ocrPermit.tryAcquire(ocrWait.toMillis(), TimeUnit.MILLISECONDS)) {
+                throw new ScreenshotBusyException("Another screenshot is being read. Try again in a moment.");
+            }
+        }
+        catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ScreenshotBusyException("Another screenshot is being read. Try again in a moment.");
+        }
+        try {
+            return read(image);
+        }
+        finally {
+            ocrPermit.release();
+        }
+    }
+
+    Semaphore ocrPermit() {
+        return ocrPermit;
+    }
+
+    private OcrResult read(BufferedImage image) {
         BufferedImage preparedImage = preprocessor.prepare(image);
         Tesseract tesseract = new Tesseract();
         tesseract.setDatapath(tessdataDirectory.toString());

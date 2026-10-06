@@ -40,6 +40,12 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(exception.getMessage());
     }
 
+    @ExceptionHandler(ScreenshotBusyException.class)
+    public ResponseEntity<String> handleScreenshotBusyException(ScreenshotBusyException exception) {
+        // A busy reader is expected, so it is not logged as an error and sends no alert.
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(exception.getMessage());
+    }
+
     @ExceptionHandler(InvalidFilterException.class)
     public ResponseEntity<String> handleInvalidFilterException(InvalidFilterException exception) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(exception.getMessage());

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -22,6 +23,7 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
@@ -180,6 +182,47 @@ class ShiftImportServiceTest {
                 createPngBytes(50, 50));
 
         assertThat(limited.createPreview(EMAIL, screenshot).shifts()).hasSize(1);
+    }
+
+    @Test
+    void createPreview_decodesAPhotoOverFiveMegapixelsSmaller() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0))));
+        BufferedImage photo = new BufferedImage(4032, 3024, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ImageIO.write(photo, "jpg", output);
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "photo.jpg", "image/jpeg", output.toByteArray());
+
+        shiftImportService.createPreview(EMAIL, screenshot);
+
+        ArgumentCaptor<BufferedImage> captured = ArgumentCaptor.forClass(BufferedImage.class);
+        verify(textExtractor).extract(captured.capture());
+        BufferedImage read = captured.getValue();
+        assertThat((long) read.getWidth() * read.getHeight()).isLessThanOrEqualTo(5_000_000L);
+        assertThat((double) read.getWidth() / read.getHeight()).isBetween(4.0 / 3 * .99, 4.0 / 3 * 1.01);
+    }
+
+    @Test
+    void createPreview_keepsANormalScreenshotAtFullResolution() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0))));
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "shift.png", "image/png",
+                createPngBytes(1170, 2532));
+
+        shiftImportService.createPreview(EMAIL, screenshot);
+
+        ArgumentCaptor<BufferedImage> captured = ArgumentCaptor.forClass(BufferedImage.class);
+        verify(textExtractor).extract(captured.capture());
+        assertThat(captured.getValue().getWidth()).isEqualTo(1170);
+        assertThat(captured.getValue().getHeight()).isEqualTo(2532);
+    }
+
+    @Test
+    void subsampleFactor_isTheSmallestStepThatFitsTheDecodeLimit() {
+        assertThat(ShiftImportService.subsampleFactor(1440, 3200)).isEqualTo(1);
+        assertThat(ShiftImportService.subsampleFactor(4032, 3024)).isEqualTo(2);
+        assertThat(ShiftImportService.subsampleFactor(6000, 5000)).isEqualTo(3);
+        assertThat(ShiftImportService.subsampleFactor(2000, 10000)).isEqualTo(2);
     }
 
     private byte[] createPngBytes(int width, int height) throws IOException {

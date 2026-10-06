@@ -14,6 +14,8 @@ public class ScreenshotPreprocessor {
     private static final double MAX_SCALE = 3.0;
     private static final int DARK_IMAGE_THRESHOLD = 110;
     private static final int PADDING = 20;
+    /** Upscaling never takes an image past this size, so a long scrolling screenshot stays bounded. */
+    static final long MAX_OUTPUT_PIXELS = 5_000_000;
 
     public BufferedImage prepare(BufferedImage source) {
         BufferedImage scaled = upscale(source);
@@ -28,10 +30,15 @@ public class ScreenshotPreprocessor {
         double scale = shortSide >= TARGET_SHORT_SIDE
                 ? 1.0
                 : Math.min(MAX_SCALE, (double) TARGET_SHORT_SIDE / shortSide);
-        if (scale == 1.0) return copy(source, source.getType() == 0 ? BufferedImage.TYPE_INT_RGB : source.getType());
+        double limit = Math.sqrt((double) MAX_OUTPUT_PIXELS / ((long) source.getWidth() * source.getHeight()));
+        boolean capped = limit < scale;
+        scale = Math.min(scale, limit);
+        // grayscale() draws from the source into a new image anyway, so an unscaled image needs no copy.
+        if (scale <= 1.0) return source;
 
-        int width = Math.max(1, (int) Math.round(source.getWidth() * scale));
-        int height = Math.max(1, (int) Math.round(source.getHeight() * scale));
+        // Rounded sides could land a few pixels over the limit, so a capped image rounds down.
+        int width = Math.max(1, (int) (capped ? Math.floor(source.getWidth() * scale) : Math.round(source.getWidth() * scale)));
+        int height = Math.max(1, (int) (capped ? Math.floor(source.getHeight() * scale) : Math.round(source.getHeight() * scale)));
         BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D graphics = result.createGraphics();
         try {
@@ -143,16 +150,5 @@ public class ScreenshotPreprocessor {
             }
         }
         return bestThreshold;
-    }
-
-    private BufferedImage copy(BufferedImage source, int type) {
-        BufferedImage result = new BufferedImage(source.getWidth(), source.getHeight(), type);
-        Graphics2D graphics = result.createGraphics();
-        try {
-            graphics.drawImage(source, 0, 0, null);
-        } finally {
-            graphics.dispose();
-        }
-        return result;
     }
 }
