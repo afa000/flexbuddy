@@ -308,6 +308,4 @@ saying so.
    iPhone never returns to Home. Changing that to `pushState` affects
    every screen and the Android back button, so it should be its own
    plan. Do you want it?
-3. **Timeout length.** 60 s is generous for Render's single CPU after
-   `plan/import-memory-limits`, where a read usually takes 3–10 s. Say if
-   you'd prefer 30 s.
+3. ~~Timeout length?~~ **Decided:** 60 s.
