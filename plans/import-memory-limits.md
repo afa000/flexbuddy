@@ -293,7 +293,5 @@ instead of competing for memory.
    native memory. Check Render's memory graph after this ships before
    changing it. I can plan that one-line change separately if the graph
    shows the heap is the limit.
-2. **The 5 MP cap.** It's above every real phone screenshot I know of.
-   If testers import screenshots from tablets (2048×2732 is 5.6 MP), they
-   would be decoded at half size. Say if any tester uses a tablet, and
-   I'll raise the cap to 6 MP.
+2. ~~The 5 MP cap?~~ **Decided:** keep 5 MP. No testers import from
+   tablets.
