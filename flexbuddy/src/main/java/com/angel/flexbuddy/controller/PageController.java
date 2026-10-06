@@ -39,6 +39,7 @@ public class PageController {
                     model.addAttribute("backupDue", backupDue);
                     model.addAttribute("setupDue", user.getSetupDismissedAt() == null);
                     model.addAttribute("hasBlocks", shiftCount > 0);
+                    model.addAttribute("askMissingMiles", user.isAskMissingMiles());
                 });
         return "shifts";
     }

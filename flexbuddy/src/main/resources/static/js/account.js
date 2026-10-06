@@ -365,6 +365,7 @@ function renderReminders(settings) {
     fillTimeZones(settings.timeZone);
     document.querySelector('#remindBefore').value = settings.remindBeforeMinutes ?? '';
     document.querySelector('#remindConfirm').checked = Boolean(settings.remindConfirm);
+    document.querySelector('#askMissingMiles').checked = settings.askMissingMiles !== false;
     document.querySelector('#remindMiles').checked = Boolean(settings.remindMiles);
     document.querySelector('#remindTax').checked = Boolean(settings.remindTax);
     document.querySelector('#forfeitCutoff').value = settings.forfeitCutoffMinutes ?? 45;
@@ -404,6 +405,7 @@ reminderForm.addEventListener('submit', async event => {
                 timeZone: timeZoneSelect.value,
                 remindBeforeMinutes: lead === '' ? null : Number(lead),
                 remindConfirm: document.querySelector('#remindConfirm').checked,
+                askMissingMiles: document.querySelector('#askMissingMiles').checked,
                 remindMiles: document.querySelector('#remindMiles').checked,
                 forfeitCutoffMinutes: Number(document.querySelector('#forfeitCutoff').value)
             })

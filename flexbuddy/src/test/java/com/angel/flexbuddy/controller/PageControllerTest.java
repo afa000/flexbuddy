@@ -221,6 +221,19 @@ class PageControllerTest {
     }
 
     @Test
+    void homeCarriesTheMissingMilesChoiceAndALinkToTheSetting() throws Exception {
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+
+        String on = pageFor(angel, 3);
+        angel.setAskMissingMiles(false);
+        String off = pageFor(angel, 3);
+
+        assertThat(on).containsPattern("id=\"missingMiles\"[^>]*data-ask=\"true\"");
+        assertThat(off).containsPattern("id=\"missingMiles\"[^>]*data-ask=\"false\"");
+        assertThat(on).containsPattern("<a[^>]*href=\"/account#reminders\"[^>]*>Stop asking</a>");
+    }
+
+    @Test
     void importScreenOffersCancelAndChooseAgain() throws Exception {
         String page = pageFor(new AppUser("Angel", "angel@example.com", "hash"), 3);
 

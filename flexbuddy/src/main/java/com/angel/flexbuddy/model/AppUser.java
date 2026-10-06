@@ -81,6 +81,10 @@ public class AppUser {
     @Column(nullable = false)
     private boolean remindMiles;
 
+    /** Show recent blocks without miles on Home and in its Needs attention card. */
+    @Column(nullable = false)
+    private boolean askMissingMiles = true;
+
     /** Push a reminder a week before and on each estimated tax due date. */
     @Column(nullable = false)
     private boolean remindTax;

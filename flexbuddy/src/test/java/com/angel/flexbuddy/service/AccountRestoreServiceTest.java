@@ -211,6 +211,41 @@ class AccountRestoreServiceTest {
     }
 
     @Test
+    void restoreTurnsTheMissingMilesPromptsOffFromAVersionFourBackup() throws Exception {
+        AccountBackupFile quiet = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                backup.shifts(), List.of(), new BackupSettings("STANDARD_MILEAGE", "0.700", "America/Chicago", 60, true,
+                        false, 45, null, null, "GROSS", "TUESDAY,FRIDAY", 1, "25", Boolean.TRUE, Boolean.FALSE),
+                new BackupCounts(2, 1));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(quiet);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        assertThat(owner.isAskMissingMiles()).isFalse();
+    }
+
+    @Test
+    void aBackupWithoutTheMissingMilesFieldKeepsTheCurrentChoice() throws Exception {
+        for (boolean current : new boolean[] {true, false}) {
+            owner.setAskMissingMiles(current);
+            AccountBackupFile older = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                    new BackupAccount("Angel", EMAIL, Instant.parse("2026-01-01T00:00:00Z")),
+                    backup.shifts(), List.of(), new BackupSettings("STANDARD_MILEAGE", "0.700", "America/Chicago", 60, true,
+                            false, 45, null, null, "GROSS", "TUESDAY,FRIDAY", 1, "25", Boolean.TRUE),
+                    new BackupCounts(2, 1));
+            when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(older);
+            MockHttpSession session = new MockHttpSession();
+            RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+            service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+            assertThat(owner.isAskMissingMiles()).isEqualTo(current);
+        }
+    }
+
+    @Test
     void aBackupWithoutTheTaxReminderFieldKeepsTheCurrentChoice() throws Exception {
         owner.setRemindTax(true);
         AccountBackupFile older = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",

@@ -552,6 +552,29 @@ class AccountControllerTest {
     }
 
     @Test
+    void updateReminders_carriesTheMissingMilesChoiceAndLeavesItNullWhenAbsent() throws Exception {
+        when(settingsService.updateReminders(any(), any()))
+                .thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                        com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, java.math.BigDecimal.ONE,
+                        java.math.BigDecimal.ONE, 2025));
+
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"America/New_York\",\"remindConfirm\":false,\"askMissingMiles\":false}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.askMissingMiles").value(true));
+        mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"timeZone\":\"America/New_York\",\"remindConfirm\":false}"))
+                .andExpect(status().isOk());
+
+        verify(settingsService).updateReminders(org.mockito.ArgumentMatchers.eq("angel@example.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> Boolean.FALSE.equals(request.askMissingMiles())));
+        verify(settingsService).updateReminders(org.mockito.ArgumentMatchers.eq("angel@example.com"),
+                org.mockito.ArgumentMatchers.argThat(request -> request.askMissingMiles() == null));
+    }
+
+    @Test
     void updateTimeZone_validatesTheZone() throws Exception {
         mockMvc.perform(put("/account/time-zone").with(user("angel@example.com")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"timeZone\":\"Nowhere\"}"))

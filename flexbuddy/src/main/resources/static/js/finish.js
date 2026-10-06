@@ -274,11 +274,18 @@
 
     /**
      * Loads the recent completed blocks with no miles, minus any the driver put off for a day. Home's Needs attention
-     * card decides whether to show them, so this only renders the list and says the count changed.
+     * card decides whether to show them, so this only renders the list and says the count changed. A driver who turned
+     * the prompts off in Account gets nothing fetched and no row.
      */
     async function loadMissing() {
         const section = document.querySelector('#missingMiles');
         if (!section) return;
+        if (section.dataset.ask === 'false') {
+            missing = 0;
+            document.querySelector('#missingMilesList').replaceChildren();
+            document.dispatchEvent(new CustomEvent('flexbuddy:attention'));
+            return;
+        }
         let shifts = [];
         try {
             const response = await apiFetch('/shifts/missing-miles?days=7');

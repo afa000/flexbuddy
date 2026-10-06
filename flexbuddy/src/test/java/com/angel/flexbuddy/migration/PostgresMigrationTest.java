@@ -67,6 +67,7 @@ class PostgresMigrationTest {
             assertThat(latest.info().pending()).isEmpty();
             assertBackfilledValues(schema);
             assertSetupBackfill(schema);
+            assertMissingMilesPromptsStartOn(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -149,6 +150,18 @@ class PostgresMigrationTest {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getString("email")).isEqualTo("noblocks@example.com");
                 assertThat(result.getTimestamp("setup_dismissed_at")).isNull();
+            }
+        }
+    }
+
+    /** Everyone keeps the Home prompts for blocks without miles until they turn them off. */
+    private void assertMissingMilesPromptsStartOn(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery(
+                    "select count(*) as total, count(*) filter (where ask_missing_miles) as asking from app_users")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt("total")).isGreaterThan(0).isEqualTo(result.getInt("asking"));
             }
         }
     }

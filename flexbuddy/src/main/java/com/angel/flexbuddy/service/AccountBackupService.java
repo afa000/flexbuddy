@@ -79,7 +79,7 @@ public class AccountBackupService {
                         user.getGoalBasis() == null ? null : user.getGoalBasis().name(), user.getPayoutDays(),
                         user.getPayoutLagDays(),
                         user.getTaxSetAsidePercent() == null ? null : user.getTaxSetAsidePercent().toPlainString(),
-                        user.isRemindTax()),
+                        user.isRemindTax(), user.isAskMissingMiles()),
                 new BackupCounts(shifts.size() - deleted, deleted, expenses.size() - deletedExpenses, deletedExpenses),
                 taxPaymentRepository.findByOwnerEmailIgnoreCaseOrderByPaidOnAscIdAsc(email).stream()
                         .map(payment -> new BackupTaxPayment(payment.getTaxYear(), payment.getQuarter(), payment.getPaidOn(),

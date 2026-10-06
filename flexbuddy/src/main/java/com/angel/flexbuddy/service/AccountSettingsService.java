@@ -66,6 +66,7 @@ public class AccountSettingsService {
         user.setRemindBeforeMinutes(request.remindBeforeMinutes());
         user.setRemindConfirm(request.remindConfirm());
         if (request.remindMiles() != null) user.setRemindMiles(request.remindMiles());
+        if (request.askMissingMiles() != null) user.setAskMissingMiles(request.askMissingMiles());
         if (request.forfeitCutoffMinutes() != null) user.setForfeitCutoffMinutes(request.forfeitCutoffMinutes());
         return response(userRepository.save(user));
     }
@@ -131,7 +132,7 @@ public class AccountSettingsService {
                 java.util.List.copyOf(PayPeriodCalculator.parseDays(user.getPayoutDays())), user.getPayoutLagDays(),
                 user.getTaxSetAsidePercent(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics",
-                user.isRemindTax());
+                user.isRemindTax(), user.isAskMissingMiles());
     }
 
     private AppUser user(String email) {

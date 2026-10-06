@@ -113,10 +113,11 @@
             <article class="home-card home-attention" id="homeAttention" hidden aria-labelledby="homeAttentionTitle" th:attr="data-backup-due=${backupDue}">
                 <h2 class="home-label" id="homeAttentionTitle">Needs attention</h2>
                 <ul class="attention-list" id="attentionList"></ul>
-                <div class="missing-miles" id="missingMiles" hidden>
+                <div class="missing-miles" id="missingMiles" hidden th:attr="data-ask=${askMissingMiles}">
                     <div class="missing-miles-heading">
                         <h3 id="missingMilesTitle">Blocks without miles</h3>
                         <small id="missingMilesCount"></small>
+                        <a class="text-link missing-miles-off" href="/account#reminders">Stop asking</a>
                     </div>
                     <div class="missing-miles-list" id="missingMilesList"></div>
                 </div>

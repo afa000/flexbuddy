@@ -17,8 +17,15 @@ public record ReminderSettingsRequest(
         /** Optional; when absent the saved cutoff is kept. */
         @Min(value = 0, message = "The forfeit cutoff must be between 0 and 720 minutes.")
         @Max(value = AppUser.MAX_FORFEIT_CUTOFF_MINUTES, message = "The forfeit cutoff must be between 0 and 720 minutes.")
-        Integer forfeitCutoffMinutes
+        Integer forfeitCutoffMinutes,
+        /** Optional; when absent the saved choice is kept. */
+        Boolean askMissingMiles
 ) {
+    public ReminderSettingsRequest(String timeZone, Integer remindBeforeMinutes, boolean remindConfirm,
+            Boolean remindMiles, Integer forfeitCutoffMinutes) {
+        this(timeZone, remindBeforeMinutes, remindConfirm, remindMiles, forfeitCutoffMinutes, null);
+    }
+
     public ReminderSettingsRequest(String timeZone, Integer remindBeforeMinutes, boolean remindConfirm,
             Boolean remindMiles) {
         this(timeZone, remindBeforeMinutes, remindConfirm, remindMiles, null);

@@ -97,6 +97,20 @@ class AccountSettingsServiceTest {
     }
 
     @Test
+    void theMissingMilesPromptsAreOnForANewUserAndStayOffOnceTurnedOff() {
+        when(userRepository.save(user)).thenReturn(user);
+        assertThat(service.get(EMAIL).askMissingMiles()).isTrue();
+
+        var off = service.updateReminders(EMAIL,
+                new ReminderSettingsRequest("America/Chicago", null, false, null, null, false));
+        assertThat(off.askMissingMiles()).isFalse();
+
+        // A request that leaves the field out, such as an older cached Account page, does not switch them back on.
+        var kept = service.updateReminders(EMAIL, new ReminderSettingsRequest("America/Chicago", 60, true, true, 45));
+        assertThat(kept.askMissingMiles()).isFalse();
+    }
+
+    @Test
     void updateTaxTurnsDueDateRemindersOnAndKeepsThemWhenOmitted() {
         when(userRepository.save(user)).thenReturn(user);
 
