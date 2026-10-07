@@ -1,5 +1,6 @@
 import java.awt.Color;
 import java.awt.image.BufferedImage;
+import java.time.Duration;
 import com.angel.flexbuddy.service.ScreenshotPreprocessor;
 import com.angel.flexbuddy.service.TesseractScreenshotTextExtractor;
 
@@ -14,7 +15,7 @@ public final class OcrNativeSmokeCheck {
         } finally {
             graphics.dispose();
         }
-        var extractor = new TesseractScreenshotTextExtractor(new ScreenshotPreprocessor());
+        var extractor = new TesseractScreenshotTextExtractor(new ScreenshotPreprocessor(), Duration.ofSeconds(20));
         extractor.extract(image);
         System.out.println("Native OCR initialization and image processing passed.");
     }
