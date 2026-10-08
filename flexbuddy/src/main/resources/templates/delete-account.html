@@ -52,7 +52,8 @@
         </ul>
 
         <p class="info-note">Uploaded screenshots are processed in memory and are never stored. Backup files already downloaded to your device remain under your control because FlexBuddy does not store them.</p>
-        <a class="primary-button auth-submit info-action" href="/login">Sign in to delete your account</a>
+        <a class="primary-button auth-submit info-action" href="/account#account" th:if="${signedIn}">Go to Account to delete your account</a>
+        <a class="primary-button auth-submit info-action" href="/login" th:unless="${signedIn}">Sign in to delete your account</a>
     </article>
 </main>
 </body>

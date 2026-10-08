@@ -93,6 +93,21 @@ class AccountControllerTest {
     }
 
     @Test
+    void deleteAccountPageSendsVisitorsToSignInAndSignedInDriversToAccount() throws Exception {
+        mockMvc.perform(get("/delete-account"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/login\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Sign in to delete your account")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("/account#account"))));
+
+        mockMvc.perform(get("/delete-account").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/account#account\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Go to Account to delete your account")))
+                .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("href=\"/login\""))));
+    }
+
+    @Test
     void privacyAndTermsOfferSignInToVisitorsAndAWayBackToSignedInDrivers() throws Exception {
         for (String page : new String[] {"/privacy", "/terms"}) {
             mockMvc.perform(get(page))

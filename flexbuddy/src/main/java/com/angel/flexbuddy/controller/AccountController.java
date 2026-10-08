@@ -138,7 +138,8 @@ public class AccountController {
     }
 
     @GetMapping("/delete-account")
-    public String deletionInfoPage() {
+    public String deletionInfoPage(Principal principal, Model model) {
+        model.addAttribute("signedIn", principal != null);
         return "delete-account";
     }
 
