@@ -124,13 +124,16 @@ public class AccountController {
         return "redirect:/login?registered";
     }
 
+    /** The legal pages stay public, so a signed-in driver gets a way back into the app instead of a sign-in link. */
     @GetMapping("/privacy")
-    public String privacyPage() {
+    public String privacyPage(Principal principal, Model model) {
+        model.addAttribute("signedIn", principal != null);
         return "privacy";
     }
 
     @GetMapping("/terms")
-    public String termsPage() {
+    public String termsPage(Principal principal, Model model) {
+        model.addAttribute("signedIn", principal != null);
         return "terms";
     }
 

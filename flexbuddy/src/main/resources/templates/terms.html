@@ -74,7 +74,8 @@
 
         <nav class="legal-links" aria-label="Legal pages">
             <a href="/privacy">Privacy Policy</a>
-            <a href="/login">Sign in</a>
+            <a href="/" th:if="${signedIn}">Back to FlexBuddy</a>
+            <a href="/login" th:unless="${signedIn}">Sign in</a>
         </nav>
     </article>
 </main>

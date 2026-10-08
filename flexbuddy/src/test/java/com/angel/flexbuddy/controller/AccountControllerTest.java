@@ -93,6 +93,21 @@ class AccountControllerTest {
     }
 
     @Test
+    void privacyAndTermsOfferSignInToVisitorsAndAWayBackToSignedInDrivers() throws Exception {
+        for (String page : new String[] {"/privacy", "/terms"}) {
+            mockMvc.perform(get(page))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("href=\"/login\"")))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Back to FlexBuddy"))));
+
+            mockMvc.perform(get(page).with(user("angel@example.com")))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.containsString("Back to FlexBuddy")))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("href=\"/login\""))));
+        }
+    }
+
+    @Test
     void privacyAndTermsPagesArePublicAndLinkedFromRegistration() throws Exception {
         mockMvc.perform(get("/privacy"))
                 .andExpect(status().isOk())
