@@ -43,6 +43,13 @@ RUN apt-get update \
 COPY --from=native-build /usr/local/lib/ /usr/local/lib/
 COPY --from=native-build /usr/local/bin/tesseract /usr/local/bin/tesseract
 RUN ldconfig && tesseract --version
+
+# Render's starter instance is killed when it passes 512 MB. Tesseract and Leptonica allocate their image buffers outside
+# the Java heap, and glibc keeps freed memory in per-thread pools, so the container grew by roughly 15 MB per screenshot
+# read until it was killed after about ten. Using two pools, handing large buffers straight back to the system and
+# running OpenMP on one thread keeps it flat; measured in a 512 MB / 0.5 CPU container, 25 reads held at about 340 MB.
+# The C1-only compiler and the serial collector are the right fit for half a CPU and save about 30 MB more.
+ENV MALLOC_ARENA_MAX=2     MALLOC_MMAP_THRESHOLD_=131072     MALLOC_TRIM_THRESHOLD_=131072     OMP_THREAD_LIMIT=1     JAVA_TOOL_OPTIONS="-XX:+UseSerialGC -XX:TieredStopAtLevel=1"
 RUN useradd --system --uid 1001 --create-home flexbuddy
 WORKDIR /app
 COPY --from=build /workspace/target/flexbuddy-*.jar app.jar
