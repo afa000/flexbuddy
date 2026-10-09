@@ -232,7 +232,21 @@ async function apiFetch(url, options = {}) {
         window.location.assign('/login?expired');
         throw new Error('Your session expired. Sign in again.');
     }
-    return response;
+    return plainFailure(response);
+}
+
+/**
+ * A failed request answered by the host rather than by FlexBuddy, such as Render's 502 page while the server restarts,
+ * comes back as a whole HTML page, and callers show a response body as the error message. This swaps it for a short
+ * sentence with the same status; every other answer from FlexBuddy itself passes through untouched.
+ */
+function plainFailure(response) {
+    if (response.ok) return response;
+    if (!(response.headers.get('Content-Type') || '').includes('text/html')) return response;
+    const message = response.status >= 500
+        ? 'FlexBuddy could not be reached right now. Try again in a minute.'
+        : 'The request could not be completed. Try again.';
+    return new Response(message, {status: response.status, headers: {'Content-Type': 'text/plain'}});
 }
 
 Object.values(previewFields).forEach(input => input.addEventListener('focus', () => {
