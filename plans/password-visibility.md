@@ -133,7 +133,7 @@ Notes for the implementer:
   before `</body>` in `login.html`, `register.html` and
   `reset-password.html`. On `login.html`, put it before the existing
   inline script at line 93.
-- **`account.html`:** add the same tag after `tax.js` (line 347).
+- **`account.html`:** add the same tag after `tax.js` (line 350).
 
 ### `static/css/styles.css`
 
@@ -211,7 +211,7 @@ Run `mvn test` and `node --test "src/test/js/*.test.js"`.
 3. Click again: dots again, and the tooltip says "Show password".
 4. Show the password, then sign in. When Chrome offers to save the
    password, the saved entry is the password, not a username-only entry.
-   Press Back after signing in: the box is hidden and empty.
+   Press Back after signing in: the box shows dots, not text.
 5. On Create account, Choose a new password (both boxes, toggled
    separately) and Account → Delete account, the eye works the same way.
 6. Edge on Windows shows only one eye per box.
