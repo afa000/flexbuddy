@@ -221,7 +221,9 @@ public class TwoFactorService {
     /** Turns two-step off. It needs the password and a current code, so a stolen session cannot do it. */
     @Transactional
     public void disable(AppUser user, String password, String code) {
-        if (!passwordEncoder.matches(password == null ? "" : password, user.getPasswordHash())) {
+        // A driver who signed up with Google has no password to give, so a code alone is enough for them.
+        if (user.isPasswordSet()
+                && !passwordEncoder.matches(password == null ? "" : password, user.getPasswordHash())) {
             throw new InvalidAccountPasswordException();
         }
         requireCode(user, code);

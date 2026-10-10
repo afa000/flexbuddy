@@ -47,6 +47,11 @@ public class SignInCompleter {
         }
     }
 
+    /** Issues the remember-me token for a sign-in that did not come through the form, such as Google's callback. */
+    public void rememberDevice(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+        rememberMeServices.loginSuccess(new RememberMeRequest(request), response, authentication);
+    }
+
     /** Presents the request as one that ticked Keep me signed in, which is what the remember-me service looks for. */
     private static final class RememberMeRequest extends HttpServletRequestWrapper {
         RememberMeRequest(HttpServletRequest request) {

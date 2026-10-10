@@ -117,6 +117,8 @@ public class PasswordResetService {
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         // The link went to the address, so using it proves the driver owns it.
         user.setEmailVerified(true);
+        // This is also how a driver who signed up with Google adds a password.
+        user.setPasswordSet(true);
         link.setUsedAt(now);
         tokenRepository.retireUnused(user.getId(), now);
         persistentTokenRepository.removeUserTokens(user.getEmail());

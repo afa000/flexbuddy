@@ -287,6 +287,20 @@
                         </form>
 
                     <article class="panel data-card">
+                        <h3>Sign-in methods</h3>
+                        <p class="success-notice" role="status" th:if="${param.googleUnlinked}">Google is no longer linked.</p>
+                        <p class="error-notice" role="alert" th:if="${param.googleNeedsPassword}">Add a password before unlinking Google.</p>
+                        <ul class="signin-methods">
+                            <li><span>Password</span><b th:text="${currentUser.passwordSet} ? 'Set' : 'Not set'">Set</b></li>
+                            <li><span>Google</span><b th:text="${currentUser.googleSubject != null} ? 'Linked' : 'Not linked'">Not linked</b></li>
+                        </ul>
+                        <p th:unless="${currentUser.passwordSet}">To add a password, use <a class="text-link" href="/forgot-password">Forgot password?</a> with your email.</p>
+                        <form th:if="${currentUser.googleSubject != null and currentUser.passwordSet}" th:action="@{/account/google/unlink}" method="post">
+                            <button class="text-button" type="submit">Unlink Google</button>
+                        </form>
+                    </article>
+
+                    <article class="panel data-card">
                         <h3>Two-step sign-in</h3>
                         <p th:text="${currentUser.twoFactorMethod == null ? 'Off. Add a code from your phone or email when you sign in on a new device.' : (currentUser.twoFactorMethod.name() == 'APP' ? 'On, with an authenticator app.' : 'On, with email codes.')}">Off.</p>
                         <a class="secondary-button" href="/account/two-factor">Manage</a>
@@ -320,13 +334,25 @@
                         </ul>
                         <p><strong>Download a backup first if you want to keep a copy.</strong></p>
                         <a class="secondary-button download-button" href="/account/backup" download>Download backup</a>
+                        <form th:unless="${currentUser.passwordSet}" th:action="@{/account/delete-code}" method="post">
+                            <button class="secondary-button" type="submit">Send me a code</button>
+                        </form>
                         <form class="settings-form deletion-form" th:action="@{/account}" th:object="${deletion}" method="post">
                             <input type="hidden" name="_method" value="delete">
-                            <label class="field">
+                            <label class="field" th:if="${currentUser.passwordSet}">
                                 <span>Current password</span>
                                 <input th:field="*{password}" type="password" data-reveal autocomplete="current-password" maxlength="72" required>
                                 <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
                             </label>
+                            <th:block th:unless="${currentUser.passwordSet}">
+                                <p class="field-hint">Your account has no password, so an emailed code confirms the deletion.</p>
+                                <p class="success-notice" role="status" th:if="${param.deleteCode}">We emailed a code to confirm.</p>
+                                <label class="field">
+                                    <span>Code from the email</span>
+                                    <input th:field="*{code}" class="code-input" autocomplete="one-time-code" inputmode="numeric" maxlength="7">
+                                    <small class="field-error" th:if="${#fields.hasErrors('code')}" th:errors="*{code}"></small>
+                                </label>
+                            </th:block>
                             <label class="field">
                                 <span>Type <strong>delete</strong> to confirm</span>
                                 <input th:field="*{confirmation}" type="text" autocomplete="off" maxlength="6" required>

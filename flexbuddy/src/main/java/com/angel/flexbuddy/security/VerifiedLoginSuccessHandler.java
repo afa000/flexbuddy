@@ -36,14 +36,17 @@ public class VerifiedLoginSuccessHandler implements AuthenticationSuccessHandler
     private final EmailVerificationService verification;
     private final TwoFactorService twoFactor;
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
+    private final SignInCompleter signInCompleter;
     private final Clock clock;
 
     public VerifiedLoginSuccessHandler(AppUserRepository userRepository, EmailVerificationService verification,
-            TwoFactorService twoFactor, PersistentTokenBasedRememberMeServices rememberMeServices, Clock clock) {
+            TwoFactorService twoFactor, PersistentTokenBasedRememberMeServices rememberMeServices,
+            SignInCompleter signInCompleter, Clock clock) {
         this.userRepository = userRepository;
         this.verification = verification;
         this.twoFactor = twoFactor;
         this.rememberMeServices = rememberMeServices;
+        this.signInCompleter = signInCompleter;
         this.clock = clock;
     }
 
@@ -51,12 +54,22 @@ public class VerifiedLoginSuccessHandler implements AuthenticationSuccessHandler
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) throws IOException, ServletException {
         AppUser user = userRepository.findByEmailIgnoreCase(authentication.getName()).orElse(null);
+        // Form sign-in says it in the remember-me field; Google's callback has none, so its choice was noted in the session.
+        HttpSession noted = request.getSession(false);
+        boolean googleRemember = noted != null && noted.getAttribute(GoogleRememberChoice.GOOGLE_REMEMBER) != null;
+        if (googleRemember) {
+            noted.removeAttribute(GoogleRememberChoice.GOOGLE_REMEMBER);
+        }
+        boolean remember = googleRemember
+                || EmailVerificationController.rememberRequested(request.getParameter("remember-me"));
         if (user == null || (user.isEmailVerified() && user.getTwoFactorMethod() == null)) {
+            if (googleRemember) {
+                signInCompleter.rememberDevice(request, response, authentication);
+            }
             response.sendRedirect("/");
             return;
         }
-        // Either step undoes the sign-in form login just made, along with the remember-me token it issued.
-        boolean remember = EmailVerificationController.rememberRequested(request.getParameter("remember-me"));
+        // Either step undoes the sign-in just made, along with any remember-me token it issued.
         rememberMeServices.logout(request, response, authentication);
         new SecurityContextLogoutHandler().logout(request, response, authentication);
         HttpSession session = request.getSession(true);

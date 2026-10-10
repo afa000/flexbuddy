@@ -60,6 +60,14 @@ public class AppUser {
     @Column(nullable = false)
     private boolean emailVerified = true;
 
+    /** Google's stable account ID once Google sign-in is linked; null otherwise. */
+    @Column(length = 255, unique = true)
+    private String googleSubject;
+
+    /** False for an account created with Google until the driver chooses a password. */
+    @Column(nullable = false)
+    private boolean passwordSet = true;
+
     /** How the second sign-in code is received; null while two-step sign-in is off. */
     @Enumerated(EnumType.STRING)
     @Column(length = 10)

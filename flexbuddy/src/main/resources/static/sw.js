@@ -22,7 +22,7 @@ const STATIC_PATHS = [/^\/css\//, /^\/js\//, /^\/icons\//, /^\/screenshots\//,
 const DATA_PATHS = [/^\/shifts(\/|$)/, /^\/expenses(\/|$)/, /^\/account\/settings$/, /^\/tax\/summary$/, /^\/standing$/];
 const NETWORK_ONLY = [/\.csv$/, /\.ics$/, /^\/shifts\/import-preview$/, /^\/account\/backup$/, /^\/push\//,
     // A setup page can hold a secret key or recovery codes, so it is never kept.
-    /^\/account\/two-factor/];
+    /^\/account\/two-factor/, /^\/oauth2\//, /^\/login\/oauth2\//];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.addAll([...VERSIONED_ASSETS, ...STATIC_ASSETS])));

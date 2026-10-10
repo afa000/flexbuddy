@@ -33,7 +33,11 @@ import com.angel.flexbuddy.dto.RestoreRequest;
 import com.angel.flexbuddy.dto.RestoreResult;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.service.AccountService;
+import com.angel.flexbuddy.service.EmailCodeService;
 import com.angel.flexbuddy.service.EmailVerificationService;
+import com.angel.flexbuddy.model.EmailCodePurpose;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import com.angel.flexbuddy.service.AccountBackupService;
 import com.angel.flexbuddy.service.AccountRestoreService;
 import com.angel.flexbuddy.service.AccountSettingsService;
@@ -65,12 +69,15 @@ public class AccountController {
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
     private final AttemptLimiter attemptLimiter;
     private final EmailVerificationService emailVerification;
+    private final EmailCodeService emailCodes;
+    private final ObjectProvider<ClientRegistrationRepository> googleRegistrations;
 
     public AccountController(AccountService accountService, AccountBackupService backupService,
             AccountRestoreService restoreService, AppUserRepository userRepository, ObjectMapper objectMapper,
             Clock clock, AccountSettingsService settingsService,
             PersistentTokenBasedRememberMeServices rememberMeServices, AttemptLimiter attemptLimiter,
-            EmailVerificationService emailVerification) {
+            EmailVerificationService emailVerification, EmailCodeService emailCodes,
+            ObjectProvider<ClientRegistrationRepository> googleRegistrations) {
         this.accountService = accountService;
         this.backupService = backupService;
         this.restoreService = restoreService;
@@ -81,17 +88,21 @@ public class AccountController {
         this.rememberMeServices = rememberMeServices;
         this.attemptLimiter = attemptLimiter;
         this.emailVerification = emailVerification;
+        this.emailCodes = emailCodes;
+        this.googleRegistrations = googleRegistrations;
     }
 
     @GetMapping("/login")
     public String loginPage(Model model) {
         model.addAttribute("lockMinutes", attemptLimiter.lockMinutes(AttemptLimiter.LOGIN_EMAIL));
+        model.addAttribute("googleEnabled", googleRegistrations.getIfAvailable() != null);
         return "login";
     }
 
     @GetMapping("/register")
     public String registrationPage(Model model) {
         model.addAttribute("registration", new RegistrationRequest());
+        model.addAttribute("googleEnabled", googleRegistrations.getIfAvailable() != null);
         return "register";
     }
 
@@ -174,6 +185,35 @@ public class AccountController {
             return "account";
         }
 
+        AppUser deleter = userRepository.findByEmailIgnoreCase(authentication.getName()).orElse(null);
+        if (deleter != null && !deleter.isPasswordSet()) {
+            // An account made with Google has no password to ask for, so an emailed code confirms the deletion.
+            String code = deletion.getCode() == null ? "" : deletion.getCode().trim();
+            if (code.isEmpty()) {
+                bindingResult.rejectValue("code", "code.required", "Enter the code we emailed you.");
+            } else {
+                EmailCodeService.CheckResult checked = emailCodes.check(deleter, EmailCodePurpose.CONFIRM_DELETE, code);
+                if (checked != EmailCodeService.CheckResult.OK) {
+                    bindingResult.rejectValue("code", "code.incorrect", checked == EmailCodeService.CheckResult.EXPIRED
+                            ? "That code has expired. Send a new one." : "That code isn't right.");
+                }
+            }
+            if (bindingResult.hasErrors()) {
+                deletion.setCode(null);
+                addAccountPageModel(authentication.getName(), model);
+                return "account";
+            }
+            accountService.deleteAccountConfirmed(authentication.getName());
+            rememberMeServices.logout(request, response, authentication);
+            new SecurityContextLogoutHandler().logout(request, response, authentication);
+            return "redirect:/login?deleted";
+        }
+        if (deletion.getPassword() == null || deletion.getPassword().isBlank()) {
+            bindingResult.rejectValue("password", "password.required", "Enter your password.");
+            addAccountPageModel(authentication.getName(), model);
+            return "account";
+        }
+
         try {
             accountService.deleteAccount(authentication.getName(), deletion.getPassword());
         } catch (InvalidAccountPasswordException exception) {
@@ -186,6 +226,29 @@ public class AccountController {
         rememberMeServices.logout(request, response, authentication);
         new SecurityContextLogoutHandler().logout(request, response, authentication);
         return "redirect:/login?deleted";
+    }
+
+    /** Emails the code that confirms a deletion for an account that has no password. */
+    @PostMapping("/account/delete-code")
+    public String sendDeleteCode(Principal principal, HttpServletRequest request) {
+        userRepository.findByEmailIgnoreCase(principal.getName()).ifPresent(user -> {
+            if (!user.isPasswordSet()) {
+                emailCodes.send(user, EmailCodePurpose.CONFIRM_DELETE, request.getRemoteAddr());
+            }
+        });
+        return "redirect:/account?deleteCode#account";
+    }
+
+    /** Unlinking Google is allowed only once a password exists, so the driver cannot lock themselves out. */
+    @PostMapping("/account/google/unlink")
+    public String unlinkGoogle(Principal principal) {
+        AppUser user = userRepository.findByEmailIgnoreCase(principal.getName()).orElse(null);
+        if (user == null || !user.isPasswordSet()) {
+            return "redirect:/account?googleNeedsPassword#account";
+        }
+        user.setGoogleSubject(null);
+        userRepository.save(user);
+        return "redirect:/account?googleUnlinked#account";
     }
 
     @PostMapping("/account/sign-out-everywhere")

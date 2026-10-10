@@ -1134,6 +1134,12 @@ h1 {
     text-align: left;
 }
 
+.auth-divider { margin: 16px 0; display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 13px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; border-top: 1px solid var(--line-soft); }
+.auth-google { width: 100%; min-height: 47px; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; }
+.auth-google svg { width: 20px; height: 20px; }
+.signin-methods { margin: 0 0 12px; padding: 0; list-style: none; }
+.signin-methods li { min-height: 44px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--line-soft); }
 .qr-box { width: 216px; padding: 8px; background: #fff; border-radius: 8px; }
 .qr-box svg { display: block; width: 200px; height: 200px; }
 .setup-key { font-family: ui-monospace, monospace; font-size: 16px; letter-spacing: .08em; overflow-wrap: anywhere; }

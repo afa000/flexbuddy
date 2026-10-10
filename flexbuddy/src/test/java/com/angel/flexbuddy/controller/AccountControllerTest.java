@@ -70,6 +70,9 @@ class AccountControllerTest {
     private com.angel.flexbuddy.service.EmailVerificationService emailVerification;
 
     @MockitoBean
+    private com.angel.flexbuddy.service.EmailCodeService emailCodes;
+
+    @MockitoBean
     private Clock clock;
 
     @MockitoBean
@@ -405,6 +408,129 @@ class AccountControllerTest {
                 .andExpect(status().isForbidden());
 
         verify(accountService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void withoutGoogleConfiguredThePagesOfferNoGoogleButton() throws Exception {
+        for (String page : new String[] {"/login", "/register"}) {
+            mockMvc.perform(get(page))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("Continue with Google"))))
+                    .andExpect(content().string(org.hamcrest.Matchers.not(org.hamcrest.Matchers.containsString("id=\"googleSignIn\""))));
+        }
+    }
+
+    private AppUser passwordlessUser() {
+        AppUser user = new AppUser("Pat", "pat@example.com", "unusable-hash");
+        user.setId(5L);
+        user.setPasswordSet(false);
+        user.setGoogleSubject("sub-1");
+        return user;
+    }
+
+    @Test
+    void deleteAccount_forAnAccountWithoutAPasswordNeedsTheEmailedCode() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("pat@example.com")).thenReturn(Optional.of(passwordlessUser()));
+
+        mockMvc.perform(post("/account")
+                        .with(user("pat@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("confirmation", "delete"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("account"))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("Enter the code we emailed you.")));
+
+        verify(accountService, never()).deleteAccountConfirmed(any());
+        verify(accountService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void deleteAccount_forAnAccountWithoutAPasswordRejectsAWrongCode() throws Exception {
+        AppUser pat = passwordlessUser();
+        when(userRepository.findByEmailIgnoreCase("pat@example.com")).thenReturn(Optional.of(pat));
+        when(emailCodes.check(pat, com.angel.flexbuddy.model.EmailCodePurpose.CONFIRM_DELETE, "000000"))
+                .thenReturn(com.angel.flexbuddy.service.EmailCodeService.CheckResult.WRONG);
+
+        mockMvc.perform(post("/account")
+                        .with(user("pat@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("code", "000000")
+                        .param("confirmation", "delete"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("That code isn&#39;t right.")));
+
+        verify(accountService, never()).deleteAccountConfirmed(any());
+    }
+
+    @Test
+    void deleteAccount_forAnAccountWithoutAPasswordSucceedsWithTheRightCode() throws Exception {
+        AppUser pat = passwordlessUser();
+        when(userRepository.findByEmailIgnoreCase("pat@example.com")).thenReturn(Optional.of(pat));
+        when(emailCodes.check(pat, com.angel.flexbuddy.model.EmailCodePurpose.CONFIRM_DELETE, "493817"))
+                .thenReturn(com.angel.flexbuddy.service.EmailCodeService.CheckResult.OK);
+
+        mockMvc.perform(post("/account")
+                        .with(user("pat@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("code", "493817")
+                        .param("confirmation", "delete"))
+                .andExpect(status().is3xxRedirection())
+                .andExpect(redirectedUrl("/login?deleted"));
+
+        verify(accountService).deleteAccountConfirmed("pat@example.com");
+        verify(accountService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void deleteAccount_forAnAccountWithAPasswordStillNeedsThePassword() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("angel@example.com"))
+                .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
+
+        mockMvc.perform(post("/account")
+                        .with(user("angel@example.com"))
+                        .with(csrf())
+                        .param("_method", "delete")
+                        .param("confirmation", "delete"))
+                .andExpect(status().isOk())
+                .andExpect(model().attributeHasFieldErrors("deletion", "password"));
+
+        verify(accountService, never()).deleteAccount(any(), any());
+    }
+
+    @Test
+    void sendingTheDeleteCodeOnlyHappensForAnAccountWithoutAPassword() throws Exception {
+        AppUser pat = passwordlessUser();
+        when(userRepository.findByEmailIgnoreCase("pat@example.com")).thenReturn(Optional.of(pat));
+        AppUser angel = new AppUser("Angel", "angel@example.com", "hash");
+        when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(angel));
+
+        mockMvc.perform(post("/account/delete-code").with(user("pat@example.com")).with(csrf()))
+                .andExpect(redirectedUrl("/account?deleteCode#account"));
+        mockMvc.perform(post("/account/delete-code").with(user("angel@example.com")).with(csrf()))
+                .andExpect(redirectedUrl("/account?deleteCode#account"));
+
+        verify(emailCodes).send(org.mockito.ArgumentMatchers.same(pat),
+                org.mockito.ArgumentMatchers.eq(com.angel.flexbuddy.model.EmailCodePurpose.CONFIRM_DELETE),
+                org.mockito.ArgumentMatchers.anyString());
+        verify(emailCodes, never()).send(org.mockito.ArgumentMatchers.same(angel), any(), any());
+    }
+
+    @Test
+    void googleCanBeUnlinkedOnlyOnceAPasswordExists() throws Exception {
+        AppUser pat = passwordlessUser();
+        when(userRepository.findByEmailIgnoreCase("pat@example.com")).thenReturn(Optional.of(pat));
+
+        mockMvc.perform(post("/account/google/unlink").with(user("pat@example.com")).with(csrf()))
+                .andExpect(redirectedUrl("/account?googleNeedsPassword#account"));
+        assertThat(pat.getGoogleSubject()).isEqualTo("sub-1");
+
+        pat.setPasswordSet(true);
+        mockMvc.perform(post("/account/google/unlink").with(user("pat@example.com")).with(csrf()))
+                .andExpect(redirectedUrl("/account?googleUnlinked#account"));
+        assertThat(pat.getGoogleSubject()).isNull();
     }
 
     @Test

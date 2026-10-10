@@ -99,6 +99,14 @@ public class AccountService {
         deleteAccountData(user.getId(), user.getEmail());
     }
 
+    /** Deletes the account after something other than a password, an emailed code, has already been checked. */
+    @Transactional
+    public void deleteAccountConfirmed(String email) {
+        AppUser user = userRepository.findByEmailIgnoreCase(email)
+                .orElseThrow(() -> new IllegalStateException("The signed-in account no longer exists."));
+        deleteAccountData(user.getId(), user.getEmail());
+    }
+
     /** Removes everything an account owns, then the account, in the one order that satisfies every reference. */
     @Transactional
     void deleteAccountData(Long ownerId, String email) {

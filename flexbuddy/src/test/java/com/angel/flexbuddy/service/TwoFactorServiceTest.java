@@ -213,6 +213,18 @@ class TwoFactorServiceTest {
     }
 
     @Test
+    void anAccountWithoutAPasswordTurnsTwoStepOffWithACodeAlone() {
+        List<String> recovery = new ArrayList<>();
+        byte[] key = enableApp(recovery);
+        angel.setPasswordSet(false);
+        clock.advance(Duration.ofSeconds(60));
+
+        service.disable(angel, null, Totp.code(key, step()));
+
+        assertThat(angel.getTwoFactorMethod()).isNull();
+    }
+
+    @Test
     void newRecoveryCodesNeedACodeAndReplaceTheOldOnes() {
         List<String> recovery = new ArrayList<>();
         byte[] key = enableApp(recovery);

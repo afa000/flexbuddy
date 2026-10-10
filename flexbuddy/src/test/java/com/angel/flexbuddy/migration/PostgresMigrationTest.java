@@ -72,6 +72,7 @@ class PostgresMigrationTest {
             assertMissingMilesPromptsStartOn(schema);
             assertExistingAccountsAreVerified(schema);
             assertTwoStepStartsOff(schema);
+            assertGoogleStartsUnlinked(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -178,6 +179,20 @@ class PostgresMigrationTest {
                     "select count(*) as total, count(*) filter (where email_verified) as verified from app_users")) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getInt("total")).isGreaterThan(0).isEqualTo(result.getInt("verified"));
+            }
+        }
+    }
+
+    /** Existing accounts have a password they know and no Google link. */
+    private void assertGoogleStartsUnlinked(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery(
+                    "select count(*) as total, count(*) filter (where password_set) as with_password, "
+                            + "count(google_subject) as linked from app_users")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt("total")).isGreaterThan(0).isEqualTo(result.getInt("with_password"));
+                assertThat(result.getInt("linked")).isZero();
             }
         }
     }

@@ -183,6 +183,17 @@ class PasswordResetServiceTest {
     }
 
     @Test
+    void resettingGivesAGoogleOnlyAccountAPassword() throws Exception {
+        angel.setPasswordSet(false);
+        linkFor("token-value", NOW.plusSeconds(600), null);
+        when(passwordEncoder.encode("new-password-1")).thenReturn("new-hash");
+
+        service.resetPassword("token-value", "new-password-1");
+
+        assertThat(angel.isPasswordSet()).isTrue();
+    }
+
+    @Test
     void resettingAlsoConfirmsAnUnverifiedAddressBecauseTheLinkWentThere() throws Exception {
         angel.setEmailVerified(false);
         linkFor("token-value", NOW.plusSeconds(600), null);

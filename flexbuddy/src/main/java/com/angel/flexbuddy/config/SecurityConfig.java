@@ -15,6 +15,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
@@ -24,6 +25,9 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.security.AttemptLimiter;
+import com.angel.flexbuddy.security.GoogleAccountService;
+import com.angel.flexbuddy.security.GoogleFailureHandler;
+import com.angel.flexbuddy.security.GoogleRememberChoice;
 import com.angel.flexbuddy.security.LockAwareFailureHandler;
 import com.angel.flexbuddy.security.LoginAttemptFilter;
 import com.angel.flexbuddy.security.SecurityLimitsProperties;
@@ -89,7 +93,11 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             PersistentTokenBasedRememberMeServices rememberMeServices,
             ObjectProvider<AttemptLimiter> limiterProvider,
-            ObjectProvider<VerifiedLoginSuccessHandler> successHandlerProvider) throws Exception {
+            ObjectProvider<VerifiedLoginSuccessHandler> successHandlerProvider,
+            ObjectProvider<ClientRegistrationRepository> googleRegistrations,
+            ObjectProvider<GoogleAccountService> googleAccounts,
+            ObjectProvider<GoogleRememberChoice> googleRememberChoice,
+            ObjectProvider<GoogleFailureHandler> googleFailureHandler) throws Exception {
         // The limiter is always there in the running app; slice tests that do not load it simply sign in without limits.
         AttemptLimiter limiter = limiterProvider.getIfAvailable();
         // Slice tests that do not load the handler send everyone home, as before.
@@ -145,6 +153,17 @@ public class SecurityConfig {
                 );
         if (limiter != null) {
             http.addFilterBefore(new LoginAttemptFilter(limiter), UsernamePasswordAuthenticationFilter.class);
+        }
+        // Google sign-in exists only once its client ID and secret are configured.
+        GoogleAccountService googleAccount = googleAccounts.getIfAvailable();
+        if (googleRegistrations.getIfAvailable() != null && googleAccount != null && successHandler != null) {
+            http.oauth2Login(oauth -> oauth
+                    .loginPage("/login")
+                    .authorizationEndpoint(endpoint -> endpoint
+                            .authorizationRequestResolver(googleRememberChoice.getObject()))
+                    .userInfoEndpoint(info -> info.oidcUserService(googleAccount))
+                    .successHandler(successHandler)
+                    .failureHandler(googleFailureHandler.getObject()));
         }
 
         return http.build();

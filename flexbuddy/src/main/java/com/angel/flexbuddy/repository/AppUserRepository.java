@@ -24,6 +24,8 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     /** Sign-ups whose code was never entered, for the daily clean-up. */
     java.util.List<AppUser> findByEmailVerifiedFalseAndCreatedAtBefore(java.time.Instant cutoff);
 
+    Optional<AppUser> findByGoogleSubject(String googleSubject);
+
     Optional<AppUser> findByCalendarToken(String calendarToken);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

@@ -38,6 +38,11 @@ services:
         value: smtp.gmail.com
       - key: FLEXBUDDY_MAIL_PORT
         value: "587"
+      # Google sign-in stays off until both are set (Google Cloud console > APIs & Services > Credentials).
+      - key: FLEXBUDDY_GOOGLE_CLIENT_ID
+        sync: false
+      - key: FLEXBUDDY_GOOGLE_CLIENT_SECRET
+        sync: false
       - key: FLEXBUDDY_MAIL_USERNAME
         sync: false
       - key: FLEXBUDDY_MAIL_PASSWORD
