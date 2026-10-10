@@ -183,11 +183,14 @@ UTF-8, with the **same keys** in the same order and groups as
 
 **Writing it:**
 - **Draft:** the implementer drafts every value.
-- **Review:** a fluent Spanish speaker (a tester) reviews it before
-  shipping. Open question 1 covers who.
-- **Register:** use **tú** throughout ("Inicia sesión", "Tu código"). It's
-  friendlier and matches most consumer apps. If the Spanish Flex app
-  uses *usted*, switch to match; that's also open question 1.
+- **Review:** no separate human review before release. The implementer
+  does a second full read-through of the Spanish file in context, by
+  clicking every screen in Spanish (manual check 3). They check against
+  the glossary and fix anything that reads as a literal translation.
+  After release, Spanish-speaking testers report wording problems
+  through Send feedback.
+- **Register:** use **tú** throughout ("Inicia sesión", "Tu código").
+  It's what Amazon's US Spanish apps and most consumer apps use.
 - **Placeholders:** keep `{0}` and `{1}` exactly. Apply the `''` rule
   from part 1 to values with arguments.
 - **Plurals:** `.one` and `.other`, the same as English.
@@ -197,7 +200,7 @@ in Spanish if you have it:
 
 | English | Spanish |
 | --- | --- |
-| block | bloque |
+| block | bloque (as in the Flex app) |
 | station | estación |
 | base pay | pago base |
 | tips | propinas |
@@ -457,19 +460,13 @@ leaves a value untranslated.
 
 ## 9. Open questions
 
-1. **Who reviews the Spanish?** The draft will be good but not perfect.
-   One fluent tester reading every screen before release would catch
-   awkward wording. Also: does the Amazon Flex app in Spanish use *tú* or
-   *usted*, and "bloque" for blocks? I'll match whatever it uses.
-2. **The legal pages.** They stay English with a Spanish note. A Spanish
-   privacy policy is nicer, but a translated legal text should be
-   checked by someone qualified. Say if you want a translated version
-   with a line saying the English version prevails.
-3. **Spanish screenshots.** To make import read the Flex app in Spanish,
-   send 3–5 screenshots of completed and scheduled blocks taken with the
-   Flex app in Spanish. Blur anything private you like, but keep the
-   date, times, station, pay and tips lines. I'll plan
-   `plan/spanish-screenshots` from them. It will likely add Spanish day
-   and month names, "a. m." and "p. m." times, and the "Propinas" label
-   to the parser, and possibly `spa.traineddata` (about 2–4 MB with the
-   fast model) to OCR.
+1. ~~Who reviews the Spanish, and *tú* or *usted*?~~ **Decided:** *tú*
+   and "bloque". There's no separate reviewer; the implementer's
+   read-through plus tester feedback after release.
+2. ~~The legal pages?~~ **Decided:** they stay English, with the Spanish
+   note.
+3. **Spanish screenshots:** you'll send 3–5 screenshots taken with the
+   Flex app in Spanish (completed and scheduled blocks, with the date,
+   times, station, pay and tips visible). `plan/spanish-screenshots` will
+   be planned from them. Until then, Import shows the Spanish note that
+   English Flex screenshots read best.
