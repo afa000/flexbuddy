@@ -210,9 +210,10 @@ helper like the existing tests:
   | `13 MARTES OCTUBRE` | Oct 13, **not** March |
 
 - **`parse_readsSpanishNumericDateDayFirst`:** `domingo, 6/9` with
-  `Inicio` on another line gives **September 6**. The same `6/9` in the
-  existing English fixture still gives **June 9**. Add that English case
-  next to the Spanish one, so the switch is pinned both ways.
+  `Inicio` on another line gives **September 6**. The same `Sunday, 6/9`
+  in English text, with no Spanish words, still gives **June 9**. Add
+  that English case next to the Spanish one, so the switch is pinned
+  both ways.
 - **`parse_readsLabelledTwelveHourTimes`:** `Inicio` / `4:45 p. m.` /
   `Terminar en` / `9:15 p. m.` gives 16:45 and 21:15. `12:30 a. m.`
   gives 00:30.
