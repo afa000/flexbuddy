@@ -10,8 +10,8 @@ import lombok.Setter;
 @Setter
 public class ForgotPasswordRequest {
 
-    @NotBlank(message = "Enter your email address.")
-    @Email(message = "Enter a valid email address.")
-    @Size(max = 254, message = "Your email address is too long.")
+    @NotBlank(message = "{validation.email.required}")
+    @Email(message = "{validation.email.invalid}")
+    @Size(max = 254, message = "{validation.email.tooLong}")
     private String email;
 }

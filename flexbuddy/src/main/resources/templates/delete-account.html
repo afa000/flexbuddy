@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <meta name="description" content="Learn how to permanently delete a FlexBuddy account and its data.">
-    <title>Delete your account | FlexBuddy</title>
+    <meta name="description" th:content="#{deletePage.learnHowToPermanentlyDelete}">
+    <title th:text="#{deletePage.deleteYourAccountFlexbuddy}">Delete your account | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -28,32 +28,32 @@
     <article class="auth-card info-card" aria-labelledby="delete-account-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Account help</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{deletePage.accountHelp}">Account help</small></div>
         </div>
 
-        <p class="eyebrow">ACCOUNT DELETION</p>
-        <h1 id="delete-account-title">Delete your account and data</h1>
-        <p class="auth-copy">You can permanently delete your account inside FlexBuddy. Deletion happens immediately and cannot be undone.</p>
+        <p class="eyebrow" th:text="#{deletePage.accountDeletion}">ACCOUNT DELETION</p>
+        <h1 id="delete-account-title" th:text="#{deletePage.deleteYourAccountAndData}">Delete your account and data</h1>
+        <p class="auth-copy" th:text="#{deletePage.youCanPermanentlyDeleteYour}">You can permanently delete your account inside FlexBuddy. Deletion happens immediately and cannot be undone.</p>
 
-        <h2>How to delete your account</h2>
+        <h2 th:text="#{deletePage.howToDeleteYourAccount}">How to delete your account</h2>
         <ol class="deletion-steps">
-            <li>Sign in to FlexBuddy and open <strong>Account</strong>.</li>
-            <li>Download a backup if you want to keep a personal copy.</li>
-            <li>Find <strong>Delete account</strong>, enter your current password, and type <strong>delete</strong>.</li>
-            <li>Select <strong>Delete account permanently</strong>.</li>
+            <li th:utext="#{deletePage.signInToFlexbuddyAnd.html}">Sign in to FlexBuddy and open <strong>Account</strong>.</li>
+            <li th:text="#{deletePage.downloadABackupIfYou}">Download a backup if you want to keep a personal copy.</li>
+            <li th:utext="#{deletePage.findDeleteAccountEnterYour.html}">Find <strong>Delete account</strong>, enter your current password, and type <strong>delete</strong>.</li>
+            <li th:utext="#{deletePage.selectDeleteAccountPermanently.html}">Select <strong>Delete account permanently</strong>.</li>
         </ol>
 
-        <h2>What FlexBuddy deletes</h2>
+        <h2 th:text="#{deletePage.whatFlexbuddyDeletes}">What FlexBuddy deletes</h2>
         <ul class="deletion-list">
-            <li>Your name, email address, password hash, and account settings</li>
-            <li>All shifts and expenses, including items in Recently deleted</li>
-            <li>Reminder history, calendar links, and push-notification subscriptions</li>
-            <li>Persistent sign-in tokens for every device</li>
+            <li th:text="#{deletePage.yourNameEmailAddressPassword}">Your name, email address, password hash, and account settings</li>
+            <li th:text="#{deletePage.allShiftsAndExpensesIncluding}">All shifts and expenses, including items in Recently deleted</li>
+            <li th:text="#{deletePage.reminderHistoryCalendarLinksAnd}">Reminder history, calendar links, and push-notification subscriptions</li>
+            <li th:text="#{deletePage.persistentSignInTokensFor}">Persistent sign-in tokens for every device</li>
         </ul>
 
-        <p class="info-note">Uploaded screenshots are processed in memory and are never stored. Backup files already downloaded to your device remain under your control because FlexBuddy does not store them.</p>
-        <a class="primary-button auth-submit info-action" href="/account#account" th:if="${signedIn}">Go to Account to delete your account</a>
-        <a class="primary-button auth-submit info-action" href="/login" th:unless="${signedIn}">Sign in to delete your account</a>
+        <p class="info-note" th:text="#{deletePage.uploadedScreenshotsAreProcessedIn}">Uploaded screenshots are processed in memory and are never stored. Backup files already downloaded to your device remain under your control because FlexBuddy does not store them.</p>
+        <a class="primary-button auth-submit info-action" href="/account#account" th:if="${signedIn}" th:text="#{deletePage.goToAccountToDelete}">Go to Account to delete your account</a>
+        <a class="primary-button auth-submit info-action" href="/login" th:unless="${signedIn}" th:text="#{deletePage.signInToDeleteYour}">Sign in to delete your account</a>
     </article>
 </main>
 </body>

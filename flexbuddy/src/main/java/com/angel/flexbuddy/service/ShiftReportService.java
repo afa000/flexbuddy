@@ -133,7 +133,7 @@ public class ShiftReportService {
     @Transactional(readOnly = true)
     public com.angel.flexbuddy.dto.PayPeriodsResponse payPeriods(String email, int count) {
         if (count < 1 || count > MAX_PAY_PERIODS) {
-            throw new com.angel.flexbuddy.exception.InvalidFilterException("count must be between 1 and 26.");
+            throw new com.angel.flexbuddy.exception.InvalidFilterException("error.filter.countRange");
         }
         AccountSettingsResponse settings = settingsService.get(email);
         Set<DayOfWeek> days = Set.copyOf(settings.payoutDays());

@@ -22,7 +22,7 @@ import lombok.Setter;
 public class UpdateShiftRequest {
 
     @NotBlank
-    @Size(max = 255, message = "Station must be 255 characters or fewer.")
+    @Size(max = 255, message = "{validation.station.tooLong}")
     private String station;
 
     @NotNull

@@ -10,7 +10,7 @@ public enum SortDirection {
         try {
             return valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown sort direction: " + value);
+            throw new InvalidFilterException("error.filter.unknownSortDirection", value);
         }
     }
 }

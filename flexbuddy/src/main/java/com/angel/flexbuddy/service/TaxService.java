@@ -240,7 +240,7 @@ public class TaxService {
     }
 
     private static void checkYear(int year) {
-        if (year < 2000 || year > 2100) throw new InvalidFilterException("year must be between 2000 and 2100.");
+        if (year < 2000 || year > 2100) throw new InvalidFilterException("error.filter.yearRange");
     }
 
     private static String money(BigDecimal value) {

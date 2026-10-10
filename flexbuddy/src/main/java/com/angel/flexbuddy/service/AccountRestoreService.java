@@ -33,6 +33,7 @@ import com.angel.flexbuddy.dto.RestoreProblem;
 import com.angel.flexbuddy.dto.RestoreRequest;
 import com.angel.flexbuddy.dto.RestoreResult;
 import com.angel.flexbuddy.exception.InvalidBackupException;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
@@ -81,14 +82,14 @@ public class AccountRestoreService {
     }
 
     public RestorePreviewResponse preview(String email, MultipartFile backup, HttpSession session) {
-        if (backup == null || backup.isEmpty()) throw new InvalidBackupException("Choose a FlexBuddy backup file.");
-        if (backup.getSize() > 5 * 1024 * 1024) throw new InvalidBackupException("The backup must be 5 MB or smaller.");
+        if (backup == null || backup.isEmpty()) throw new InvalidBackupException("error.backup.chooseFile");
+        if (backup.getSize() > 5 * 1024 * 1024) throw new InvalidBackupException("error.backup.tooLarge");
 
         AccountBackupFile file;
         try {
             file = objectMapper.readValue(backup.getInputStream(), AccountBackupFile.class);
         } catch (IOException | RuntimeException exception) {
-            throw new InvalidBackupException("This file is not a readable FlexBuddy backup.", exception);
+            throw new InvalidBackupException(exception, "error.backup.unreadable");
         }
         validateHeader(file);
 
@@ -154,25 +155,25 @@ public class AccountRestoreService {
     public RestoreResult restore(String email, RestoreRequest request, HttpSession session) {
         Object value = session.getAttribute(SESSION_KEY);
         if (!(value instanceof StagedBackup staged) || !staged.token().equals(request.token())) {
-            throw new InvalidBackupException("This restore preview has expired. Upload the backup again.");
+            throw new InvalidBackupException("error.backup.previewExpired");
         }
         if (!staged.email().equals(email.toLowerCase(Locale.ROOT))
                 || !staged.expiresAt().isAfter(Instant.now(clock))) {
             session.removeAttribute(SESSION_KEY);
-            throw new InvalidBackupException("This restore preview has expired. Upload the backup again.");
+            throw new InvalidBackupException("error.backup.previewExpired");
         }
         if (request.mode() == RestoreMode.REPLACE && !request.acknowledgeReplace()) {
-            throw new InvalidBackupException("Confirm that Replace will move current shifts to Recently deleted.");
+            throw new InvalidBackupException("error.backup.confirmReplace");
         }
 
         AccountBackupFile file = staged.file();
         List<RestoreProblem> problems = validateRows(file.shifts());
         problems.addAll(validateExpenses(file));
         if (problems.stream().anyMatch(problem -> "settings".equals(problem.field()))) {
-            throw new InvalidBackupException("The backup contains invalid expense settings.");
+            throw new InvalidBackupException("error.backup.invalidExpenseSettings");
         }
         if (request.mode() == RestoreMode.REPLACE && !problems.isEmpty()) {
-            throw new InvalidBackupException("Replace cannot continue because the backup contains invalid shifts.");
+            throw new InvalidBackupException("error.backup.invalidShifts");
         }
 
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
@@ -258,7 +259,7 @@ public class AccountRestoreService {
                 }
                 userRepository.save(owner);
             } catch (RuntimeException exception) {
-                throw new InvalidBackupException("The backup contains invalid expense settings.", exception);
+                throw new InvalidBackupException(exception, "error.backup.invalidExpenseSettings");
             }
         }
         session.removeAttribute(SESSION_KEY);
@@ -328,13 +329,13 @@ public class AccountRestoreService {
     }
 
     private void validateHeader(AccountBackupFile file) {
-        if (file == null) throw new InvalidBackupException("This file is not a readable FlexBuddy backup.");
-        if (!"flexbuddy-backup".equals(file.format())) throw new InvalidBackupException("This is not a FlexBuddy backup file.");
-        if (file.version() > 4) throw new InvalidBackupException("This backup was created by a newer FlexBuddy version.");
-        if (file.version() < 1) throw new InvalidBackupException("This backup version is not supported.");
-        if (file.shifts().size() > MAX_SHIFTS) throw new InvalidBackupException("A backup can contain at most 10,000 shifts.");
+        if (file == null) throw new InvalidBackupException("error.backup.unreadable");
+        if (!"flexbuddy-backup".equals(file.format())) throw new InvalidBackupException("error.backup.notABackup");
+        if (file.version() > 4) throw new InvalidBackupException("error.backup.tooNew");
+        if (file.version() < 1) throw new InvalidBackupException("error.backup.versionUnsupported");
+        if (file.shifts().size() > MAX_SHIFTS) throw new InvalidBackupException("error.backup.tooManyShifts");
         if (file.shifts().size() + file.expenses().size() > MAX_RECORDS) {
-            throw new InvalidBackupException("A backup can contain at most 20,000 shifts and expenses.");
+            throw new InvalidBackupException("error.backup.tooManyRecords");
         }
     }
 
@@ -347,20 +348,20 @@ public class AccountRestoreService {
             BackupExpense expense = file.expenses().get(index);
             int problemIndex = file.shifts().size() + index;
             if (expense == null) {
-                problems.add(new RestoreProblem(problemIndex, "expense", "Expense entry is missing."));
+                problems.add(new RestoreProblem(problemIndex, "expense", Messages.current("restore.problem.expenseMissing")));
                 continue;
             }
-            if (expense.date() == null) problems.add(new RestoreProblem(problemIndex, "date", "must not be null"));
+            if (expense.date() == null) problems.add(new RestoreProblem(problemIndex, "date", Messages.current("restore.problem.mustNotBeNull")));
             try { ExpenseCategory.valueOf(expense.category()); }
-            catch (RuntimeException exception) { problems.add(new RestoreProblem(problemIndex, "category", "must be a supported category")); }
+            catch (RuntimeException exception) { problems.add(new RestoreProblem(problemIndex, "category", Messages.current("restore.problem.categoryUnsupported"))); }
             BigDecimal amount = parseMoney(expense.amount(), problemIndex, "amount", problems);
-            if (amount != null && amount.signum() <= 0) problems.add(new RestoreProblem(problemIndex, "amount", "must be greater than 0"));
+            if (amount != null && amount.signum() <= 0) problems.add(new RestoreProblem(problemIndex, "amount", Messages.current("restore.problem.amountPositive")));
             if (amount != null && (amount.scale() > 2 || Math.max(0, amount.precision() - amount.scale()) > 10)) {
-                problems.add(new RestoreProblem(problemIndex, "amount", "must have at most 10 whole digits and 2 decimal places"));
+                problems.add(new RestoreProblem(problemIndex, "amount", Messages.current("restore.problem.amountDigits")));
             }
-            if (expense.note() != null && expense.note().length() > 255) problems.add(new RestoreProblem(problemIndex, "note", "must be 255 characters or fewer"));
+            if (expense.note() != null && expense.note().length() > 255) problems.add(new RestoreProblem(problemIndex, "note", Messages.current("restore.problem.noteLength")));
             if (expense.shiftBackupId() != null && !shiftIds.contains(expense.shiftBackupId())) {
-                problems.add(new RestoreProblem(problemIndex, "shiftBackupId", "does not reference a shift in this backup"));
+                problems.add(new RestoreProblem(problemIndex, "shiftBackupId", Messages.current("restore.problem.shiftReference")));
             }
         }
         if (file.settings() != null) {
@@ -396,7 +397,7 @@ public class AccountRestoreService {
                 }
             } catch (RuntimeException exception) {
                 problems.add(new RestoreProblem(file.shifts().size() + file.expenses().size(),
-                        "settings", "vehicle cost settings are invalid"));
+                        "settings", Messages.current("restore.problem.settingsInvalid")));
             }
         }
         return problems;
@@ -407,7 +408,7 @@ public class AccountRestoreService {
         for (int index = 0; index < shifts.size(); index++) {
             BackupShift shift = shifts.get(index);
             if (shift == null) {
-                problems.add(new RestoreProblem(index, "shift", "Shift entry is missing."));
+                problems.add(new RestoreProblem(index, "shift", Messages.current("restore.problem.shiftMissing")));
                 continue;
             }
             BigDecimal basePay = parseMoney(shift.basePay(), index, "basePay", problems);
@@ -420,30 +421,30 @@ public class AccountRestoreService {
             }
             ShiftStatus status = parseStatus(shift.status(), index, problems);
             if (status != null && basePay != null && tips != null) {
-                String statusProblem = status.validate(basePay, tips, miles);
-                if (statusProblem != null) problems.add(new RestoreProblem(index, "status", statusProblem));
+                String statusProblem = status.problemKey(basePay, tips, miles);
+                if (statusProblem != null) problems.add(new RestoreProblem(index, "status", Messages.current(statusProblem)));
             }
             BigDecimal odometerStart = parseOptionalDecimal(shift.odometerStart(), index, "odometerStart", problems);
             BigDecimal odometerEnd = parseOptionalDecimal(shift.odometerEnd(), index, "odometerEnd", problems);
             if ((odometerStart != null && odometerStart.signum() < 0) || (odometerEnd != null && odometerEnd.signum() < 0)) {
-                problems.add(new RestoreProblem(index, "odometerStart", "readings cannot be negative"));
+                problems.add(new RestoreProblem(index, "odometerStart", Messages.current("restore.problem.odometerNegative")));
             } else if (odometerStart != null && odometerEnd != null && odometerEnd.compareTo(odometerStart) < 0) {
-                problems.add(new RestoreProblem(index, "odometerEnd", "must be at least the start reading"));
+                problems.add(new RestoreProblem(index, "odometerEnd", Messages.current("restore.problem.odometerOrder")));
             }
             boolean hasRoute = shift.stops() != null || shift.packages() != null || shift.returns() != null;
             if (hasRoute && status != ShiftStatus.COMPLETED) {
-                problems.add(new RestoreProblem(index, "stops", "is only recorded for completed blocks"));
+                problems.add(new RestoreProblem(index, "stops", Messages.current("restore.problem.onlyCompleted")));
             } else if ((shift.stops() != null && shift.stops() < 0) || (shift.packages() != null && shift.packages() < 0)
                     || (shift.returns() != null && shift.returns() < 0)) {
-                problems.add(new RestoreProblem(index, "stops", "counts cannot be negative"));
+                problems.add(new RestoreProblem(index, "stops", Messages.current("restore.problem.countsNegative")));
             } else if (shift.returns() != null && shift.packages() != null && shift.returns() > shift.packages()) {
-                problems.add(new RestoreProblem(index, "returns", "cannot be more than the packages carried"));
+                problems.add(new RestoreProblem(index, "returns", Messages.current("restore.problem.returnsOverPackages")));
             }
             if (shift.actualEnd() != null && shift.actualStart() == null) {
-                problems.add(new RestoreProblem(index, "actualStart", "is required when actualEnd is set"));
+                problems.add(new RestoreProblem(index, "actualStart", Messages.current("restore.problem.actualStartRequired")));
             }
             if (shift.actualStart() != null && status != ShiftStatus.COMPLETED && status != ShiftStatus.SCHEDULED) {
-                problems.add(new RestoreProblem(index, "actualStart", "is only recorded for completed blocks"));
+                problems.add(new RestoreProblem(index, "actualStart", Messages.current("restore.problem.onlyCompleted")));
             }
         }
         return problems;
@@ -455,7 +456,7 @@ public class AccountRestoreService {
         try {
             return ShiftStatus.valueOf(value);
         } catch (IllegalArgumentException exception) {
-            problems.add(new RestoreProblem(index, "status", "must be SCHEDULED, COMPLETED, CANCELLED, or FORFEITED"));
+            problems.add(new RestoreProblem(index, "status", Messages.current("restore.problem.statusUnknown")));
             return null;
         }
     }
@@ -464,7 +465,7 @@ public class AccountRestoreService {
         try {
             return value == null ? null : new BigDecimal(value);
         } catch (NumberFormatException exception) {
-            problems.add(new RestoreProblem(index, field, "must be a valid amount"));
+            problems.add(new RestoreProblem(index, field, Messages.current("restore.problem.amountInvalid")));
             return null;
         }
     }

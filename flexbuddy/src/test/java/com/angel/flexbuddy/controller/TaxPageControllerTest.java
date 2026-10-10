@@ -107,7 +107,7 @@ class TaxPageControllerTest {
     @Test
     void aYearOutOfRangeIsABadRequest() throws Exception {
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.empty());
-        when(taxService.yearReport(any(), any(), eq(1999))).thenThrow(new InvalidFilterException("year must be between 2000 and 2100."));
+        when(taxService.yearReport(any(), any(), eq(1999))).thenThrow(new InvalidFilterException("error.filter.yearRange"));
 
         mockMvc.perform(get("/tax/year-summary").param("year", "1999").with(user("angel@example.com")))
                 .andExpect(status().isBadRequest());

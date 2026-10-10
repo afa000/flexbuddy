@@ -12,13 +12,13 @@ public class ResetPasswordRequest {
 
     private String token;
 
-    @NotBlank(message = "Create a password.")
-    @Size(min = 8, max = 72, message = "Your password must be between 8 and 72 characters.")
+    @NotBlank(message = "{validation.password.create}")
+    @Size(min = 8, max = 72, message = "{validation.password.length}")
     private String password;
 
     private String confirmPassword;
 
-    @AssertTrue(message = "The two passwords do not match.")
+    @AssertTrue(message = "{validation.password.mismatch}")
     public boolean isMatching() {
         return password != null && password.equals(confirmPassword);
     }

@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidPushSubscriptionException extends RuntimeException {
+public class InvalidPushSubscriptionException extends LocalizedException {
 
-    public InvalidPushSubscriptionException(String message) {
-        super(message);
+    public InvalidPushSubscriptionException(String messageKey, Object... messageArgs) {
+        super(messageKey, messageArgs);
     }
 }

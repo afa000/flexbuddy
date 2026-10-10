@@ -1,7 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class TaxPaymentNotFoundException extends RuntimeException {
+public class TaxPaymentNotFoundException extends LocalizedException {
+
     public TaxPaymentNotFoundException(Long id) {
-        super("Tax payment " + id + " was not found.");
+        super("error.taxPayment.notFound", new Object[] {String.valueOf(id)});
     }
 }

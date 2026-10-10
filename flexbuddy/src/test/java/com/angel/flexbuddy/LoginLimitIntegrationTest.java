@@ -211,7 +211,7 @@ class LoginLimitIntegrationTest {
         mockMvc.perform(get("/login").param("locked", ""))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
-                        "Too many sign-in attempts. Wait <span>15</span> minutes, or")))
+                        "Too many sign-in attempts. Wait 15 minutes, or")))
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("reset your password")));
     }
 

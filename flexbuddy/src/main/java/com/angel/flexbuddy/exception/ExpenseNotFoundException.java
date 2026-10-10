@@ -1,7 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class ExpenseNotFoundException extends RuntimeException {
+public class ExpenseNotFoundException extends LocalizedException {
+
     public ExpenseNotFoundException(Long id) {
-        super("Expense with id " + id + " was not found.");
+        super("error.expense.notFound", new Object[] {String.valueOf(id)});
     }
 }

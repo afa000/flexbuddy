@@ -60,7 +60,7 @@ public class PushService {
     @Transactional
     public void subscribe(String email, PushSubscriptionRequest request, String userAgent) {
         if (!gateway.isConfigured()) {
-            throw new InvalidPushSubscriptionException("Push reminders are not configured on this server.");
+            throw new InvalidPushSubscriptionException("error.push.notConfigured");
         }
         String endpoint = supportedEndpoint(request.endpoint());
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
@@ -120,6 +120,6 @@ public class PushService {
     }
 
     private static InvalidPushSubscriptionException unsupportedEndpoint() {
-        return new InvalidPushSubscriptionException("This push endpoint is not from a supported browser push service.");
+        return new InvalidPushSubscriptionException("error.push.endpointNotSupported");
     }
 }

@@ -6,6 +6,8 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 
+import com.angel.flexbuddy.i18n.Messages;
+
 /**
  * Sends the reset email over SMTP as plain text, which delivers more reliably than HTML. It runs on the mail executor
  * so the visitor's page returns straight away whether or not an email goes out. A failure is logged without the
@@ -29,19 +31,8 @@ public class SmtpPasswordResetMailer implements PasswordResetMailer {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
-        message.setSubject("Reset your FlexBuddy password");
-        message.setText("""
-                Hi %s,
-
-                Someone asked to reset the password for your FlexBuddy account. To choose a new
-                password, open this link within 30 minutes:
-
-                %s
-
-                If you didn't ask for this, you can ignore this email. Your password won't change.
-
-                FlexBuddy
-                """.formatted(displayName, link));
+        message.setSubject(Messages.english("email.reset.subject"));
+        message.setText(Messages.english("email.reset.body", displayName, link));
         try {
             sender.send(message);
         } catch (RuntimeException exception) {

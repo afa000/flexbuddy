@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class ScreenshotOcrException extends RuntimeException {
+public class ScreenshotOcrException extends LocalizedException {
 
-    public ScreenshotOcrException(String message, Throwable cause) {
-        super(message, cause);
+    public ScreenshotOcrException(Throwable cause, String messageKey, Object... messageArgs) {
+        super(cause, messageKey, messageArgs);
     }
 }

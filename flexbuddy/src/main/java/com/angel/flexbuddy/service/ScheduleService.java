@@ -57,7 +57,7 @@ public class ScheduleService {
     @Transactional(readOnly = true)
     public UpcomingResponse upcoming(String email, int days) {
         if (days < 1 || days > MAX_UPCOMING_DAYS) {
-            throw new InvalidFilterException("days must be between 1 and " + MAX_UPCOMING_DAYS + ".");
+            throw new InvalidFilterException("error.filter.daysRange", String.valueOf(MAX_UPCOMING_DAYS));
         }
         ZoneId zone = userTime.zone(email);
         LocalDateTime now = userTime.now(zone);

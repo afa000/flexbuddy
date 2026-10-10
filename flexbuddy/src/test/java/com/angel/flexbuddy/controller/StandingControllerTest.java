@@ -121,7 +121,7 @@ class StandingControllerTest {
 
     @Test
     void aFutureDayExplainsWhy() throws Exception {
-        doThrow(new InvalidStandingException("Standing can be logged for today or an earlier day."))
+        doThrow(new InvalidStandingException("error.standing.notFuture"))
                 .when(standingService).log(eq("angel@example.com"), eq(LocalDate.of(2026, 9, 30)), any());
 
         mockMvc.perform(put("/standing/2026-09-30").with(user("angel@example.com")).with(csrf())

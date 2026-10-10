@@ -6,6 +6,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
 
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.EmailCodePurpose;
 
 /**
@@ -30,18 +31,8 @@ public class SmtpEmailCodeMailer implements EmailCodeMailer {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
-        message.setSubject("Your FlexBuddy code: " + code);
-        message.setText("""
-                Hi %s,
-
-                Enter this code in FlexBuddy to confirm your email:
-
-                %s
-
-                It works for 15 minutes. If you didn't create a FlexBuddy account, you can ignore this email.
-
-                FlexBuddy
-                """.formatted(displayName, code));
+        message.setSubject(Messages.english("email.code.subject", code));
+        message.setText(Messages.english("email.code.body", displayName, code));
         try {
             sender.send(message);
         } catch (RuntimeException exception) {

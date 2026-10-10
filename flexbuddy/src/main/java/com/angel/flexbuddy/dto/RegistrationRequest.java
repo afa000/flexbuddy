@@ -10,16 +10,16 @@ import lombok.Setter;
 @Setter
 public class RegistrationRequest {
 
-    @NotBlank(message = "Enter your name.")
-    @Size(max = 80, message = "Your name must be 80 characters or fewer.")
+    @NotBlank(message = "{validation.name.required}")
+    @Size(max = 80, message = "{validation.name.tooLong}")
     private String displayName;
 
-    @NotBlank(message = "Enter your email address.")
-    @Email(message = "Enter a valid email address.")
-    @Size(max = 254, message = "Your email address is too long.")
+    @NotBlank(message = "{validation.email.required}")
+    @Email(message = "{validation.email.invalid}")
+    @Size(max = 254, message = "{validation.email.tooLong}")
     private String email;
 
-    @NotBlank(message = "Create a password.")
-    @Size(min = 8, max = 72, message = "Your password must be between 8 and 72 characters.")
+    @NotBlank(message = "{validation.password.create}")
+    @Size(min = 8, max = 72, message = "{validation.password.length}")
     private String password;
 }

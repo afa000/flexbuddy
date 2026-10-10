@@ -242,7 +242,7 @@ public class ShiftService {
     /** Completed blocks from the last few days, newest first, that still have no miles logged. */
     @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public List<ShiftResponse> missingMiles(String email, int days) {
-        if (days < 1 || days > 31) throw new com.angel.flexbuddy.exception.InvalidFilterException("days must be between 1 and 31.");
+        if (days < 1 || days > 31) throw new com.angel.flexbuddy.exception.InvalidFilterException("error.filter.daysRange", "31");
         LocalDate today = userTime.today(email);
         List<Shift> missing = findFiltered(email, ShiftFilter.report(today.minusDays(days - 1L), today, null, null)
                 .withStatuses(java.util.Set.of(ShiftStatus.COMPLETED))).stream()
@@ -264,14 +264,14 @@ public class ShiftService {
         Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ShiftNotFoundException(id));
         if (shift.getStatus() != ShiftStatus.SCHEDULED) {
-            throw new InvalidShiftException("Only a scheduled block can be started.");
+            throw new InvalidShiftException("error.shift.onlyScheduledCanStart");
         }
         java.time.LocalDateTime now = userTime.now(email).truncatedTo(java.time.temporal.ChronoUnit.MINUTES);
         if (now.isBefore(shift.getStartDateTime().minusMinutes(EARLIEST_START_MINUTES))) {
-            throw new InvalidShiftException("A block can be started from 2 hours before its scheduled start.");
+            throw new InvalidShiftException("error.shift.startTooEarly");
         }
         if (now.isAfter(shift.getEndDateTime())) {
-            throw new InvalidShiftException("This block's scheduled time has passed. Mark it completed instead.");
+            throw new InvalidShiftException("error.shift.startPassed");
         }
         shift.setActualStart(now.toLocalTime());
         shift.setActualEnd(null);
@@ -324,10 +324,13 @@ public class ShiftService {
         ShiftStatus current = shift.getStatus() == null ? ShiftStatus.COMPLETED : shift.getStatus();
         boolean existing = shift.getId() != null;
         if (existing && status == ShiftStatus.SCHEDULED && current != ShiftStatus.SCHEDULED) {
-            throw new InvalidShiftException("A " + current.label()
-                    + " shift cannot be moved back to scheduled. Delete it and add the block again.");
+            throw new InvalidShiftException(switch (current) {
+                case COMPLETED -> "error.shift.completedCannotReschedule";
+                case CANCELLED -> "error.shift.cancelledCannotReschedule";
+                default -> "error.shift.forfeitedCannotReschedule";
+            });
         }
-        String problem = status.validate(basePay, tips, miles);
+        String problem = status.problemKey(basePay, tips, miles);
         if (problem != null) throw new InvalidShiftException(problem);
         if (existing && current != status) shift.setStatusChangedAt(Instant.now(clock));
         shift.setStatus(status);
@@ -365,23 +368,23 @@ public class ShiftService {
         applyOdometer(shift, requestedMiles);
         checkRoute(shift);
         if (shift.getActualStart() == null && shift.getActualEnd() == null) return;
-        if (!worked) throw new InvalidShiftException("Actual times are only recorded for completed blocks.");
-        if (shift.getActualStart() == null) throw new InvalidShiftException("Enter when the block started.");
+        if (!worked) throw new InvalidShiftException("error.shift.actualTimesOnlyCompleted");
+        if (shift.getActualStart() == null) throw new InvalidShiftException("error.shift.enterStart");
         if (shift.getStatus() == ShiftStatus.SCHEDULED && shift.getActualEnd() != null) {
-            throw new InvalidShiftException("Mark the block completed to record when it finished.");
+            throw new InvalidShiftException("error.shift.markCompletedToFinish");
         }
         if (shift.getActualStart().equals(shift.getActualEnd())) {
-            throw new InvalidShiftException("The finish time must be after the start time.");
+            throw new InvalidShiftException("error.shift.finishAfterStart");
         }
     }
 
     private static void checkRoute(Shift shift) {
         if (shift.getStops() == null && shift.getPackages() == null && shift.getReturns() == null) return;
         if (shift.getStatus() != ShiftStatus.COMPLETED) {
-            throw new InvalidShiftException("Stops, packages, and returns are only recorded for completed blocks.");
+            throw new InvalidShiftException("error.shift.routeOnlyCompleted");
         }
         if (shift.getReturns() != null && shift.getPackages() != null && shift.getReturns() > shift.getPackages()) {
-            throw new InvalidShiftException("Returns cannot be more than the packages carried.");
+            throw new InvalidShiftException("error.shift.returnsOverPackages");
         }
     }
 
@@ -390,11 +393,11 @@ public class ShiftService {
         BigDecimal end = shift.getOdometerEnd();
         if (start == null && end == null) return;
         if (shift.getStatus() == ShiftStatus.SCHEDULED) {
-            throw new InvalidShiftException("Record the odometer when the block is finished.");
+            throw new InvalidShiftException("error.shift.odometerWhenFinished");
         }
         if (start == null || end == null) return;
         if (end.compareTo(start) < 0) {
-            throw new InvalidShiftException("The odometer end reading must be at least the start reading.");
+            throw new InvalidShiftException("error.shift.odometerEndBeforeStart");
         }
         if (requestedMiles == null) shift.setMiles(end.subtract(start).setScale(1, RoundingMode.HALF_UP));
     }

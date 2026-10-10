@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.PushMessage;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.ReminderKind;
 import com.angel.flexbuddy.model.ReminderLog;
@@ -66,9 +67,9 @@ public class ReminderJob {
             Instant start = shift.getStartDateTime().atZone(userTime.zone(owner)).toInstant();
             Instant remindAt = start.minus(Duration.ofMinutes(owner.getRemindBeforeMinutes()));
             if (!isDue(remindAt, now) || !claim(shift, ReminderKind.BEFORE_START, now)) continue;
-            pushService.send(owner, new PushMessage("Upcoming block · " + shift.getStation(),
-                    "Starts at " + START_TIME.format(shift.getStartTime()) + " · "
-                            + money(shift.getBasePay()) + " offered",
+            pushService.send(owner, new PushMessage(Messages.english("push.upcoming.title", shift.getStation()),
+                    Messages.english("push.upcoming.body", START_TIME.format(shift.getStartTime()),
+                            money(shift.getBasePay())),
                     SCHEDULE_URL, "shift-" + shift.getId() + "-start"));
             sent++;
         }
@@ -87,10 +88,9 @@ public class ReminderJob {
             Instant end = shift.getEndDateTime().atZone(userTime.zone(owner)).toInstant();
             boolean endedInWindow = !end.isAfter(now.minus(CONFIRM_AFTER)) && end.isAfter(now.minus(CONFIRM_UNTIL));
             if (!endedInWindow || !claim(shift, ReminderKind.CONFIRM, now)) continue;
-            pushService.send(owner, new PushMessage("Did you work this block?",
-                    shift.getStation() + " · " + DAY.format(shift.getDate()) + " "
-                            + CLOCK_TIME.format(shift.getStartTime()) + "–" + CLOCK_TIME.format(shift.getEndTime())
-                            + ". Confirm it in FlexBuddy.",
+            pushService.send(owner, new PushMessage(Messages.english("push.confirm.title"),
+                    Messages.english("push.confirm.body", shift.getStation(), DAY.format(shift.getDate()),
+                            CLOCK_TIME.format(shift.getStartTime()), CLOCK_TIME.format(shift.getEndTime())),
                     SCHEDULE_URL, "shift-" + shift.getId() + "-confirm"));
             sent++;
         }
@@ -110,8 +110,8 @@ public class ReminderJob {
             AppUser owner = shift.getOwner();
             Instant end = shift.getEndDateTime().atZone(userTime.zone(owner)).toInstant();
             if (!isDue(end.plus(MILES_AFTER), now) || !claim(shift, ReminderKind.MILES, now)) continue;
-            pushService.send(owner, new PushMessage("How many miles for your " + shift.getStation() + " block?",
-                    "Log them now while you remember.", "/?finish=" + shift.getId(),
+            pushService.send(owner, new PushMessage(Messages.english("push.miles.title", shift.getStation()),
+                    Messages.english("push.miles.body"), "/?finish=" + shift.getId(),
                     "shift-" + shift.getId() + "-miles"));
             sent++;
         }

@@ -13,14 +13,14 @@ import lombok.Setter;
 public class AccountDeletionRequest {
 
     /** Required, and checked by the controller, for an account that has a password. */
-    @Size(max = 72, message = "Password must be 72 characters or fewer.")
+    @Size(max = 72, message = "{validation.password.tooLong}")
     private String password;
 
     /** The emailed code that stands in for the password on an account created with Google. */
-    @Size(max = 7, message = "Enter the 6-digit code.")
+    @Size(max = 7, message = "{validation.code.sixDigits}")
     private String code;
 
-    @NotBlank(message = "Type delete to confirm.")
-    @Pattern(regexp = "delete", message = "Type delete exactly as shown.")
+    @NotBlank(message = "{validation.delete.required}")
+    @Pattern(regexp = "delete", message = "{validation.delete.exact}")
     private String confirmation;
 }

@@ -80,9 +80,9 @@ public class EmailVerificationController {
         }
         model.addAttribute("maskedEmail", mask(user.getEmail()));
         model.addAttribute("error", switch (result) {
-            case EXPIRED -> "That code has expired. Send a new one.";
-            case TOO_MANY -> "Too many wrong tries. Send a new code.";
-            default -> "That code isn't right. Check the email and try again.";
+            case EXPIRED -> "error.code.expired";
+            case TOO_MANY -> "error.verify.tooManyWrong";
+            default -> "error.twoFactor.codeWrongEmail";
         });
         return "verify-email";
     }
@@ -95,7 +95,7 @@ public class EmailVerificationController {
         }
         if (verification.startVerification(user, request.getRemoteAddr()) == EmailCodeService.SendResult.LIMITED) {
             model.addAttribute("maskedEmail", mask(user.getEmail()));
-            model.addAttribute("error", "Too many codes requested. Try again in an hour.");
+            model.addAttribute("error", "error.code.tooManyRequested");
             return "verify-email";
         }
         return "redirect:/verify-email?resent";

@@ -18,6 +18,8 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 
+import com.angel.flexbuddy.i18n.Messages;
+
 @Component
 public class ShiftScreenshotParser {
 
@@ -102,7 +104,7 @@ public class ShiftScreenshotParser {
         if (date.value() != null && shouldUsePreviousYear(date.value(), context.today())) {
             date = date.withValue(date.value().minusYears(1));
             warnings.add(new ImportWarning("YEAR_ROLLOVER", WarningSeverity.INFO, "date",
-                    "The screenshot does not include a year, so the date was adjusted to the previous year."));
+                    Messages.current("import.warning.yearRollover")));
         }
         return new ParsedShiftData(station, date, times[0], times[1], basePay, tips, warnings);
     }

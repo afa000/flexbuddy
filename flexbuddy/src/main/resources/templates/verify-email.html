@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <meta name="description" content="Confirm your email to finish creating your FlexBuddy account.">
-    <title>Check your email | FlexBuddy</title>
+    <meta name="description" th:content="#{verify.confirmYourEmailToFinish}">
+    <title th:text="#{verify.checkYourEmailFlexbuddy}">Check your email | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -28,29 +28,29 @@
     <section class="auth-card" aria-labelledby="verify-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{app.tagline}">Shift tracker</small></div>
         </div>
 
-        <p class="eyebrow">ONE LAST STEP</p>
-        <h1 id="verify-title">Check your email</h1>
-        <p class="auth-copy">We sent a 6-digit code to <strong th:text="${maskedEmail}">a••••@gmail.com</strong>. It works for 15 minutes. Check your spam folder if it doesn't arrive.</p>
+        <p class="eyebrow" th:text="#{verify.oneLastStep}">ONE LAST STEP</p>
+        <h1 id="verify-title" th:text="#{verify.checkYourEmail}">Check your email</h1>
+        <p class="auth-copy" th:utext="#{verify.codeSent.html(${#strings.escapeXml(maskedEmail)})}">We sent a 6-digit code to <strong>a••••@gmail.com</strong>. It works for 15 minutes. Check your spam folder if it doesn't arrive.</p>
 
-        <p class="auth-copy" role="status" th:if="${param.resent}">We sent a new code.</p>
-        <div class="notice error-notice" role="alert" th:if="${error}" th:text="${error}"></div>
+        <p class="auth-copy" role="status" th:if="${param.resent}" th:text="#{verify.weSentANewCode}">We sent a new code.</p>
+        <div class="notice error-notice" role="alert" th:if="${error}" th:text="#{${error}}"></div>
 
         <form class="auth-form" th:action="@{/verify-email}" method="post">
             <label class="field">
-                <span>Code</span>
+                <span th:text="#{verify.code}">Code</span>
                 <input class="code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus>
             </label>
-            <button class="primary-button auth-submit" type="submit">Verify email</button>
+            <button class="primary-button auth-submit" type="submit" th:text="#{verify.verifyEmail}">Verify email</button>
         </form>
 
         <form th:action="@{/verify-email/resend}" method="post">
-            <button class="text-button" type="submit">Send a new code</button>
+            <button class="text-button" type="submit" th:text="#{verify.sendANewCode}">Send a new code</button>
         </form>
         <form th:action="@{/verify-email/cancel}" method="post">
-            <button class="text-button" type="submit">Use a different email</button>
+            <button class="text-button" type="submit" th:text="#{verify.useADifferentEmail}">Use a different email</button>
         </form>
     </section>
 </main>

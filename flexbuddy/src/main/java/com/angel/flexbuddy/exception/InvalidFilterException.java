@@ -1,7 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidFilterException extends RuntimeException {
-    public InvalidFilterException(String message) {
-        super(message);
+public class InvalidFilterException extends LocalizedException {
+
+    public InvalidFilterException(String messageKey, Object... messageArgs) {
+        super(messageKey, messageArgs);
     }
 }

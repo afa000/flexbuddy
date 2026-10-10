@@ -23,6 +23,7 @@ import com.angel.flexbuddy.dto.DuplicateMatch;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.ShiftStatus;
 
 @Service
@@ -61,14 +62,14 @@ public class ShiftImportService {
     public ShiftImportPreviewResponse createPreview(String email, MultipartFile screenshot) {
 
         if (screenshot == null || screenshot.isEmpty()) {
-            throw new InvalidScreenshotException("A screenshot must be provided.");
+            throw new InvalidScreenshotException("error.import.noScreenshot");
         }
 
         String contentType = screenshot.getContentType();
 
         if (!"image/png".equals(contentType) && !"image/jpeg".equals(contentType)) {
 
-            throw new InvalidScreenshotException("Unsupported screenshot type.");
+            throw new InvalidScreenshotException("error.import.unsupportedType");
         }
 
         OcrResult ocrResult;
@@ -76,7 +77,7 @@ public class ShiftImportService {
         try (ImageInputStream input = ImageIO.createImageInputStream(screenshot.getInputStream())) {
             if (input == null) {
                 throw new InvalidScreenshotException(
-                        "The uploaded file is not a readable image."
+                        "error.import.notReadableImage"
                 );
             }
 
@@ -84,7 +85,7 @@ public class ShiftImportService {
 
             if (!readers.hasNext()) {
                 throw new InvalidScreenshotException(
-                        "The uploaded file is not a readable image."
+                        "error.import.notReadableImage"
                 );
             }
 
@@ -101,8 +102,8 @@ public class ShiftImportService {
         }
         catch (IOException exception) {
             throw new InvalidScreenshotException(
-                    "The screenshot could not be read.",
-                    exception
+                    exception,
+                    "error.import.couldNotRead"
             );
         }
 
@@ -139,7 +140,7 @@ public class ShiftImportService {
                 screenshot.getOriginalFilename(),
                 contentType,
                 screenshot.getSize(),
-                "Found 1 shift. Review the imported values before saving.",
+                Messages.current("import.foundOneShift"),
                 ocrResult.text(),
                 year,
                 ocrResult.meanConfidence(),
@@ -170,14 +171,13 @@ public class ShiftImportService {
 
         if (width > MAX_SIDE || height > MAX_SIDE) {
             throw new InvalidScreenshotException(
-                    "The screenshot is too large. Neither side may be over " + MAX_SIDE + " pixels."
+                    "error.import.tooLargeSides", String.valueOf(MAX_SIDE)
             );
         }
 
         if ((long) width * height > maxPixels) {
             throw new InvalidScreenshotException(
-                    "The screenshot is too large. Use an image under "
-                            + Math.max(1, maxPixels / 1_000_000) + " megapixels."
+                    "error.import.tooLargeMegapixels", String.valueOf(Math.max(1, maxPixels / 1_000_000))
             );
         }
 
@@ -189,7 +189,7 @@ public class ShiftImportService {
 
         if (image == null) {
             throw new InvalidScreenshotException(
-                    "The uploaded file is not a readable image."
+                    "error.import.notReadableImage"
             );
         }
 

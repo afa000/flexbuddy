@@ -11,7 +11,7 @@ public record ExpenseFilter(LocalDate from, LocalDate to, String station, String
         station = normalize(station);
         query = normalize(query);
         if (from != null && to != null && from.isAfter(to)) {
-            throw new InvalidFilterException("The start date must be on or before the end date.");
+            throw new InvalidFilterException("error.filter.startAfterEnd");
         }
     }
 

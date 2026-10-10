@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class CalendarFeedNotFoundException extends RuntimeException {
+public class CalendarFeedNotFoundException extends LocalizedException {
 
     public CalendarFeedNotFoundException() {
-        super("Calendar feed not found.");
+        super("error.calendar.feedNotFound", new Object[0]);
     }
 }

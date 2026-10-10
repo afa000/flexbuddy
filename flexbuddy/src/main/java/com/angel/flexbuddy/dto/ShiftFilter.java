@@ -22,7 +22,7 @@ public record ShiftFilter(
         direction = direction == null ? SortDirection.DESC : direction;
         statuses = statuses == null || statuses.isEmpty() ? ShiftStatus.HISTORY : Set.copyOf(statuses);
         if (from != null && to != null && from.isAfter(to)) {
-            throw new InvalidFilterException("The start date must be on or before the end date.");
+            throw new InvalidFilterException("error.filter.startAfterEnd");
         }
     }
 

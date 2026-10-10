@@ -12,7 +12,7 @@ public enum ShiftSort {
         try {
             return valueOf(normalized);
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown sort: " + value);
+            throw new InvalidFilterException("error.filter.unknownSort", value);
         }
     }
 }

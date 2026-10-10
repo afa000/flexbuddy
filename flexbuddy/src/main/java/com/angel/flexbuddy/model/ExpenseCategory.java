@@ -12,7 +12,7 @@ public enum ExpenseCategory {
         try {
             return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown expense category: " + value);
+            throw new InvalidFilterException("error.filter.unknownExpenseCategory", value);
         }
     }
 }

@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidShiftException extends RuntimeException {
+public class InvalidShiftException extends LocalizedException {
 
-    public InvalidShiftException(String message) {
-        super(message);
+    public InvalidShiftException(String messageKey, Object... messageArgs) {
+        super(messageKey, messageArgs);
     }
 }

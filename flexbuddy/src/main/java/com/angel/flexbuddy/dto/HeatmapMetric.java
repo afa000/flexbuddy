@@ -13,7 +13,7 @@ public enum HeatmapMetric {
         try {
             return valueOf(value.trim().replaceAll("([a-z])([A-Z])", "$1_$2").toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown heatmap metric: " + value);
+            throw new InvalidFilterException("error.filter.unknownHeatmapMetric", value);
         }
     }
 }

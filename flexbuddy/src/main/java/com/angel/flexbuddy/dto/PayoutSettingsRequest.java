@@ -10,9 +10,9 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotEmpty;
 
 public record PayoutSettingsRequest(
-        @NotEmpty(message = "Choose at least one payout day.") Set<DayOfWeek> payoutDays,
-        @Min(value = 0, message = "The payout lag must be between 0 and 14 days.")
-        @Max(value = AppUser.MAX_PAYOUT_LAG_DAYS, message = "The payout lag must be between 0 and 14 days.")
+        @NotEmpty(message = "{validation.payoutDays.required}") Set<DayOfWeek> payoutDays,
+        @Min(value = 0, message = "{validation.payoutLag.range}")
+        @Max(value = AppUser.MAX_PAYOUT_LAG_DAYS, message = "{validation.payoutLag.range}")
         int payoutLagDays
 ) {
 }

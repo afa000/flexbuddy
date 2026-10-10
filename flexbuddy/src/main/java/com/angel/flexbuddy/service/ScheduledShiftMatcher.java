@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.DuplicateKind;
 import com.angel.flexbuddy.dto.DuplicateMatch;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -43,8 +44,7 @@ public class ScheduledShiftMatcher {
                 .filter(shift -> overlapMinutes(candidateStart, candidateEnd,
                         shift.getStartDateTime(), shift.getEndDateTime()) >= MINIMUM_OVERLAP_MINUTES)
                 .map(shift -> new DuplicateMatch(shift.getId(), DuplicateKind.SCHEDULED_MATCH,
-                        "This looks like your scheduled " + shift.getStation() + " block on "
-                                + DAY_LABEL.format(shift.getDate()) + ". Complete it?"))
+                        Messages.current("import.scheduledMatch", shift.getStation(), DAY_LABEL.format(shift.getDate()))))
                 .toList();
     }
 

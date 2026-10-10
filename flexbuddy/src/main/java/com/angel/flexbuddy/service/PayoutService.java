@@ -40,10 +40,10 @@ public class PayoutService {
     @Transactional
     public void record(String email, LocalDate payoutDate, PayoutDepositRequest request) {
         if (payoutDate.isAfter(userTime.today(email))) {
-            throw new InvalidPayoutException("A payout can be recorded once its day comes.");
+            throw new InvalidPayoutException("error.payout.notYet");
         }
         if (!settingsService.get(email).payoutDays().contains(payoutDate.getDayOfWeek())) {
-            throw new InvalidPayoutException("That date is not one of your payout days.");
+            throw new InvalidPayoutException("error.payout.notPayoutDay");
         }
         PayoutDeposit deposit = deposits.findByOwnerEmailIgnoreCaseAndPayoutDate(email, payoutDate).orElseGet(() -> {
             AppUser owner = userRepository.findByEmailIgnoreCase(email)

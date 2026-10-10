@@ -45,12 +45,12 @@ public class TesseractScreenshotTextExtractor implements ScreenshotTextExtractor
     public OcrResult extract(BufferedImage image) {
         try {
             if (!ocrPermit.tryAcquire(ocrWait.toMillis(), TimeUnit.MILLISECONDS)) {
-                throw new ScreenshotBusyException("Another screenshot is being read. Try again in a moment.");
+                throw new ScreenshotBusyException("error.import.busy");
             }
         }
         catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
-            throw new ScreenshotBusyException("Another screenshot is being read. Try again in a moment.");
+            throw new ScreenshotBusyException("error.import.busy");
         }
         try {
             return read(image);
@@ -96,8 +96,8 @@ public class TesseractScreenshotTextExtractor implements ScreenshotTextExtractor
         }
         catch (RuntimeException exception) {
             throw new ScreenshotOcrException(
-                    "Text could not be extracted from the screenshot.",
-                    exception
+                    exception,
+                    "error.import.textNotExtracted"
             );
         }
     }

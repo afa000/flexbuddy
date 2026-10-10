@@ -46,7 +46,7 @@ public class CalendarController {
             try {
                 value = YearMonth.parse(month.trim());
             } catch (DateTimeParseException exception) {
-                throw new InvalidFilterException("month must look like 2026-09.");
+                throw new InvalidFilterException("error.filter.monthFormat");
             }
         }
         return scheduleService.month(principal.getName(), value);

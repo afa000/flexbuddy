@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <meta name="description" content="FlexBuddy could not complete this request.">
-    <title th:text="${status == 404 ? 'Page not found | FlexBuddy' : 'Something went wrong | FlexBuddy'}">Something went wrong | FlexBuddy</title>
+    <meta name="description" th:content="#{errorPage.flexbuddyCouldNotCompleteThis}">
+    <title th:text="${status == 404} ? #{errorPage.pageNotFoundFlexbuddy} : #{errorPage.somethingWentWrongFlexbuddy}">Something went wrong | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -28,19 +28,19 @@
     <article class="auth-card info-card error-card" aria-labelledby="error-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{app.tagline}">Shift tracker</small></div>
         </div>
 
-        <p class="error-code" th:text="${status == 404 ? 'ERROR 404' : 'ERROR'}">ERROR</p>
-        <h1 id="error-title" th:text="${status == 404 ? 'Page not found' : 'Something went wrong'}">Something went wrong</h1>
-        <p class="auth-copy" th:if="${status == 404}">The page you requested does not exist or may have moved.</p>
-        <p class="auth-copy" th:unless="${status == 404}">FlexBuddy could not complete that request. Your saved data is still available, so you can safely try again.</p>
+        <p class="error-code" th:text="${status == 404} ? #{errorPage.error404} : #{errorPage.error}">ERROR</p>
+        <h1 id="error-title" th:text="${status == 404} ? #{errorPage.pageNotFound} : #{errorPage.somethingWentWrong}">Something went wrong</h1>
+        <p class="auth-copy" th:if="${status == 404}" th:text="#{errorPage.thePageYouRequestedDoes}">The page you requested does not exist or may have moved.</p>
+        <p class="auth-copy" th:unless="${status == 404}" th:text="#{errorPage.flexbuddyCouldNotCompleteThat}">FlexBuddy could not complete that request. Your saved data is still available, so you can safely try again.</p>
 
         <div class="error-actions">
-            <a class="primary-button auth-submit info-action" href="/">Return to FlexBuddy</a>
+            <a class="primary-button auth-submit info-action" href="/" th:text="#{errorPage.returnToFlexbuddy}">Return to FlexBuddy</a>
             <a class="secondary-button error-support-link"
-               th:href="|mailto:flexbuddysupport@gmail.com?subject=${#uris.escapeQueryParam('FlexBuddy problem report')}&body=${#uris.escapeQueryParam('What were you doing when this happened? (error ' + (status ?: 'unknown') + ')')}|"
-               href="mailto:flexbuddysupport@gmail.com">Contact support</a>
+               th:href="|mailto:flexbuddysupport@gmail.com?subject=${#uris.escapeQueryParam(#messages.msg('errorPage.reportSubject'))}&body=${#uris.escapeQueryParam(#messages.msg('errorPage.reportBody', '' + (status ?: 'unknown')))}|"
+               href="mailto:flexbuddysupport@gmail.com" th:text="#{errorPage.contactSupport}">Contact support</a>
         </div>
     </article>
 </main>

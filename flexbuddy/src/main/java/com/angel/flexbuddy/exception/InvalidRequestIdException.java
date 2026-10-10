@@ -1,7 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidRequestIdException extends RuntimeException {
+public class InvalidRequestIdException extends LocalizedException {
+
     public InvalidRequestIdException() {
-        super("Idempotency-Key must be a UUID.");
+        super("error.request.idNotUuid", new Object[0]);
     }
 }

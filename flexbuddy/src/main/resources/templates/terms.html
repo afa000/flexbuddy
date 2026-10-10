@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,7 +12,7 @@
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
     <meta name="description" content="Read the terms that apply when using FlexBuddy to track shifts, mileage, earnings, and expenses.">
-    <title>Terms of use | FlexBuddy</title>
+    <title th:text="#{legal.termsOfUseFlexbuddy}">Terms of use | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -25,10 +25,10 @@
 </head>
 <body class="auth-page">
 <main class="auth-layout legal-layout">
-    <article class="auth-card info-card legal-card" aria-labelledby="terms-title">
+    <article class="auth-card info-card legal-card" lang="en" aria-labelledby="terms-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Terms</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{legal.terms}">Terms</small></div>
         </div>
 
         <p class="eyebrow">TERMS OF USE</p>
@@ -74,8 +74,8 @@
 
         <nav class="legal-links" aria-label="Legal pages">
             <a href="/privacy">Privacy Policy</a>
-            <a href="/" th:if="${signedIn}">Back to FlexBuddy</a>
-            <a href="/login" th:unless="${signedIn}">Sign in</a>
+            <a href="/" th:if="${signedIn}" th:text="#{legal.backToFlexbuddy}">Back to FlexBuddy</a>
+            <a href="/login" th:unless="${signedIn}" th:text="#{legal.signIn}">Sign in</a>
         </nav>
     </article>
 </main>

@@ -86,7 +86,7 @@ public class TwoFactorController {
             return "redirect:/login?locked";
         }
         return codeView(user, model, result == TwoFactorService.Result.EXPIRED
-                ? "That code has expired. Send a new one." : "That code isn't right.");
+                ? "error.code.expired" : "error.twoFactor.codeWrong");
     }
 
     @PostMapping("/sign-in/code/resend")
@@ -97,7 +97,7 @@ public class TwoFactorController {
         }
         if (user.getTwoFactorMethod() == TwoFactorMethod.EMAIL
                 && twoFactor.sendSignInEmail(user, request.getRemoteAddr()) == EmailCodeService.SendResult.LIMITED) {
-            return codeView(user, model, "Too many codes requested. Try again in an hour.");
+            return codeView(user, model, "error.code.tooManyRequested");
         }
         return "redirect:/sign-in/code?resent";
     }
@@ -163,7 +163,7 @@ public class TwoFactorController {
         HttpSession session = request.getSession(false);
         String secret = session == null ? null : (String) session.getAttribute(SETUP_SECRET);
         if (secret == null) {
-            return settingsView(user, model, "That setup has expired. Start again.", null);
+            return settingsView(user, model, "error.twoFactor.setupExpired", null);
         }
         try {
             List<String> codes = twoFactor.confirmApp(user, secret, code);
@@ -172,7 +172,7 @@ public class TwoFactorController {
         } catch (InvalidTwoFactorCodeException exception) {
             // The same key stays on screen so the driver can try the next code without scanning again.
             model.addAttribute("setup", twoFactor.setupFor(user, secret));
-            return settingsView(user, model, exception.getMessage(), null);
+            return settingsView(user, model, exception.messageKey(), null);
         }
     }
 
@@ -180,7 +180,7 @@ public class TwoFactorController {
     public String beginEmail(Principal principal, HttpServletRequest request, Model model) {
         AppUser user = user(principal);
         if (twoFactor.beginEmail(user, request.getRemoteAddr()) == EmailCodeService.SendResult.LIMITED) {
-            return settingsView(user, model, "Too many codes requested. Try again in an hour.", null);
+            return settingsView(user, model, "error.code.tooManyRequested", null);
         }
         model.addAttribute("emailPending", true);
         return settingsView(user, model, null, null);
@@ -194,7 +194,7 @@ public class TwoFactorController {
             return settingsView(user, model, null, twoFactor.confirmEmail(user, code));
         } catch (InvalidTwoFactorCodeException exception) {
             model.addAttribute("emailPending", true);
-            return settingsView(user, model, exception.getMessage(), null);
+            return settingsView(user, model, exception.messageKey(), null);
         }
     }
 
@@ -203,7 +203,7 @@ public class TwoFactorController {
     public String sendCode(Principal principal, HttpServletRequest request, Model model) {
         AppUser user = user(principal);
         if (twoFactor.sendSignInEmail(user, request.getRemoteAddr()) == EmailCodeService.SendResult.LIMITED) {
-            return settingsView(user, model, "Too many codes requested. Try again in an hour.", null);
+            return settingsView(user, model, "error.code.tooManyRequested", null);
         }
         return "redirect:/account/two-factor?sent";
     }
@@ -215,7 +215,7 @@ public class TwoFactorController {
         try {
             return settingsView(user, model, null, twoFactor.regenerateRecoveryCodes(user, code));
         } catch (InvalidTwoFactorCodeException exception) {
-            return settingsView(user, model, exception.getMessage(), null);
+            return settingsView(user, model, exception.messageKey(), null);
         }
     }
 
@@ -227,9 +227,9 @@ public class TwoFactorController {
             twoFactor.disable(user, password, code);
             return "redirect:/account/two-factor?off";
         } catch (InvalidAccountPasswordException exception) {
-            return settingsView(user, model, "That password isn't right.", null);
+            return settingsView(user, model, "error.twoFactor.passwordWrong", null);
         } catch (InvalidTwoFactorCodeException exception) {
-            return settingsView(user, model, exception.getMessage(), null);
+            return settingsView(user, model, exception.messageKey(), null);
         }
     }
 

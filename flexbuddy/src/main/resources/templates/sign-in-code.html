@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <meta name="description" content="Enter your sign-in code to open FlexBuddy.">
-    <title>Enter your code | FlexBuddy</title>
+    <meta name="description" th:content="#{signInCode.enterYourSignInCode}">
+    <title th:text="#{signInCode.enterYourCodeFlexbuddy}">Enter your code | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -28,34 +28,34 @@
     <section class="auth-card" aria-labelledby="code-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{app.tagline}">Shift tracker</small></div>
         </div>
 
-        <p class="eyebrow">TWO-STEP SIGN-IN</p>
-        <h1 id="code-title">Enter your code</h1>
-        <p class="auth-copy" th:if="${method == 'APP'}">Open your authenticator app and enter the 6-digit code for FlexBuddy.</p>
-        <p class="auth-copy" th:if="${method == 'EMAIL'}">We emailed a 6-digit code to <strong th:text="${maskedEmail}">a••••@gmail.com</strong>. It works for 15 minutes.</p>
+        <p class="eyebrow" th:text="#{signInCode.twoStepSignIn}">TWO-STEP SIGN-IN</p>
+        <h1 id="code-title" th:text="#{signInCode.enterYourCode}">Enter your code</h1>
+        <p class="auth-copy" th:if="${method == 'APP'}" th:text="#{signInCode.openYourAuthenticatorAppAnd}">Open your authenticator app and enter the 6-digit code for FlexBuddy.</p>
+        <p class="auth-copy" th:if="${method == 'EMAIL'}" th:utext="#{signInCode.codeEmailed.html(${#strings.escapeXml(maskedEmail)})}">We emailed a 6-digit code to <strong>a••••@gmail.com</strong>. It works for 15 minutes.</p>
 
-        <p class="auth-copy" role="status" th:if="${param.resent}">We sent a new code.</p>
-        <div class="notice error-notice" role="alert" th:if="${error}" th:text="${error}"></div>
+        <p class="auth-copy" role="status" th:if="${param.resent}" th:text="#{signInCode.weSentANewCode}">We sent a new code.</p>
+        <div class="notice error-notice" role="alert" th:if="${error}" th:text="#{${error}}"></div>
 
         <form class="auth-form" th:action="@{/sign-in/code}" method="post">
             <label class="field">
-                <span>Code</span>
+                <span th:text="#{signInCode.code}">Code</span>
                 <input class="code-input" name="code" id="signInCode" autocomplete="one-time-code" inputmode="numeric" maxlength="11" required autofocus>
             </label>
-            <button class="primary-button auth-submit" type="submit">Continue</button>
+            <button class="primary-button auth-submit" type="submit" th:text="#{signInCode.continue}">Continue</button>
         </form>
 
         <form th:if="${method == 'EMAIL'}" th:action="@{/sign-in/code/resend}" method="post">
-            <button class="text-button" type="submit">Send a new code</button>
+            <button class="text-button" type="submit" th:text="#{signInCode.sendANewCode}">Send a new code</button>
         </form>
         <details class="recovery-hint" ontoggle="if (this.open) document.getElementById('signInCode').inputMode = 'text'">
-            <summary>Use a recovery code</summary>
-            <p class="field-hint">Lost your phone or can't get email? Type one of the recovery codes you saved, like ABCDE-FGHJK, in the box above. Each works once.</p>
+            <summary th:text="#{signInCode.useARecoveryCode}">Use a recovery code</summary>
+            <p class="field-hint" th:text="#{signInCode.lostYourPhoneOrCan}">Lost your phone or can't get email? Type one of the recovery codes you saved, like ABCDE-FGHJK, in the box above. Each works once.</p>
         </details>
         <form th:action="@{/sign-in/code/cancel}" method="post">
-            <button class="text-button" type="submit">Cancel</button>
+            <button class="text-button" type="submit" th:text="#{signInCode.cancel}">Cancel</button>
         </form>
     </section>
 </main>

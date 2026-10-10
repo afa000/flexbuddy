@@ -102,11 +102,11 @@ public class TwoFactorService {
         try {
             key = Totp.fromBase32(base32Secret);
         } catch (IllegalArgumentException exception) {
-            throw new InvalidTwoFactorCodeException("The setup key is not valid. Start again.");
+            throw new InvalidTwoFactorCodeException("error.twoFactor.setupKeyInvalid");
         }
         OptionalLong step = Totp.matchStep(key, clean(code), nowStep());
         if (step.isEmpty()) {
-            throw new InvalidTwoFactorCodeException("That code isn't right. Check your app and try again.");
+            throw new InvalidTwoFactorCodeException("error.twoFactor.codeWrongApp");
         }
         user.setTotpSecret(cipher.encrypt(Totp.base32(key)));
         user.setTwoFactorMethod(TwoFactorMethod.APP);
@@ -126,8 +126,8 @@ public class TwoFactorService {
         EmailCodeService.CheckResult result = emailCodes.check(user, EmailCodePurpose.SIGN_IN, clean(code));
         if (result != EmailCodeService.CheckResult.OK) {
             throw new InvalidTwoFactorCodeException(result == EmailCodeService.CheckResult.EXPIRED
-                    ? "That code has expired. Send a new one."
-                    : "That code isn't right. Check the email and try again.");
+                    ? "error.code.expired"
+                    : "error.twoFactor.codeWrongEmail");
         }
         user.setTwoFactorMethod(TwoFactorMethod.EMAIL);
         user.setTotpSecret(null);
@@ -244,7 +244,7 @@ public class TwoFactorService {
     private void requireCode(AppUser user, String code) {
         Result result = verifySignIn(user, code);
         if (result == Result.WRONG || result == Result.EXPIRED) {
-            throw new InvalidTwoFactorCodeException("That code isn't right.");
+            throw new InvalidTwoFactorCodeException("error.twoFactor.codeWrong");
         }
     }
 

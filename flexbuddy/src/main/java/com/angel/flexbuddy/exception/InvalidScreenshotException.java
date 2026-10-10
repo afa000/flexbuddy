@@ -1,12 +1,12 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidScreenshotException extends RuntimeException {
+public class InvalidScreenshotException extends LocalizedException {
 
-    public InvalidScreenshotException(String message) {
-        super(message);
+    public InvalidScreenshotException(String messageKey, Object... messageArgs) {
+        super(messageKey, messageArgs);
     }
 
-    public InvalidScreenshotException(String message, Throwable cause) {
-        super(message, cause);
+    public InvalidScreenshotException(Throwable cause, String messageKey, Object... messageArgs) {
+        super(cause, messageKey, messageArgs);
     }
 }

@@ -79,7 +79,7 @@ class PayoutControllerTest {
 
     @Test
     void aPayoutTheScheduleDoesNotAllowExplainsWhy() throws Exception {
-        doThrow(new InvalidPayoutException("That date is not one of your payout days."))
+        doThrow(new InvalidPayoutException("error.payout.notPayoutDay"))
                 .when(payoutService).record(eq("angel@example.com"), eq(LocalDate.of(2026, 9, 10)), any());
 
         mockMvc.perform(put("/payouts/2026-09-10").with(user("angel@example.com")).with(csrf())

@@ -115,7 +115,7 @@ public class AccountController {
     ) {
         String address = request.getRemoteAddr();
         if (attemptLimiter.isLocked(AttemptLimiter.REGISTER_IP, address)) {
-            bindingResult.reject("register.limit", "Too many sign-ups from this connection. Try again in an hour.");
+            bindingResult.reject("validation.register.limit");
             response.setStatus(429);
             return "register";
         }
@@ -123,7 +123,7 @@ public class AccountController {
         attemptLimiter.record(AttemptLimiter.REGISTER_IP, address);
 
         if (accountService.emailIsRegistered(registration.getEmail())) {
-            bindingResult.rejectValue("email", "email.registered", "An account already uses this email.");
+            bindingResult.rejectValue("email", "validation.email.registered");
         }
 
         if (bindingResult.hasErrors()) {
@@ -134,7 +134,7 @@ public class AccountController {
         try {
             created = accountService.register(registration);
         } catch (DataIntegrityViolationException exception) {
-            bindingResult.rejectValue("email", "email.registered", "An account already uses this email.");
+            bindingResult.rejectValue("email", "validation.email.registered");
             return "register";
         }
 
@@ -190,12 +190,12 @@ public class AccountController {
             // An account made with Google has no password to ask for, so an emailed code confirms the deletion.
             String code = deletion.getCode() == null ? "" : deletion.getCode().trim();
             if (code.isEmpty()) {
-                bindingResult.rejectValue("code", "code.required", "Enter the code we emailed you.");
+                bindingResult.rejectValue("code", "validation.code.required");
             } else {
                 EmailCodeService.CheckResult checked = emailCodes.check(deleter, EmailCodePurpose.CONFIRM_DELETE, code);
                 if (checked != EmailCodeService.CheckResult.OK) {
-                    bindingResult.rejectValue("code", "code.incorrect", checked == EmailCodeService.CheckResult.EXPIRED
-                            ? "That code has expired. Send a new one." : "That code isn't right.");
+                    bindingResult.rejectValue("code", checked == EmailCodeService.CheckResult.EXPIRED
+                            ? "validation.code.expired" : "validation.code.wrong");
                 }
             }
             if (bindingResult.hasErrors()) {
@@ -209,7 +209,7 @@ public class AccountController {
             return "redirect:/login?deleted";
         }
         if (deletion.getPassword() == null || deletion.getPassword().isBlank()) {
-            bindingResult.rejectValue("password", "password.required", "Enter your password.");
+            bindingResult.rejectValue("password", "validation.password.required");
             addAccountPageModel(authentication.getName(), model);
             return "account";
         }
@@ -217,7 +217,7 @@ public class AccountController {
         try {
             accountService.deleteAccount(authentication.getName(), deletion.getPassword());
         } catch (InvalidAccountPasswordException exception) {
-            bindingResult.rejectValue("password", "password.incorrect", exception.getMessage());
+            bindingResult.rejectValue("password", exception.messageKey());
             deletion.setPassword(null);
             addAccountPageModel(authentication.getName(), model);
             return "account";

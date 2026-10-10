@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class ShiftNotFoundException extends RuntimeException {
+public class ShiftNotFoundException extends LocalizedException {
 
     public ShiftNotFoundException(Long id) {
-        super("Shift not found with id: " + id);
+        super("error.shift.notFound", new Object[] {String.valueOf(id)});
     }
 }

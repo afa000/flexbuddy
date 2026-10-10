@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
@@ -73,16 +74,16 @@ public class CalendarFeedService {
         ShiftStatus status = shift.getStatus();
         String station = shift.getStation();
         String summary = switch (status) {
-            case SCHEDULED -> "Flex block · " + station + " · " + money(shift.getBasePay());
-            case COMPLETED -> "Flex block · " + station + " · " + money(shift.getEarnedPay());
-            case CANCELLED -> "Cancelled · Flex block · " + station;
-            case FORFEITED -> "Forfeited · Flex block · " + station;
+            case SCHEDULED -> Messages.english("calendar.summary.scheduled", station, money(shift.getBasePay()));
+            case COMPLETED -> Messages.english("calendar.summary.completed", station, money(shift.getEarnedPay()));
+            case CANCELLED -> Messages.english("calendar.summary.cancelled", station);
+            case FORFEITED -> Messages.english("calendar.summary.forfeited", station);
         };
         String description = switch (status) {
-            case SCHEDULED -> "Scheduled block. Offered pay " + money(shift.getBasePay()) + ".";
-            case COMPLETED -> "Completed. Earned " + money(shift.getEarnedPay()) + ".";
-            case CANCELLED -> "Cancelled by Amazon.";
-            case FORFEITED -> "Forfeited.";
+            case SCHEDULED -> Messages.english("calendar.description.scheduled", money(shift.getBasePay()));
+            case COMPLETED -> Messages.english("calendar.description.completed", money(shift.getEarnedPay()));
+            case CANCELLED -> Messages.english("calendar.description.cancelled");
+            case FORFEITED -> Messages.english("calendar.description.forfeited");
         };
         Integer alarm = status != ShiftStatus.SCHEDULED ? null
                 : owner.getRemindBeforeMinutes() == null ? DEFAULT_ALARM_MINUTES : owner.getRemindBeforeMinutes();

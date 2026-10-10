@@ -7,12 +7,12 @@ public enum GroupBy {
 
     public static GroupBy parse(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidFilterException("groupBy is required.");
+            throw new InvalidFilterException("error.filter.groupByRequired");
         }
         try {
             return valueOf(value.trim().toUpperCase());
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown groupBy: " + value);
+            throw new InvalidFilterException("error.filter.unknownGroupBy", value);
         }
     }
 }

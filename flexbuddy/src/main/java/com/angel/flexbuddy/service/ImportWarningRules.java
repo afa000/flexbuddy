@@ -10,6 +10,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Component;
 
+import com.angel.flexbuddy.i18n.Messages;
+
 @Component
 public class ImportWarningRules {
 
@@ -21,35 +23,38 @@ public class ImportWarningRules {
     public ParsedShiftData apply(ParsedShiftData shift, int meanConfidence, ParseContext context,
             boolean scheduled) {
         List<ImportWarning> warnings = new ArrayList<>(shift.warnings());
-        checkField("station", "Station", shift.station(), warnings);
-        checkField("date", "Date", shift.date(), warnings);
-        checkField("startTime", "Start time", shift.startTime(), warnings);
-        checkField("endTime", "End time", shift.endTime(), warnings);
-        checkField("basePay", "Base pay", shift.basePay(), warnings);
+        checkField("station", shift.station(), warnings, "import.warning.stationMissing",
+                "import.warning.stationLow", "import.warning.stationConfirm");
+        checkField("date", shift.date(), warnings, "import.warning.dateMissing",
+                "import.warning.dateLow", "import.warning.dateConfirm");
+        checkField("startTime", shift.startTime(), warnings, "import.warning.startTimeMissing",
+                "import.warning.startTimeLow", "import.warning.startTimeConfirm");
+        checkField("endTime", shift.endTime(), warnings, "import.warning.endTimeMissing",
+                "import.warning.endTimeLow", "import.warning.endTimeConfirm");
+        checkField("basePay", shift.basePay(), warnings, "import.warning.basePayMissing",
+                "import.warning.basePayLow", "import.warning.basePayConfirm");
         if (meanConfidence < 55) {
             warnings.add(warning("POOR_IMAGE", WarningSeverity.WARNING, null,
-                    "The screenshot was difficult to read. Check all imported values."));
+                    "import.warning.poorImage"));
         }
         checkDate(shift, context, scheduled, warnings);
         checkTimeAndPay(shift, warnings);
         if (shift.basePay().value() != null && shift.tips().value() != null
                 && shift.tips().value().compareTo(shift.basePay().value()) > 0) {
             warnings.add(warning("TIPS_EXCEED_BASE", WarningSeverity.WARNING, "tips",
-                    "Tips are higher than base pay. Confirm that the values were read correctly."));
+                    "import.warning.tipsExceedBase"));
         }
         return shift.withWarnings(warnings.stream().distinct().toList());
     }
 
-    private void checkField(String field, String label, ParsedField<?> value, List<ImportWarning> warnings) {
+    private void checkField(String field, ParsedField<?> value, List<ImportWarning> warnings, String missingKey,
+            String lowKey, String confirmKey) {
         if (value.level() == ConfidenceLevel.MISSING) {
-            warnings.add(warning("MISSING_FIELD", WarningSeverity.ERROR, field,
-                    label + " could not be read from the screenshot."));
+            warnings.add(warning("MISSING_FIELD", WarningSeverity.ERROR, field, missingKey));
         } else if (value.level() == ConfidenceLevel.LOW) {
-            warnings.add(warning("LOW_CONFIDENCE", WarningSeverity.WARNING, field,
-                    label + " may have been read incorrectly."));
+            warnings.add(warning("LOW_CONFIDENCE", WarningSeverity.WARNING, field, lowKey));
         } else if (value.level() == ConfidenceLevel.MEDIUM) {
-            warnings.add(warning("MEDIUM_CONFIDENCE", WarningSeverity.INFO, field,
-                    "Please confirm the imported " + label.toLowerCase() + "."));
+            warnings.add(warning("MEDIUM_CONFIDENCE", WarningSeverity.INFO, field, confirmKey));
         }
     }
 
@@ -59,13 +64,13 @@ public class ImportWarningRules {
         if (shift.date().value().isAfter(context.today().plusDays(14))) {
             warnings.add(scheduled
                     ? warning("FUTURE_DATE", WarningSeverity.INFO, "date",
-                            "This scheduled block is more than two weeks away.")
+                            "import.warning.scheduledFar")
                     : warning("FUTURE_DATE", WarningSeverity.WARNING, "date",
-                            "This date is more than two weeks in the future."));
+                            "import.warning.dateFar"));
         }
         if (shift.date().value().isBefore(context.today().minusDays(400))) {
             warnings.add(warning("OLD_DATE", WarningSeverity.WARNING, "date",
-                    "This date is more than 400 days old."));
+                    "import.warning.dateOld"));
         }
     }
 
@@ -77,15 +82,15 @@ public class ImportWarningRules {
         if (!end.isAfter(start)) {
             end = end.plusDays(1);
             warnings.add(warning("OVERNIGHT", WarningSeverity.INFO, "endTime",
-                    "This shift appears to end on the following day."));
+                    "import.warning.overnight"));
         }
         long minutes = Duration.between(start, end).toMinutes();
         if (minutes > 600) {
             warnings.add(warning("LONG_SHIFT", WarningSeverity.WARNING, "endTime",
-                    "This shift is longer than 10 hours."));
+                    "import.warning.longShift"));
         } else if (minutes < 30) {
             warnings.add(warning("SHORT_SHIFT", WarningSeverity.WARNING, "endTime",
-                    "This shift is shorter than 30 minutes."));
+                    "import.warning.shortShift"));
         }
 
         BigDecimal basePay = shift.basePay().value();
@@ -98,11 +103,12 @@ public class ImportWarningRules {
                 || hourly.compareTo(new BigDecimal("90")) > 0;
         if (amountOutsideRange || hourlyOutsideRange) {
             warnings.add(warning("PAY_OUT_OF_RANGE", WarningSeverity.WARNING, "basePay",
-                    "The imported pay or hourly rate is outside the usual range."));
+                    "import.warning.payOutOfRange"));
         }
     }
 
-    private ImportWarning warning(String code, WarningSeverity severity, String field, String message) {
-        return new ImportWarning(code, severity, field, message);
+    /** Warnings carry the text for the language of the request being served. */
+    private ImportWarning warning(String code, WarningSeverity severity, String field, String messageKey) {
+        return new ImportWarning(code, severity, field, Messages.current(messageKey));
     }
 }

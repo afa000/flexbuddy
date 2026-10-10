@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: light)">
     <meta name="robots" content="noindex">
-    <title th:text="'Tax year summary ' + ${report.year} + ' | FlexBuddy'">Tax year summary | FlexBuddy</title>
+    <title th:text="#{taxSummary.titleFlexbuddy(${'' + report.year})}">Tax year summary | FlexBuddy</title>
     <script>document.documentElement.dataset.theme = localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';</script>
     <style>
         html { background: #02080b; }
@@ -17,37 +17,37 @@
 <body class="print-page">
 <main class="print-layout">
     <div class="print-header">
-        <a class="secondary-button compact-button" href="/account#taxes">Back to account</a>
-        <button class="primary-button" id="printButton" type="button">Print or save as PDF</button>
+        <a class="secondary-button compact-button" href="/account#taxes" th:text="#{taxSummary.backToAccount}">Back to account</a>
+        <button class="primary-button" id="printButton" type="button" th:text="#{taxSummary.printOrSaveAsPdf}">Print or save as PDF</button>
     </div>
 
     <header class="print-title print-section">
-        <p class="step-label">FLEXBUDDY</p>
-        <h1 th:text="'Tax year summary · ' + ${report.year}">Tax year summary · 2026</h1>
+        <p class="step-label" th:text="#{taxSummary.flexbuddy}">FLEXBUDDY</p>
+        <h1 th:text="#{taxSummary.heading(${'' + report.year})}">Tax year summary · 2026</h1>
         <p class="print-name" th:text="${report.displayName}">Driver</p>
-        <p class="print-meta">Generated <span th:text="${#temporals.format(report.generatedOn, 'MMM d, yyyy')}">Sep 29, 2026</span></p>
+        <p class="print-meta"><th:block th:text="#{taxSummary.generated}">Generated</th:block> <span th:text="${#temporals.format(report.generatedOn, 'MMM d, yyyy')}">Sep 29, 2026</span></p>
         <p class="print-meta" th:if="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE'}"
-           th:text="'Vehicle costs: Standard mileage at $' + ${report.mileageRate.toPlainString()} + '/mile'">Vehicle costs: Standard mileage</p>
-        <p class="print-meta" th:unless="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE'}">Vehicle costs: Actual expenses</p>
+           th:text="#{taxSummary.vehicleCostsStandardMileageAt(${report.mileageRate.toPlainString()})}">Vehicle costs: Standard mileage</p>
+        <p class="print-meta" th:unless="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE'}" th:text="#{taxSummary.vehicleCostsActualExpenses}">Vehicle costs: Actual expenses</p>
     </header>
 
-    <p class="notice warning-notice print-notice print-section">
+    <p class="notice warning-notice print-notice print-section" th:text="#{taxSummary.theseAreEstimatesFromYour}">
         These are estimates from your own records and the percentage you chose. They are not tax advice, and FlexBuddy
         does not work out what you owe. Figures match the CSV download for the same year.
     </p>
 
     <section class="print-section" aria-labelledby="monthlyTitle">
-        <h2 id="monthlyTitle">Earnings and deductions by month</h2>
+        <h2 id="monthlyTitle" th:text="#{taxSummary.earningsAndDeductionsByMonth}">Earnings and deductions by month</h2>
         <div class="breakdown-scroll">
             <table class="breakdown-table print-table">
-                <caption class="sr-only" th:text="'Earnings, miles and expenses by month for ' + ${report.year}">Earnings by month</caption>
+                <caption class="sr-only" th:text="#{taxSummary.earningsByMonthCaption(${'' + report.year})}">Earnings by month</caption>
                 <thead>
                 <tr>
-                    <th scope="col">Month</th><th scope="col">Blocks</th><th scope="col">Base pay</th><th scope="col">Tips</th>
-                    <th scope="col">Gross</th><th scope="col">Miles</th><th scope="col">Rate/mile</th><th scope="col">Mileage cost</th>
-                    <th scope="col">Fuel</th><th scope="col">Tolls</th><th scope="col">Parking</th><th scope="col">Maintenance</th>
-                    <th scope="col">Other</th><th scope="col">Vehicle costs</th><th scope="col">Vehicle cost</th>
-                    <th scope="col">Total deductions</th><th scope="col">Est. net</th>
+                    <th scope="col" th:text="#{taxSummary.month}">Month</th><th scope="col" th:text="#{taxSummary.blocks}">Blocks</th><th scope="col" th:text="#{taxSummary.basePay}">Base pay</th><th scope="col" th:text="#{taxSummary.tips}">Tips</th>
+                    <th scope="col" th:text="#{taxSummary.gross}">Gross</th><th scope="col" th:text="#{taxSummary.miles}">Miles</th><th scope="col" th:text="#{taxSummary.rateMile}">Rate/mile</th><th scope="col" th:text="#{taxSummary.mileageCost}">Mileage cost</th>
+                    <th scope="col" th:text="#{taxSummary.fuel}">Fuel</th><th scope="col" th:text="#{taxSummary.tolls}">Tolls</th><th scope="col" th:text="#{taxSummary.parking}">Parking</th><th scope="col" th:text="#{taxSummary.maintenance}">Maintenance</th>
+                    <th scope="col" th:text="#{taxSummary.other}">Other</th><th scope="col" th:text="#{taxSummary.vehicleCosts}">Vehicle costs</th><th scope="col" th:text="#{taxSummary.vehicleCost}">Vehicle cost</th>
+                    <th scope="col" th:text="#{taxSummary.totalDeductions}">Total deductions</th><th scope="col" th:text="#{taxSummary.estNet}">Est. net</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -61,19 +61,19 @@
     </section>
 
     <section class="print-section" aria-labelledby="periodsTitle">
-        <h2 id="periodsTitle">Estimated payment periods</h2>
-        <p class="print-meta" th:if="${report.summary.percent == null}">No set-aside percentage chosen.</p>
+        <h2 id="periodsTitle" th:text="#{taxSummary.estimatedPaymentPeriods}">Estimated payment periods</h2>
+        <p class="print-meta" th:if="${report.summary.percent == null}" th:text="#{taxSummary.noSetAsidePercentageChosen}">No set-aside percentage chosen.</p>
         <p class="print-meta" th:unless="${report.summary.percent == null}"
-           th:text="'Set aside: ' + ${#numbers.formatDecimal(report.summary.percent, 1, 'COMMA', 1, 'POINT')} + '% of net earnings, as an estimate.'">Set aside</p>
+           th:text="#{taxSummary.setAsidePercent(${#numbers.formatDecimal(report.summary.percent, 1, 'COMMA', 1, 'POINT')})}">Set aside</p>
         <div class="breakdown-scroll">
             <table class="breakdown-table print-table">
-                <caption class="sr-only">Estimated tax by payment period</caption>
+                <caption class="sr-only" th:text="#{taxSummary.estimatedTaxByPaymentPeriod}">Estimated tax by payment period</caption>
                 <thead>
-                <tr><th scope="col">Period</th><th scope="col">Dates</th><th scope="col">Due</th><th scope="col">Est. net</th><th scope="col">Est. set-aside</th><th scope="col">Paid</th></tr>
+                <tr><th scope="col" th:text="#{taxSummary.period}">Period</th><th scope="col" th:text="#{taxSummary.dates}">Dates</th><th scope="col" th:text="#{taxSummary.due}">Due</th><th scope="col" th:text="#{taxSummary.estNet}">Est. net</th><th scope="col" th:text="#{taxSummary.estSetAside}">Est. set-aside</th><th scope="col" th:text="#{taxSummary.paid}">Paid</th></tr>
                 </thead>
                 <tbody>
                 <tr th:each="quarter : ${report.summary.quarters}">
-                    <th scope="row" th:text="'Q' + ${quarter.quarter}">Q1</th>
+                    <th scope="row" th:text="#{taxSummary.quarterShort(${'' + quarter.quarter})}">Q1</th>
                     <td th:text="${#temporals.format(quarter.from, 'MMM d')} + '–' + ${#temporals.format(quarter.to, 'MMM d')}">Jan 1–Mar 31</td>
                     <td th:text="${#temporals.format(quarter.dueDate, 'MMM d, yyyy')}">Apr 15, 2026</td>
                     <td class="num" th:text="'$' + ${#numbers.formatDecimal(quarter.net, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
@@ -87,12 +87,12 @@
     </section>
 
     <section class="print-section" aria-labelledby="paymentsTitle">
-        <h2 id="paymentsTitle">Payments recorded</h2>
-        <p class="print-meta" th:if="${#lists.isEmpty(report.summary.payments)}">No payments recorded.</p>
+        <h2 id="paymentsTitle" th:text="#{taxSummary.paymentsRecorded}">Payments recorded</h2>
+        <p class="print-meta" th:if="${#lists.isEmpty(report.summary.payments)}" th:text="#{taxSummary.noPaymentsRecorded}">No payments recorded.</p>
         <ul class="print-payments" th:unless="${#lists.isEmpty(report.summary.payments)}">
             <li th:each="payment : ${report.summary.payments}">
                 <strong th:text="${#temporals.format(payment.paidOn, 'MMM d, yyyy')}">Apr 14, 2026</strong>
-                <span th:text="${payment.quarter == null} ? 'Period not given' : 'For Q' + ${payment.quarter}">For Q1</span>
+                <span th:text="${payment.quarter == null} ? #{taxSummary.periodNotGiven} : #{taxSummary.forQuarter(${'' + payment.quarter})}">For Q1</span>
                 <span class="num" th:text="'$' + ${#numbers.formatDecimal(payment.amount, 1, 'COMMA', 2, 'POINT')}">$0.00</span>
                 <span th:if="${payment.note != null}" th:text="${payment.note}">Note</span>
             </li>
@@ -100,13 +100,13 @@
     </section>
 
     <section class="print-section" aria-labelledby="expensesTitle">
-        <h2 id="expensesTitle">Expenses</h2>
-        <p class="print-meta" th:if="${#lists.isEmpty(report.expenses)}" th:text="'No expenses recorded for ' + ${report.year} + '.'">No expenses recorded.</p>
+        <h2 id="expensesTitle" th:text="#{taxSummary.expenses}">Expenses</h2>
+        <p class="print-meta" th:if="${#lists.isEmpty(report.expenses)}" th:text="#{taxSummary.noExpensesRecordedFor(${'' + report.year})}">No expenses recorded.</p>
         <div class="breakdown-scroll" th:unless="${#lists.isEmpty(report.expenses)}">
             <table class="breakdown-table print-table print-expenses">
-                <caption class="sr-only" th:text="'Every expense counted in ' + ${report.year}">Expenses</caption>
+                <caption class="sr-only" th:text="#{taxSummary.everyExpenseCountedIn(${'' + report.year})}">Expenses</caption>
                 <thead>
-                <tr><th scope="col">Date</th><th scope="col">Category</th><th scope="col">Block</th><th scope="col">Note</th><th scope="col">Amount</th></tr>
+                <tr><th scope="col" th:text="#{taxSummary.date}">Date</th><th scope="col" th:text="#{taxSummary.category}">Category</th><th scope="col" th:text="#{taxSummary.block}">Block</th><th scope="col" th:text="#{taxSummary.note}">Note</th><th scope="col" th:text="#{taxSummary.amount}">Amount</th></tr>
                 </thead>
                 <tbody>
                 <tr th:each="expense : ${report.expenses}">
@@ -118,18 +118,18 @@
                 </tr>
                 </tbody>
                 <tfoot>
-                <tr th:if="${report.total.fuel.signum() != 0}"><th scope="row" colspan="4">Fuel</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.fuel, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
-                <tr th:if="${report.total.tolls.signum() != 0}"><th scope="row" colspan="4">Tolls</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.tolls, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
-                <tr th:if="${report.total.parking.signum() != 0}"><th scope="row" colspan="4">Parking</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.parking, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
-                <tr th:if="${report.total.maintenance.signum() != 0}"><th scope="row" colspan="4">Maintenance</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.maintenance, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
-                <tr th:if="${report.total.other.signum() != 0}"><th scope="row" colspan="4">Other</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.other, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
-                <tr class="print-total"><th scope="row" colspan="4">Total expenses</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(#aggregates.sum(report.expenses.![amount]), 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr th:if="${report.total.fuel.signum() != 0}"><th scope="row" colspan="4" th:text="#{taxSummary.fuel}">Fuel</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.fuel, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr th:if="${report.total.tolls.signum() != 0}"><th scope="row" colspan="4" th:text="#{taxSummary.tolls}">Tolls</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.tolls, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr th:if="${report.total.parking.signum() != 0}"><th scope="row" colspan="4" th:text="#{taxSummary.parking}">Parking</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.parking, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr th:if="${report.total.maintenance.signum() != 0}"><th scope="row" colspan="4" th:text="#{taxSummary.maintenance}">Maintenance</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.maintenance, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr th:if="${report.total.other.signum() != 0}"><th scope="row" colspan="4" th:text="#{taxSummary.other}">Other</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(report.total.other, 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
+                <tr class="print-total"><th scope="row" colspan="4" th:text="#{taxSummary.totalExpenses}">Total expenses</th><td class="num" th:text="'$' + ${#numbers.formatDecimal(#aggregates.sum(report.expenses.![amount]), 1, 'COMMA', 2, 'POINT')}">$0.00</td></tr>
                 </tfoot>
             </table>
         </div>
     </section>
 
-    <p class="print-footer">FlexBuddy · figures are estimates from your own records.</p>
+    <p class="print-footer" th:text="#{taxSummary.flexbuddyFiguresAreEstimatesFrom}">FlexBuddy · figures are estimates from your own records.</p>
 </main>
 
 <th:block th:remove="all">
@@ -147,7 +147,7 @@
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.parking, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.maintenance, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.other, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
-        <td th:text="${row.vehicleCostMethod.name() == 'STANDARD_MILEAGE'} ? 'Standard mileage' : 'Actual expenses'">Standard mileage</td>
+        <td th:text="${row.vehicleCostMethod.name() == 'STANDARD_MILEAGE'} ? #{taxSummary.standardMileage} : #{taxSummary.actualExpenses}">Standard mileage</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.vehicleCost, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.totalDeductions, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.net, 1, 'COMMA', 2, 'POINT')}">$0.00</td>

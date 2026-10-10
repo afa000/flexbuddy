@@ -16,12 +16,12 @@ public enum ShiftStatus {
 
     public static ShiftStatus parse(String value) {
         if (value == null || value.isBlank()) {
-            throw new InvalidFilterException("status is required.");
+            throw new InvalidFilterException("error.filter.statusRequired");
         }
         try {
             return valueOf(value.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
-            throw new InvalidFilterException("Unknown status: " + value);
+            throw new InvalidFilterException("error.filter.unknownStatus", value);
         }
     }
 
@@ -35,21 +35,21 @@ public enum ShiftStatus {
         return statuses.isEmpty() ? defaults : Set.copyOf(statuses);
     }
 
-    /** Returns a message describing why the values are invalid for this status, or null when they are valid. */
-    public String validate(BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
+    /** Returns the message key saying why the values are invalid for this status, or null when they are valid. */
+    public String problemKey(BigDecimal basePay, BigDecimal tips, BigDecimal miles) {
         boolean hasTips = tips != null && tips.signum() != 0;
         return switch (this) {
-            case SCHEDULED -> basePay == null || basePay.signum() <= 0 ? "A scheduled shift needs the offered pay."
-                    : hasTips ? "A scheduled shift cannot have tips yet."
-                    : miles != null ? "A scheduled shift cannot have miles yet." : null;
+            case SCHEDULED -> basePay == null || basePay.signum() <= 0 ? "error.shift.scheduledNeedsPay"
+                    : hasTips ? "error.shift.scheduledNoTips"
+                    : miles != null ? "error.shift.scheduledNoMiles" : null;
             case COMPLETED -> basePay == null || basePay.signum() <= 0
-                    ? "A completed shift needs base pay greater than 0." : null;
+                    ? "error.shift.completedNeedsPay" : null;
             case CANCELLED -> basePay == null || basePay.signum() < 0
-                    ? "A cancelled shift needs cancellation pay of 0 or more."
-                    : hasTips ? "A cancelled shift cannot have tips." : null;
+                    ? "error.shift.cancelledNeedsPay"
+                    : hasTips ? "error.shift.cancelledNoTips" : null;
             case FORFEITED -> basePay == null || basePay.signum() < 0
-                    ? "A forfeited shift needs base pay of 0 or more."
-                    : hasTips ? "A forfeited shift cannot have tips." : null;
+                    ? "error.shift.forfeitedNeedsPay"
+                    : hasTips ? "error.shift.forfeitedNoTips" : null;
         };
     }
 

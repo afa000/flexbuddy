@@ -419,7 +419,7 @@ class ShiftControllerTest {
         logger.addAppender(logs);
         try {
             when(shiftImportService.createPreview(any(), any())).thenThrow(new com.angel.flexbuddy.exception.ScreenshotOcrException(
-                    "The screenshot could not be read.", new RuntimeException("tesseract failed")));
+                    new RuntimeException("tesseract failed"), "error.import.couldNotRead"));
 
             mockMvc.perform(multipart("/shifts/import-preview")
                             .file(new org.springframework.mock.web.MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1, 2, 3}))
@@ -445,7 +445,7 @@ class ShiftControllerTest {
         logger.addAppender(logs);
         try {
             when(shiftImportService.createPreview(any(), any())).thenThrow(
-                    new com.angel.flexbuddy.exception.ScreenshotBusyException("Another screenshot is being read. Try again in a moment."));
+                    new com.angel.flexbuddy.exception.ScreenshotBusyException("error.import.busy"));
 
             mockMvc.perform(multipart("/shifts/import-preview")
                             .file(new org.springframework.mock.web.MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1, 2, 3}))
@@ -470,7 +470,7 @@ class ShiftControllerTest {
         );
 
         when(shiftImportService.createPreview(any(), any()))
-                .thenThrow(new InvalidScreenshotException("Unsupported screenshot type."));
+                .thenThrow(new InvalidScreenshotException("error.import.unsupportedType"));
 
         mockMvc.perform(multipart("/shifts/import-preview")
                         .file(screenshot)
@@ -503,7 +503,7 @@ class ShiftControllerTest {
     @Test
     void changeStatus_returnsTheRuleThatWasBroken() throws Exception {
         when(shiftService.changeStatus(eq("angel@example.com"), eq(5L), any(ShiftStatusRequest.class), org.mockito.ArgumentMatchers.isNull()))
-                .thenThrow(new InvalidShiftException("A completed shift cannot be moved back to scheduled. Delete it and add the block again."));
+                .thenThrow(new InvalidShiftException("error.shift.completedCannotReschedule"));
 
         mockMvc.perform(patch("/shifts/{id}/status", 5L)
                         .with(user("angel@example.com"))
@@ -578,7 +578,7 @@ class ShiftControllerTest {
     void missingMiles_usesAWeekByDefaultAndRejectsABadWindow() throws Exception {
         when(shiftService.missingMiles("angel@example.com", 7)).thenReturn(List.of());
         when(shiftService.missingMiles("angel@example.com", 40))
-                .thenThrow(new com.angel.flexbuddy.exception.InvalidFilterException("days must be between 1 and 31."));
+                .thenThrow(new com.angel.flexbuddy.exception.InvalidFilterException("error.filter.daysRange", "31"));
 
         mockMvc.perform(get("/shifts/missing-miles").with(user("angel@example.com")))
                 .andExpect(status().isOk())

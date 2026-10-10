@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.PushMessage;
 import com.angel.flexbuddy.dto.TaxQuarterResponse;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.TaxReminderKind;
 import com.angel.flexbuddy.model.TaxReminderLog;
@@ -77,13 +78,14 @@ public class TaxReminderJob {
     }
 
     private PushMessage message(AppUser owner, int taxYear, int quarter, LocalDate due, TaxReminderKind kind) {
-        String title = kind == TaxReminderKind.WEEK_BEFORE ? "Estimated tax due " + DAY.format(due)
-                : "Estimated tax due today · Q" + quarter;
+        String title = kind == TaxReminderKind.WEEK_BEFORE
+                ? Messages.english("push.tax.weekBefore.title", DAY.format(due))
+                : Messages.english("push.tax.dueToday.title", String.valueOf(quarter));
         TaxQuarterResponse period = taxService.summary(owner.getEmail(), taxYear).quarters().get(quarter - 1);
         String body = period.setAside() == null
-                ? "Q" + quarter + " payment is due. Choose a set-aside percentage in FlexBuddy to see an estimate."
-                : "Q" + quarter + " estimate to set aside: " + money(period.setAside()) + " · " + money(period.paid())
-                        + " recorded as paid. An estimate from your own numbers, not tax advice.";
+                ? Messages.english("push.tax.noEstimate.body", String.valueOf(quarter))
+                : Messages.english("push.tax.estimate.body", String.valueOf(quarter), money(period.setAside()),
+                        money(period.paid()));
         String tag = "tax-" + taxYear + "-q" + quarter + (kind == TaxReminderKind.WEEK_BEFORE ? "-week" : "-due");
         return new PushMessage(title, body, TAXES_URL, tag);
     }

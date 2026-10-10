@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" th:lang="${#locale.toLanguageTag()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -11,8 +11,8 @@
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
-    <meta name="description" content="Sign in to FlexBuddy.">
-    <title>Sign in | FlexBuddy</title>
+    <meta name="description" th:content="#{login.signInToFlexbuddy}">
+    <title th:text="#{login.signInFlexbuddy}">Sign in | FlexBuddy</title>
     <script>
         document.documentElement.dataset.theme =
             localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
@@ -36,70 +36,69 @@
     <section class="auth-card" aria-labelledby="login-title">
         <div class="auth-brand">
             <span class="auth-brand-mark">FB</span>
-            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+            <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{app.tagline}">Shift tracker</small></div>
         </div>
 
-        <p class="eyebrow">WELCOME BACK</p>
-        <h1 id="login-title">Sign in</h1>
-        <p class="auth-copy">Access your private shift history and earnings.</p>
+        <p class="eyebrow" th:text="#{login.welcomeBack}">WELCOME BACK</p>
+        <h1 id="login-title" th:text="#{login.signIn}">Sign in</h1>
+        <p class="auth-copy" th:text="#{login.accessYourPrivateShiftHistory}">Access your private shift history and earnings.</p>
 
-        <div class="notice success-notice" th:if="${param.registered}">
+        <div class="notice success-notice" th:if="${param.registered}" th:text="#{login.accountCreatedSignInTo}">
             Account created. Sign in to get started.
         </div>
-        <div class="notice error-notice auth-notice" th:if="${param.error}">
+        <div class="notice error-notice auth-notice" th:if="${param.error}" th:text="#{login.theEmailOrPasswordWas}">
             The email or password was incorrect.
         </div>
-        <div class="notice error-notice auth-notice" th:if="${param.locked}" role="alert">
-            Too many sign-in attempts. Wait <span th:text="${lockMinutes}">15</span> minutes, or
-            <a class="text-link" href="/forgot-password">reset your password</a>.
+        <div class="notice error-notice auth-notice" th:if="${param.locked}" role="alert"
+             th:utext="#{login.locked.html(${'' + lockMinutes})}">
+            Too many sign-in attempts. Wait 15 minutes, or <a class="text-link" href="/forgot-password">reset your password</a>.
         </div>
-        <div class="notice success-notice" th:if="${param.reset}">
+        <div class="notice success-notice" th:if="${param.reset}" th:text="#{login.yourPasswordWasChangedSign}">
             Your password was changed. Sign in with your new password.
         </div>
-        <div class="notice error-notice auth-notice" th:if="${param.expired}">
+        <div class="notice error-notice auth-notice" th:if="${param.expired}" th:text="#{login.yourSessionExpiredSignIn}">
             Your session expired. Sign in again.
         </div>
-        <div class="notice success-notice" th:if="${param.logout}">
+        <div class="notice success-notice" th:if="${param.logout}" th:text="#{login.youHaveSignedOut}">
             You have signed out.
         </div>
-        <div class="notice success-notice" th:if="${param.everywhere}">
+        <div class="notice success-notice" th:if="${param.everywhere}" th:text="#{login.youHaveBeenSignedOut}">
             You have been signed out on every device.
         </div>
         <div class="notice error-notice auth-notice" th:if="${param.google}"
-             th:text="${param.google[0] == 'unverified' ? 'Your Google account''s email isn''t verified. Verify it with Google or sign up with email.'
-                     : param.google[0] == 'linked' ? 'That Google account is linked to a different FlexBuddy account.'
-                     : param.google[0] == 'limit' ? 'Too many sign-ups from this connection. Try again in an hour.'
-                     : 'Google sign-in didn''t finish. Try again.'}">
+             th:text="${param.google[0] == 'unverified'} ? #{login.googleUnverified}
+                     : (${param.google[0] == 'linked'} ? #{login.googleLinked}
+                     : (${param.google[0] == 'limit'} ? #{login.googleLimit} : #{login.googleFailed}))">
         </div>
-        <div class="notice success-notice" th:if="${param.deleted}">
+        <div class="notice success-notice" th:if="${param.deleted}" th:text="#{login.yourFlexbuddyAccountAndIts}">
             Your FlexBuddy account and its data have been deleted.
         </div>
 
         <form class="auth-form" th:action="@{/login}" method="post">
             <label class="field">
-                <span>Email</span>
+                <span th:text="#{login.email}">Email</span>
                 <input name="username" type="email" autocomplete="email" required autofocus>
             </label>
             <label class="field">
-                <span>Password</span>
+                <span th:text="#{login.password}">Password</span>
                 <input name="password" type="password" data-reveal autocomplete="current-password" required>
             </label>
-            <a class="text-link forgot-link" href="/forgot-password">Forgot password?</a>
+            <a class="text-link forgot-link" href="/forgot-password" th:text="#{login.forgotPassword}">Forgot password?</a>
             <label class="remember-me-row">
                 <input id="rememberMe" name="remember-me" type="checkbox">
-                <span><strong>Keep me signed in</strong><small>Stay signed in on this device for 30 days.</small></span>
+                <span><strong th:text="#{login.keepMeSignedIn}">Keep me signed in</strong><small th:text="#{login.staySignedInOnThis}">Stay signed in on this device for 30 days.</small></span>
             </label>
             <input id="appDisplayMode" name="app-display-mode" type="hidden" value="browser">
-            <button class="primary-button auth-submit" type="submit">Sign in</button>
+            <button class="primary-button auth-submit" type="submit" th:text="#{login.signIn}">Sign in</button>
         </form>
 
-        <div class="auth-divider" th:if="${googleEnabled}"><span>or</span></div>
+        <div class="auth-divider" th:if="${googleEnabled}"><span th:text="#{login.or}">or</span></div>
         <a class="secondary-button auth-google" th:if="${googleEnabled}" id="googleSignIn" href="/oauth2/authorization/google">
             <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-            <span>Continue with Google</span>
+            <span th:text="#{login.continueWithGoogle}">Continue with Google</span>
         </a>
 
-        <p class="auth-switch">New to FlexBuddy? <a href="/register">Create an account</a></p>
+        <p class="auth-switch" th:utext="#{login.newToFlexbuddyCreateAn.html}">New to FlexBuddy? <a href="/register">Create an account</a></p>
     </section>
 </main>
 <script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>

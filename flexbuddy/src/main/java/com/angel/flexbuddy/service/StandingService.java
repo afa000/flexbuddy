@@ -53,7 +53,7 @@ public class StandingService {
     @Transactional(readOnly = true)
     public StandingResponse window(String email, int days) {
         if (days < MIN_DAYS || days > MAX_DAYS) {
-            throw new InvalidStandingException("Choose between " + MIN_DAYS + " and " + MAX_DAYS + " days.");
+            throw new InvalidStandingException("error.standing.dayRange", String.valueOf(MIN_DAYS), String.valueOf(MAX_DAYS));
         }
         LocalDate to = userTime.today(email);
         LocalDate from = to.minusDays(days - 1L);
@@ -76,7 +76,7 @@ public class StandingService {
     @Transactional
     public void log(String email, LocalDate recordedOn, StandingEntryRequest request) {
         if (recordedOn.isAfter(userTime.today(email))) {
-            throw new InvalidStandingException("Standing can be logged for today or an earlier day.");
+            throw new InvalidStandingException("error.standing.notFuture");
         }
         StandingEntry entry = entries.findByOwnerEmailIgnoreCaseAndRecordedOn(email, recordedOn).orElseGet(() -> {
             AppUser owner = userRepository.findByEmailIgnoreCase(email)

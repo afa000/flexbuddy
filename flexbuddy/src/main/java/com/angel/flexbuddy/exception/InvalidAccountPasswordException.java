@@ -1,8 +1,8 @@
 package com.angel.flexbuddy.exception;
 
-public class InvalidAccountPasswordException extends RuntimeException {
+public class InvalidAccountPasswordException extends LocalizedException {
 
     public InvalidAccountPasswordException() {
-        super("The password you entered is incorrect.");
+        super("error.account.wrongPassword", new Object[0]);
     }
 }
