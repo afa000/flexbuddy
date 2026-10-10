@@ -548,13 +548,11 @@ when its client ID and secret are set in the environment.
 
 ## 9. Open questions
 
-1. **Two-step after Google.** I kept the FlexBuddy code step for drivers
-   who turned two-step on, even when they sign in with Google. It's
-   consistent, and safe if their Google account is weak. Many apps skip
-   their own step for Google sign-ins, because Google has its own. Say if
-   you'd rather skip it.
-2. **The iPhone home-screen app.** If step 11 shows the sign-in finishing
-   in Safari instead of the app, the simplest fix is to hide the Google
-   button when `navigator.standalone` is true (iOS home-screen only) and
-   show "Use your password here, or open FlexBuddy in Safari to use
-   Google." I'll write that as a follow-up if the check fails.
+1. ~~Two-step after Google?~~ **Decided:** still ask for the FlexBuddy
+   code after a Google sign-in when the driver has two-step on, as
+   planned.
+2. ~~The iPhone home-screen app?~~ **Decided:** run manual check 11. If
+   the sign-in finishes in Safari instead of the app, plan the follow-up
+   that hides the Google button when `navigator.standalone` is true and
+   shows "Use your password here, or open FlexBuddy in Safari to use
+   Google."
