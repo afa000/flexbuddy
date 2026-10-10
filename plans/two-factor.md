@@ -607,11 +607,11 @@ off or making new recovery codes needs the password and a code.
 
 ## 9. Open questions
 
-1. **Lost phone, lost email, no recovery codes.** Who can switch two-step
-   off, and how do they prove who they are? For now I suggest support by
-   email to `flexbuddysupport@gmail.com`, with you clearing the three
-   columns by hand once you're satisfied. The plan adds no admin page.
-   Say if you'd rather have a documented SQL snippet in the README.
+1. ~~Lost phone, lost email, no recovery codes?~~ **Decided:** support
+   by email to `flexbuddysupport@gmail.com`. The operator clears
+   `two_factor_method`, `totp_secret` and `totp_last_step` by hand once
+   satisfied, and deletes the account's `recovery_code` rows. There's no
+   admin page.
 2. **The QR library.** This plan adds `com.google.zxing:core` 3.5.4 (about
    550 KB) to draw the QR server-side. The alternative is a self-hosted
    JS QR library. Server-side keeps the secret off any third-party
