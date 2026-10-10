@@ -72,9 +72,9 @@
         shift = target;
         trigger = from;
         latest = await latestReading();
-        el.label.textContent = completing() ? 'FINISH BLOCK' : 'BLOCK DETAILS';
+        el.label.textContent = completing() ? t('js.finish.labelFinish') : t('js.finish.labelDetails');
         el.title.textContent = shift.station;
-        el.description.textContent = `${formatDate(shift.date)} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)} scheduled`;
+        el.description.textContent = t('js.finish.scheduledLine', formatDate(shift.date), formatTime(shift.startTime), formatTime(shift.endTime));
         el.start.value = trimTime(shift.details?.actualStart) || trimTime(shift.startTime);
         el.end.value = trimTime(shift.details?.actualEnd) || defaultEnd();
         const details = shift.details ?? {};
@@ -89,7 +89,7 @@
         setMode(details.odometerStart != null || details.odometerEnd != null || (latest != null && shift.miles == null));
         el.payField.classList.toggle('is-hidden', !completing());
         el.pay.value = shift.basePay ?? '';
-        el.save.querySelector('span').textContent = completing() ? 'Finish block' : 'Save details';
+        el.save.querySelector('span').textContent = completing() ? t('js.finish.finishBlock') : t('js.finish.saveDetails');
         el.save.disabled = false;
         hideMessage(el.error);
         updateSummary();
@@ -121,7 +121,7 @@
         useOdometer = odometer;
         el.odometer.classList.toggle('is-hidden', !odometer);
         el.milesField.classList.toggle('is-hidden', odometer);
-        el.mode.textContent = odometer ? 'Enter miles instead' : 'Use the odometer';
+        el.mode.textContent = odometer ? t('js.finish.enterMilesInstead') : t('js.finish.useOdometer');
         updateSummary();
     }
 
@@ -149,13 +149,13 @@
         const minutes = minutesBetween(el.start.value, el.end.value);
         if (minutes) {
             const early = shift.timeWorked - minutes;
-            const pace = early > 0 ? `${formatMinutes(early)} early` : early < 0 ? `${formatMinutes(-early)} over` : 'right on schedule';
-            parts.push(`${formatMinutes(minutes)} on the clock · ${pace}`);
+            const pace = early > 0 ? t('js.finish.early', formatMinutes(early)) : early < 0 ? t('js.finish.over', formatMinutes(-early)) : t('js.finish.onSchedule');
+            parts.push(t('js.finish.onTheClock', formatMinutes(minutes), pace));
         }
         const miles = useOdometer ? odometerMiles() : (el.miles.value === '' ? null : Number(el.miles.value));
-        if (miles !== null && miles >= 0) parts.push(`${miles.toFixed(1)} mi`);
-        el.summary.textContent = parts.join(' · ') || 'Enter both times to see how long the block took.';
-        el.routeSummary.textContent = routeSummary(count(el.stops), count(el.returns), minutes || shift.timeWorked) || 'Optional';
+        if (miles !== null && miles >= 0) parts.push(t('js.common.miles', miles.toFixed(1)));
+        el.summary.textContent = parts.join(' · ') || t('js.finish.enterBothTimes');
+        el.routeSummary.textContent = routeSummary(count(el.stops), count(el.returns), minutes || shift.timeWorked) || t('js.finish.optional');
         updateOdometerHint();
     }
 
@@ -167,8 +167,8 @@
         const from = `${formatDate(latest.date)} · ${latest.station}`;
         const start = el.odometerStart.value === '' ? null : Number(el.odometerStart.value);
         el.odometerHint.textContent = start !== null && start < Number(latest.reading)
-            ? `Lower than your last reading, ${latest.reading} on ${from}. Different car?`
-            : `Last reading ${latest.reading}, from ${from}.`;
+            ? t('js.finish.lowerThanLast', latest.reading, from)
+            : t('js.finish.lastReading', latest.reading, from);
     }
 
     function count(input) {
@@ -176,15 +176,15 @@
     }
 
     function problem() {
-        if (el.end.value && !el.start.value) return 'Enter when the block started.';
-        if (el.start.value && el.start.value === el.end.value) return 'The finish time must be after the start time.';
+        if (el.end.value && !el.start.value) return t('js.finish.enterStart');
+        if (el.start.value && el.start.value === el.end.value) return t('js.finish.finishAfterStart');
         if (useOdometer && odometerMiles() !== null && odometerMiles() < 0) {
-            return 'The odometer end reading must be at least the start reading.';
+            return t('js.finish.odometerEndBeforeStart');
         }
         if (count(el.returns) !== null && count(el.packages) !== null && count(el.returns) > count(el.packages)) {
-            return 'Returns cannot be more than the packages carried.';
+            return t('js.finish.returnsOverPackages');
         }
-        if (completing() && !(Number(el.pay.value) > 0)) return 'Enter the base pay for this block.';
+        if (completing() && !(Number(el.pay.value) > 0)) return t('js.finish.enterBasePay');
         return null;
     }
 
@@ -220,24 +220,25 @@
             const result = await window.flexbuddyOutbox.submit('shift-finish', {
                 method: 'PATCH', url: `/shifts/${finished.id}/status`, body,
                 shiftId: finished.id, expectedUpdatedAt: finished.updatedAt,
-                summary: {title: `Finish · ${finished.station}`,
-                    detail: `${formatShortDay(finished.date)}${drove == null ? '' : ` · ${drove.toFixed(1)} mi`}`}
+                summary: {title: ['js.finish.queuedTitle', finished.station],
+                    detail: drove == null ? formatShortDay(finished.date)
+                        : ['js.finish.queuedDetail', formatShortDay(finished.date), drove.toFixed(1)]}
             });
             if (result.queued) {
                 close();
-                showToast('Saved offline · will sync',
-                    `${finished.station} on ${formatDate(finished.date)} will be updated when you're back online.`);
+                showToast(t('js.finish.savedOfflineTitle'),
+                    t('js.finish.savedOfflineMessage', finished.station, formatDate(finished.date)));
                 return;
             }
             const response = result.sent;
-            if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text() || 'The block could not be saved.');
+            if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text() || t('js.finish.saveFailed'));
             const wasScheduled = completing();
             close();
-            showToast(wasScheduled ? 'Block finished' : 'Block details saved',
-                `${finished.station} on ${formatDate(finished.date)} is up to date.`);
+            showToast(wasScheduled ? t('js.finish.finishedTitle') : t('js.finish.detailsSavedTitle'),
+                t('js.finish.upToDate', finished.station, formatDate(finished.date)));
             await loadDashboard();
         } catch (error) {
-            showMessage(el.error, error.message || 'The block could not be saved.');
+            showMessage(el.error, error.message || t('js.finish.saveFailed'));
             el.save.disabled = false;
         }
     }
@@ -250,7 +251,7 @@
             const target = await response.json();
             if (target.status === 'SCHEDULED' || target.status === 'COMPLETED') await open(target, from);
         } catch {
-            showToast('Block not found', 'That block could not be opened. It may have been deleted.', {alert: true});
+            showToast(t('js.finish.notFoundTitle'), t('js.finish.notFoundMessage'), {alert: true});
         }
     }
 
@@ -296,8 +297,7 @@
         const skipped = snoozed();
         const visible = shifts.filter(shift => !skipped[shift.id]);
         missing = visible.length;
-        document.querySelector('#missingMilesCount').textContent =
-            `${visible.length} ${visible.length === 1 ? 'block' : 'blocks'} this week`;
+        document.querySelector('#missingMilesCount').textContent = tn(visible.length, 'js.finish.blocksThisWeek');
         const offline = window.flexbuddyPwa?.isOffline() ?? false;
         document.querySelector('#missingMilesList').replaceChildren(...visible.map(shift => {
             const row = document.createElement('article');
@@ -306,9 +306,9 @@
                 <p><strong>${escapeHtml(formatDate(shift.date))} · ${escapeHtml(shift.station)}</strong>
                     <span>${escapeHtml(formatTime(shift.startTime))}–${escapeHtml(formatTime(shift.endTime))}</span></p>
                 <div class="confirm-actions">
-                    <button class="primary-button compact-button" type="button" data-action="add">Add miles</button>
-                    <button class="secondary-button compact-button" type="button" data-action="none" data-online-only>No miles</button>
-                    <button class="text-button" type="button" data-action="later">Not now</button>
+                    <button class="primary-button compact-button" type="button" data-action="add">${escapeHtml(t('js.finish.addMiles'))}</button>
+                    <button class="secondary-button compact-button" type="button" data-action="none" data-online-only>${escapeHtml(t('js.finish.noMiles'))}</button>
+                    <button class="text-button" type="button" data-action="later">${escapeHtml(t('js.finish.notNow'))}</button>
                 </div>`;
             row.querySelectorAll('[data-online-only]').forEach(button => button.disabled = offline);
             row.querySelector('[data-action="add"]').addEventListener('click', event => open(shift, event.currentTarget));
@@ -336,11 +336,11 @@
                 headers: csrfHeaders({'Content-Type': 'application/json'}),
                 body: JSON.stringify({status: 'COMPLETED', miles: 0})
             });
-            if (!response.ok) throw new Error(await response.text() || 'The block could not be updated.');
-            showToast('Saved as no miles', `${target.station} on ${formatDate(target.date)} will not ask again.`);
+            if (!response.ok) throw new Error(await response.text() || t('js.finish.updateFailed'));
+            showToast(t('js.finish.noMilesTitle'), t('js.finish.noMilesMessage', target.station, formatDate(target.date)));
             await loadDashboard();
         } catch (error) {
-            showToast('Not saved', error.message || 'The block could not be updated.', {alert: true});
+            showToast(t('js.common.notSaved'), error.message || t('js.finish.updateFailed'), {alert: true});
             button.disabled = false;
         }
     }

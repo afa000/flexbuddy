@@ -220,7 +220,7 @@ async function apiFetch(url, options = {}) {
         // Being offline is not an expired session, so a failed request never bounces to the login page.
         if (error?.name !== 'AbortError' && !navigator.onLine) {
             window.flexbuddyPwa?.noteNetworkFailure();
-            const offlineError = new Error('You are offline. Try again when your connection returns.');
+            const offlineError = new Error(t('js.common.offlineTryAgain'));
             offlineError.offline = true;
             throw offlineError;
         }
@@ -230,7 +230,7 @@ async function apiFetch(url, options = {}) {
     const responsePath = new URL(response.url, window.location.origin).pathname;
     if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
         window.location.assign('/login?expired');
-        throw new Error('Your session expired. Sign in again.');
+        throw new Error(t('js.common.sessionExpired'));
     }
     return plainFailure(response);
 }
@@ -244,8 +244,8 @@ function plainFailure(response) {
     if (response.ok) return response;
     if (!(response.headers.get('Content-Type') || '').includes('text/html')) return response;
     const message = response.status >= 500
-        ? 'FlexBuddy could not be reached right now. Try again in a minute.'
-        : 'The request could not be completed. Try again.';
+        ? t('js.app.unreachable')
+        : t('js.app.requestFailed');
     return new Response(message, {status: response.status, headers: {'Content-Type': 'text/plain'}});
 }
 
@@ -357,8 +357,8 @@ elements.trashSection.addEventListener('toggle', () => {
     if (elements.trashSection.open) loadTrash();
 });
 elements.emptyTrashButton.addEventListener('click', () => openConfirm(
-    'Empty Recently deleted?',
-    'Every deleted shift will be permanently removed. This cannot be undone.',
+    t('js.app.emptyTrashTitle'),
+    t('js.app.emptyTrashMessage'),
     emptyTrash
 ));
 elements.expenseForm.addEventListener('submit', saveExpense);
@@ -368,8 +368,8 @@ elements.expenseDate.addEventListener('change', () => populateExpenseShifts(curr
 elements.expenseQuery.addEventListener('input', () => { clearTimeout(elements.expenseQuery._timer); elements.expenseQuery._timer = setTimeout(loadExpenses, 250); });
 elements.expenseTrashSection.addEventListener('toggle', () => { if (elements.expenseTrashSection.open) loadExpenseTrash(); });
 elements.emptyExpenseTrashButton.addEventListener('click', () => openConfirm(
-    'Empty deleted expenses?',
-    'Every deleted expense will be permanently removed. This cannot be undone.',
+    t('js.app.emptyExpenseTrashTitle'),
+    t('js.app.emptyExpenseTrashMessage'),
     emptyExpenseTrash
 ));
 elements.cancelConfirmButton.addEventListener('click', closeConfirm);
@@ -380,7 +380,7 @@ elements.acceptConfirmButton.addEventListener('click', async () => {
     try {
         await action();
     } catch (error) {
-        showToast('Action failed', error.message || 'The action could not be completed.', {alert: true});
+        showToast(t('js.app.actionFailed'), error.message || t('js.app.actionNotCompleted'), {alert: true});
     }
 });
 elements.editModal.addEventListener('click', event => {
@@ -440,7 +440,7 @@ function toggleTheme() {
 }
 
 function updateThemeToggle(theme) {
-    const label = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    const label = theme === 'light' ? t('js.common.switchToDarkMode') : t('js.common.switchToLightMode');
     elements.themeToggleButton.setAttribute('aria-label', label);
     elements.themeToggleButton.title = label;
 }
@@ -541,12 +541,12 @@ async function processScreenshot(file) {
     hideMessage(elements.uploadError);
 
     if (!['image/png', 'image/jpeg'].includes(file.type)) {
-        showMessage(elements.uploadError, 'Choose a PNG or JPEG screenshot.');
+        showMessage(elements.uploadError, t('js.app.choosePngJpeg'));
         return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-        showMessage(elements.uploadError, 'The screenshot must be 5 MB or smaller.');
+        showMessage(elements.uploadError, t('js.app.screenshotTooBig'));
         return;
     }
 
@@ -574,7 +574,7 @@ async function processScreenshot(file) {
         });
 
         if (!response.ok) {
-            throw new Error(await response.text() || 'The screenshot could not be processed.');
+            throw new Error(await response.text() || t('js.app.screenshotNotProcessed'));
         }
 
         const preview = await response.json();
@@ -585,8 +585,8 @@ async function processScreenshot(file) {
         if (importAbort !== abort && !timedOut) return;
         if (error.name === 'AbortError' && !timedOut) return;
         showMessage(elements.uploadError, timedOut
-            ? 'Reading this screenshot took too long. Try again, or choose a different screenshot.'
-            : error.message || 'The screenshot could not be processed.');
+            ? t('js.app.screenshotTimedOut')
+            : error.message || t('js.app.screenshotNotProcessed'));
         elements.emptyPreview.classList.remove('is-hidden');
         elements.previewForm.classList.add('is-hidden');
     } finally {
@@ -618,7 +618,7 @@ function showSelectedFile(file) {
 
 function populatePreview(preview) {
     const candidate = preview.shifts?.[0];
-    if (!candidate) throw new Error('No shift details were found in this screenshot.');
+    if (!candidate) throw new Error(t('js.app.noShiftDetails'));
 
     setPreviewField('station', candidate.station);
     setPreviewField('date', candidate.date);
@@ -650,12 +650,12 @@ function applyImportStatusRules() {
         elements.tips.value = 0;
         elements.miles.value = '';
     }
-    elements.saveButton.querySelector('span').textContent = scheduled ? 'Add scheduled shift' : 'Add shift';
+    elements.saveButton.querySelector('span').textContent = scheduled ? t('js.common.addScheduledShift') : t('js.common.addShift');
     // A future date is expected for a scheduled block and suspicious for a completed one.
     const warnings = importWarnings.map(warning => warning.code !== 'FUTURE_DATE' ? warning : {
         ...warning,
         severity: scheduled ? 'INFO' : 'WARNING',
-        message: scheduled ? 'This scheduled block is more than two weeks away.' : 'This date is more than two weeks in the future.'
+        message: scheduled ? t('js.app.scheduledFar') : t('js.app.dateFar')
     });
     renderWarnings(warnings);
     elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
@@ -687,14 +687,14 @@ async function completeScheduledShift() {
                 miles: elements.miles.value === '' ? null : Number(elements.miles.value)
             })
         });
-        if (!response.ok) throw new Error(await response.text() || 'The scheduled shift could not be completed.');
+        if (!response.ok) throw new Error(await response.text() || t('js.app.scheduledNotCompleted'));
         resetImport();
-        showToast('Scheduled shift completed', 'Your earnings and hours now include this block.');
+        showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
         await loadStations();
         await loadDashboard();
         showDashboard();
     } catch (error) {
-        showMessage(elements.saveError, error.message || 'The scheduled shift could not be completed.');
+        showMessage(elements.saveError, error.message || t('js.app.scheduledNotCompleted'));
     } finally {
         elements.completeScheduledButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
     }
@@ -711,7 +711,7 @@ function setPreviewField(name, parsedField, transform = value => value ?? '') {
     if (field.level !== 'HIGH' || field.confidence < 90) {
         const badge = document.createElement('small');
         badge.className = `confidence-badge confidence-${field.level.toLowerCase()}`;
-        badge.textContent = field.level === 'MISSING' ? 'Missing' : `${field.confidence}% read`;
+        badge.textContent = field.level === 'MISSING' ? t('js.app.missing') : t('js.app.percentRead', field.confidence);
         wrapper.querySelector('span:first-child').append(badge);
     }
 }
@@ -723,7 +723,8 @@ function renderWarnings(warnings) {
         if (!group.length) continue;
         const heading = document.createElement('li');
         heading.className = `warning-group warning-${severity.toLowerCase()}`;
-        heading.textContent = severity === 'ERROR' ? 'Needs attention' : severity === 'WARNING' ? 'Please check' : 'For your information';
+        heading.textContent = severity === 'ERROR' ? t('js.app.needsAttention')
+            : severity === 'WARNING' ? t('js.app.pleaseCheck') : t('js.app.forYourInformation');
         elements.warningList.append(heading);
         for (const warning of group) {
             const item = document.createElement('li');
@@ -754,7 +755,7 @@ function renderReadQuality(confidence) {
 function renderRawText(lines, fallbackText) {
     elements.rawText.replaceChildren();
     if (!lines?.length) {
-        elements.rawText.textContent = fallbackText || 'No readable text was found.';
+        elements.rawText.textContent = fallbackText || t('js.app.noReadableText');
         return;
     }
     lines.forEach((line, position) => {
@@ -801,19 +802,19 @@ async function saveShift(event) {
 
         if (!response.ok) {
             const message = await response.text();
-            throw new Error(message || 'The shift could not be saved. Check each field and try again.');
+            throw new Error(message || t('js.app.saveFailedCheck'));
         }
 
         const scheduled = shift.status === 'SCHEDULED';
         resetImport();
-        showToast(scheduled ? 'Shift scheduled' : 'Shift added',
-            scheduled ? 'It is on your schedule and calendar feed.' : 'Your earnings history is up to date.');
+        showToast(scheduled ? t('js.app.shiftScheduled') : t('js.app.shiftAdded'),
+            scheduled ? t('js.app.shiftScheduledMessage') : t('js.app.shiftAddedMessage'));
         await loadStations();
         await loadDashboard();
         if (scheduled) showScheduleScreen();
         else showDashboard();
     } catch (error) {
-        showMessage(elements.saveError, error.message || 'The shift could not be saved.');
+        showMessage(elements.saveError, error.message || t('js.app.saveFailed'));
     } finally {
         setSaving(false);
     }
@@ -855,14 +856,14 @@ async function loadTaxTile() {
         return;
     }
     if (summary.percent == null) {
-        elements.taxWeekAmount.textContent = 'Not set up';
-        elements.taxWeekDetail.innerHTML = '<a class="text-link" href="/account#taxes">Set up</a>';
+        elements.taxWeekAmount.textContent = t('js.app.taxNotSetUp');
+        elements.taxWeekDetail.innerHTML = `<a class="text-link" href="/account#taxes">${escapeHtml(t('js.app.taxSetUp'))}</a>`;
         return;
     }
     elements.taxWeekAmount.textContent = formatMoney(summary.thisWeekSetAside);
-    elements.taxWeekDetail.textContent = `${Number(summary.percent)}% of net · estimate`;
-    elements.taxWeekDetail.title = `${Number(summary.percent)}% of ${formatMoney(summary.thisWeekNet)} estimated net`
-        + ` · ${formatMoney(summary.remaining)} still to set aside this year`;
+    elements.taxWeekDetail.textContent = t('js.app.taxPercentOfNet', Number(summary.percent));
+    elements.taxWeekDetail.title = t('js.app.taxTitle', Number(summary.percent), formatMoney(summary.thisWeekNet),
+        formatMoney(summary.remaining));
 }
 
 // Which of the server's pay periods each preset shows: the one covering today, and the one before it.
@@ -881,7 +882,7 @@ async function loadPayPeriods() {
         payPeriods = await response.json();
     } catch {
         elements.nextPayoutAmount.textContent = '—';
-        elements.nextPayoutDetail.textContent = 'Pay periods could not be loaded.';
+        elements.nextPayoutDetail.textContent = t('js.app.payPeriodsFailed');
         return payPeriods;
     }
     renderNextPayout(payPeriods.nextPayout);
@@ -894,31 +895,31 @@ async function loadPayPeriods() {
 }
 
 function renderNextPayout(payout) {
-    const scheduled = Number(payout.scheduledPay) > 0 ? ` · +${formatMoney(payout.scheduledPay)} scheduled` : '';
+    const scheduled = Number(payout.scheduledPay) > 0 ? ` · ${t('js.app.plusScheduled', formatMoney(payout.scheduledPay))}` : '';
     elements.nextPayoutAmount.textContent = formatMoney(payout.earned);
-    elements.nextPayoutDetail.textContent = `${payoutDay(payout.payoutDate)} · ${payout.blocks} ${payout.blocks === 1 ? 'block' : 'blocks'}${scheduled}`;
-    elements.nextPayoutDetail.title = `Blocks from ${formatDate(payout.from)} to ${formatDate(payout.to)}. An estimate: tips can arrive in a later payout.`;
+    elements.nextPayoutDetail.textContent = `${payoutDay(payout.payoutDate)} · ${tn(payout.blocks, 'js.common.blocks')}${scheduled}`;
+    elements.nextPayoutDetail.title = t('js.app.payoutRangeTitle', formatDate(payout.from), formatDate(payout.to));
 }
 
 /** The tile's link into the payouts sheet, nudging when the latest payout that arrived is unchecked or came up short. */
 function renderPayoutCheck(latest) {
     const button = elements.payoutCheckButton;
-    const day = latest ? parseLocalDate(latest.payoutDate).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'}) : '';
+    const day = latest ? parseLocalDate(latest.payoutDate).toLocaleDateString(appLocale(), {weekday: 'short', month: 'short', day: 'numeric'}) : '';
     button.classList.toggle('is-warning', latest?.status === 'SHORT');
     if (latest?.status === 'UNCHECKED' && latest.blocks > 0) {
-        button.textContent = `Check the ${day} payout`;
+        button.textContent = t('js.app.checkPayout', day);
     } else if (latest?.status === 'SHORT') {
-        button.textContent = `${day} payout was ${formatMoney(Math.abs(Number(latest.difference)))} short`;
+        button.textContent = t('js.app.payoutShort', day, formatMoney(Math.abs(Number(latest.difference))));
     } else {
-        button.textContent = 'Payout history';
+        button.textContent = t('js.app.payoutHistory');
     }
 }
 
 function payoutDay(date) {
     const days = Math.round((parseLocalDate(date) - startOfToday()) / 86400000);
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    return parseLocalDate(date).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
+    if (days === 0) return t('js.app.today');
+    if (days === 1) return t('js.app.tomorrow');
+    return parseLocalDate(date).toLocaleDateString(appLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
 }
 
 let lastWeekGoalPercent;
@@ -936,9 +937,9 @@ async function loadGoals() {
     const week = goals.week;
     const month = goals.month;
     elements.goalMonth.textContent = month
-        ? `This month: ${formatMoney(month.earned)} of ${formatMoney(month.goal)} · ${Number(month.percent).toFixed(0)}%`
+        ? t('js.app.monthGoal', formatMoney(month.earned), formatMoney(month.goal), Number(month.percent).toFixed(0))
         : '';
-    elements.goalLink.textContent = week || month ? 'Change goals' : 'Set a goal';
+    elements.goalLink.textContent = week || month ? t('js.app.changeGoals') : t('js.app.setGoal');
     // A round line cap would draw a dot for an empty ring, so the fill is hidden until there is progress.
     elements.goalRingFill.classList.toggle('is-empty', !week || Number(week.percent) <= 0);
     elements.goalPercent.textContent = week ? `${Math.round(Number(week.percent))}%` : '';
@@ -946,36 +947,39 @@ async function loadGoals() {
         elements.goalCard.dataset.state = 'none';
         elements.goalRingFill.setAttribute('stroke-dasharray', '0 100');
         // Home knows what was earned this week, which reads better than "No goal yet" beside an empty ring.
-        elements.goalProgress.textContent = window.flexbuddyHome?.noGoalText() ?? (month ? 'No weekly goal' : 'No goal yet');
-        elements.goalSentence.textContent = month ? 'Your monthly goal is below.' : 'Set a weekly target to see your progress here.';
+        elements.goalProgress.textContent = window.flexbuddyHome?.noGoalText() ?? (month ? t('js.app.noWeeklyGoal') : t('js.app.noGoalYet'));
+        elements.goalSentence.textContent = month ? t('js.app.monthlyGoalBelow') : t('js.app.setWeeklyTarget');
         return;
     }
     const percent = Number(week.percent);
     const reached = percent >= 100;
     elements.goalCard.dataset.state = reached ? 'reached' : week.onTrack ? 'on-track' : 'behind';
     elements.goalRingFill.setAttribute('stroke-dasharray', `${Math.min(percent, 100)} 100`);
-    elements.goalProgress.textContent = `${formatMoney(week.earned)} of ${formatMoney(week.goal)}`;
+    elements.goalProgress.textContent = t('js.app.earnedOfGoal', formatMoney(week.earned), formatMoney(week.goal));
     elements.goalSentence.textContent = goalSentence(week, goals.basis);
     if (lastWeekGoalPercent !== undefined && lastWeekGoalPercent < 100 && reached) {
-        showToast('Weekly goal reached', formatMoney(week.earned));
+        showToast(t('js.app.weeklyGoalReached'), formatMoney(week.earned));
     }
     lastWeekGoalPercent = percent;
 }
 
 function goalSentence(week, basis) {
-    const amount = basis === 'NET' ? 'estimated net' : 'pay';
-    if (Number(week.percent) >= 100) return `Goal reached with ${formatMoney(Number(week.earned) - Number(week.goal))} to spare.`;
-    if (Number(week.remaining) === 0) return 'Your scheduled blocks cover the rest.';
-    const scheduled = Number(week.planned) > 0 ? 'With your scheduled blocks, ' : '';
+    const amount = basis === 'NET' ? t('js.app.goalAmountNet') : t('js.app.goalAmountPay');
+    if (Number(week.percent) >= 100) return t('js.app.goalReached', formatMoney(Number(week.earned) - Number(week.goal)));
+    if (Number(week.remaining) === 0) return t('js.app.goalCovered');
+    const planned = Number(week.planned) > 0;
     if (!week.blocksToGo || !week.averageBlockMinutes) {
-        return `${formatMoney(week.remaining)} to go${scheduled ? ' after your scheduled blocks' : ''}.`;
+        return planned ? t('js.app.goalToGoPlanned', formatMoney(week.remaining)) : t('js.app.goalToGo', formatMoney(week.remaining));
     }
     const hours = Math.round(week.averageBlockMinutes / 30) / 2;
     const count = week.blocksToGo;
-    const words = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
-    const number = words[count] || String(count);
-    const sentence = `${number} more ${hours}-hour ${count === 1 ? 'block' : 'blocks'} at your usual ${amount} reach ${formatMoney(week.goal)}.`;
-    const text = `${scheduled}${sentence}`;
+    const words = ['', 'js.common.numberOne', 'js.common.numberTwo', 'js.common.numberThree', 'js.common.numberFour',
+        'js.common.numberFive', 'js.common.numberSix', 'js.common.numberSeven', 'js.common.numberEight', 'js.common.numberNine'];
+    const number = words[count] ? t(words[count]) : String(count);
+    const key = count === 1
+        ? (planned ? 'js.app.goalBlocksPlanned.one' : 'js.app.goalBlocks.one')
+        : (planned ? 'js.app.goalBlocksPlanned.other' : 'js.app.goalBlocks.other');
+    const text = t(key, number, hours, amount, formatMoney(week.goal));
     return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
@@ -993,24 +997,24 @@ async function loadStatistics(query, signal) {
         const timed = statistics.timedShifts > 0;
         elements.totalShiftsDetail.textContent = flexbuddyReports.rangeLabel(filterState).replace(/ ▾$/, '');
         elements.timeWorkedDetail.textContent = timed
-            ? `${formatMinutes(statistics.clockedMinutes)} on the clock · ${paceText(statistics.averageFinishedEarlyMinutes)}`
-            : 'Across every shift';
+            ? t('js.app.onTheClockPace', formatMinutes(statistics.clockedMinutes), paceText(statistics.averageFinishedEarlyMinutes))
+            : t('js.app.acrossEveryShift');
         elements.baseTipsTotal.textContent = `${formatMoney(statistics.totalBasePay)} · ${formatMoney(statistics.totalTips)}`;
         const tipShare = Number(statistics.tipsShareOfEarnings || 0);
         elements.baseShareBar.style.width = `${100 - tipShare}%`;
         elements.tipsShareBar.style.width = `${tipShare}%`;
-        elements.tipsShare.textContent = `${tipShare.toFixed(1)}% from tips`;
+        elements.tipsShare.textContent = t('js.app.percentFromTips', tipShare.toFixed(1));
         elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
-        elements.netHourly.textContent = `${formatMoney(statistics.netHourlyRate)}/hr est. net`;
-        elements.netMargin.textContent = `After deductions · ${Number(statistics.netMargin || 0).toFixed(1)}% margin`;
+        elements.netHourly.textContent = t('js.app.netHourlyEst', formatMoney(statistics.netHourlyRate));
+        elements.netMargin.textContent = t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
         elements.expenseTotal.textContent = formatMoney(statistics.totalExpenses);
-        elements.totalMiles.textContent = `${Number(statistics.totalMiles || 0).toFixed(1)} mi`;
-        elements.mileageCost.textContent = `${formatMoney(statistics.mileageCost)} mileage cost`;
+        elements.totalMiles.textContent = t('js.common.miles', Number(statistics.totalMiles || 0).toFixed(1));
+        elements.mileageCost.textContent = t('js.app.mileageCost', formatMoney(statistics.mileageCost));
         const lateThisMonth = statistics.lateForfeitedThisMonth ?? 0;
-        elements.forfeitsMonth.textContent = `${statistics.forfeitedThisMonth ?? 0}${lateThisMonth ? ` (${lateThisMonth} late)` : ''}`;
+        elements.forfeitsMonth.textContent = (lateThisMonth ? t('js.app.forfeitsWithLate', statistics.forfeitedThisMonth ?? 0, lateThisMonth) : String(statistics.forfeitedThisMonth ?? 0));
         elements.forfeitsDetail.textContent = statistics.needsConfirmation
-            ? `${statistics.needsConfirmation} ${statistics.needsConfirmation === 1 ? 'block' : 'blocks'} to confirm`
-            : `${statistics.cancelledShifts ?? 0} cancelled in this view`;
+            ? tn(statistics.needsConfirmation, 'js.home.blocksToConfirm')
+            : t('js.app.cancelledInView', statistics.cancelledShifts ?? 0);
     } catch (error) {
         if (error?.name === 'AbortError') return;
         [elements.totalEarnings, elements.totalShifts, elements.totalTime, elements.averagePay,
@@ -1034,13 +1038,13 @@ async function loadShifts(query, signal) {
     } catch (error) {
         if (error?.name === 'AbortError') return;
         currentShifts = [];
-        elements.historyList.innerHTML = '<div class="history-empty">Shifts could not be loaded.</div>';
+        elements.historyList.innerHTML = `<div class="history-empty">${escapeHtml(t('js.app.shiftsNotLoaded'))}</div>`;
         elements.showMoreButton.classList.add('is-hidden');
-        elements.resultsSummary.textContent = 'Shift results unavailable.';
-        elements.activeFilterSummary.textContent = 'Shifts could not be loaded.';
+        elements.resultsSummary.textContent = t('js.app.resultsUnavailable');
+        elements.activeFilterSummary.textContent = t('js.app.shiftsNotLoaded');
         elements.exportCsvButton.classList.add('is-disabled');
         elements.exportCsvButton.setAttribute('aria-disabled', 'true');
-        elements.exportCsvButton.title = 'Shift results are unavailable';
+        elements.exportCsvButton.title = t('js.app.resultsUnavailableTitle');
     }
 }
 
@@ -1056,28 +1060,34 @@ async function loadHeatmap() {
         const heatmap = await response.json();
         window.flexbuddyCharts.renderHeatmap(elements.heatmapTable, elements.heatmapLegend, heatmap);
         const best = heatmap.best;
-        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+        const days = ['js.charts.dayMonday', 'js.charts.dayTuesday', 'js.charts.dayWednesday', 'js.charts.dayThursday',
+            'js.charts.dayFriday', 'js.charts.daySaturday', 'js.charts.daySunday'];
         const label = elements.heatmapMetric.selectedOptions[0].textContent.toLowerCase();
         if (heatmap.totalShifts < HEATMAP_MIN_TOTAL) {
-            elements.heatmapSummary.textContent = `Not enough blocks yet to see a pattern (${heatmap.totalShifts} so far).`;
+            elements.heatmapSummary.textContent = t('js.app.heatmapNotEnough', heatmap.totalShifts);
         } else if (!best) {
-            elements.heatmapSummary.textContent = 'No time slot has two blocks yet.';
+            elements.heatmapSummary.textContent = t('js.app.heatmapNoSlot');
         } else {
-            const value = metric === 'SHIFTS' ? `${best.value} blocks`
-                : metric === 'AVERAGE_PAY' ? `${formatMoney(best.value)} ${label}` : `${formatMoney(best.value)}/hr ${label.replace(' per hour', '')}`;
-            elements.heatmapSummary.textContent = `Best: ${days[best.weekday - 1]} ${heatmap.bands[best.band]} · ${value}`
-                + ` from ${best.shifts} ${best.shifts === 1 ? 'block' : 'blocks'}.`;
+            const value = metric === 'SHIFTS' ? tn(best.value, 'js.common.blocks')
+                : metric === 'AVERAGE_PAY' ? `${formatMoney(best.value)} ${label}`
+                    : `${t('js.common.perHour', formatMoney(best.value))} ${label.replace(t('js.app.perHourSuffix'), '')}`;
+            elements.heatmapSummary.textContent = t('js.app.heatmapBest', t(days[best.weekday - 1]), heatmap.bands[best.band], value,
+                tn(best.shifts, 'js.common.blocks'));
         }
     } catch {
-        elements.heatmapSummary.textContent = 'The best times could not be loaded.';
+        elements.heatmapSummary.textContent = t('js.app.heatmapFailed');
         elements.heatmapTable.replaceChildren();
         elements.heatmapLegend.textContent = '';
     }
 }
 
+const REPORT_GROUP_KEYS = {
+    station: 'js.charts.groupStation', week: 'js.charts.groupWeek', month: 'js.charts.groupMonth', year: 'js.charts.groupYear'
+};
+
 async function loadEarningsReport(query) {
     hideMessage(elements.reportError);
-    elements.earningsChartTitle.textContent = `Earnings by ${reportGroupBy}`;
+    elements.earningsChartTitle.textContent = t('js.app.earningsBy', REPORT_GROUP_KEYS[reportGroupBy] ? t(REPORT_GROUP_KEYS[reportGroupBy]) : reportGroupBy);
     reportAbort?.abort();
     reportAbort = new AbortController();
     const signal = reportAbort.signal;
@@ -1091,7 +1101,7 @@ async function loadEarningsReport(query) {
         window.flexbuddyCharts.renderTable(elements.breakdownBody, report, drillIntoBucket);
     } catch (error) {
         if (error?.name === 'AbortError') return;
-        showMessage(elements.reportError, error.message || 'The earnings report could not be loaded.');
+        showMessage(elements.reportError, error.message || t('js.app.reportFailed'));
         elements.earningsChart.replaceChildren();
         elements.payMixChart.replaceChildren();
         elements.hourlyChart.replaceChildren();
@@ -1105,7 +1115,7 @@ function renderShifts(shifts) {
     if (!shifts.length) {
         const empty = document.createElement('div');
         empty.className = 'history-empty';
-        empty.innerHTML = 'No shifts match these filters. <button class="text-button" type="button">Clear filters</button>';
+        empty.innerHTML = `${escapeHtml(t('js.app.noShiftsMatch'))} <button class="text-button" type="button">${escapeHtml(t('js.app.clearFilters'))}</button>`;
         empty.querySelector('button').addEventListener('click', clearFilters);
         elements.historyList.append(empty);
         elements.showMoreButton.classList.add('is-hidden');
@@ -1119,19 +1129,19 @@ function renderShifts(shifts) {
         row.className = 'shift-row';
 
         const date = parseLocalDate(shift.date);
-        const month = date.toLocaleDateString(undefined, {month: 'short'});
+        const month = date.toLocaleDateString(appLocale(), {month: 'short'});
         const day = date.getDate();
-        const weekday = date.toLocaleDateString(undefined, {weekday: 'short'});
+        const weekday = date.toLocaleDateString(appLocale(), {weekday: 'short'});
         const total = shift.earnedPay ?? shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
         const worked = !shift.status || shift.status === 'COMPLETED';
         const statusBadge = worked ? ''
-            : `<small class="status-badge status-${shift.status.toLowerCase()}">${shift.status === 'CANCELLED' ? 'Cancelled'
-                : shift.lateForfeit ? 'Late forfeit' : 'Forfeited'}</small>`;
+            : `<small class="status-badge status-${shift.status.toLowerCase()}">${escapeHtml(shift.status === 'CANCELLED' ? t('js.common.cancelled')
+                : shift.lateForfeit ? t('js.common.lateForfeit') : t('js.common.forfeited'))}</small>`;
         const actual = shift.details?.actualMinutes;
         const workSummary = worked && actual != null
-            ? `${formatMinutes(actual)} worked of ${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.details.actualHourlyRate)}/hr worked`
-            : worked ? `${formatMinutes(shift.timeWorked)} · ${formatMoney(shift.hourlyRate)}/hr gross`
-            : shift.status === 'CANCELLED' ? 'Cancellation pay · no hours' : 'Not worked · no pay';
+            ? t('js.app.workedOf', formatMinutes(actual), formatMinutes(shift.timeWorked), formatMoney(shift.details.actualHourlyRate))
+            : worked ? t('js.app.grossLine', formatMinutes(shift.timeWorked), formatMoney(shift.hourlyRate))
+            : shift.status === 'CANCELLED' ? t('js.app.cancellationNoHours') : t('js.app.notWorkedNoPay');
         const route = worked ? routeSummary(shift.details?.stops, shift.details?.returns,
             shift.details?.actualMinutes ?? shift.timeWorked) : '';
         const edited = shift.createdAt && shift.updatedAt
@@ -1139,9 +1149,9 @@ function renderShifts(shifts) {
 
         row.innerHTML = `
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
-            <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? '<small class="edited-tag">edited</small>' : ''}${statusBadge}</strong><span>${escapeHtml(weekday)} shift</span></div>
-            <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>Scheduled time</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${shift.miles == null ? '' : `${Number(shift.miles).toFixed(1)} mi · `}${formatMoney(shift.netPay)} est. net · ${formatMoney(shift.netHourlyRate)}/hr est. net</span>${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
+            <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? `<small class="edited-tag">${escapeHtml(t('js.app.edited'))}</small>` : ''}${statusBadge}</strong><span>${escapeHtml(t('js.app.weekdayShift', weekday))}</span></div>
+            <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>${escapeHtml(t('js.app.scheduledTime'))}</span></div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${escapeHtml((shift.miles == null ? '' : `${t('js.common.miles', Number(shift.miles).toFixed(1))} · `) + t('js.app.estNetLine', formatMoney(shift.netPay), formatMoney(shift.netHourlyRate)))}</span>${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -1149,13 +1159,13 @@ function renderShifts(shifts) {
 
         row.dataset.shiftId = shift.id;
         const editButton = row.querySelector('.edit-shift-button');
-        editButton.setAttribute('aria-label', `Edit ${shift.station} shift on ${shift.date}`);
+        editButton.setAttribute('aria-label', t('js.app.editShiftOn', shift.station, shift.date));
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
         elements.historyList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
             onEdit: () => openEditModal(shift, editButton),
             onDelete: () => deleteShiftFromList(shift),
             onDuplicate: () => duplicateShift(shift, editButton),
-            deleteQuestion: `Delete ${shift.station} on ${formatDate(shift.date)}?`
+            deleteQuestion: t('js.app.deleteQuestion', shift.station, formatDate(shift.date))
         }) : row);
     }
     elements.showMoreButton.classList.toggle('is-hidden', visibleShiftCount >= shifts.length);
@@ -1172,7 +1182,7 @@ function refreshPendingTags() {
         if (queued && !tag) {
             const added = document.createElement('small');
             added.className = 'pending-tag';
-            added.textContent = 'Pending';
+            added.textContent = t('js.common.pending');
             heading.append(added);
         } else if (!queued && tag) {
             tag.remove();
@@ -1212,10 +1222,10 @@ function openEditModal(shift, trigger, options = {}) {
         option.disabled = option.value === 'SCHEDULED' && editMode === 'edit' && editOriginalStatus !== 'SCHEDULED';
     });
     const isNew = editMode === 'new';
-    elements.editDialogTitle.textContent = isNew ? newShiftCopy(elements.editStatus.value).title : 'Edit shift';
+    elements.editDialogTitle.textContent = isNew ? newShiftCopy(elements.editStatus.value).title : t('js.app.editShift');
     elements.editDialogDescription.textContent = isNew
         ? newShiftCopy(elements.editStatus.value).description
-        : 'Update the values and save your changes.';
+        : t('js.app.updateValues');
     elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
     elements.duplicateShiftButton.classList.toggle('is-hidden', isNew);
     elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
@@ -1223,7 +1233,7 @@ function openEditModal(shift, trigger, options = {}) {
     if (!isNew) {
         loadLinkedExpenses(shift.id);
         elements.editTimestamps.textContent = timestampSummary(shift);
-        elements.editTimestamps.title = `Created ${formatTimestamp(shift.createdAt)} · Updated ${formatTimestamp(shift.updatedAt)}`;
+        elements.editTimestamps.title = t('js.app.createdUpdated', formatTimestamp(shift.createdAt), formatTimestamp(shift.updatedAt));
     }
     applyEditStatusRules(Boolean(options.status) && options.status !== editOriginalStatus);
     applyOfflineEditState();
@@ -1242,12 +1252,12 @@ function openEditModal(shift, trigger, options = {}) {
 /** The words for adding a shift, which follow the chosen status: a scheduled block is a plan, anything else happened. */
 function newShiftCopy(status) {
     return status === 'SCHEDULED'
-        ? {title: 'Add scheduled shift',
-            description: 'Enter a block you accepted. It will not count toward earnings or hours until you confirm it.',
-            toast: ['Shift scheduled', 'It is on your schedule and calendar feed.']}
-        : {title: 'Add shift',
-            description: 'Enter a block you already worked. It counts toward your earnings, hours, and miles.',
-            toast: ['Shift added', 'Your earnings history is up to date.']};
+        ? {title: t('js.common.addScheduledShift'),
+            description: t('js.app.addScheduledDescription'),
+            toast: [t('js.app.shiftScheduled'), t('js.app.shiftScheduledMessage')]}
+        : {title: t('js.common.addShift'),
+            description: t('js.app.addShiftDescription'),
+            toast: [t('js.app.shiftAdded'), t('js.app.shiftAddedMessage')]};
 }
 
 function applyEditStatusRules(statusChanged = false) {
@@ -1262,14 +1272,14 @@ function applyEditStatusRules(statusChanged = false) {
         }
     }
     const hints = {
-        SCHEDULED: 'Offered pay only. It does not count toward earnings or hours until you confirm it.',
-        COMPLETED: 'Worked and paid. Counts toward earnings, hours, and miles.',
-        CANCELLED: 'Amazon cancelled the block. Enter cancellation pay if you received any; miles still count.',
-        FORFEITED: 'You dropped or missed the block. It earns nothing; miles still count.'
+        SCHEDULED: t('js.app.hintScheduled'),
+        COMPLETED: t('js.app.hintCompleted'),
+        CANCELLED: t('js.app.hintCancelled'),
+        FORFEITED: t('js.app.hintForfeited')
     };
     elements.editStatusHint.textContent = hints[status];
-    elements.editBasePayLabel.textContent = status === 'SCHEDULED' ? 'Offered pay'
-        : status === 'CANCELLED' ? 'Cancellation pay' : 'Base pay';
+    elements.editBasePayLabel.textContent = status === 'SCHEDULED' ? t('js.app.offeredPay')
+        : status === 'CANCELLED' ? t('js.app.cancellationPay') : t('js.app.basePay');
     elements.editBasePay.min = status === 'COMPLETED' || status === 'SCHEDULED' ? '0.01' : '0';
     const tipsAllowed = status === 'COMPLETED';
     elements.editTips.disabled = !tipsAllowed;
@@ -1297,10 +1307,10 @@ function minutesBetween(start, end) {
 function routeSummary(stops, returns, clockedMinutes) {
     const parts = [];
     if (stops) {
-        parts.push(`${stops} ${stops === 1 ? 'stop' : 'stops'}`);
-        if (clockedMinutes) parts.push(`${(clockedMinutes / stops).toFixed(1)} min/stop`);
+        parts.push(tn(stops, 'js.app.stops'));
+        if (clockedMinutes) parts.push(t('js.app.minPerStop', (clockedMinutes / stops).toFixed(1)));
     }
-    if (returns !== null && returns !== undefined) parts.push(`${returns} ${returns === 1 ? 'return' : 'returns'}`);
+    if (returns !== null && returns !== undefined) parts.push(tn(returns, 'js.app.returns'));
     return parts.join(' · ');
 }
 
@@ -1308,7 +1318,7 @@ function updateRouteSummary() {
     const count = input => input.value === '' ? null : Number(input.value);
     const clocked = minutesBetween(elements.editActualStart.value, elements.editActualEnd.value)
         || minutesBetween(elements.editStartTime.value, elements.editEndTime.value);
-    elements.editRouteSummary.textContent = routeSummary(count(elements.editStops), count(elements.editReturns), clocked) || 'Optional';
+    elements.editRouteSummary.textContent = routeSummary(count(elements.editStops), count(elements.editReturns), clocked) || t('js.app.optional');
 }
 
 function odometerMiles() {
@@ -1318,27 +1328,28 @@ function odometerMiles() {
 
 function updateOdometerSummary() {
     const miles = odometerMiles();
-    elements.editOdometerSummary.textContent = miles === null ? 'Optional'
-        : miles < 0 ? 'End is below start' : `${miles.toFixed(1)} mi`;
+    elements.editOdometerSummary.textContent = miles === null ? t('js.app.optional')
+        : miles < 0 ? t('js.app.endBelowStart') : t('js.common.miles', miles.toFixed(1));
 }
 
 function updateActualSummary() {
     const actual = minutesBetween(elements.editActualStart.value, elements.editActualEnd.value);
     const scheduled = minutesBetween(elements.editStartTime.value, elements.editEndTime.value);
     if (!actual) {
-        elements.editActualSummary.textContent = elements.editActualStart.value ? 'Started, not finished' : 'Optional';
+        elements.editActualSummary.textContent = elements.editActualStart.value ? t('js.app.startedNotFinished') : t('js.app.optional');
         return;
     }
     const early = scheduled === null ? 0 : scheduled - actual;
-    const pace = early > 0 ? ` · ${formatMinutes(early)} early` : early < 0 ? ` · ${formatMinutes(-early)} over` : '';
-    elements.editActualSummary.textContent = `${formatMinutes(actual)} on the clock${pace}`;
+    const pace = early > 0 ? ` · ${t('js.finish.early', formatMinutes(early))}` : early < 0 ? ` · ${t('js.finish.over', formatMinutes(-early))}` : '';
+    elements.editActualSummary.textContent = `${t('js.app.onTheClock', formatMinutes(actual))}${pace}`;
 }
 
 function saveEditLabel() {
     const status = elements.editStatus.value;
-    if (editMode === 'new') return status === 'SCHEDULED' ? 'Add scheduled shift' : 'Add shift';
-    if (status === editOriginalStatus) return 'Save changes';
-    return {COMPLETED: 'Mark completed', CANCELLED: 'Mark cancelled', FORFEITED: 'Mark forfeited'}[status] || 'Save changes';
+    if (editMode === 'new') return status === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
+    if (status === editOriginalStatus) return t('js.app.saveChanges');
+    return {COMPLETED: t('js.app.markCompleted'), CANCELLED: t('js.app.markCancelled'), FORFEITED: t('js.app.markForfeited')}[status]
+        || t('js.app.saveChanges');
 }
 
 function closeEditModal() {
@@ -1356,6 +1367,11 @@ function closeEditModal() {
     if (lastFocusedElement?.isConnected) lastFocusedElement.focus();
     lastFocusedElement = undefined;
 }
+
+const MARKED_MESSAGES = {
+    COMPLETED: 'js.app.markedCompleted', CANCELLED: 'js.app.markedCancelled', FORFEITED: 'js.app.markedForfeited',
+    SCHEDULED: 'js.app.markedScheduled'
+};
 
 async function saveEditedShift(event) {
     event.preventDefault();
@@ -1381,17 +1397,17 @@ async function saveEditedShift(event) {
     if (shift.status !== 'SCHEDULED') {
         const worked = shift.status === 'COMPLETED';
         if (worked && elements.editActualEnd.value && !elements.editActualStart.value) {
-            showMessage(elements.editError, 'Enter when the block started.');
+            showMessage(elements.editError, t('js.finish.enterStart'));
             return;
         }
         if (odometerMiles() !== null && odometerMiles() < 0) {
-            showMessage(elements.editError, 'The odometer end reading must be at least the start reading.');
+            showMessage(elements.editError, t('js.finish.odometerEndBeforeStart'));
             return;
         }
         const reading = input => input.value === '' ? null : Number(input.value);
         if (worked && reading(elements.editReturns) !== null && reading(elements.editPackages) !== null
                 && reading(elements.editReturns) > reading(elements.editPackages)) {
-            showMessage(elements.editError, 'Returns cannot be more than the packages carried.');
+            showMessage(elements.editError, t('js.finish.returnsOverPackages'));
             return;
         }
         shift.details = {
@@ -1412,12 +1428,12 @@ async function saveEditedShift(event) {
         if (creating) {
             const result = await window.flexbuddyOutbox.submit('shift-create', {
                 method: 'POST', url: '/shifts', body: shift,
-                summary: {title: `Add shift · ${shift.station}`,
+                summary: {title: ['js.app.queuedAddShift', shift.station],
                     detail: `${formatShortDay(shift.date)} · ${formatTime(shift.startTime)}–${formatTime(shift.endTime)}`}
             });
             if (result.queued) {
                 closeEditModal();
-                showToast('Saved offline · will sync', `${shift.station} on ${formatDate(shift.date)} will be added when you're back online.`);
+                showToast(t('js.finish.savedOfflineTitle'), t('js.app.savedOfflineAdded', shift.station, formatDate(shift.date)));
                 return;
             }
             response = result.sent;
@@ -1431,7 +1447,7 @@ async function saveEditedShift(event) {
 
         if (!response.ok && !(await isDuplicate(response))) {
             const message = await response.text();
-            throw new Error(message || 'The shift could not be updated. Check each field and try again.');
+            throw new Error(message || t('js.app.updateFailedCheck'));
         }
 
         const previous = editSnapshot;
@@ -1439,10 +1455,10 @@ async function saveEditedShift(event) {
         if (creating) {
             showToast(...newShiftCopy(shift.status).toast);
         } else if (statusChanged) {
-            showToast('Shift updated', `Marked ${shift.status.toLowerCase()}. Earnings and hours are up to date.`);
+            showToast(t('js.app.shiftUpdated'), t(MARKED_MESSAGES[shift.status] || 'js.app.shiftUpdatedMessage'));
         } else {
-            showToast('Shift updated', 'Your changes have been saved.', {
-                actionLabel: 'Undo',
+            showToast(t('js.app.shiftUpdated'), t('js.app.shiftUpdatedMessage'), {
+                actionLabel: t('js.common.undo'),
                 duration: 8000,
                 onAction: () => undoEdit(shiftId, previous)
             });
@@ -1450,7 +1466,7 @@ async function saveEditedShift(event) {
         await loadStations();
         await loadDashboard();
     } catch (error) {
-        showMessage(elements.editError, error.message || 'The shift could not be updated.');
+        showMessage(elements.editError, error.message || t('js.app.updateFailed'));
     } finally {
         setEditSaving(false);
         applyOfflineEditState();
@@ -1477,7 +1493,7 @@ async function deleteEditedShift() {
         closeEditModal();
         await afterShiftDeleted(batch);
     } catch (error) {
-        showMessage(elements.editError, error.message || 'The shift could not be deleted.');
+        showMessage(elements.editError, error.message || t('js.app.deleteFailed'));
     } finally {
         elements.confirmDeleteButton.disabled = false;
     }
@@ -1488,20 +1504,20 @@ async function deleteShiftFromList(shift) {
     try {
         await afterShiftDeleted(await deleteShift(shift.id));
     } catch (error) {
-        showToast('Not deleted', error.message || 'The shift could not be deleted.', {alert: true});
+        showToast(t('js.app.notDeleted'), error.message || t('js.app.deleteFailed'), {alert: true});
         await loadDashboard();
     }
 }
 
 async function deleteShift(id) {
     const response = await apiFetch(`/shifts/${id}`, {method: 'DELETE', headers: csrfHeaders()});
-    if (!response.ok) throw new Error(await response.text() || 'The shift could not be deleted.');
+    if (!response.ok) throw new Error(await response.text() || t('js.app.deleteFailed'));
     return response.headers.get('X-Delete-Batch');
 }
 
 async function afterShiftDeleted(batch) {
-    showToast('Shift deleted', 'It is available in Recently deleted for 30 days.', {
-        actionLabel: 'Undo',
+    showToast(t('js.app.shiftDeleted'), t('js.app.availableInTrash'), {
+        actionLabel: t('js.common.undo'),
         duration: 8000,
         alert: true,
         onAction: () => restoreBatch(batch)
@@ -1524,7 +1540,7 @@ function duplicateShift(shift, trigger) {
         status: 'SCHEDULED'},
         trigger, {status: 'SCHEDULED'});
     elements.editDialogDescription.textContent =
-        `A copy of ${shift.station} on ${formatDate(shift.date)}. Check the date and pay, then add it.`;
+        t('js.app.copyOf', shift.station, formatDate(shift.date));
 }
 
 async function undoEdit(id, previous) {
@@ -1552,7 +1568,7 @@ async function undoEdit(id, previous) {
         })
     });
     if (!response.ok) throw new Error(await response.text());
-    showToast('Edit undone', 'The previous shift values were restored.');
+    showToast(t('js.app.editUndone'), t('js.app.editUndoneMessage'));
     await loadDashboard();
 }
 
@@ -1562,20 +1578,20 @@ async function restoreBatch(batch) {
         method: 'POST', headers: csrfHeaders()
     });
     if (!response.ok) throw new Error(await response.text());
-    showToast('Shift restored', 'The shift is back in your history.');
+    showToast(t('js.app.shiftRestored'), t('js.app.shiftRestoredMessage'));
     await loadStations();
     await loadDashboard();
     if (elements.trashSection.open) await loadTrash();
 }
 
 async function loadTrash() {
-    elements.trashList.innerHTML = '<p>Loading recently deleted shifts…</p>';
+    elements.trashList.innerHTML = `<p>${escapeHtml(t('js.app.loadingTrash'))}</p>`;
     try {
         const response = await apiFetch('/shifts/trash');
         if (!response.ok) throw new Error(await response.text());
         renderTrash(await response.json());
     } catch (error) {
-        elements.trashList.innerHTML = `<p>${escapeHtml(error.message || 'Recently deleted could not be loaded.')}</p>`;
+        elements.trashList.innerHTML = `<p>${escapeHtml(error.message || t('js.app.trashNotLoaded'))}</p>`;
     }
 }
 
@@ -1584,17 +1600,17 @@ function renderTrash(shifts) {
     elements.emptyTrashButton.classList.toggle('is-hidden', shifts.length === 0);
     elements.trashList.replaceChildren();
     if (!shifts.length) {
-        elements.trashList.innerHTML = '<p>There are no recently deleted shifts.</p>';
+        elements.trashList.innerHTML = `<p>${escapeHtml(t('js.app.noTrash'))}</p>`;
         return;
     }
     shifts.forEach(shift => {
         const row = document.createElement('article');
         row.className = 'trash-row';
-        row.innerHTML = `<div><strong>${escapeHtml(shift.station)} · ${formatDate(shift.date)}</strong><span>Deleted ${formatTimestamp(shift.deletedAt)}</span></div><div><button class="text-button restore-trash" type="button">Restore</button><button class="danger-text-button permanent-trash" type="button">Delete permanently</button></div>`;
+        row.innerHTML = `<div><strong>${escapeHtml(shift.station)} · ${formatDate(shift.date)}</strong><span>${escapeHtml(t('js.app.deletedAt', formatTimestamp(shift.deletedAt)))}</span></div><div><button class="text-button restore-trash" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button permanent-trash" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
         row.querySelector('.restore-trash').addEventListener('click', () => restoreTrashShift(shift.id));
         row.querySelector('.permanent-trash').addEventListener('click', () => openConfirm(
-            'Delete this shift permanently?',
-            `${shift.station} on ${formatDate(shift.date)} will be removed forever.`,
+            t('js.app.deleteShiftPermanentlyTitle'),
+            t('js.app.deleteShiftPermanentlyMessage', shift.station, formatDate(shift.date)),
             () => permanentlyDeleteShift(shift.id)
         ));
         elements.trashList.append(row);
@@ -1604,7 +1620,7 @@ function renderTrash(shifts) {
 async function restoreTrashShift(id) {
     const response = await apiFetch(`/shifts/${id}/restore`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
-    showToast('Shift restored', 'The shift is back in your history.');
+    showToast(t('js.app.shiftRestored'), t('js.app.shiftRestoredMessage'));
     await loadTrash();
     await loadStations();
     await loadDashboard();
@@ -1613,7 +1629,7 @@ async function restoreTrashShift(id) {
 async function permanentlyDeleteShift(id) {
     const response = await apiFetch(`/shifts/trash/${id}`, {method: 'DELETE', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
-    showToast('Shift permanently deleted', 'The shift can no longer be restored.', {alert: true});
+    showToast(t('js.app.permanentlyDeletedTitle'), t('js.app.permanentlyDeletedMessage'), {alert: true});
     await loadTrash();
 }
 
@@ -1621,11 +1637,11 @@ async function emptyTrash() {
     const response = await apiFetch('/shifts/trash', {method: 'DELETE', headers: csrfHeaders()});
     if (!response.ok) throw new Error(await response.text());
     const result = await response.json();
-    showToast('Recently deleted emptied', `${result.deleted} shifts were permanently removed.`, {alert: true});
+    showToast(t('js.app.trashEmptiedTitle'), t('js.app.trashEmptiedMessage', result.deleted), {alert: true});
     await loadTrash();
 }
 
-function openConfirm(title, message, action, acceptLabel = 'Delete permanently') {
+function openConfirm(title, message, action, acceptLabel = t('js.common.deletePermanently')) {
     pendingConfirmAction = action;
     lastFocusedElement = document.activeElement;
     elements.confirmTitle.textContent = title;
@@ -1699,8 +1715,8 @@ function setProcessing(processing) {
 
 function setSaving(saving) {
     elements.saveButton.disabled = saving;
-    elements.saveButton.querySelector('span').textContent = saving ? 'Adding shift…'
-        : elements.importStatus.value === 'SCHEDULED' ? 'Add scheduled shift' : 'Add shift';
+    elements.saveButton.querySelector('span').textContent = saving ? t('js.app.addingShift')
+        : elements.importStatus.value === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
 }
 
 /** Editing, deleting and duplicating a saved shift need a connection; adding one does not, because it can be queued. */
@@ -1708,13 +1724,13 @@ function applyOfflineEditState() {
     const blocked = editMode === 'edit' && (window.flexbuddyPwa?.isOffline() ?? false);
     [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton].forEach(button => {
         button.disabled = blocked;
-        button.title = blocked ? 'Available when you are back online' : '';
+        button.title = blocked ? t('js.pwa.availableWhenOnline') : '';
     });
 }
 
 function setEditSaving(saving) {
     elements.saveEditButton.disabled = saving;
-    elements.saveEditButton.querySelector('span').textContent = saving ? 'Saving…' : saveEditLabel();
+    elements.saveEditButton.querySelector('span').textContent = saving ? t('js.app.saving') : saveEditLabel();
 }
 
 function showMessage(element, message) {
@@ -1746,12 +1762,12 @@ function trimTime(time) {
 function formatTime(time) {
     if (!time) return '—';
     const [hours, minutes] = time.split(':').map(Number);
-    return new Intl.DateTimeFormat(undefined, {hour: 'numeric', minute: '2-digit'})
+    return new Intl.DateTimeFormat(appLocale(), {hour: 'numeric', minute: '2-digit'})
         .format(new Date(2000, 0, 1, hours, minutes));
 }
 
 function formatMoney(value) {
-    return new Intl.NumberFormat(undefined, {
+    return new Intl.NumberFormat(appLocale(), {
         style: 'currency',
         currency: 'USD'
     }).format(Number(value || 0));
@@ -1759,21 +1775,21 @@ function formatMoney(value) {
 
 /** How a timed block's length compared with its schedule, for example "finish 38m early on average". */
 function paceText(earlyMinutes) {
-    if (earlyMinutes == null || earlyMinutes === 0) return 'on schedule on average';
-    return earlyMinutes > 0 ? `finish ${formatMinutes(earlyMinutes)} early on average`
-        : `run ${formatMinutes(-earlyMinutes)} over on average`;
+    if (earlyMinutes == null || earlyMinutes === 0) return t('js.app.paceOnSchedule');
+    return earlyMinutes > 0 ? t('js.app.paceEarly', formatMinutes(earlyMinutes))
+        : t('js.app.paceOver', formatMinutes(-earlyMinutes));
 }
 
 function formatMinutes(value) {
     const totalMinutes = Number(value || 0);
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-    return `${hours}h ${minutes}m`;
+    return t('js.common.hoursMinutes', hours, minutes);
 }
 
 function formatFileSize(bytes) {
-    if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (bytes < 1024 * 1024) return t('js.app.sizeKb', Math.max(1, Math.round(bytes / 1024)));
+    return t('js.app.sizeMb', (bytes / (1024 * 1024)).toFixed(1));
 }
 
 function parseLocalDate(value) {
@@ -1816,8 +1832,8 @@ function syncFilterControls() {
     const custom = filterState.preset === 'custom';
     elements.filterFrom.disabled = !custom;
     elements.filterTo.disabled = !custom;
-    elements.sortDirectionButton.textContent = filterState.dir === 'asc' ? '↑ Asc' : '↓ Desc';
-    elements.sortDirectionButton.setAttribute('aria-label', `Sort ${filterState.dir === 'asc' ? 'ascending' : 'descending'}`);
+    elements.sortDirectionButton.textContent = filterState.dir === 'asc' ? t('js.app.sortAsc') : t('js.app.sortDesc');
+    elements.sortDirectionButton.setAttribute('aria-label', filterState.dir === 'asc' ? t('js.app.sortAscending') : t('js.app.sortDescending'));
     elements.presetChips.forEach(chip => chip.classList.toggle('is-active', chip.dataset.preset === filterState.preset));
     elements.groupButtons.forEach(button => button.classList.toggle('is-active', button.dataset.group === reportGroupBy));
     elements.rangeChip.textContent = flexbuddyReports.rangeLabel(filterState);
@@ -1851,7 +1867,7 @@ async function applyPreset(preset) {
     } else if (PAY_PERIOD_PRESETS[preset] !== undefined) {
         const period = (payPeriods ?? await loadPayPeriods())?.periods[PAY_PERIOD_PRESETS[preset]];
         if (!period) {
-            showToast('Pay period unavailable', 'Your pay periods could not be loaded. Try again in a moment.', {alert: true});
+            showToast(t('js.app.payPeriodUnavailable'), t('js.app.payPeriodUnavailableMessage'), {alert: true});
             return;
         }
         from = period.from;
@@ -1892,7 +1908,7 @@ function clearFilters() {
 
 function validateDateRange() {
     if (filterState.from && filterState.to && filterState.from > filterState.to) {
-        showMessage(elements.filterError, 'The start date must be on or before the end date.');
+        showMessage(elements.filterError, t('js.app.startAfterEnd'));
         return false;
     }
     hideMessage(elements.filterError);
@@ -1928,7 +1944,7 @@ async function loadStations() {
         const response = await apiFetch('/shifts/stations');
         if (!response.ok) throw new Error();
         const stations = await response.json();
-        elements.filterStation.replaceChildren(new Option('All stations', ''));
+        elements.filterStation.replaceChildren(new Option(t('js.app.allStations'), ''));
         stations.forEach(station => elements.filterStation.add(new Option(station, station)));
         window.flexbuddyEvaluate?.setStations(stations);
         if (filterState.station && !stations.some(station => station.toLowerCase() === filterState.station.toLowerCase())) {
@@ -1936,31 +1952,31 @@ async function loadStations() {
         }
         elements.filterStation.value = filterState.station;
     } catch {
-        elements.filterStation.replaceChildren(new Option('All stations', ''));
+        elements.filterStation.replaceChildren(new Option(t('js.app.allStations'), ''));
     }
 }
 
 function updateResultSummary(shifts) {
     const count = shifts.length;
-    let range = 'All dates';
+    let range = t('js.app.allDates');
     if (filterState.from || filterState.to) {
-        range = `${filterState.from ? formatDate(filterState.from) : 'Beginning'} – ${filterState.to ? formatDate(filterState.to) : 'Today'}`;
+        range = `${filterState.from ? formatDate(filterState.from) : t('js.app.beginning')} – ${filterState.to ? formatDate(filterState.to) : t('js.app.today')}`;
     } else if (count) {
         const dates = shifts.map(shift => shift.date).sort();
         range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
     }
     const station = filterState.station ? ` · ${filterState.station}` : '';
     const expenseScope = filterState.station
-        ? 'expenses linked to these shifts only'
-        : 'expenses included by date';
-    elements.resultsSummary.textContent = `${count} shift${count === 1 ? '' : 's'} · ${range}${station} · ${expenseScope} · export includes these`;
+        ? t('js.app.expensesLinkedOnly')
+        : t('js.app.expensesByDate');
+    elements.resultsSummary.textContent = t('js.app.resultsSummary', tn(count, 'js.schedule.shifts'), range, station, expenseScope);
     elements.activeFilterSummary.textContent = flexbuddyReports.summaryLine(shifts);
     elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
     elements.exportCsvButton.classList.toggle('is-disabled', count === 0);
     elements.exportCsvButton.setAttribute('aria-disabled', String(count === 0));
     elements.exportCsvButton.title = count === 0
-            ? 'No shifts match the active filters'
-            : `Export ${count} matching shifts`;
+            ? t('js.app.noShiftsMatchActive')
+            : t('js.app.exportMatching', count);
 }
 
 function drillIntoBucket(bucket, groupBy) {
@@ -1978,26 +1994,26 @@ function drillIntoBucket(bucket, groupBy) {
 
 /** "Sep 29": a day without its year, for the short lines in the Waiting to sync strip. */
 function formatShortDay(value) {
-    return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+    return parseLocalDate(value).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric'});
 }
 
 function formatDate(value) {
-    return parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'});
+    return parseLocalDate(value).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric', year: 'numeric'});
 }
 
 function formatTimestamp(value) {
-    return value ? new Date(value).toLocaleString() : 'Unknown';
+    return value ? new Date(value).toLocaleString(appLocale()) : t('js.app.unknown');
 }
 
 function timestampSummary(shift) {
     if (!shift.createdAt) return '';
-    const added = new Date(shift.createdAt).toLocaleDateString(undefined, {
+    const added = new Date(shift.createdAt).toLocaleDateString(appLocale(), {
         month: 'short', day: 'numeric', year: 'numeric'
     });
     const edited = shift.updatedAt && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000
-            ? ` · Last edited ${new Date(shift.updatedAt).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})}`
+            ? ` · ${t('js.app.lastEdited', new Date(shift.updatedAt).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric', year: 'numeric'}))}`
             : '';
-    return `Added ${added}${edited}`;
+    return `${t('js.app.added', added)}${edited}`;
 }
 
 function startOfToday() {
@@ -2039,7 +2055,7 @@ async function isDuplicate(response) {
 
 function populateExpenseShifts(shifts) {
     const selected = elements.expenseShift.value;
-    elements.expenseShift.innerHTML = '<option value="">No linked shift</option>';
+    elements.expenseShift.innerHTML = `<option value="">${escapeHtml(t('js.app.noLinkedShift'))}</option>`;
     const selectedDate = elements.expenseDate.value;
     shifts.filter(shift => !selectedDate || shift.date === selectedDate || String(shift.id) === selected).forEach(shift => {
         const option = document.createElement('option');
@@ -2048,6 +2064,16 @@ function populateExpenseShifts(shifts) {
         elements.expenseShift.append(option);
     });
     if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
+}
+
+const EXPENSE_CATEGORY_KEYS = {
+    FUEL: 'js.app.categoryFuel', TOLL: 'js.app.categoryToll', PARKING: 'js.app.categoryParking',
+    MAINTENANCE: 'js.app.categoryMaintenance', OTHER: 'js.app.categoryOther'
+};
+
+/** A category's name in the driver's language, as the expense list shows it in capitals. */
+function categoryName(category) {
+    return EXPENSE_CATEGORY_KEYS[category] ? t(EXPENSE_CATEGORY_KEYS[category]) : category;
 }
 
 function expenseQueryString() {
@@ -2075,15 +2101,15 @@ async function loadExpenses() {
         renderExpenseSummary(await summaryResponse.json());
         const settings = await settingsResponse.json();
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
-            ? 'actual expenses' : `standard mileage at ${formatMoney(settings.mileageRate)}/mi`;
+            ? t('js.app.costActual') : t('js.app.costStandard', formatMoney(settings.mileageRate));
     } catch (error) {
-        elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || 'Expenses could not be loaded.')}</p>`;
+        elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || t('js.app.expensesNotLoaded'))}</p>`;
     }
 }
 
 function renderExpenseSummary(summary) {
     elements.expenseSummaryTotal.textContent = formatMoney(summary.total);
-    elements.expenseSummaryCount.textContent = `${summary.count || 0} ${summary.count === 1 ? 'entry' : 'entries'}`;
+    elements.expenseSummaryCount.textContent = tn(summary.count || 0, 'js.app.entries');
     elements.expenseFuel.textContent = formatMoney(summary.byCategory?.FUEL);
     elements.expenseRoad.textContent = formatMoney(Number(summary.byCategory?.TOLL || 0) + Number(summary.byCategory?.PARKING || 0));
     const categories = ['FUEL', 'TOLL', 'PARKING', 'MAINTENANCE', 'OTHER'];
@@ -2091,7 +2117,7 @@ function renderExpenseSummary(summary) {
     elements.expenseCategoryBreakdown.replaceChildren(...categories.map(category => {
         const row = document.createElement('div');
         const label = document.createElement('span');
-        label.textContent = category.charAt(0) + category.slice(1).toLowerCase();
+        label.textContent = categoryName(category);
         const track = document.createElement('div');
         const bar = document.createElement('span');
         bar.style.width = `${Number(summary.byCategory?.[category] || 0) / max * 100}%`;
@@ -2106,27 +2132,27 @@ function renderExpenseSummary(summary) {
 function renderExpenses(expenses) {
     elements.expenseList.replaceChildren();
     if (!expenses.length) {
-        elements.expenseList.innerHTML = '<p class="history-empty">No expenses match these filters.</p>';
+        elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(t('js.app.noExpensesMatch'))}</p>`;
         return;
     }
     expenses.forEach(expense => {
         const row = document.createElement('article');
         row.className = 'expense-row';
-        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(expense.category.slice(0, 1))}</div><div class="expense-main"><strong>${escapeHtml(expense.category.replace('_', ' '))}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || 'No note')}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">Edit</button><button class="danger-text-button delete-expense" type="button">Delete</button></div>`;
+        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(categoryName(expense.category).slice(0, 1).toUpperCase())}</div><div class="expense-main"><strong>${escapeHtml(categoryName(expense.category).toUpperCase())}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || t('js.app.noNote'))}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">${escapeHtml(t('js.common.edit'))}</button><button class="danger-text-button delete-expense" type="button">${escapeHtml(t('js.common.delete'))}</button></div>`;
         row.querySelector('.edit-expense').addEventListener('click', () => editExpense(expense));
         row.querySelector('.delete-expense').addEventListener('click', () => deleteExpense(expense));
         elements.expenseList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
             onEdit: () => editExpense(expense),
             onDelete: () => deleteExpense(expense),
-            deleteQuestion: `Delete this ${formatMoney(expense.amount)} ${expense.category.toLowerCase()} expense?`
+            deleteQuestion: t('js.app.deleteExpenseQuestion', formatMoney(expense.amount), categoryName(expense.category).toLowerCase())
         }) : row);
     });
 }
 
 function editExpense(expense) {
     editingExpenseId = expense.id;
-    elements.expenseFormTitle.textContent = 'Edit expense';
-    elements.saveExpenseButton.textContent = 'Save expense';
+    elements.expenseFormTitle.textContent = t('js.app.editExpense');
+    elements.saveExpenseButton.textContent = t('js.app.saveExpense');
     elements.cancelExpenseEdit.classList.remove('is-hidden');
     elements.expenseDate.value = expense.date;
     elements.expenseCategory.value = expense.category;
@@ -2141,15 +2167,15 @@ function editExpense(expense) {
 function applyOfflineExpenseState() {
     const blocked = editingExpenseId !== undefined && (window.flexbuddyPwa?.isOffline() ?? false);
     elements.saveExpenseButton.disabled = blocked;
-    elements.saveExpenseButton.title = blocked ? 'Available when you are back online' : '';
+    elements.saveExpenseButton.title = blocked ? t('js.pwa.availableWhenOnline') : '';
 }
 
 function resetExpenseForm() {
     editingExpenseId = undefined;
     elements.expenseForm.reset();
     elements.expenseDate.value = toIsoDate(new Date());
-    elements.expenseFormTitle.textContent = 'Log an expense';
-    elements.saveExpenseButton.textContent = 'Add expense';
+    elements.expenseFormTitle.textContent = t('js.app.logExpense');
+    elements.saveExpenseButton.textContent = t('js.app.addExpense');
     elements.cancelExpenseEdit.classList.add('is-hidden');
     hideMessage(elements.expenseError);
     applyOfflineExpenseState();
@@ -2177,24 +2203,24 @@ async function saveExpense(event) {
             });
             if (result.queued) {
                 resetExpenseForm();
-                showToast('Saved offline · will sync', `${label} · ${formatMoney(body.amount)} will be added when you're back online.`);
+                showToast(t('js.finish.savedOfflineTitle'), t('js.app.savedOfflineExpense', label, formatMoney(body.amount)));
                 return;
             }
             response = result.sent;
         }
         if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text());
         resetExpenseForm();
-        showToast(id ? 'Expense updated' : 'Expense added', 'Net earnings have been recalculated.');
+        showToast(id ? t('js.app.expenseUpdated') : t('js.app.expenseAdded'), t('js.account.netRecalculated'));
         await Promise.all([loadExpenses(), loadDashboard()]);
-    } catch (error) { showMessage(elements.expenseError, error.message || 'The expense could not be saved.'); }
+    } catch (error) { showMessage(elements.expenseError, error.message || t('js.app.expenseNotSaved')); }
     finally { elements.saveExpenseButton.disabled = false; applyOfflineExpenseState(); }
 }
 
 async function deleteExpense(expense) {
     const response = await apiFetch(`/expenses/${expense.id}`, {method: 'DELETE', headers: csrfHeaders()});
-    if (!response.ok) return showToast('Delete failed', await response.text(), {alert: true});
+    if (!response.ok) return showToast(t('js.app.deleteFailedTitle'), await response.text(), {alert: true});
     const batch = response.headers.get('X-Delete-Batch');
-    showToast('Expense deleted', 'It is available in Recently deleted for 30 days.', {actionLabel: 'Undo', duration: 8000,
+    showToast(t('js.app.expenseDeleted'), t('js.app.availableInTrash'), {actionLabel: t('js.common.undo'), duration: 8000,
         onAction: async () => { await apiFetch(`/expenses/restore-batch/${encodeURIComponent(batch)}`, {method:'POST', headers:csrfHeaders()}); await loadExpenses(); await loadDashboard(); }});
     await Promise.all([loadExpenses(), loadDashboard()]);
 }
@@ -2206,34 +2232,34 @@ async function loadExpenseTrash() {
     elements.expenseTrashCount.textContent = expenses.length ? `(${expenses.length})` : '';
     elements.emptyExpenseTrashButton.classList.toggle('is-hidden', expenses.length === 0);
     elements.expenseTrashList.replaceChildren();
-    if (!expenses.length) return elements.expenseTrashList.innerHTML = '<p>There are no recently deleted expenses.</p>';
+    if (!expenses.length) return elements.expenseTrashList.innerHTML = `<p>${escapeHtml(t('js.app.noExpenseTrash'))}</p>`;
     expenses.forEach(expense => {
         const row = document.createElement('article'); row.className = 'trash-row';
-        row.innerHTML = `<div><strong>${escapeHtml(expense.category)} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}</span></div><div><button class="text-button" type="button">Restore</button><button class="danger-text-button" type="button">Delete permanently</button></div>`;
+        row.innerHTML = `<div><strong>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}</span></div><div><button class="text-button" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
         const [restore, remove] = row.querySelectorAll('button');
         restore.addEventListener('click', async () => { await apiFetch(`/expenses/${expense.id}/restore`, {method:'POST',headers:csrfHeaders()}); await loadExpenseTrash(); await loadExpenses(); await loadDashboard(); });
-        remove.addEventListener('click', () => openConfirm('Delete this expense permanently?', 'This expense cannot be recovered.', async () => { await apiFetch(`/expenses/trash/${expense.id}`, {method:'DELETE',headers:csrfHeaders()}); await loadExpenseTrash(); }));
+        remove.addEventListener('click', () => openConfirm(t('js.app.deleteExpensePermanentlyTitle'), t('js.app.deleteExpensePermanentlyMessage'), async () => { await apiFetch(`/expenses/trash/${expense.id}`, {method:'DELETE',headers:csrfHeaders()}); await loadExpenseTrash(); }));
         elements.expenseTrashList.append(row);
     });
 }
 
 async function emptyExpenseTrash() {
     const response = await apiFetch('/expenses/trash', {method: 'DELETE', headers: csrfHeaders()});
-    if (!response.ok) throw new Error(await response.text() || 'Deleted expenses could not be emptied.');
+    if (!response.ok) throw new Error(await response.text() || t('js.app.expenseTrashNotEmptied'));
     await loadExpenseTrash();
-    showToast('Deleted expenses emptied', 'The deleted expenses were permanently removed.');
+    showToast(t('js.app.expenseTrashEmptiedTitle'), t('js.app.expenseTrashEmptiedMessage'));
 }
 
 async function loadLinkedExpenses(shiftId) {
-    elements.linkedExpensesList.innerHTML = '<small>Loading…</small>';
+    elements.linkedExpensesList.innerHTML = `<small>${escapeHtml(t('js.common.loading'))}</small>`;
     try {
         const response = await apiFetch(`/shifts/${shiftId}/expenses`);
         if (!response.ok) throw new Error();
         const expenses = await response.json();
         elements.linkedExpensesList.innerHTML = expenses.length
-            ? expenses.map(expense => `<small>${escapeHtml(expense.category)} · ${formatMoney(expense.amount)} · ${formatDate(expense.date)}</small>`).join('')
-            : '<small>No expenses linked to this shift.</small>';
-    } catch { elements.linkedExpensesList.innerHTML = '<small>Linked expenses could not be loaded.</small>'; }
+            ? expenses.map(expense => `<small>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)} · ${formatDate(expense.date)}</small>`).join('')
+            : `<small>${escapeHtml(t('js.app.noLinkedExpenses'))}</small>`;
+    } catch { elements.linkedExpensesList.innerHTML = `<small>${escapeHtml(t('js.app.linkedExpensesNotLoaded'))}</small>`; }
 }
 
 function openInitialScreen() {
@@ -2260,7 +2286,7 @@ function openInitialScreen() {
 }
 
 const SHARE_INBOX = 'flexbuddy-share-inbox';
-const SHARED_UNAVAILABLE = 'The shared screenshot is no longer available. Choose it again.';
+const SHARED_UNAVAILABLE = t('js.app.sharedUnavailable');
 
 /** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
 /** Right after the emailed code is accepted the address carries ?welcome; say so once and tidy the address. */
@@ -2271,8 +2297,7 @@ function noteRecoveryCodeUse() {
     const query = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
     const left = Number(document.body.dataset.recoveryLeft);
-    const remaining = Number.isFinite(left) ? `${left} left. ` : '';
-    showToast('You used a recovery code', `${remaining}Make new ones in Account.`);
+    showToast(t('js.app.recoveryUsed'), Number.isFinite(left) ? t('js.app.recoveryUsedLeft', left) : t('js.app.recoveryUsedMakeNew'));
 }
 
 function greetNewDriver() {
@@ -2281,7 +2306,7 @@ function greetNewDriver() {
     params.delete('welcome');
     const query = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
-    showToast('Email confirmed', 'Welcome to FlexBuddy.');
+    showToast(t('js.app.emailConfirmed'), t('js.app.welcome'));
 }
 
 async function importSharedScreenshot() {
@@ -2334,7 +2359,7 @@ async function reportTimeZone() {
                 body: JSON.stringify({timeZone: zone})
             });
             if (!saved.ok) return;
-            showToast('Time zone updated', `Time zone set to ${zone}`);
+            showToast(t('js.app.timeZoneUpdated'), t('js.app.timeZoneSet', zone));
             await loadDashboard();
         }
         try {
@@ -2375,8 +2400,8 @@ function setupInstallBanner() {
         document.dispatchEvent(new CustomEvent('flexbuddy:attention'));
         elements.installBannerButton.classList.toggle('is-hidden', state !== 'prompt');
         elements.installBannerText.textContent = state === 'ios'
-            ? 'In Safari, tap Share, then Add to Home Screen, to open FlexBuddy like an app.'
-            : 'Open it from your home screen like an app, with your last synced data available offline.';
+            ? t('js.app.installIos')
+            : t('js.app.installOpenFromHome');
     });
 }
 

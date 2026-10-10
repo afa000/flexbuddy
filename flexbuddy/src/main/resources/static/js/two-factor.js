@@ -4,10 +4,10 @@
     /** The text saved to the recovery file, dated with the device's own calendar day. */
     function recoveryFileText(codes, dateIso) {
         return [
-            'FlexBuddy recovery codes',
-            `Made ${dateIso}`,
+            t('js.twoFactor.recoveryFileTitle'),
+            t('js.twoFactor.recoveryFileMade', dateIso),
             '',
-            'Each code works once. Keep this file somewhere safe.',
+            t('js.twoFactor.recoveryFileNote'),
             '',
             ...codes,
             ''
@@ -34,9 +34,9 @@
     async function copy(text, button) {
         try {
             await navigator.clipboard.writeText(text);
-            flash(button, 'Copied');
+            flash(button, t('js.common.copied'));
         } catch {
-            flash(button, 'Copy failed');
+            flash(button, t('js.common.copyFailed'));
         }
     }
 
@@ -57,7 +57,7 @@
 
     const themeButton = document.querySelector('#themeToggleButton');
     if (themeButton) {
-        const label = theme => (theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode');
+        const label = theme => (theme === 'light' ? t('js.common.switchToDarkMode') : t('js.common.switchToLightMode'));
         const show = theme => {
             themeButton.setAttribute('aria-label', label(theme));
             themeButton.title = label(theme);

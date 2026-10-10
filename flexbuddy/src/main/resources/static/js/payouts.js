@@ -56,7 +56,7 @@
             periods = (await response.json()).periods;
             render();
         } catch {
-            showMessage(el.error, 'Payouts could not be loaded.');
+            showMessage(el.error, t('js.payouts.loadFailed'));
         }
     }
 
@@ -64,32 +64,32 @@
         el.list.replaceChildren(...periods.map(row));
     }
 
-    const payoutDate = value => parseLocalDate(value).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
-    const shortDate = value => parseLocalDate(value).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
-    const blocks = count => `${count} ${count === 1 ? 'block' : 'blocks'}`;
+    const payoutDate = value => parseLocalDate(value).toLocaleDateString(appLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
+    const shortDate = value => parseLocalDate(value).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric'});
+    const blocks = count => tn(count, 'js.common.blocks');
 
     // A payout with no logged blocks and nothing recorded has nothing to check, so it gets no form unless asked.
     const empty = period => period.status === 'UNCHECKED' && period.blocks === 0 && editing !== period.payoutDate;
 
     function statusLabel(period) {
         const gap = formatMoney(Math.abs(Number(period.difference)));
-        if (empty(period)) return 'No blocks';
+        if (empty(period)) return t('js.payouts.noBlocks');
         return {
-            UPCOMING: 'Coming',
-            UNCHECKED: 'Not checked',
-            MATCHED: 'Matches',
-            SHORT: `${gap} short`,
-            OVER: `${gap} over`
+            UPCOMING: t('js.payouts.coming'),
+            UNCHECKED: t('js.payouts.notChecked'),
+            MATCHED: t('js.payouts.matches'),
+            SHORT: t('js.payouts.short', gap),
+            OVER: t('js.payouts.over', gap)
         }[period.status];
     }
 
     function gapSentence(period) {
         const gap = formatMoney(Math.abs(Number(period.difference)));
         if (period.status === 'SHORT') {
-            return `${gap} less than your logged blocks earned. Compare it with this payout in the Flex app.`;
+            return t('js.payouts.gapLess', gap);
         }
         if (period.status === 'OVER') {
-            return `${gap} more than your logged blocks earned, often tips from earlier blocks or a block not logged here.`;
+            return t('js.payouts.gapMore', gap);
         }
         return '';
     }
@@ -103,7 +103,7 @@
                 <strong>${escapeHtml(payoutDate(period.payoutDate))}</strong>
                 <span class="payout-status">${escapeHtml(statusLabel(period))}</span>
             </div>
-            <p class="payout-row-meta">Blocks ${escapeHtml(range)} · ${escapeHtml(blocks(period.blocks))} · earned ${escapeHtml(formatMoney(period.earned))}</p>`;
+            <p class="payout-row-meta">${escapeHtml(t('js.payouts.rowMeta', range, blocks(period.blocks), formatMoney(period.earned)))}</p>`;
         if (period.status === 'UPCOMING') return item;
         const offline = window.flexbuddyPwa?.isOffline() ?? false;
         if (empty(period)) {
@@ -111,7 +111,7 @@
             const record = document.createElement('button');
             record.className = 'text-button payout-record';
             record.type = 'button';
-            record.textContent = 'Record a deposit';
+            record.textContent = t('js.payouts.recordDeposit');
             record.disabled = offline;
             record.addEventListener('click', () => startEditing(period));
             item.append(record);
@@ -121,11 +121,11 @@
             const received = document.createElement('div');
             received.className = 'payout-received';
             received.innerHTML = `
-                <p>Received <strong>${escapeHtml(formatMoney(period.received))}</strong>${period.note ? ` · ${escapeHtml(period.note)}` : ''}</p>
+                <p>${escapeHtml(t('js.payouts.received'))} <strong>${escapeHtml(formatMoney(period.received))}</strong>${period.note ? ` · ${escapeHtml(period.note)}` : ''}</p>
                 ${gapSentence(period) ? `<p class="payout-gap">${escapeHtml(gapSentence(period))}</p>` : ''}
                 <div class="confirm-actions">
-                    <button class="secondary-button compact-button" type="button" data-action="edit">Change</button>
-                    <button class="text-button danger-text-button" type="button" data-action="remove">Remove</button>
+                    <button class="secondary-button compact-button" type="button" data-action="edit">${escapeHtml(t('js.common.change'))}</button>
+                    <button class="text-button danger-text-button" type="button" data-action="remove">${escapeHtml(t('js.common.remove'))}</button>
                 </div>`;
             received.querySelectorAll('button').forEach(button => button.disabled = offline);
             received.querySelector('[data-action="edit"]').addEventListener('click', () => startEditing(period));
@@ -150,17 +150,17 @@
         form.dataset.payout = period.payoutDate;
         form.noValidate = true;
         form.innerHTML = `
-            <label class="field money-field"><span>What landed</span>
+            <label class="field money-field"><span>${escapeHtml(t('js.payouts.whatLanded'))}</span>
                 <span class="input-with-prefix"><b>$</b><input id="${id}-amount" type="number" min="0" max="99999.99" step="0.01"
                     inputmode="decimal" enterkeyhint="done"></span></label>
-            <label class="field"><span>Note <small>(optional)</small></span>
+            <label class="field"><span>${escapeHtml(t('js.common.note'))} <small>${escapeHtml(t('js.common.optional'))}</small></span>
                 <input id="${id}-note" type="text" maxlength="255" autocomplete="off"></label>
             <div class="notice error-notice is-hidden" role="alert"></div>
             <div class="confirm-actions">
-                <button class="primary-button compact-button" type="submit">Save</button>
+                <button class="primary-button compact-button" type="submit">${escapeHtml(t('js.common.save'))}</button>
                 ${period.received == null && Number(period.earned) > 0
-                    ? `<button class="secondary-button compact-button" type="button" data-action="exact">It was ${escapeHtml(formatMoney(period.earned))}</button>` : ''}
-                ${editing === period.payoutDate ? '<button class="text-button" type="button" data-action="cancel">Cancel</button>' : ''}
+                    ? `<button class="secondary-button compact-button" type="button" data-action="exact">${escapeHtml(t('js.payouts.itWas', formatMoney(period.earned)))}</button>` : ''}
+                ${editing === period.payoutDate ? '<button class="text-button" type="button" data-action="cancel">${escapeHtml(t('js.common.cancel'))}</button>' : ''}
             </div>`;
         const amount = form.querySelector('input[type="number"]');
         const note = form.querySelector('input[type="text"]');
@@ -183,7 +183,7 @@
         const error = form.querySelector('.error-notice');
         const amount = Number(value);
         if (value === '' || !Number.isFinite(amount) || amount < 0 || amount > 99999.99) {
-            showMessage(error, 'Enter the amount that landed, such as 84.50.');
+            showMessage(error, t('js.payouts.amountInvalid'));
             return;
         }
         hideMessage(error);
@@ -194,18 +194,18 @@
                 headers: csrfHeaders({'Content-Type': 'application/json'}),
                 body: JSON.stringify({amount: Math.round(amount * 100) / 100, note: note.trim() || null})
             });
-            if (!response.ok) throw new Error(await response.text() || 'The payout could not be saved.');
+            if (!response.ok) throw new Error(await response.text() || t('js.payouts.saveFailed'));
             editing = null;
             await load();
             loadPayPeriods();
         } catch (failure) {
-            showMessage(error, failure.message || 'The payout could not be saved.');
+            showMessage(error, failure.message || t('js.payouts.saveFailed'));
             form.querySelectorAll('button').forEach(button => button.disabled = false);
         }
     }
 
     async function remove(period, button) {
-        if (!window.confirm(`Forget the ${formatMoney(period.received)} recorded for ${payoutDate(period.payoutDate)}?`)) return;
+        if (!window.confirm(t('js.payouts.confirmForget', formatMoney(period.received), payoutDate(period.payoutDate)))) return;
         button.disabled = true;
         try {
             const response = await apiFetch(`/payouts/${period.payoutDate}`, {method: 'DELETE', headers: csrfHeaders()});
@@ -213,7 +213,7 @@
             await load();
             loadPayPeriods();
         } catch {
-            showToast('Payout not removed', 'The recorded amount could not be removed. Try again.', {alert: true});
+            showToast(t('js.payouts.notRemovedTitle'), t('js.payouts.notRemovedMessage'), {alert: true});
             button.disabled = false;
         }
     }

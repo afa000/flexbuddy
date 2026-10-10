@@ -60,7 +60,7 @@
     async function loadUpcoming() {
         try {
             const response = await apiFetch(`/shifts/upcoming?days=${UPCOMING_DAYS}`);
-            if (!response.ok) throw new Error(await response.text() || 'Your schedule could not be loaded.');
+            if (!response.ok) throw new Error(await response.text() || t('js.schedule.loadFailed'));
             state.upcoming = await response.json();
             state.fetchedAt = Date.now();
             hideMessage(el.error);
@@ -73,7 +73,7 @@
                 renderUpcomingList();
             }
         } catch (error) {
-            if (isVisible()) showMessage(el.error, error.message || 'Your schedule could not be loaded.');
+            if (isVisible()) showMessage(el.error, error.message || t('js.schedule.loadFailed'));
         }
     }
 
@@ -82,7 +82,7 @@
         if (el.badge) {
             el.badge.textContent = needsConfirmation.length;
             el.badge.classList.toggle('is-hidden', needsConfirmation.length === 0);
-            el.badge.setAttribute('aria-label', `${needsConfirmation.length} to confirm`);
+            el.badge.setAttribute('aria-label', t('js.schedule.toConfirm', needsConfirmation.length));
         }
     }
 
@@ -94,11 +94,11 @@
             row.className = 'confirm-row';
             row.innerHTML = `
                 <p><strong>${escapeHtml(dayLabel(shift.date))} · ${escapeHtml(shift.station)} ${timeRange(shift)}</strong>
-                    <span>Did you work this block?</span></p>
+                    <span>${escapeHtml(t('js.schedule.didYouWork'))}</span></p>
                 <div class="confirm-actions">
-                    <button class="primary-button compact-button" type="button" data-action="completed">Completed</button>
-                    <button class="secondary-button compact-button" type="button" data-action="cancelled">Cancelled</button>
-                    <button class="danger-text-button" type="button" data-action="forfeited">Forfeited</button>
+                    <button class="primary-button compact-button" type="button" data-action="completed">${escapeHtml(t('js.common.completed'))}</button>
+                    <button class="secondary-button compact-button" type="button" data-action="cancelled">${escapeHtml(t('js.common.cancelled'))}</button>
+                    <button class="danger-text-button" type="button" data-action="forfeited">${escapeHtml(t('js.common.forfeited'))}</button>
                 </div>`;
             bindActions(row, shift);
             return row;
@@ -116,33 +116,33 @@
         if (!shift) {
             container.innerHTML = `
                 <div class="next-up-main">
-                    <p class="step-label">NEXT UP</p>
-                    <h2>No upcoming blocks</h2>
-                    <p class="next-up-when">Add a scheduled shift, or import a screenshot of a block you accepted.</p>
+                    <p class="step-label">${escapeHtml(t('js.schedule.nextUp'))}</p>
+                    <h2>${escapeHtml(t('js.schedule.noUpcoming'))}</h2>
+                    <p class="next-up-when">${escapeHtml(t('js.schedule.noUpcomingHint'))}</p>
                 </div>`;
             return;
         }
         const started = Boolean(shift.details?.actualStart);
         const current = started || nowMs() >= localMs(shift.date, shift.startTime) - EARLIEST_START_MS;
         const blockActions = !current ? ''
-            : started ? '<button class="primary-button compact-button" type="button" data-action="finish">Finish block</button>'
-            : `<button class="primary-button compact-button" type="button" data-action="start">Start block</button>
-               <button class="secondary-button compact-button" type="button" data-action="finish">Finish block</button>`;
+            : started ? `<button class="primary-button compact-button" type="button" data-action="finish">${escapeHtml(t('js.finish.finishBlock'))}</button>`
+            : `<button class="primary-button compact-button" type="button" data-action="start">${escapeHtml(t('js.quickActions.startBlock'))}</button>
+               <button class="secondary-button compact-button" type="button" data-action="finish">${escapeHtml(t('js.finish.finishBlock'))}</button>`;
         container.innerHTML = `
             <div class="next-up-main">
-                <p class="step-label">${started ? 'IN PROGRESS' : 'NEXT UP'}</p>
+                <p class="step-label">${escapeHtml(started ? t('js.schedule.inProgress') : t('js.schedule.nextUp'))}</p>
                 <h2>${escapeHtml(shift.station)}</h2>
                 <p class="next-up-when">${escapeHtml(dayLabel(shift.date))} · ${timeRange(shift)}</p>
                 <p class="next-up-countdown"></p>
                 <p class="forfeit-deadline"></p>
             </div>
-            <div class="next-up-pay"><strong>${formatMoney(shift.basePay)}</strong><span>offered · ${formatMinutes(shift.timeWorked)}</span></div>
+            <div class="next-up-pay"><strong>${formatMoney(shift.basePay)}</strong><span>${escapeHtml(t('js.schedule.offeredFor', formatMinutes(shift.timeWorked)))}</span></div>
             <div class="next-up-actions">
                 ${blockActions}
-                <a class="secondary-button compact-button" href="/shifts/${shift.id}.ics" download>Add to calendar</a>
-                <button class="secondary-button compact-button" type="button" data-action="cancelled">Mark cancelled</button>
-                <button class="danger-text-button" type="button" data-action="forfeited">Forfeit</button>
-                <button class="text-button" type="button" data-action="edit">Edit</button>
+                <a class="secondary-button compact-button" href="/shifts/${shift.id}.ics" download>${escapeHtml(t('js.schedule.addToCalendar'))}</a>
+                <button class="secondary-button compact-button" type="button" data-action="cancelled">${escapeHtml(t('js.schedule.markCancelled'))}</button>
+                <button class="danger-text-button" type="button" data-action="forfeited">${escapeHtml(t('js.schedule.forfeit'))}</button>
+                <button class="text-button" type="button" data-action="edit">${escapeHtml(t('js.common.edit'))}</button>
             </div>`;
         bindActions(container, shift);
         const countdown = container.querySelector('.next-up-countdown');
@@ -167,7 +167,7 @@
         const weekTotals = new Map(weeks.map(week => [week.weekStart, week]));
         el.upcomingList.replaceChildren();
         if (!days.length) {
-            el.upcomingList.innerHTML = `<p class="history-empty">Nothing scheduled in the next ${UPCOMING_DAYS} days.</p>`;
+            el.upcomingList.innerHTML = `<p class="history-empty">${escapeHtml(t('js.schedule.nothingScheduled', UPCOMING_DAYS))}</p>`;
             return;
         }
         days.forEach((day, index) => {
@@ -179,10 +179,10 @@
                 row.className = 'upcoming-row';
                 row.innerHTML = `
                     <div><strong>${timeRange(shift)}</strong>
-                        <span>${escapeHtml(shift.station)}${shift.forfeitDeadline ? ` · forfeit by ${escapeHtml(formatTime(shift.forfeitDeadline.slice(11, 16)))}` : ''}${overlapping.has(shift.id) ? ' <small class="status-badge status-conflict">Overlaps</small>' : ''}</span></div>
+                        <span>${escapeHtml(shift.station)}${shift.forfeitDeadline ? ` · ${escapeHtml(t('js.schedule.forfeitBy', formatTime(shift.forfeitDeadline.slice(11, 16))))}` : ''}${overlapping.has(shift.id) ? ` <small class="status-badge status-conflict">${escapeHtml(t('js.schedule.overlaps'))}</small>` : ''}</span></div>
                     <strong class="upcoming-pay">${formatMoney(shift.basePay)}</strong>
                     <button class="edit-shift-button" type="button" data-action="edit">${PENCIL}</button>`;
-                row.querySelector('button').setAttribute('aria-label', `Edit ${shift.station} block on ${formatDate(shift.date)}`);
+                row.querySelector('button').setAttribute('aria-label', t('js.schedule.editBlockOn', shift.station, formatDate(shift.date)));
                 bindActions(row, shift);
                 section.append(row);
             });
@@ -194,8 +194,8 @@
                 const total = weekTotals.get(week);
                 const footer = document.createElement('p');
                 footer.className = 'week-footer';
-                footer.textContent = `Week of ${shortDay(week)} · ${total.shifts} ${total.shifts === 1 ? 'block' : 'blocks'} · `
-                    + `${formatMinutes(total.plannedMinutes)} planned · ${formatMoney(total.expectedPay)} expected`;
+                footer.textContent = t('js.schedule.weekFooter', shortDay(week), tn(total.shifts, 'js.common.blocks'),
+                    formatMinutes(total.plannedMinutes), formatMoney(total.expectedPay));
                 el.upcomingList.append(footer);
             }
         });
@@ -204,16 +204,16 @@
     async function loadMonth(month) {
         state.month = month;
         const [year, number] = month.split('-').map(Number);
-        el.monthLabel.textContent = new Date(year, number - 1, 1).toLocaleDateString(undefined, {month: 'long', year: 'numeric'});
+        el.monthLabel.textContent = new Date(year, number - 1, 1).toLocaleDateString(appLocale(), {month: 'long', year: 'numeric'});
         try {
             const response = await apiFetch(`/shifts/calendar?month=${month}`);
-            if (!response.ok) throw new Error(await response.text() || 'The calendar could not be loaded.');
+            if (!response.ok) throw new Error(await response.text() || t('js.schedule.calendarFailed'));
             const result = await response.json();
             if (state.month !== month) return;
             state.monthDays = result.days;
             renderGrid();
         } catch (error) {
-            showMessage(el.error, error.message || 'The calendar could not be loaded.');
+            showMessage(el.error, error.message || t('js.schedule.calendarFailed'));
         }
     }
 
@@ -247,14 +247,14 @@
     }
 
     async function loadDay(date) {
-        el.dayPanel.innerHTML = '<p class="day-panel-empty">Loading…</p>';
+        el.dayPanel.innerHTML = `<p class="day-panel-empty">${escapeHtml(t('js.common.loading'))}</p>`;
         try {
             const params = new URLSearchParams({from: date, to: date, status: 'all', sort: 'date', dir: 'asc'});
             const response = await apiFetch(`/shifts?${params}`);
-            if (!response.ok) throw new Error(await response.text() || 'This day could not be loaded.');
+            if (!response.ok) throw new Error(await response.text() || t('js.schedule.dayFailed'));
             renderDay(date, await response.json());
         } catch (error) {
-            el.dayPanel.innerHTML = `<p class="day-panel-empty">${escapeHtml(error.message || 'This day could not be loaded.')}</p>`;
+            el.dayPanel.innerHTML = `<p class="day-panel-empty">${escapeHtml(error.message || t('js.schedule.dayFailed'))}</p>`;
         }
     }
 
@@ -263,14 +263,14 @@
         el.dayPanel.replaceChildren();
         const heading = document.createElement('div');
         heading.className = 'day-panel-heading';
-        heading.innerHTML = `<h3>${escapeHtml(longDay(date))}</h3><button class="text-button" type="button">Add scheduled shift</button>`;
+        heading.innerHTML = `<h3>${escapeHtml(longDay(date))}</h3><button class="text-button" type="button">${escapeHtml(t('js.common.addScheduledShift'))}</button>`;
         const addButton = heading.querySelector('button');
         addButton.addEventListener('click', () => addScheduled(date, addButton));
         el.dayPanel.append(heading);
         if (!shifts.length) {
             const empty = document.createElement('p');
             empty.className = 'day-panel-empty';
-            empty.textContent = 'No shifts on this day.';
+            empty.textContent = t('js.schedule.noShiftsToday');
             el.dayPanel.append(empty);
             return;
         }
@@ -281,7 +281,7 @@
                 <span class="status-dot status-dot-${shift.status.toLowerCase()}" aria-hidden="true"></span>
                 <div><strong>${escapeHtml(shift.station)} · ${timeRange(shift)}</strong><span>${escapeHtml(statusSummary(shift))}</span></div>
                 <button class="edit-shift-button" type="button" data-action="edit">${PENCIL}</button>`;
-            row.querySelector('button').setAttribute('aria-label', `Edit ${shift.station} shift on ${formatDate(shift.date)}`);
+            row.querySelector('button').setAttribute('aria-label', t('js.schedule.editShiftOn', shift.station, formatDate(shift.date)));
             bindActions(row, shift);
             el.dayPanel.append(row);
         });
@@ -309,13 +309,13 @@
             button.className = 'week-strip-day';
             button.classList.toggle('is-today', date === today());
             button.innerHTML = `
-                <small>${escapeHtml(parsed.toLocaleDateString(undefined, {weekday: 'short'}))}</small>
+                <small>${escapeHtml(parsed.toLocaleDateString(appLocale(), {weekday: 'short'}))}</small>
                 <strong>${parsed.getDate()}</strong>
                 <span>${dayShifts.length ? escapeHtml(formatTime(dayShifts[0].startTime)) : '—'}</span>
                 <span class="calendar-dots" aria-hidden="true">${dayShifts.slice(0, 3)
                     .map(shift => `<i class="status-dot status-dot-${shift.status.toLowerCase()}"></i>`).join('')}</span>`;
             button.setAttribute('aria-label',
-                `${longDay(date)}: ${dayShifts.length} ${dayShifts.length === 1 ? 'shift' : 'shifts'}`);
+                t('js.schedule.dayShiftCount', longDay(date), tn(dayShifts.length, 'js.schedule.shifts')));
             button.addEventListener('click', () => selectDay(date));
             return button;
         }));
@@ -343,28 +343,28 @@
         if (button) button.disabled = true;
         try {
             const response = await apiFetch(`/shifts/${shift.id}/start`, {method: 'POST', headers: csrfHeaders()});
-            if (!response.ok) throw new Error(await response.text() || 'The block could not be started.');
+            if (!response.ok) throw new Error(await response.text() || t('js.schedule.startFailed'));
             const started = await response.json();
-            showToast('Block started', `Started at ${formatTime(started.details.actualStart)}. Tap Finish block when you are done.`);
+            showToast(t('js.schedule.startedTitle'), t('js.schedule.startedMessage', formatTime(started.details.actualStart)));
             await loadDashboard();
         } catch (error) {
-            showToast('Block not started', error.message || 'The block could not be started.', {alert: true});
+            showToast(t('js.schedule.notStartedTitle'), error.message || t('js.schedule.startFailed'), {alert: true});
             if (button) button.disabled = false;
         }
     }
 
     function confirmForfeit(shift) {
         if (insideForfeitWindow(shift)) {
-            openConfirm('Late forfeit',
-                `${shift.station} on ${formatDate(shift.date)} is inside the forfeit window, so this is a late forfeit and may affect your standing. Forfeit anyway?`,
-                () => changeStatus(shift, {status: 'FORFEITED'}, 'Block forfeited late'),
-                'Forfeit anyway');
+            openConfirm(t('js.common.lateForfeit'),
+                t('js.schedule.lateForfeitMessage', shift.station, formatDate(shift.date)),
+                () => changeStatus(shift, {status: 'FORFEITED'}, t('js.schedule.forfeitedLateTitle')),
+                t('js.schedule.forfeitAnyway'));
             return;
         }
-        openConfirm('Forfeit this block?',
-            `${shift.station} on ${formatDate(shift.date)} will be marked forfeited. It earns nothing and counts toward this month's forfeits.`,
-            () => changeStatus(shift, {status: 'FORFEITED'}, 'Block forfeited'),
-            'Forfeit block');
+        openConfirm(t('js.schedule.forfeitThisBlock'),
+            t('js.schedule.forfeitMessage', shift.station, formatDate(shift.date)),
+            () => changeStatus(shift, {status: 'FORFEITED'}, t('js.schedule.forfeitedTitle')),
+            t('js.schedule.forfeitBlock'));
     }
 
     function deadlineMs(shift) {
@@ -384,9 +384,9 @@
         if (deadline === null || shift.details?.actualStart) return {text: '', state: ''};
         const at = formatTime(shift.forfeitDeadline.slice(11, 16));
         const remaining = deadline - nowMs();
-        if (remaining < 0) return {text: `Inside the forfeit window since ${at}`, state: 'passed'};
+        if (remaining < 0) return {text: t('js.schedule.insideWindow', at), state: 'passed'};
         return {
-            text: `Forfeit deadline ${at} · in ${duration(remaining)}`,
+            text: t('js.schedule.deadlineIn', at, duration(remaining)),
             state: remaining <= DEADLINE_WARNING_MS ? 'soon' : ''
         };
     }
@@ -397,8 +397,8 @@
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(body)
         });
-        if (!response.ok) throw new Error(await response.text() || 'The shift could not be updated.');
-        showToast(title, `${shift.station} on ${formatDate(shift.date)} is up to date.`);
+        if (!response.ok) throw new Error(await response.text() || t('js.schedule.updateFailed'));
+        showToast(title, t('js.schedule.upToDate', shift.station, formatDate(shift.date)));
         await loadDashboard();
         return response.json();
     }
@@ -426,12 +426,12 @@
         const end = start + shift.timeWorked * 60000;
         const now = nowMs();
         if (shift.details?.actualStart) {
-            const ends = now < end ? ` · scheduled to end in ${duration(end - now)}` : ' · past its scheduled end';
-            return `Started at ${formatTime(shift.details.actualStart)}${ends}`;
+            const ends = now < end ? t('js.schedule.scheduledToEndIn', duration(end - now)) : t('js.schedule.pastScheduledEnd');
+            return `${t('js.schedule.startedAt', formatTime(shift.details.actualStart))} · ${ends}`;
         }
-        if (now < start) return `Starts in ${duration(start - now)}`;
-        if (now < end) return `In progress · ends in ${duration(end - now)}`;
-        return 'Finished · confirm it when the list refreshes';
+        if (now < start) return t('js.schedule.startsIn', duration(start - now));
+        if (now < end) return t('js.schedule.inProgressEndsIn', duration(end - now));
+        return t('js.schedule.finishedConfirm');
     }
 
     /** The current time in the driver's zone, from the server's clock when the schedule loaded. */
@@ -451,17 +451,17 @@
         const days = Math.floor(totalMinutes / 1440);
         const hours = Math.floor((totalMinutes % 1440) / 60);
         const minutes = totalMinutes % 60;
-        if (days) return `${days} d ${hours} h`;
-        if (hours) return `${hours} h ${minutes} m`;
-        return `${minutes} m`;
+        if (days) return t('js.schedule.durationDaysHours', days, hours);
+        if (hours) return t('js.schedule.durationHoursMinutes', hours, minutes);
+        return t('js.schedule.durationMinutes', minutes);
     }
 
     function statusSummary(shift) {
         switch (shift.status) {
-            case 'SCHEDULED': return `Scheduled · ${formatMoney(shift.basePay)} offered`;
-            case 'CANCELLED': return `Cancelled · ${formatMoney(shift.earnedPay)} cancellation pay`;
-            case 'FORFEITED': return 'Forfeited · earns nothing';
-            default: return `Completed · ${formatMoney(shift.earnedPay)} earned`;
+            case 'SCHEDULED': return t('js.schedule.summaryScheduled', formatMoney(shift.basePay));
+            case 'CANCELLED': return t('js.schedule.summaryCancelled', formatMoney(shift.earnedPay));
+            case 'FORFEITED': return t('js.schedule.summaryForfeited');
+            default: return t('js.schedule.summaryCompleted', formatMoney(shift.earnedPay));
         }
     }
 
@@ -470,15 +470,15 @@
     }
 
     function dayLabel(date) {
-        return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
+        return calendar.parseIso(date).toLocaleDateString(appLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
     }
 
     function shortDay(date) {
-        return calendar.parseIso(date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+        return calendar.parseIso(date).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric'});
     }
 
     function longDay(date) {
-        return calendar.parseIso(date).toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
+        return calendar.parseIso(date).toLocaleDateString(appLocale(), {weekday: 'long', month: 'long', day: 'numeric'});
     }
 
     window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock, renderNextInto,

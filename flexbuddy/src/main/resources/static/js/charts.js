@@ -8,17 +8,21 @@
     }
 
     function money(value) {
-        return new Intl.NumberFormat(undefined, {style: 'currency', currency: 'USD', maximumFractionDigits: 0})
+        return new Intl.NumberFormat(appLocale(), {style: 'currency', currency: 'USD', maximumFractionDigits: 0})
             .format(Number(value || 0));
     }
 
     function fullMoney(value) {
-        return new Intl.NumberFormat(undefined, {style: 'currency', currency: 'USD'}).format(Number(value || 0));
+        return new Intl.NumberFormat(appLocale(), {style: 'currency', currency: 'USD'}).format(Number(value || 0));
     }
 
     function hours(minutes) {
         return (Number(minutes || 0) / 60).toFixed(1);
     }
+
+    const GROUP_LABELS = {
+        station: 'js.charts.groupStation', week: 'js.charts.groupWeek', month: 'js.charts.groupMonth', year: 'js.charts.groupYear'
+    };
 
     function empty(container, message) {
         const text = document.createElement('p');
@@ -30,19 +34,19 @@
     function tooltip(bucket) {
         return [
             bucket.label,
-            `${bucket.shifts} shift${bucket.shifts === 1 ? '' : 's'}`,
-            `Base: ${fullMoney(bucket.basePay)}`,
-            `Tips: ${fullMoney(bucket.tips)}`,
-            `Total: ${fullMoney(bucket.totalEarnings)}`,
-            `Hours: ${hours(bucket.minutesWorked)}`,
-            `Hourly: ${fullMoney(bucket.hourlyRate)}`
+            tn(bucket.shifts, 'js.charts.shifts'),
+            t('js.charts.base', fullMoney(bucket.basePay)),
+            t('js.charts.tips', fullMoney(bucket.tips)),
+            t('js.charts.total', fullMoney(bucket.totalEarnings)),
+            t('js.charts.hoursLine', hours(bucket.minutesWorked)),
+            t('js.charts.hourly', fullMoney(bucket.hourlyRate))
         ].join('\n');
     }
 
     function renderEarningsChart(container, report) {
         const buckets = report?.buckets ?? [];
         if (!buckets.length) {
-            empty(container, 'No earnings to chart for these filters.');
+            empty(container, t('js.charts.noEarningsToChart'));
             return;
         }
 
@@ -53,7 +57,7 @@
         const svg = svgElement('svg', {
             viewBox: `0 0 ${width} ${height}`,
             role: 'img',
-            'aria-label': `Earnings grouped by ${report.groupBy}`,
+            'aria-label': t('js.charts.groupedBy', GROUP_LABELS[report.groupBy] ? t(GROUP_LABELS[report.groupBy]) : report.groupBy),
             preserveAspectRatio: 'xMinYMin meet'
         });
         svg.classList.add('earnings-svg');
@@ -136,12 +140,12 @@
         const tips = Number(totals?.tips || 0);
         const total = base + tips;
         if (!total) {
-            empty(container, 'No earnings to compare.');
+            empty(container, t('js.charts.noEarningsToCompare'));
             return;
         }
         const tipPercent = tips / total * 100;
         const svg = svgElement('svg', {viewBox: '0 0 260 220', role: 'img',
-            'aria-label': `${tipPercent.toFixed(1)} percent of earnings came from tips`});
+            'aria-label': t('js.charts.tipsPercentLabel', tipPercent.toFixed(1))});
         const group = svgElement('g', {transform: 'rotate(-90 130 104)'});
         group.append(svgElement('circle', {cx: 130, cy: 104, r: 70, class: 'donut-base', 'stroke-width': 28, fill: 'none'}));
         group.append(svgElement('circle', {cx: 130, cy: 104, r: 70, class: 'donut-tips', 'stroke-width': 28, fill: 'none',
@@ -151,7 +155,7 @@
         percent.textContent = `${tipPercent.toFixed(1)}%`;
         svg.append(percent);
         const caption = svgElement('text', {x: 130, y: 126, class: 'donut-caption'});
-        caption.textContent = 'from tips';
+        caption.textContent = t('js.charts.fromTips');
         svg.append(caption);
         container.replaceChildren(svg);
     }
@@ -159,8 +163,8 @@
     /** Average minutes a bucket's timed blocks finished before (or after) their scheduled end. */
     function pace(earlyMinutes) {
         if (earlyMinutes == null) return '—';
-        if (earlyMinutes === 0) return 'On time';
-        return earlyMinutes > 0 ? `${earlyMinutes} min early` : `${-earlyMinutes} min over`;
+        if (earlyMinutes === 0) return t('js.charts.onTime');
+        return earlyMinutes > 0 ? t('js.charts.minEarly', earlyMinutes) : t('js.charts.minOver', -earlyMinutes);
     }
 
     function optional(value) {
@@ -175,7 +179,7 @@
             const cell = document.createElement('td');
             cell.colSpan = 14;
             cell.className = 'table-empty';
-            cell.textContent = 'No shifts match these filters.';
+            cell.textContent = t('js.charts.noShiftsMatch');
             row.append(cell);
             tbody.append(row);
             return;
@@ -184,7 +188,7 @@
         for (const bucket of buckets) {
             const row = document.createElement('tr');
             row.tabIndex = 0;
-            row.title = `Filter to ${bucket.label}`;
+            row.title = t('js.charts.filterTo', bucket.label);
             const values = [
                 bucket.label, bucket.shifts, hours(bucket.minutesWorked),
                 fullMoney(bucket.totalEarnings), Number(bucket.miles || 0).toFixed(1),
@@ -214,7 +218,7 @@
     function renderHourlyChart(container, report) {
         const buckets = report?.buckets ?? [];
         container.replaceChildren();
-        if (!buckets.length) return empty(container, 'No shifts match these filters.');
+        if (!buckets.length) return empty(container, t('js.charts.noShiftsMatch'));
         const max = Math.max(...buckets.flatMap(bucket => [Number(bucket.hourlyRate || 0), Number(bucket.netHourlyRate || 0)]), 1);
         const list = document.createElement('div');
         list.className = 'hourly-comparison';
@@ -229,25 +233,28 @@
             grossBar.style.width = `${Math.max(0, Number(bucket.hourlyRate || 0) / max * 100)}%`;
             grossTrack.append(grossBar);
             const grossValue = document.createElement('small');
-            grossValue.textContent = `Gross ${fullMoney(bucket.hourlyRate)}`;
+            grossValue.textContent = t('js.charts.gross', fullMoney(bucket.hourlyRate));
             const netTrack = document.createElement('div');
             const netBar = document.createElement('span');
             netBar.className = 'net-bar';
             netBar.style.width = `${Math.max(0, Number(bucket.netHourlyRate || 0) / max * 100)}%`;
             netTrack.append(netBar);
             const netValue = document.createElement('small');
-            netValue.textContent = `Est. net ${fullMoney(bucket.netHourlyRate)}`;
+            netValue.textContent = t('js.charts.estNet', fullMoney(bucket.netHourlyRate));
             row.append(label, grossTrack, grossValue, netTrack, netValue);
             list.append(row);
         });
         container.append(list);
     }
 
-    const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const WEEKDAYS = ['js.charts.dayMonday', 'js.charts.dayTuesday', 'js.charts.dayWednesday', 'js.charts.dayThursday',
+        'js.charts.dayFriday', 'js.charts.daySaturday', 'js.charts.daySunday'];
+    const WEEKDAYS_SHORT = ['js.common.weekdayMon', 'js.common.weekdayTue', 'js.common.weekdayWed', 'js.common.weekdayThu',
+        'js.common.weekdayFri', 'js.common.weekdaySat', 'js.common.weekdaySun'];
 
     function heatmapValue(value, metric) {
         if (metric === 'SHIFTS') return String(Number(value));
-        return metric === 'AVERAGE_PAY' ? money(value) : `${fullMoney(value)}/hr`;
+        return metric === 'AVERAGE_PAY' ? money(value) : t('js.common.perHour', fullMoney(value));
     }
 
     /**
@@ -260,7 +267,7 @@
         const headRow = document.createElement('tr');
         const corner = document.createElement('th');
         corner.scope = 'col';
-        corner.innerHTML = '<span class="sr-only">Weekday</span>';
+        corner.innerHTML = `<span class="sr-only">${escapeHtml(t('js.charts.weekday'))}</span>`;
         headRow.append(corner, ...response.bands.map(label => {
             const th = document.createElement('th');
             th.scope = 'col';
@@ -269,11 +276,12 @@
         }));
         head.append(headRow);
         const body = document.createElement('tbody');
-        WEEKDAYS.forEach((name, index) => {
+        WEEKDAYS.forEach((dayKey, index) => {
+            const name = t(dayKey);
             const row = document.createElement('tr');
             const label = document.createElement('th');
             label.scope = 'row';
-            label.textContent = name.slice(0, 3);
+            label.textContent = t(WEEKDAYS_SHORT[index]);
             label.title = name;
             row.append(label);
             response.bands.forEach((band, bandIndex) => {
@@ -281,11 +289,11 @@
                 const td = document.createElement('td');
                 if (!cell) {
                     td.className = 'heatmap-empty';
-                    td.innerHTML = '<span class="sr-only">No blocks</span>';
+                    td.innerHTML = `<span class="sr-only">${escapeHtml(t('js.charts.noBlocks'))}</span>`;
                 } else {
-                    const blocks = `${cell.shifts} ${cell.shifts === 1 ? 'block' : 'blocks'}`;
+                    const blocks = tn(cell.shifts, 'js.common.blocks');
                     td.textContent = heatmapValue(cell.value, response.metric);
-                    td.title = `${name} ${band}: ${heatmapValue(cell.value, response.metric)} from ${blocks}`;
+                    td.title = t('js.charts.heatmapCell', name, band, heatmapValue(cell.value, response.metric), blocks);
                     if (cell.sparse) {
                         td.className = 'heatmap-sparse';
                     } else {
@@ -303,13 +311,13 @@
         });
         table.replaceChildren(head, body);
         legend.textContent = response.scale.length
-            ? `Darker is higher. Steps up to ${response.scale.map(bound => heatmapValue(bound, response.metric)).join(', ')}. Hatched slots have only one block and are not ranked.`
-            : 'Slots need at least two blocks to be ranked.';
+            ? t('js.charts.heatmapLegend', response.scale.map(bound => heatmapValue(bound, response.metric)).join(', '))
+            : t('js.charts.heatmapNeedTwo');
     }
 
     const STANDING_ROWS = {FANTASTIC: 22, GREAT: 50, FAIR: 78, AT_RISK: 106};
-    const STANDING_LABELS = {FANTASTIC: 'Fantastic', GREAT: 'Great', FAIR: 'Fair', AT_RISK: 'At Risk'};
-    const STANDING_EVENT_LABELS = {LATE_FORFEIT: 'Late forfeit', FORFEITED: 'Forfeit', CANCELLED: 'Cancelled by Amazon'};
+    const STANDING_LABELS = {FANTASTIC: 'js.standing.fantastic', GREAT: 'js.standing.great', FAIR: 'js.standing.fair', AT_RISK: 'js.standing.atRisk'};
+    const STANDING_EVENT_LABELS = {LATE_FORFEIT: 'js.common.lateForfeit', FORFEITED: 'js.standing.forfeit', CANCELLED: 'js.common.cancelledByAmazon'};
     const DAY_MS = 86400000;
 
     /** Whole days since a fixed point, from an ISO date, so daylight saving never shifts a column. */
@@ -336,17 +344,16 @@
         data.events.forEach(event => counts[event.kind] += 1);
         const entries = data.entries;
         const summary = entries.length
-            ? entries.map(entry => `${STANDING_LABELS[entry.level]} from ${shortDate(entry.recordedOn)}`).join(', ')
-            : 'No standing logged';
-        svg.setAttribute('aria-label', `Standing over the last ${span + 1} days: ${summary}. `
-            + `${counts.LATE_FORFEIT} late forfeit${counts.LATE_FORFEIT === 1 ? '' : 's'}, `
-            + `${counts.FORFEITED} forfeit${counts.FORFEITED === 1 ? '' : 's'}, `
-            + `${counts.CANCELLED} cancellation${counts.CANCELLED === 1 ? '' : 's'}.`);
+            ? entries.map(entry => t('js.charts.standingFrom', t(STANDING_LABELS[entry.level]), shortDate(entry.recordedOn))).join(', ')
+            : t('js.charts.noStandingLogged');
+        svg.setAttribute('aria-label', t('js.charts.standingSummary', span + 1, summary,
+            tn(counts.LATE_FORFEIT, 'js.charts.lateForfeits'), tn(counts.FORFEITED, 'js.charts.forfeits'),
+            tn(counts.CANCELLED, 'js.charts.cancellations')));
 
         Object.entries(STANDING_ROWS).forEach(([level, y]) => {
             svg.append(svgElement('line', {x1: left, x2: left + width, y1: y, y2: y, class: 'standing-grid'}));
             const label = svgElement('text', {x: left - 6, y: y + 3.5, class: 'standing-axis-label', 'text-anchor': 'end'});
-            label.textContent = STANDING_LABELS[level];
+            label.textContent = t(STANDING_LABELS[level]);
             svg.append(label);
         });
 
@@ -379,7 +386,7 @@
                 : svgElement('path', {d: `M${cx} ${cy - 4.5}L${cx + 4.2} ${cy + 3.5}H${cx - 4.2}Z`,
                     class: `standing-event standing-event-${event.kind === 'LATE_FORFEIT' ? 'late' : 'forfeit'}`});
             const title = svgElement('title');
-            title.textContent = `${STANDING_EVENT_LABELS[event.kind]} · ${event.station} · ${shortDate(event.date)}`;
+            title.textContent = `${t(STANDING_EVENT_LABELS[event.kind])} · ${event.station} · ${shortDate(event.date)}`;
             mark.append(title);
             svg.append(mark);
         });
@@ -391,7 +398,7 @@
             const tick = x(date.toISOString().slice(0, 10)); // utc-day: day numbers here are UTC throughout
             svg.append(svgElement('line', {x1: tick, x2: tick, y1: 140, y2: 146, class: 'standing-grid'}));
             const label = svgElement('text', {x: tick, y: 162, class: 'standing-axis-label', 'text-anchor': 'middle'});
-            label.textContent = date.toLocaleDateString(undefined, {month: 'short', timeZone: 'UTC'});
+            label.textContent = date.toLocaleDateString(appLocale(), {month: 'short', timeZone: 'UTC'});
             svg.append(label);
         }
         container.append(svg);
@@ -399,7 +406,7 @@
 
     function shortDate(value) {
         const [year, month, day] = value.split('-').map(Number);
-        return new Date(year, month - 1, day).toLocaleDateString(undefined, {month: 'short', day: 'numeric'});
+        return new Date(year, month - 1, day).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric'});
     }
 
     window.flexbuddyCharts = {renderEarningsChart, renderDonut, renderTable, renderHourlyChart, renderHeatmap, renderStanding};

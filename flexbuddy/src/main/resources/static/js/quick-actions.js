@@ -17,7 +17,7 @@
     function open(focus = 'first') {
         refreshStartRow();
         const onSchedule = !elements.scheduleScreen.classList.contains('is-hidden');
-        sheet.querySelector('#qaAddShiftHint').textContent = onSchedule ? 'A scheduled block' : 'A block you worked';
+        sheet.querySelector('#qaAddShiftHint').textContent = onSchedule ? t('js.quickActions.addScheduledHint') : t('js.quickActions.addWorkedHint');
         sheet.classList.remove('is-hidden');
         document.body.classList.add('modal-open');
         button.setAttribute('aria-expanded', 'true');
@@ -38,10 +38,10 @@
     function refreshStartRow() {
         startShift = window.flexbuddySchedule?.startable() ?? null;
         const offline = window.flexbuddyPwa?.isOffline() ?? false;
-        sheet.querySelector('#qaStartLabel').textContent = startShift ? 'Start block' : 'No block to start';
+        sheet.querySelector('#qaStartLabel').textContent = startShift ? t('js.quickActions.startBlock') : t('js.quickActions.noBlockToStart');
         sheet.querySelector('#qaStartHint').textContent = startShift
             ? `${startShift.station} · ${formatTime(startShift.startTime)}–${formatTime(startShift.endTime)}`
-            : 'Blocks can start 2 hours before their start time';
+            : t('js.quickActions.startWindowHint');
         startRow.disabled = !startShift || offline;
         // Adding a shift or an expense is queued offline; only importing and starting a block need a connection.
         sheet.querySelector('#qaImport').disabled = offline;

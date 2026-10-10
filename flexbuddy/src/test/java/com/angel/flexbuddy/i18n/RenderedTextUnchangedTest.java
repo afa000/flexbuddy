@@ -81,6 +81,18 @@ class RenderedTextUnchangedTest {
                 "Keep me signed in", "Stay signed in on this device for 30 days.", "Shift tracker");
     }
 
+    /**
+     * The sign-in and sign-up forms ask for a CSRF token, which starts the session. That has to happen before the
+     * response is sent, and the page's script text is large enough to fill the response buffer, so it comes after them.
+     */
+    @Test
+    void theScriptTextComesAfterTheFormsSoTheSessionStartsBeforeTheResponseIsSent() throws Exception {
+        for (String path : new String[] {"/login", "/register"}) {
+            String page = render(get(path));
+            assertThat(page.indexOf("id=\"flexbuddyMessages\"")).as(path).isGreaterThan(page.lastIndexOf("</form>"));
+        }
+    }
+
     @Test
     void theSignInNoticesReadAsBefore() throws Exception {
         assertThat(render(get("/login").param("locked", ""))).contains("Too many sign-in attempts. Wait 15 minutes, or");

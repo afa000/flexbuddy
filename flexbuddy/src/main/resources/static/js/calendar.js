@@ -1,10 +1,10 @@
 (() => {
-    const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const WEEKDAYS = ['js.common.weekdayMon', 'js.common.weekdayTue', 'js.common.weekdayWed', 'js.common.weekdayThu', 'js.common.weekdayFri', 'js.common.weekdaySat', 'js.common.weekdaySun'];
     const STATUSES = [
-        ['scheduled', 'SCHEDULED', 'scheduled'],
-        ['completed', 'COMPLETED', 'completed'],
-        ['cancelled', 'CANCELLED', 'cancelled'],
-        ['forfeited', 'FORFEITED', 'forfeited']
+        ['scheduled', 'SCHEDULED', 'js.calendar.countScheduled'],
+        ['completed', 'COMPLETED', 'js.calendar.countCompleted'],
+        ['cancelled', 'CANCELLED', 'js.calendar.countCancelled'],
+        ['forfeited', 'FORFEITED', 'js.calendar.countForfeited']
     ];
     const MAX_DOTS = 4;
 
@@ -42,12 +42,12 @@
     }
 
     function describe(date, summary, formatMoney) {
-        const label = parseIso(date).toLocaleDateString(undefined, {weekday: 'long', month: 'long', day: 'numeric'});
-        if (!summary) return `${label}: no shifts`;
-        const parts = STATUSES.filter(([key]) => summary[key] > 0).map(([key, , word]) => `${summary[key]} ${word}`);
-        if (Number(summary.earned) > 0) parts.push(`${formatMoney(summary.earned)} earned`);
-        if (Number(summary.expectedPay) > 0) parts.push(`${formatMoney(summary.expectedPay)} expected`);
-        return `${label}: ${parts.join(', ')}`;
+        const label = parseIso(date).toLocaleDateString(appLocale(), {weekday: 'long', month: 'long', day: 'numeric'});
+        if (!summary) return t('js.calendar.dayNoShifts', label);
+        const parts = STATUSES.filter(([key]) => summary[key] > 0).map(([key, , word]) => t(word, summary[key]));
+        if (Number(summary.earned) > 0) parts.push(t('js.calendar.earned', formatMoney(summary.earned)));
+        if (Number(summary.expectedPay) > 0) parts.push(t('js.calendar.expected', formatMoney(summary.expectedPay)));
+        return t('js.calendar.dayDescription', label, parts.join(', '));
     }
 
     /**
@@ -67,10 +67,10 @@
         const header = document.createElement('div');
         header.className = 'calendar-row calendar-weekdays';
         header.setAttribute('role', 'row');
-        WEEKDAYS.forEach(name => {
+        WEEKDAYS.forEach(key => {
             const cell = document.createElement('span');
             cell.setAttribute('role', 'columnheader');
-            cell.textContent = name;
+            cell.textContent = t(key);
             header.append(cell);
         });
         container.append(header);

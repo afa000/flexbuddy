@@ -36,7 +36,7 @@
         elements.title.textContent = next.title;
         elements.message.textContent = next.message;
         elements.toast.setAttribute('role', next.alert ? 'alert' : 'status');
-        elements.action.textContent = next.actionLabel || 'Undo';
+        elements.action.textContent = next.actionLabel || t('js.common.undo');
         elements.action.classList.toggle('is-hidden', !next.onAction);
         elements.action.onclick = next.onAction ? async () => {
             const action = next.onAction;
@@ -44,7 +44,7 @@
             try {
                 await action();
             } catch (error) {
-                show('Undo failed', error.message || 'The action could not be undone.', {alert: true});
+                show(t('js.toast.undoFailed'), error.message || t('js.toast.actionCouldNotBeUndone'), {alert: true});
             }
         } : null;
         if (elements.countdown) {

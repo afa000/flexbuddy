@@ -101,6 +101,8 @@
         <p class="auth-switch" th:utext="#{login.newToFlexbuddyCreateAn.html}">New to FlexBuddy? <a href="/register">Create an account</a></p>
     </section>
 </main>
+<script id="flexbuddyMessages" type="application/json" th:utext="${scriptMessages}">{}</script>
+<script th:src="@{/js/i18n.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
 <script>
     (() => {

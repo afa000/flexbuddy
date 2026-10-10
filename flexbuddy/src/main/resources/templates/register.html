@@ -69,6 +69,8 @@
         <p class="auth-switch" th:utext="#{register.alreadyHaveAnAccountSign.html}">Already have an account? <a href="/login">Sign in</a></p>
     </section>
 </main>
+<script id="flexbuddyMessages" type="application/json" th:utext="${scriptMessages}">{}</script>
+<script th:src="@{/js/i18n.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
 <script>
     (() => {

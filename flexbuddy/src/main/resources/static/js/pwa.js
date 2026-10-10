@@ -72,8 +72,8 @@
         if (banner) {
             if (syncTime || !offline) {
                 banner.textContent = syncTime
-                    ? `Offline · showing your last synced data from ${syncTime}`
-                    : 'Offline · showing your last synced data';
+                    ? t('js.pwa.offlineSyncedFrom', syncTime)
+                    : t('js.pwa.offlineSynced');
             }
             banner.classList.remove('is-hidden');
         }
@@ -85,7 +85,7 @@
             if (element.disabled) return;
             element.disabled = true;
             element.dataset.offlineTitle = element.title || '';
-            element.title = 'Available when you are back online';
+            element.title = t('js.pwa.availableWhenOnline');
             disabledByOffline.add(element);
         });
     }
@@ -142,8 +142,8 @@
 
     function promptUpdate(worker) {
         if (!window.flexbuddyToast) return;
-        window.flexbuddyToast.show('FlexBuddy updated', 'Reload to use the latest version.', {
-            actionLabel: 'Reload',
+        window.flexbuddyToast.show(t('js.pwa.updatedTitle'), t('js.pwa.updatedMessage'), {
+            actionLabel: t('js.common.reload'),
             duration: 10 * 60 * 1000,
             onAction: () => {
                 updateRequested = true;

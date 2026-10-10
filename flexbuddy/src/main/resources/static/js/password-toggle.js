@@ -8,8 +8,8 @@
     /** What the button shows and says for a box that is currently visible or hidden. */
     function buttonState(visible) {
         return visible
-            ? {type: 'text', label: 'Hide password', pressed: 'true', icon: EYE_OFF}
-            : {type: 'password', label: 'Show password', pressed: 'false', icon: EYE};
+            ? {type: 'text', label: t('js.passwordToggle.hidePassword'), pressed: 'true', icon: EYE_OFF}
+            : {type: 'password', label: t('js.passwordToggle.showPassword'), pressed: 'false', icon: EYE};
     }
 
     function apply(input, button, visible) {

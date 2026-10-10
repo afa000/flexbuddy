@@ -5,11 +5,15 @@
     const SECTIONS = ['costs', 'taxes-section', 'payouts-section', 'reminders', 'backup', 'account'];
     // The anchors that existed before the sections did, each now inside one of them.
     const ANCHORS = {goals: 'costs', taxes: 'taxes-section', payouts: 'payouts-section'};
-    const DAY_NAMES = {MONDAY: 'Mon', TUESDAY: 'Tue', WEDNESDAY: 'Wed', THURSDAY: 'Thu', FRIDAY: 'Fri', SATURDAY: 'Sat', SUNDAY: 'Sun'};
+    const DAY_NAMES = {
+        MONDAY: 'js.common.weekdayMon', TUESDAY: 'js.common.weekdayTue', WEDNESDAY: 'js.common.weekdayWed',
+        THURSDAY: 'js.common.weekdayThu', FRIDAY: 'js.common.weekdayFri', SATURDAY: 'js.common.weekdaySat',
+        SUNDAY: 'js.common.weekdaySun'
+    };
     const WEEK = Object.keys(DAY_NAMES);
-    const rate = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3});
-    const dollars = new Intl.NumberFormat('en-US', {style: 'currency', currency: 'USD'});
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const rate = new Intl.NumberFormat(appLocale(), {style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 3});
+    const dollars = new Intl.NumberFormat(appLocale(), {style: 'currency', currency: 'USD'});
+    const MONTHS = ['js.common.monthJan', 'js.common.monthFeb', 'js.common.monthMar', 'js.common.monthApr', 'js.common.monthMay', 'js.common.monthJun', 'js.common.monthJul', 'js.common.monthAug', 'js.common.monthSep', 'js.common.monthOct', 'js.common.monthNov', 'js.common.monthDec'];
 
     /** The section a link's hash opens: "#goals" opens Earnings & costs, a section's own id opens itself, else null. */
     function sectionForHash(hash) {
@@ -26,45 +30,47 @@
     /** "Standard mileage · $0.70/mi" or "Actual expenses". */
     function costMethod(settings) {
         return settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
-            ? 'Actual expenses' : `Standard mileage · ${rate.format(Number(settings.mileageRate))}/mi`;
+            ? t('js.accountSections.actualExpenses') : t('js.accountSections.standardMileage', rate.format(Number(settings.mileageRate)));
     }
 
     function costs(settings) {
         const method = costMethod(settings);
-        if (settings.weeklyGoal != null) return `${method} · Goal ${goalAmount(settings.weeklyGoal)}/wk`;
-        if (settings.monthlyGoal != null) return `${method} · Goal ${goalAmount(settings.monthlyGoal)}/mo`;
+        if (settings.weeklyGoal != null) return t('js.accountSections.goalWeekly', method, goalAmount(settings.weeklyGoal));
+        if (settings.monthlyGoal != null) return t('js.accountSections.goalMonthly', method, goalAmount(settings.monthlyGoal));
         return method;
     }
 
     function taxes(settings, extra) {
-        if (settings.taxSetAsidePercent == null) return 'Off';
-        return `${Number(settings.taxSetAsidePercent)}% set aside${extra.remindTax ? ' · reminders on' : ''}`;
+        if (settings.taxSetAsidePercent == null) return t('js.accountSections.taxOff');
+        const percent = Number(settings.taxSetAsidePercent);
+        return extra.remindTax ? t('js.accountSections.setAsideReminders', percent) : t('js.accountSections.setAside', percent);
     }
 
     function payouts(settings) {
-        const days = WEEK.filter(day => (settings.payoutDays || []).includes(day)).map(day => DAY_NAMES[day]);
+        const days = WEEK.filter(day => (settings.payoutDays || []).includes(day)).map(day => t(DAY_NAMES[day]));
         const lag = settings.payoutLagDays ?? 1;
-        const after = lag === 0 ? 'paid the same day' : `paid ${lag} ${lag === 1 ? 'day' : 'days'} after`;
-        return `${days.join(' & ')} · ${after}`;
+        const after = lag === 0 ? t('js.accountSections.paidSameDay') : tn(lag, 'js.accountSections.paidAfter');
+        return `${days.join(` ${t('js.accountSections.dayAnd')} `)} · ${after}`;
     }
 
     function leadTime(minutes) {
-        if (minutes == null) return 'No reminder before blocks';
-        if (minutes < 60) return `${minutes} min before`;
+        if (minutes == null) return t('js.accountSections.noReminder');
+        if (minutes < 60) return t('js.accountSections.minutesBefore', minutes);
         const hours = minutes / 60;
-        return `${Number.isInteger(hours) ? hours : hours.toFixed(1)} ${hours === 1 ? 'hour' : 'hours'} before`;
+        const shown = Number.isInteger(hours) ? hours : hours.toFixed(1);
+        return t(hours === 1 ? 'js.accountSections.hoursBefore.one' : 'js.accountSections.hoursBefore.other', shown);
     }
 
     function reminders(settings) {
-        return `${leadTime(settings.remindBeforeMinutes)} · confirm ${settings.remindConfirm ? 'on' : 'off'}`
-            + ` · miles ${settings.remindMiles ? 'on' : 'off'}`;
+        return t('js.accountSections.reminderSummary', leadTime(settings.remindBeforeMinutes),
+            t(settings.remindConfirm ? 'js.common.on' : 'js.common.off'), t(settings.remindMiles ? 'js.common.on' : 'js.common.off'));
     }
 
     /** "Last backup: Sep 14" in the device's own time zone, from the instant the server stored. */
     function backup(lastBackupAt) {
-        if (!lastBackupAt) return 'Never backed up';
+        if (!lastBackupAt) return t('js.accountSections.neverBackedUp');
         const date = new Date(lastBackupAt);
-        return `Last backup: ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+        return t('js.accountSections.lastBackup', t('js.common.monthDay', t(MONTHS[date.getMonth()]), date.getDate()));
     }
 
     /**
@@ -74,10 +80,10 @@
     function summaries(settings, extra = {}) {
         const loaded = Boolean(settings);
         return {
-            costs: loaded ? costs(settings) : 'Loading…',
-            taxes: loaded ? taxes(settings, extra) : 'Loading…',
-            payouts: loaded ? payouts(settings) : 'Loading…',
-            reminders: loaded ? reminders(settings) : 'Loading…',
+            costs: loaded ? costs(settings) : t('js.common.loading'),
+            taxes: loaded ? taxes(settings, extra) : t('js.common.loading'),
+            payouts: loaded ? payouts(settings) : t('js.common.loading'),
+            reminders: loaded ? reminders(settings) : t('js.common.loading'),
             backup: backup(extra.lastBackupAt),
             account: `${extra.displayName} · ${extra.email}`
         };

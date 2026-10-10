@@ -24,7 +24,7 @@ async function apiFetch(url, options) {
     } catch (error) {
         if (!navigator.onLine) {
             window.flexbuddyPwa?.noteNetworkFailure();
-            throw new Error('You are offline. Try again when your connection returns.');
+            throw new Error(t('js.common.offlineTryAgain'));
         }
         throw error;
     }
@@ -32,7 +32,7 @@ async function apiFetch(url, options) {
     const responsePath = new URL(response.url, window.location.origin).pathname;
     if (response.status === 401 || response.status === 403 || (response.redirected && responsePath === '/login')) {
         window.location.assign('/login?expired');
-        throw new Error('Your session expired. Sign in again.');
+        throw new Error(t('js.common.sessionExpired'));
     }
     return response;
 }
@@ -49,7 +49,7 @@ updateThemeLabel(document.documentElement.dataset.theme);
 
 const lastBackup = document.querySelector('#backupStatus').dataset.lastBackup;
 if (lastBackup) {
-    document.querySelector('#backupStatus').textContent = `Last backup: ${new Date(lastBackup).toLocaleString()}`;
+    document.querySelector('#backupStatus').textContent = t('js.account.lastBackup', new Date(lastBackup).toLocaleString(appLocale()));
 }
 
 backupPicker.addEventListener('click', () => backupInput.click());
@@ -57,7 +57,7 @@ backupInput.addEventListener('change', async () => {
     const file = backupInput.files[0];
     if (!file) return;
     hideError();
-    backupPicker.querySelector('strong').textContent = 'Reading backup…';
+    backupPicker.querySelector('strong').textContent = t('js.account.readingBackup');
     const form = new FormData();
     form.append('backup', file);
     try {
@@ -65,10 +65,10 @@ backupInput.addEventListener('change', async () => {
         if (!response.ok) throw new Error(await response.text());
         renderPreview(await response.json(), file.name);
     } catch (error) {
-        showError(error.message || 'The backup could not be read.');
+        showError(error.message || t('js.account.backupUnreadable'));
         restorePreview.classList.add('is-hidden');
     } finally {
-        backupPicker.querySelector('strong').textContent = 'Choose another backup';
+        backupPicker.querySelector('strong').textContent = t('js.account.chooseAnotherBackup');
     }
 });
 
@@ -81,12 +81,12 @@ document.querySelectorAll('input[name="restoreMode"]').forEach(input => input.ad
 restoreButton.addEventListener('click', async () => {
     hideError();
     if (selectedMode() === 'REPLACE' && !replaceAck.checked) {
-        showError('Confirm that your current shifts will move to Recently deleted.');
+        showError(t('js.account.confirmReplace'));
         replaceAck.focus();
         return;
     }
     restoreButton.disabled = true;
-    restoreButton.textContent = 'Restoring…';
+    restoreButton.textContent = t('js.account.restoring');
     try {
         const response = await apiFetch('/account/restore', {
             method: 'POST',
@@ -100,14 +100,14 @@ restoreButton.addEventListener('click', async () => {
         });
         if (!response.ok) throw new Error(await response.text());
         const result = await response.json();
-        showToast('Restore complete', `${result.inserted} shifts and ${result.expensesInserted || 0} expenses restored · ${result.skipped + (result.expensesSkipped || 0)} skipped`,
+        showToast(t('js.account.restoreComplete'), t('js.account.restoreCompleteMessage', result.inserted, result.expensesInserted || 0, result.skipped + (result.expensesSkipped || 0)),
             result.batchId ? {duration: 10000, onAction: () => undoRestore(result.batchId)} : {});
         restorePreview.classList.add('is-hidden');
     } catch (error) {
-        showError(error.message || 'The backup could not be restored.');
+        showError(error.message || t('js.account.backupNotRestored'));
     } finally {
         restoreButton.disabled = false;
-        restoreButton.textContent = 'Restore account data';
+        restoreButton.textContent = t('js.account.restoreAccountData');
     }
 });
 
@@ -116,20 +116,22 @@ function renderPreview(preview, filename) {
     document.querySelector('#previewTotal').textContent = preview.total;
     document.querySelector('#previewNew').textContent = preview.newShifts;
     document.querySelector('#previewNewNote').textContent = preview.newDeletedShifts
-        ? `+${preview.newDeletedShifts} if recently deleted are included`
+        ? t('js.account.newIfDeletedIncluded', preview.newDeletedShifts)
         : '';
     document.querySelector('#previewExisting').textContent = preview.alreadyPresent;
     document.querySelector('#previewTrashed').textContent = preview.inRecentlyDeleted;
     document.querySelector('#previewDuplicates').textContent = preview.duplicateInBackup;
     document.querySelector('#previewInvalid').textContent = preview.invalid;
     document.querySelector('#previewExpenses').textContent = preview.totalExpenses || 0;
-    document.querySelector('#previewExpenseNote').textContent = preview.duplicateExpenses ? `${preview.duplicateExpenses} duplicates` : `${preview.newExpenses || 0} new`;
-    document.querySelector('#previewSource').textContent = `${filename} · ${preview.sameAccount ? 'Same account' : `From ${preview.sourceEmail || 'another account'}`} · ${preview.deletedInBackup} recently deleted`;
+    document.querySelector('#previewExpenseNote').textContent = preview.duplicateExpenses ? t('js.account.duplicateExpenses', preview.duplicateExpenses) : t('js.account.newExpenses', preview.newExpenses || 0);
+    document.querySelector('#previewSource').textContent = t('js.account.previewSource', filename,
+        preview.sameAccount ? t('js.account.sameAccount') : t('js.account.fromAccount', preview.sourceEmail || t('js.account.anotherAccount')),
+        preview.deletedInBackup);
     const problems = document.querySelector('#restoreProblems');
     problems.replaceChildren();
     preview.problems.forEach(problem => {
         const item = document.createElement('li');
-        item.textContent = `Entry ${problem.index + 1}, ${problem.field}: ${problem.message}`;
+        item.textContent = t('js.account.problemEntry', problem.index + 1, problem.field, problem.message);
         problems.append(item);
     });
     restorePreview.classList.remove('is-hidden');
@@ -140,7 +142,7 @@ function csrfHeaders(extra = {}) { return csrfToken && csrfHeader ? {...extra, [
 function showError(message) { restoreError.textContent = message; restoreError.classList.remove('is-hidden'); }
 function hideError() { restoreError.textContent = ''; restoreError.classList.add('is-hidden'); }
 function updateThemeLabel(theme) {
-    const label = theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode';
+    const label = theme === 'light' ? t('js.common.switchToDarkMode') : t('js.common.switchToLightMode');
     themeToggleButton.setAttribute('aria-label', label);
     themeToggleButton.title = label;
 }
@@ -153,7 +155,7 @@ async function undoRestore(batchId) {
     const response = await apiFetch(`/account/restore/${encodeURIComponent(batchId)}/undo`, {method: 'POST', headers: csrfHeaders()});
     if (!response.ok) return showError(await response.text());
     const result = await response.json();
-    showToast('Restore undone', `${result.restored} shifts and ${result.expensesRestored || 0} expenses restored`);
+    showToast(t('js.account.restoreUndone'), t('js.account.restoreUndoneMessage', result.restored, result.expensesRestored || 0));
 }
 
 settingsForm.addEventListener('submit', async event => {
@@ -169,9 +171,9 @@ settingsForm.addEventListener('submit', async event => {
         if (!response.ok) throw new Error(await response.text());
         const settings = await response.json();
         renderSettings(settings);
-        showToast('Settings saved', 'Net earnings have been recalculated.');
+        showToast(t('js.account.settingsSaved'), t('js.account.netRecalculated'));
     } catch (exception) {
-        error.textContent = exception.message || 'Settings could not be saved.';
+        error.textContent = exception.message || t('js.account.settingsNotSaved');
         error.classList.remove('is-hidden');
     } finally { button.disabled = false; }
 });
@@ -190,9 +192,9 @@ document.querySelector('#resetMileageRateButton').addEventListener('click', asyn
         });
         if (!response.ok) throw new Error(await response.text());
         renderSettings(await response.json());
-        showToast('Default rate restored', 'Net earnings now use the app default mileage rate.');
+        showToast(t('js.account.defaultRateRestored'), t('js.account.defaultRateMessage'));
     } catch (exception) {
-        error.textContent = exception.message || 'The default rate could not be restored.';
+        error.textContent = exception.message || t('js.account.defaultRateFailed');
         error.classList.remove('is-hidden');
     }
 });
@@ -208,7 +210,7 @@ function renderSettings(settings) {
     latestSettings = settings;
     document.querySelector('#vehicleCostMethod').value = settings.vehicleCostMethod;
     document.querySelector('#accountMileageRate').value = settings.mileageRate;
-    document.querySelector('#mileageRateHelp').textContent = `App default: $${Number(settings.defaultMileageRate).toFixed(3)} per mile (${settings.mileageRateYear}). This is an estimate, not tax advice.`;
+    document.querySelector('#mileageRateHelp').textContent = t('js.account.mileageRateHelp', Number(settings.defaultMileageRate).toFixed(3), settings.mileageRateYear);
     renderReminders(settings);
     renderGoals(settings);
     renderPayouts(settings);
@@ -264,7 +266,7 @@ payoutForm.addEventListener('submit', async event => {
     error.classList.add('is-hidden');
     const days = [...payoutForm.querySelectorAll('.payout-days input:checked')].map(box => box.value);
     if (!days.length) {
-        error.textContent = 'Choose at least one payout day.';
+        error.textContent = t('js.account.choosePayoutDay');
         error.classList.remove('is-hidden');
         return;
     }
@@ -276,11 +278,11 @@ payoutForm.addEventListener('submit', async event => {
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify({payoutDays: days, payoutLagDays: Number(document.querySelector('#payoutLagDays').value)})
         });
-        if (!response.ok) throw await responseError(response, 'Choose at least one payout day and a lag from 0 to 14 days.');
+        if (!response.ok) throw await responseError(response, t('js.account.payoutInvalid'));
         renderSettings(await response.json());
-        showToast('Payout schedule saved', 'Pay periods and the Next payout tile use the new schedule.');
+        showToast(t('js.account.payoutSaved'), t('js.account.payoutSavedMessage'));
     } catch (exception) {
-        error.textContent = exception.message || 'The payout schedule could not be saved.';
+        error.textContent = exception.message || t('js.account.payoutNotSaved');
         error.classList.remove('is-hidden');
     } finally {
         button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
@@ -316,11 +318,11 @@ goalForm.addEventListener('submit', async event => {
                 goalBasis: goalForm.querySelector('input[name="goalBasis"]:checked').value
             })
         });
-        if (!response.ok) throw await responseError(response, 'Goals must be more than zero, or left empty to turn them off.');
+        if (!response.ok) throw await responseError(response, t('js.account.goalsInvalid'));
         renderSettings(await response.json());
-        showToast('Goals saved', 'Your dashboard shows the new targets.');
+        showToast(t('js.account.goalsSaved'), t('js.account.goalsSavedMessage'));
     } catch (exception) {
-        error.textContent = exception.message || 'Goals could not be saved.';
+        error.textContent = exception.message || t('js.account.goalsNotSaved');
         error.classList.remove('is-hidden');
     } finally {
         button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
@@ -347,7 +349,7 @@ async function guardedSignOut(event) {
     event.preventDefault();
     const form = event.currentTarget;
     const waiting = window.flexbuddyOutbox?.count() ?? 0;
-    if (waiting > 0 && !window.confirm(`${waiting} ${waiting === 1 ? "change hasn't" : "changes haven't"} synced. Signing out discards ${waiting === 1 ? 'it' : 'them'}. Sign out anyway?`)) {
+    if (waiting > 0 && !window.confirm(tn(waiting, 'js.account.signOutUnsynced'))) {
         return;
     }
     try {
@@ -372,7 +374,7 @@ function renderReminders(settings) {
     const hasFeed = Boolean(settings.calendarFeedPath);
     calendarFeedUrl.value = hasFeed ? new URL(settings.calendarFeedPath, window.location.origin).href : '';
     document.querySelector('#copyFeedButton').disabled = !hasFeed;
-    document.querySelector('#regenerateFeedButton').textContent = hasFeed ? 'Regenerate link' : 'Create calendar link';
+    document.querySelector('#regenerateFeedButton').textContent = hasFeed ? t('js.account.regenerateLink') : t('js.account.createCalendarLink');
 }
 
 function fillTimeZones(selected) {
@@ -410,13 +412,13 @@ reminderForm.addEventListener('submit', async event => {
                 forfeitCutoffMinutes: Number(document.querySelector('#forfeitCutoff').value)
             })
         });
-        if (!response.ok) throw await responseError(response, 'Choose a valid time zone, reminder time, and forfeit cutoff (0 to 720 minutes).');
+        if (!response.ok) throw await responseError(response, t('js.account.remindersInvalid'));
         renderSettings(await response.json());
-        showToast('Reminders saved', lead === ''
-            ? 'Push reminders are off. Calendar alarms use a 1 hour lead time.'
-            : 'Your calendar feed and push reminders use the new lead time.');
+        showToast(t('js.account.remindersSaved'), lead === ''
+            ? t('js.account.remindersSavedPushOff')
+            : t('js.account.remindersSavedLeadTime'));
     } catch (exception) {
-        error.textContent = exception.message || 'Reminder settings could not be saved.';
+        error.textContent = exception.message || t('js.account.remindersNotSaved');
         error.classList.remove('is-hidden');
     } finally {
         button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
@@ -427,26 +429,26 @@ document.querySelector('#copyFeedButton').addEventListener('click', async () => 
     if (!calendarFeedUrl.value) return;
     try {
         await navigator.clipboard.writeText(calendarFeedUrl.value);
-        showToast('Link copied', 'Add it to Google Calendar or iOS Calendar as a subscribed calendar.');
+        showToast(t('js.account.linkCopied'), t('js.account.linkCopiedMessage'));
     } catch {
         calendarFeedUrl.select();
-        showToast('Copy the selected link', 'Your browser did not allow automatic copying.');
+        showToast(t('js.account.copySelected'), t('js.account.copyBlocked'));
     }
 });
 
 document.querySelector('#regenerateFeedButton').addEventListener('click', async event => {
     const button = event.currentTarget;
     const replacing = Boolean(calendarFeedUrl.value);
-    if (replacing && !window.confirm('Regenerate the calendar link? Calendars subscribed to the current link will stop updating.')) return;
+    if (replacing && !window.confirm(t('js.account.confirmRegenerate'))) return;
     button.disabled = true;
     try {
         const response = await apiFetch('/account/calendar-token', {method: 'POST', headers: csrfHeaders()});
-        if (!response.ok) throw await responseError(response, 'The calendar link could not be created.');
+        if (!response.ok) throw await responseError(response, t('js.account.linkNotCreated'));
         renderSettings(await response.json());
-        showToast(replacing ? 'Link regenerated' : 'Calendar link created',
-            replacing ? 'The old link no longer works.' : 'Copy it into your calendar app.');
+        showToast(replacing ? t('js.account.linkRegenerated') : t('js.account.linkCreated'),
+            replacing ? t('js.account.oldLinkDead') : t('js.account.copyIntoCalendar'));
     } catch (exception) {
-        showToast('Calendar link failed', exception.message || 'The calendar link could not be created.', {alert: true});
+        showToast(t('js.account.linkFailed'), exception.message || t('js.account.linkNotCreated'), {alert: true});
     } finally {
         button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
     }
@@ -459,8 +461,8 @@ function pushSupported() {
 async function initPush() {
     if (!pushSupported()) {
         pushStatus.textContent = window.flexbuddyPwa?.isIos() && !window.flexbuddyPwa.isStandalone()
-            ? 'Install FlexBuddy to your home screen first, then turn on push reminders here.'
-            : 'This browser cannot receive push reminders. The calendar link works everywhere.';
+            ? t('js.account.pushInstallFirst')
+            : t('js.account.pushUnsupported');
         return;
     }
     try {
@@ -470,7 +472,7 @@ async function initPush() {
         pushConfig = {configured: false};
     }
     if (!pushConfig.configured) {
-        pushStatus.textContent = 'Push reminders are not configured on this server.';
+        pushStatus.textContent = t('js.account.pushNotConfigured');
         return;
     }
     await renderPushState();
@@ -480,12 +482,12 @@ async function renderPushState() {
     const registration = await navigator.serviceWorker.ready;
     const subscription = await registration.pushManager.getSubscription();
     pushToggleButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
-    pushToggleButton.textContent = subscription ? 'Turn off push on this device' : 'Turn on push on this device';
+    pushToggleButton.textContent = subscription ? t('js.account.pushTurnOff') : t('js.account.pushTurnOn');
     pushStatus.textContent = subscription
-        ? 'Push reminders are on for this device.'
+        ? t('js.account.pushIsOn')
         : Notification.permission === 'denied'
-            ? 'Notifications are blocked for this site in your browser settings.'
-            : 'Push reminders are off for this device.';
+            ? t('js.account.pushBlocked')
+            : t('js.account.pushIsOff');
 }
 
 pushToggleButton.addEventListener('click', async () => {
@@ -500,10 +502,10 @@ pushToggleButton.addEventListener('click', async () => {
                 body: JSON.stringify({endpoint: existing.endpoint})
             });
             await existing.unsubscribe();
-            showToast('Push reminders off', 'This device will no longer get push reminders.');
+            showToast(t('js.account.pushOffTitle'), t('js.account.pushOffMessage'));
         } else {
             if (await Notification.requestPermission() !== 'granted') {
-                throw new Error('Allow notifications for FlexBuddy to turn on push reminders.');
+                throw new Error(t('js.account.pushAllow'));
             }
             const subscription = await registration.pushManager.subscribe({
                 userVisibleOnly: true,
@@ -516,14 +518,14 @@ pushToggleButton.addEventListener('click', async () => {
             });
             if (!response.ok) {
                 await subscription.unsubscribe();
-                throw await responseError(response, 'Push reminders could not be turned on.');
+                throw await responseError(response, t('js.account.pushNotTurnedOn'));
             }
-            showToast('Push reminders on', document.querySelector('#remindBefore').value
-                ? 'You will get a reminder before each scheduled block.'
-                : 'Choose a reminder time above and save to get reminders before each block.');
+            showToast(t('js.account.pushOnTitle'), document.querySelector('#remindBefore').value
+                ? t('js.account.pushOnMessage')
+                : t('js.account.pushOnChooseTime'));
         }
     } catch (exception) {
-        showToast('Push reminders', exception.message || 'Push reminders could not be changed.', {alert: true});
+        showToast(t('js.account.pushTitle'), exception.message || t('js.account.pushNotChanged'), {alert: true});
     } finally {
         await renderPushState();
     }
@@ -539,8 +541,8 @@ window.flexbuddyPwa?.onInstallChange(state => {
     document.querySelector('#installSection').classList.toggle('is-hidden', state === 'installed' || state === 'unavailable');
     document.querySelector('#installAppButton').classList.toggle('is-hidden', state !== 'prompt');
     document.querySelector('#installHelp').textContent = state === 'ios'
-        ? 'In Safari, tap the Share button, then Add to Home Screen.'
-        : 'Open FlexBuddy from your home screen, full screen, with your last synced data available offline.';
+        ? t('js.account.installIos')
+        : t('js.account.installHelp');
 });
 
 initPush();

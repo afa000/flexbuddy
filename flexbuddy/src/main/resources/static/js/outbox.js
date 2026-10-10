@@ -15,21 +15,21 @@
     const REQUEST_TIMEOUT_MS = 20000;
     const LOCK_NAME = 'flexbuddy-outbox';
     const BACKOFF_MS = [30000, 60000, 120000, 300000];
-    const OFFLINE_MESSAGE = 'You are offline. Try again when your connection returns.';
-    const TOO_MANY_MESSAGE = 'Too many changes are waiting to sync. Connect to send them before adding more.';
+    const OFFLINE_MESSAGE = t('js.outbox.offlineMessage');
+    const TOO_MANY_MESSAGE = t('js.outbox.tooManyMessage');
 
     // What each queued finish can change, in the order the conflict sheet shows it.
     const CONFLICT_FIELDS = [
-        {label: 'Status', kind: 'text', key: 'status'},
-        {label: 'Started', kind: 'time', key: 'actualStart', group: 'details'},
-        {label: 'Finished', kind: 'time', key: 'actualEnd', group: 'details'},
-        {label: 'Odometer start', kind: 'number', key: 'odometerStart', group: 'details'},
-        {label: 'Odometer end', kind: 'number', key: 'odometerEnd', group: 'details'},
-        {label: 'Miles', kind: 'number', key: 'miles'},
-        {label: 'Stops', kind: 'number', key: 'stops', group: 'details'},
-        {label: 'Packages', kind: 'number', key: 'packages', group: 'details'},
-        {label: 'Returns', kind: 'number', key: 'returns', group: 'details'},
-        {label: 'Base pay', kind: 'money', key: 'basePay'}
+        {label: 'js.outbox.fieldStatus', kind: 'text', key: 'status'},
+        {label: 'js.outbox.fieldStarted', kind: 'time', key: 'actualStart', group: 'details'},
+        {label: 'js.outbox.fieldFinished', kind: 'time', key: 'actualEnd', group: 'details'},
+        {label: 'js.outbox.fieldOdometerStart', kind: 'number', key: 'odometerStart', group: 'details'},
+        {label: 'js.outbox.fieldOdometerEnd', kind: 'number', key: 'odometerEnd', group: 'details'},
+        {label: 'js.outbox.fieldMiles', kind: 'number', key: 'miles'},
+        {label: 'js.outbox.fieldStops', kind: 'number', key: 'stops', group: 'details'},
+        {label: 'js.outbox.fieldPackages', kind: 'number', key: 'packages', group: 'details'},
+        {label: 'js.outbox.fieldReturns', kind: 'number', key: 'returns', group: 'details'},
+        {label: 'js.outbox.fieldBasePay', kind: 'money', key: 'basePay'}
     ];
 
     // ----- Pure decisions -----
@@ -83,7 +83,7 @@
             const savedSource = field.group === 'details' ? saved.details || {} : saved;
             const mine = normalise(mineSource[field.key], field.kind);
             const theirs = normalise(savedSource[field.key], field.kind);
-            rows.push({label: field.label, kind: field.kind, mine, saved: theirs, differs: mine !== theirs});
+            rows.push({label: t(field.label), kind: field.kind, mine, saved: theirs, differs: mine !== theirs});
         }
         return rows;
     }
@@ -315,7 +315,7 @@
                     await putItem({...item, state: 'conflict', current: result.json && result.json.current});
                     conflicts++;
                 } else if (outcome === 'failed') {
-                    await putItem({...item, state: 'failed', error: (result.text || 'The server refused this change.').slice(0, 200)});
+                    await putItem({...item, state: 'failed', error: (result.text || t('js.outbox.serverRefused')).slice(0, 200)});
                 } else if (outcome === 'stop') {
                     stopped = true;
                 } else {
@@ -335,13 +335,16 @@
         }
     }
 
-    function plural(n, word) {
-        return `${n} ${word}${n === 1 ? '' : 's'}`;
+    /** The words of a queued item's label: a [key, ...arguments] pair, or plain text kept from an older version. */
+    function summaryText(part) {
+        return Array.isArray(part) ? t(part[0], ...part.slice(1)) : (part ?? '');
     }
 
     function reportSynced(synced, conflicts) {
-        const title = conflicts ? `${plural(synced, 'change')} synced · ${conflicts} needs your choice` : 'All changes synced';
-        window.flexbuddyToast?.show(title, 'What you saved offline is now in your history.');
+        const title = conflicts
+            ? `${tn(synced, 'js.outbox.changesSynced')} · ${t('js.outbox.needsChoiceCount', conflicts)}`
+            : t('js.outbox.allSynced');
+        window.flexbuddyToast?.show(title, t('js.outbox.nowInHistory'));
         if (typeof loadDashboard === 'function') loadDashboard();
         const expenses = document.querySelector('#expensesScreen');
         if (typeof loadExpenses === 'function' && expenses && !expenses.classList.contains('is-hidden')) loadExpenses();
@@ -414,10 +417,10 @@
     const esc = value => (typeof escapeHtml === 'function' ? escapeHtml(value) : String(value ?? ''));
 
     function tagFor(item, foreign) {
-        if (foreign) return {text: 'From another account', className: 'is-foreign'};
-        if (item.state === 'conflict') return {text: 'Needs your choice', className: 'is-conflict'};
-        if (item.state === 'failed') return {text: "Couldn't sync", className: 'is-failed'};
-        return {text: 'Pending', className: 'is-pending'};
+        if (foreign) return {text: t('js.outbox.fromAnotherAccount'), className: 'is-foreign'};
+        if (item.state === 'conflict') return {text: t('js.outbox.needsChoice'), className: 'is-conflict'};
+        if (item.state === 'failed') return {text: t('js.outbox.couldNotSync'), className: 'is-failed'};
+        return {text: t('js.outbox.pending'), className: 'is-pending'};
     }
 
     function renderStrip() {
@@ -432,11 +435,11 @@
         const sync = $('#outboxSyncButton');
         const signIn = $('#outboxSignIn');
         const waiting = mine().length;
-        title.textContent = signedOut ? `Sign in to finish syncing ${plural(waiting, 'change')}` : `Waiting to sync · ${items.length}`;
+        title.textContent = signedOut ? tn(waiting, 'js.outbox.signInToSync') : t('js.outbox.waitingToSync', items.length);
         signIn.hidden = !signedOut;
         sync.hidden = signedOut;
         sync.disabled = offlineNow();
-        sync.title = sync.disabled ? 'Available when you are back online' : '';
+        sync.title = sync.disabled ? t('js.pwa.availableWhenOnline') : '';
         $('#outboxList').replaceChildren(...items.map(item => row(item, item.accountId !== owner)));
     }
 
@@ -445,20 +448,20 @@
         const li = document.createElement('li');
         li.innerHTML = `
             <div class="outbox-main">
-                <strong>${esc(item.summary && item.summary.title)}</strong>
-                <span>${esc(item.summary && item.summary.detail)}</span>
+                <strong>${esc(summaryText(item.summary && item.summary.title))}</strong>
+                <span>${esc(summaryText(item.summary && item.summary.detail))}</span>
                 ${item.state === 'failed' && !foreign ? `<p class="outbox-error">${esc(item.error)}</p>` : ''}
             </div>
             <div class="outbox-actions">
                 <span class="outbox-tag ${tag.className}">${esc(tag.text)}</span>
-                ${item.state === 'conflict' && !foreign ? '<button class="text-button" type="button" data-action="choose">Choose</button>' : ''}
-                <button class="text-button danger-text-button" type="button" data-action="discard">Discard</button>
+                ${item.state === 'conflict' && !foreign ? `<button class="text-button" type="button" data-action="choose">${esc(t('js.outbox.choose'))}</button>` : ''}
+                <button class="text-button danger-text-button" type="button" data-action="discard">${esc(t('js.common.discard'))}</button>
             </div>`;
         li.querySelector('[data-action="choose"]')?.addEventListener('click', event => openConflict(item, event.currentTarget));
         li.querySelector('[data-action="discard"]').addEventListener('click', () => {
             // A change that was never sent cannot be recovered, so it asks first; one that failed or is foreign does not.
             if (item.state === 'pending' && !foreign && typeof openConfirm === 'function') {
-                openConfirm('Discard this change?', "It hasn't been sent and can't be recovered.", () => discard(item.id), 'Discard');
+                openConfirm(t('js.outbox.discardTitle'), t('js.outbox.discardMessage'), () => discard(item.id), t('js.common.discard'));
             } else {
                 discard(item.id);
             }
@@ -482,7 +485,7 @@
         conflictItem = item;
         conflictTrigger = trigger;
         const saved = item.current || {};
-        $('#conflictShift').textContent = `${saved.station || (item.summary && item.summary.title) || 'This block'}${saved.date ? ` · ${saved.date}` : ''}`;
+        $('#conflictShift').textContent = `${saved.station || summaryText(item.summary && item.summary.title) || t('js.outbox.thisBlock')}${saved.date ? ` · ${saved.date}` : ''}`;
         // A field that is empty on both sides has nothing to choose between, so the sheet leaves it out.
         const rows = conflictRows(item.body, item.current).filter(entry => entry.mine !== null || entry.saved !== null);
         $('#conflictRows').replaceChildren(...rows.map(entry => {
@@ -549,7 +552,7 @@
         if (!status) return;
         const waiting = mine().length;
         $('#outboxAccountRow').hidden = waiting === 0;
-        status.textContent = signedOut ? `${plural(waiting, 'change')} waiting · sign in to sync` : `${plural(waiting, 'change')} waiting to sync`;
+        status.textContent = tn(waiting, signedOut ? 'js.outbox.waitingSignIn' : 'js.outbox.waitingCount');
         $('#outboxAccountSync').disabled = offlineNow();
     }
 
@@ -569,7 +572,7 @@
         $('#outboxAccountSync')?.addEventListener('click', () => drain());
         $('#outboxAccountDiscard')?.addEventListener('click', () => {
             const n = mine().length;
-            if (n && window.confirm(`Discard ${plural(n, 'unsynced change')}? This can't be undone.`)) discardAll();
+            if (n && window.confirm(tn(n, 'js.outbox.confirmDiscardAll'))) discardAll();
         });
         const kick = () => {
             render();

@@ -31,7 +31,7 @@
     /** encodeURIComponent, not URLSearchParams, which writes "+" for a space and some mail apps show it literally. */
     function feedbackMailto({buildId, screen, platform, installed, date}) {
         const body = [
-            'What happened, or what would help?', '', '', '', '—',
+            t('js.feedback.prompt'), '', '', '', '—',
             `App version: ${buildId}`,
             `Screen: ${screen}`,
             `Device: ${platform} · ${installed ? 'installed app' : 'browser'}`,

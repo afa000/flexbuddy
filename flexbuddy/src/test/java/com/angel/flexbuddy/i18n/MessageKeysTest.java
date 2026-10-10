@@ -33,6 +33,15 @@ class MessageKeysTest {
 
     private static final String FILE = "i18n/messages.properties";
     private static final Path JAVA = Path.of("src", "main", "java");
+    private static final Path SCRIPTS = Path.of("src", "main", "resources", "static", "js");
+    /** Scripts whose text is not for the driver: error reports for the operator, and the data lines of the feedback mail. */
+    private static final Set<String> NOT_TRANSLATED = Set.of("errors.js", "feedback.js", "i18n.js");
+    private static final Pattern SCRIPT_KEY = Pattern.compile("js\\.[A-Za-z0-9_.]+");
+    /** A key built from pieces: {@code t(`js.x.${y}`)} or {@code t('js.x.' + y)}. */
+    private static final Pattern COMPUTED_KEY = Pattern.compile(
+            "(?<![A-Za-z0-9_$.])(?:t\\(\\s*|tn\\([^,()]+,\\s*)(?:`|'[^']*'\\s*\\+|\"[^\"]*\"\\s*\\+)");
+    /** Text that starts like a sentence: a capital, then lower case, then more words. */
+    private static final Pattern ENGLISH = Pattern.compile("^[A-Z][a-z]+(?:[ ,.:;!?'’·–()/-]+[A-Za-z0-9$%&.,'’:;!?()·–/-]+)+");
 
     /** {@code #{key}} and {@code #{key(args)}} in a template. */
     private static final Pattern TEMPLATE_KEY = Pattern.compile("#\\{([A-Za-z0-9_.]+)");
@@ -87,6 +96,29 @@ class MessageKeysTest {
         while (matcher.find()) into.computeIfAbsent(matcher.group(1), key -> new TreeSet<>()).add(where);
     }
 
+    private static Map<String, String> scripts() throws IOException {
+        Map<String, String> scripts = new TreeMap<>();
+        try (Stream<Path> files = Files.list(SCRIPTS)) {
+            for (Path file : files.filter(path -> path.toString().endsWith(".js")).toList()) {
+                scripts.put(file.getFileName().toString(), Files.readString(file, StandardCharsets.UTF_8));
+            }
+        }
+        return scripts;
+    }
+
+    /** The keys the scripts name, as literals: a plain key, or the base of a .one and .other pair. */
+    private static Map<String, Set<String>> scriptKeysUsed() throws IOException {
+        Map<String, Set<String>> used = new TreeMap<>();
+        for (Map.Entry<String, String> script : scripts().entrySet()) {
+            for (ScriptLiterals.Literal literal : ScriptLiterals.in(script.getValue())) {
+                if (SCRIPT_KEY.matcher(literal.text()).matches()) {
+                    used.computeIfAbsent(literal.text(), key -> new TreeSet<>()).add(script.getKey() + ":" + literal.line());
+                }
+            }
+        }
+        return used;
+    }
+
     private static Map<String, Set<String>> keysUsed() throws IOException {
         Map<String, Set<String>> used = new TreeMap<>();
         for (Map.Entry<String, String> template : templates().entrySet()) {
@@ -112,9 +144,58 @@ class MessageKeysTest {
     }
 
     @Test
+    void everyKeyAScriptNamesIsInTheFile() throws Exception {
+        Set<String> defined = messages().stringPropertyNames();
+        List<String> missing = new ArrayList<>();
+        scriptKeysUsed().forEach((key, where) -> {
+            boolean plural = defined.contains(key + ".one") && defined.contains(key + ".other");
+            if (!defined.contains(key) && !plural) missing.add(key + " (in " + String.join(", ", where) + ")");
+        });
+        assertThat(missing).as("keys a script uses that " + FILE + " does not have, or a plural without both forms").isEmpty();
+    }
+
+    @Test
+    void aScriptNeverBuildsAKeyFromPieces() throws Exception {
+        List<String> computed = new ArrayList<>();
+        for (Map.Entry<String, String> script : scripts().entrySet()) {
+            // i18n.js is the lookup itself, so it is the one script that builds the .one and .other keys.
+            if (script.getKey().equals("i18n.js")) continue;
+            Matcher matcher = COMPUTED_KEY.matcher(script.getValue());
+            while (matcher.find()) {
+                int line = (int) script.getValue().substring(0, matcher.start()).chars().filter(c -> c == '\n').count() + 1;
+                computed.add(script.getKey() + ":" + line + " " + matcher.group().strip());
+            }
+        }
+        assertThat(computed).as("keys must be literals, so the key test can see them; use a lookup of literal keys").isEmpty();
+    }
+
+    @Test
+    void aScriptLeavesNoEnglishSentenceInline() throws Exception {
+        List<String> left = new ArrayList<>();
+        for (Map.Entry<String, String> script : scripts().entrySet()) {
+            if (NOT_TRANSLATED.contains(script.getKey())) continue;
+            for (ScriptLiterals.Literal literal : ScriptLiterals.in(script.getValue())) {
+                // Markup around the words is not text, so each run of text between tags is looked at on its own.
+                for (String piece : literal.text().split("<[^>]*>")) {
+                    String words = piece.strip();
+                    if (words.contains(" ") && ENGLISH.matcher(words).find()) {
+                        left.add(script.getKey() + ":" + literal.line() + " " + words);
+                    }
+                }
+            }
+        }
+        assertThat(left).as("English text left in a script; move it to " + FILE + " as a js.* key").isEmpty();
+    }
+
+    @Test
     void everyKeyInTheFileIsUsed() throws Exception {
         Set<String> used = new HashSet<>(keysUsed().keySet());
         used.addAll(USED_BY_SCRIPTS);
+        for (String key : scriptKeysUsed().keySet()) {
+            used.add(key);
+            used.add(key + ".one");
+            used.add(key + ".other");
+        }
         List<String> unused = messages().stringPropertyNames().stream().filter(key -> !used.contains(key)).sorted().toList();
         assertThat(unused).as("keys in " + FILE + " that nothing uses").isEmpty();
     }

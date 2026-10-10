@@ -22,10 +22,10 @@
         note: card.querySelector('#taxPaymentNote'),
         paymentError: card.querySelector('#taxPaymentError')
     };
-    const money = new Intl.NumberFormat(undefined, {style: 'currency', currency: 'USD'});
+    const money = new Intl.NumberFormat(appLocale(), {style: 'currency', currency: 'USD'});
     const format = value => value == null ? '—' : money.format(Number(value));
     const day = value => value
-        ? new Date(`${value}T00:00:00`).toLocaleDateString(undefined, {month: 'short', day: 'numeric', year: 'numeric'})
+        ? new Date(`${value}T00:00:00`).toLocaleDateString(appLocale(), {month: 'short', day: 'numeric', year: 'numeric'})
         : '—';
 
     function init() {
@@ -49,18 +49,18 @@
             if (!response.ok) throw new Error();
             render(await response.json());
         } catch {
-            el.figures.replaceChildren(text('p', 'The tax summary could not be loaded.'));
+            el.figures.replaceChildren(text('p', t('js.tax.loadFailed')));
         }
     }
 
     function render(summary) {
         el.percent.value = summary.percent ?? '';
         const rows = [
-            ['Net earnings this year', format(summary.netYearToDate)],
-            ['Set aside so far (estimate)', summary.percent == null ? 'Choose a percentage' : format(summary.reserveToDate)],
-            ['Payments recorded', format(summary.paid)],
-            ['Still to set aside (estimate)', summary.percent == null ? '—' : format(summary.remaining)],
-            ['Next due date', summary.nextDueDate ? day(summary.nextDueDate) : 'None left this year']
+            [t('js.tax.netEarnings'), format(summary.netYearToDate)],
+            [t('js.tax.setAsideSoFar'), summary.percent == null ? t('js.tax.choosePercent') : format(summary.reserveToDate)],
+            [t('js.tax.paymentsRecorded'), format(summary.paid)],
+            [t('js.tax.stillToSetAside'), summary.percent == null ? '—' : format(summary.remaining)],
+            [t('js.tax.nextDueDate'), summary.nextDueDate ? day(summary.nextDueDate) : t('js.tax.noneLeft')]
         ];
         el.figures.replaceChildren(...rows.map(([label, value]) => {
             const row = document.createElement('div');
@@ -71,7 +71,7 @@
         const body = el.quarters.querySelector('tbody');
         body.replaceChildren(...summary.quarters.map(quarter => {
             const row = document.createElement('tr');
-            row.append(text('th', `Q${quarter.quarter}`), text('td', `${day(quarter.from)} – ${day(quarter.to)}`),
+            row.append(text('th', t('js.tax.quarterShort', quarter.quarter)), text('td', `${day(quarter.from)} – ${day(quarter.to)}`),
                 text('td', day(quarter.dueDate)), text('td', format(quarter.net)),
                 text('td', summary.percent == null ? '—' : format(quarter.setAside)), text('td', format(quarter.paid)));
             row.firstChild.scope = 'row';
@@ -80,17 +80,19 @@
 
         el.payments.replaceChildren(...(summary.payments.length ? summary.payments.map(payment => {
             const row = document.createElement('li');
-            const label = `${format(payment.amount)} on ${day(payment.paidOn)}${payment.quarter ? ` · Q${payment.quarter}` : ''}`;
+            const label = payment.quarter
+                ? t('js.tax.paymentOnQuarter', format(payment.amount), day(payment.paidOn), payment.quarter)
+                : t('js.tax.paymentOn', format(payment.amount), day(payment.paidOn));
             row.append(text('span', label));
             if (payment.note) row.append(text('small', payment.note));
-            const remove = text('button', 'Delete');
+            const remove = text('button', t('js.common.delete'));
             remove.type = 'button';
             remove.className = 'danger-text-button';
-            remove.setAttribute('aria-label', `Delete the ${label} payment`);
+            remove.setAttribute('aria-label', t('js.tax.deletePaymentLabel', label));
             remove.addEventListener('click', () => deletePayment(payment, remove));
             row.append(remove);
             return row;
-        }) : [text('li', 'No payments recorded for this year.')]));
+        }) : [text('li', t('js.tax.noPayments'))]));
     }
 
     async function savePercent(event) {
@@ -103,9 +105,9 @@
                 headers: csrfHeaders({'Content-Type': 'application/json'}),
                 body: JSON.stringify({taxSetAsidePercent: value === '' ? null : Number(value), remindTax: el.remind.checked})
             });
-            if (!response.ok) throw await responseError(response, 'Choose a percentage from 1 to 60, or leave it empty to turn this off.');
-            const reminders = `Due-date reminders are ${el.remind.checked ? 'on' : 'off'}.`;
-            showToast('Tax settings saved', `${value === '' ? 'The set-aside estimate is off.' : `Setting aside ${value}% of net earnings.`} ${reminders}`);
+            if (!response.ok) throw await responseError(response, t('js.tax.percentInvalid'));
+            const reminders = el.remind.checked ? t('js.tax.remindersOn') : t('js.tax.remindersOff');
+            showToast(t('js.tax.savedTitle'), `${value === '' ? t('js.tax.estimateOff') : t('js.tax.settingAside', value)} ${reminders}`);
             await load();
             // The section's summary line reads the saved settings, so they are loaded again.
             await loadSettings();
@@ -130,10 +132,10 @@
                     note: el.note.value.trim() || null
                 })
             });
-            if (!response.ok) throw await responseError(response, 'Enter the date and an amount above zero.');
+            if (!response.ok) throw await responseError(response, t('js.tax.paymentInvalid'));
             el.amount.value = '';
             el.note.value = '';
-            showToast('Payment recorded', `Counted against your ${el.year.value} reserve.`);
+            showToast(t('js.tax.recordedTitle'), t('js.tax.recordedMessage', el.year.value));
             await load();
         } catch (error) {
             el.paymentError.textContent = error.message;
@@ -142,15 +144,15 @@
     }
 
     async function deletePayment(payment, button) {
-        if (!window.confirm(`Delete the ${format(payment.amount)} payment from ${day(payment.paidOn)}?`)) return;
+        if (!window.confirm(t('js.tax.confirmDelete', format(payment.amount), day(payment.paidOn)))) return;
         button.disabled = true;
         try {
             const response = await apiFetch(`/tax/payments/${payment.id}`, {method: 'DELETE', headers: csrfHeaders()});
             if (!response.ok) throw new Error();
-            showToast('Payment deleted', 'It no longer counts against your reserve.');
+            showToast(t('js.tax.deletedTitle'), t('js.tax.deletedMessage'));
             await load();
         } catch {
-            showToast('Not deleted', 'The payment could not be deleted.', {alert: true});
+            showToast(t('js.tax.notDeletedTitle'), t('js.tax.notDeletedMessage'), {alert: true});
             button.disabled = false;
         }
     }

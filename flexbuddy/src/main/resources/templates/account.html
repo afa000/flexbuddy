@@ -373,7 +373,9 @@
         <button class="toast-action is-hidden" id="accountToastAction" type="button" th:text="#{account.undo}">Undo</button>
     </div>
 </div>
+<script id="flexbuddyMessages" type="application/json" th:utext="${scriptMessages}">{}</script>
 <script th:src="@{/js/errors.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/i18n.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/outbox.js(v=${buildId})}" defer></script>

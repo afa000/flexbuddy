@@ -9,9 +9,9 @@
 
     /** Off, or the driver's own percentage, always called an estimate; no percentage is suggested. */
     function taxDetail(settings) {
-        if (!settings) return 'Loading…';
-        if (settings.taxSetAsidePercent == null) return 'Off · an estimate to help you save, not tax advice';
-        return `${Number(settings.taxSetAsidePercent)}% set aside · estimate, not tax advice`;
+        if (!settings) return t('js.common.loading');
+        if (settings.taxSetAsidePercent == null) return t('js.setup.taxOffDetail');
+        return t('js.setup.taxOnDetail', Number(settings.taxSetAsidePercent));
     }
 
     /** The rows and progress. `settings` is null while they load. */
@@ -22,18 +22,18 @@
         const complete = doneCount === 2;
         return {
             rows: [
-                {key: 'block', text: 'Add your first block', detail: 'Import a screenshot, add one by hand, or restore a backup in Account',
-                    done: hasBlocks, action: hasBlocks ? null : 'Add'},
-                {key: 'goal', text: 'Set a weekly goal', detail: 'See your progress on Home each week', done: goalSet,
-                    action: goalSet ? null : 'Set goal'},
-                {key: 'costs', text: 'Vehicle costs', detail: settings ? sections().costMethod(settings) : 'Loading…', review: true, action: 'Change'},
-                {key: 'payouts', text: 'Payouts', detail: settings ? sections().payouts(settings) : 'Loading…', review: true, action: 'Change'},
-                {key: 'taxes', text: 'Taxes (optional)', detail: taxDetail(settings), review: true, action: taxOn ? 'Change' : 'Set up'}
+                {key: 'block', text: t('js.setup.addFirstBlock'), detail: t('js.setup.addFirstBlockDetail'),
+                    done: hasBlocks, action: hasBlocks ? null : t('js.setup.add')},
+                {key: 'goal', text: t('js.setup.setWeeklyGoal'), detail: t('js.setup.setWeeklyGoalDetail'), done: goalSet,
+                    action: goalSet ? null : t('js.setup.setGoal')},
+                {key: 'costs', text: t('js.setup.vehicleCosts'), detail: settings ? sections().costMethod(settings) : t('js.common.loading'), review: true, action: t('js.common.change')},
+                {key: 'payouts', text: t('js.setup.payouts'), detail: settings ? sections().payouts(settings) : t('js.common.loading'), review: true, action: t('js.common.change')},
+                {key: 'taxes', text: t('js.setup.taxesOptional'), detail: taxDetail(settings), review: true, action: taxOn ? t('js.common.change') : t('js.setup.setUp')}
             ],
             doneCount,
             total: 2,
             complete,
-            progress: complete ? "You're set up" : `${doneCount} of 2 done`
+            progress: complete ? t('js.setup.allSetUp') : t('js.setup.progress', doneCount)
         };
     }
 
@@ -94,7 +94,7 @@
                 + `<span>${escapeHtml(row.text)}<small>${escapeHtml(row.detail)}</small></span>`
                 + (row.action ? `<b>${escapeHtml(row.action)}</b>` : '');
             if (row.done) {
-                item.innerHTML = `<div class="setup-row is-done">${inner}<span class="sr-only">Done</span></div>`;
+                item.innerHTML = `<div class="setup-row is-done">${inner}<span class="sr-only">${escapeHtml(t('js.setup.done'))}</span></div>`;
             } else {
                 item.innerHTML = `<button class="setup-row" type="button">${inner}</button>`;
                 item.querySelector('button').addEventListener('click', () => open(row));

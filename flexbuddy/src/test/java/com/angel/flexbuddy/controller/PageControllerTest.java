@@ -52,6 +52,19 @@ class PageControllerTest {
     }
 
     @Test
+    void theHomePageCarriesTheScriptTextBeforeItsFirstScript() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<script id=\"flexbuddyMessages\" type=\"application/json\">{\"js.");
+        assertThat(page).contains("No blocks yet. Add one from the + button.");
+        assertThat(page.indexOf("id=\"flexbuddyMessages\"")).isPositive().isLessThan(page.indexOf("/js/errors.js?v="));
+        assertThat(page.indexOf("/js/i18n.js?v=")).isGreaterThan(page.indexOf("/js/errors.js?v="))
+                .isLessThan(page.indexOf("/js/toast.js?v="));
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

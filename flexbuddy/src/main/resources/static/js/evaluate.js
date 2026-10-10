@@ -4,12 +4,12 @@
     const STORAGE_KEY = 'flexbuddy-evaluate';
     const DEBOUNCE_MS = 300;
     const WIDE_SCREEN = '(min-width: 621px)';
-    const DEFAULT_SUMMARY = 'What it nets you per hour';
-    const EMPTY_HINT = 'Enter the station, hours, and pay from the offer to see what it nets you.';
+    const DEFAULT_SUMMARY = t('js.evaluate.defaultSummary');
+    const EMPTY_HINT = t('js.evaluate.emptyHint');
     const VERDICTS = {
-        ABOVE_USUAL: {label: 'Above your usual', tone: 'above'},
-        ABOUT_USUAL: {label: 'About your usual', tone: 'about'},
-        BELOW_USUAL: {label: 'Below your usual', tone: 'below'}
+        ABOVE_USUAL: {label: t('js.evaluate.aboveUsual'), tone: 'above'},
+        ABOUT_USUAL: {label: t('js.evaluate.aboutUsual'), tone: 'about'},
+        BELOW_USUAL: {label: t('js.evaluate.belowUsual'), tone: 'below'}
     };
     let el;
     let selectedHours = '';
@@ -127,14 +127,14 @@
                 body: JSON.stringify(offer),
                 signal: pending.signal
             });
-            if (!response.ok) throw new Error('This offer could not be evaluated. Check the hours and pay.');
+            if (!response.ok) throw new Error(t('js.evaluate.evaluateFailedCheck'));
             const estimate = await response.json();
             if (current !== sequence) return;
             render(estimate, offer);
             remember(offer);
         } catch (error) {
             if (error?.name === 'AbortError' || current !== sequence) return;
-            showError(error.message || 'This offer could not be evaluated.');
+            showError(error.message || t('js.evaluate.evaluateFailed'));
         } finally {
             if (current === sequence) el.result.classList.remove('is-loading');
         }
@@ -159,40 +159,43 @@
     function render(estimate, offer) {
         const verdict = VERDICTS[estimate.verdict];
         const pill = verdict
-            ? `<span class="verdict-pill verdict-${verdict.tone}">${verdict.label} · ${formatPercent(estimate.differencePercent)}</span>`
+            ? `<span class="verdict-pill verdict-${verdict.tone}">${escapeHtml(verdict.label)} · ${formatPercent(estimate.differencePercent)}</span>`
             : '';
-        const miles = estimate.estimatedMiles === null ? '' : ` · ${Number(estimate.estimatedMiles).toFixed(1)} mi`;
+        const miles = estimate.estimatedMiles === null ? '' : ` · ${t('js.common.miles', Number(estimate.estimatedMiles).toFixed(1))}`;
         el.result.innerHTML = `
             <div class="evaluate-headline">
-                <div class="evaluate-figure"><strong>${formatMoney(estimate.estimatedNetHourly)}</strong><span>net per hour</span></div>
+                <div class="evaluate-figure"><strong>${formatMoney(estimate.estimatedNetHourly)}</strong><span>${escapeHtml(t('js.evaluate.netPerHour'))}</span></div>
                 ${pill}
             </div>
             <dl class="evaluate-breakdown">
-                <div><dt>Offer</dt><dd>${formatMoney(offer.offeredPay)} · ${formatMoney(estimate.offeredHourly)}/hr</dd></div>
-                ${Number(estimate.surgePay) > 0 ? `<div class="evaluate-surge"><dt>Includes surge over the usual ${formatMoney(estimate.usualBaseHourly)}/hr</dt><dd>${formatMoney(estimate.surgePay)}</dd></div>` : ''}
-                <div><dt>${offer.expectedTips === null ? 'Tips (your average)' : 'Tips'}</dt><dd>+${formatMoney(estimate.estimatedTips)}</dd></div>
-                <div><dt>Vehicle cost</dt><dd>−${formatMoney(estimate.estimatedVehicleCost)}${miles}</dd></div>
-                <div><dt>Tolls, parking, other</dt><dd>−${formatMoney(estimate.estimatedOtherExpenses)}</dd></div>
-                <div class="evaluate-total"><dt>Estimated net</dt><dd>${formatMoney(estimate.estimatedNet)}</dd></div>
+                <div><dt>${escapeHtml(t('js.evaluate.offer'))}</dt><dd>${formatMoney(offer.offeredPay)} · ${escapeHtml(t('js.common.perHour', formatMoney(estimate.offeredHourly)))}</dd></div>
+                ${Number(estimate.surgePay) > 0 ? `<div class="evaluate-surge"><dt>${escapeHtml(t('js.evaluate.includesSurge', formatMoney(estimate.usualBaseHourly)))}</dt><dd>${formatMoney(estimate.surgePay)}</dd></div>` : ''}
+                <div><dt>${escapeHtml(offer.expectedTips === null ? t('js.evaluate.tipsAverage') : t('js.evaluate.tips'))}</dt><dd>+${formatMoney(estimate.estimatedTips)}</dd></div>
+                <div><dt>${escapeHtml(t('js.evaluate.vehicleCost'))}</dt><dd>−${formatMoney(estimate.estimatedVehicleCost)}${miles}</dd></div>
+                <div><dt>${escapeHtml(t('js.evaluate.tollsParkingOther'))}</dt><dd>−${formatMoney(estimate.estimatedOtherExpenses)}</dd></div>
+                <div class="evaluate-total"><dt>${escapeHtml(t('js.evaluate.estimatedNet'))}</dt><dd>${formatMoney(estimate.estimatedNet)}</dd></div>
             </dl>
             <p class="evaluate-basis">${basisText(estimate)}</p>`;
-        setSummary(`${formatMoney(estimate.estimatedNetHourly)}/hr net${verdict ? ` · ${verdict.label.toLowerCase()}` : ''}`, true);
+        setSummary(verdict
+            ? t('js.evaluate.summaryVerdict', formatMoney(estimate.estimatedNetHourly), verdict.label.toLowerCase())
+            : t('js.evaluate.summaryNet', formatMoney(estimate.estimatedNetHourly)), true);
     }
 
     function basisText(estimate) {
         const count = estimate.sampleSize;
         const station = escapeHtml(estimate.station);
-        const blocks = `${count} ${count === 1 ? 'block' : 'blocks'}`;
+        const blocks = tn(count, 'js.common.blocks');
         let text;
-        if (estimate.basis === 'STATION_90_DAYS') text = `Based on <strong>${count} ${station} ${count === 1 ? 'block' : 'blocks'}</strong> in the last 90 days.`;
-        else if (estimate.basis === 'STATION_ALL_TIME') text = `Based on all <strong>${count} ${station} blocks</strong> you have logged.`;
-        else if (count > 0) text = `${station} has fewer than 3 logged blocks, so this uses <strong>all ${blocks}</strong> on your account.`;
-        else return 'No completed blocks yet, so this is the offer’s pay before any costs.';
+        if (estimate.basis === 'STATION_90_DAYS') text = tn(count, 'js.evaluate.basedOn90Days', station);
+        else if (estimate.basis === 'STATION_ALL_TIME') text = t('js.evaluate.basedOnAll', count, station);
+        else if (count > 0) text = t('js.evaluate.fewBlocks', station, blocks);
+        else return t('js.evaluate.noBlocksYet');
         if (estimate.usualNetHourly !== null) {
-            text += ` You usually net ${formatMoney(estimate.usualNetHourly)}/hr ${estimate.basis === 'ACCOUNT' ? 'overall' : 'there'}.`;
+            text += ' ' + t(estimate.basis === 'ACCOUNT' ? 'js.evaluate.usuallyNetOverall' : 'js.evaluate.usuallyNetThere',
+                formatMoney(estimate.usualNetHourly));
         }
         if (estimate.estimatedMiles === null && Number(estimate.estimatedVehicleCost) === 0) {
-            text += ' Log miles on your blocks to include vehicle cost.';
+            text += ' ' + t('js.evaluate.logMiles');
         }
         return text;
     }

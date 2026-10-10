@@ -13,22 +13,25 @@
      * Wraps a row so it can slide over its actions. Options: onEdit, onDelete, onDuplicate (optional), and
      * deleteQuestion, the text shown when asking to confirm a delete. Returns the wrapper to put in the list.
      */
+    /** Text for a place where markup is built as a string. */
+    const esc = value => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
     function wrap(row, options) {
         const wrapper = document.createElement('div');
         wrapper.className = 'swipe-row';
         const behind = document.createElement('div');
         behind.className = 'swipe-actions';
         behind.innerHTML = `
-            ${options.onDuplicate ? '<button class="swipe-action swipe-duplicate" type="button" tabindex="-1">Duplicate</button>' : ''}
+            ${options.onDuplicate ? `<button class="swipe-action swipe-duplicate" type="button" tabindex="-1">${esc(t('js.common.duplicate'))}</button>` : ''}
             <span class="swipe-spacer"></span>
-            <button class="swipe-action swipe-edit" type="button" tabindex="-1">Edit</button>
-            <button class="swipe-action swipe-delete" type="button" tabindex="-1">Delete</button>`;
+            <button class="swipe-action swipe-edit" type="button" tabindex="-1">${esc(t('js.common.edit'))}</button>
+            <button class="swipe-action swipe-delete" type="button" tabindex="-1">${esc(t('js.common.delete'))}</button>`;
         const confirm = document.createElement('div');
         confirm.className = 'swipe-confirm';
         confirm.hidden = true;
         confirm.innerHTML = `<span></span>
-            <button class="secondary-button compact-button swipe-cancel" type="button">Cancel</button>
-            <button class="danger-button swipe-confirm-delete" type="button">Delete</button>`;
+            <button class="secondary-button compact-button swipe-cancel" type="button">${esc(t('js.common.cancel'))}</button>
+            <button class="danger-button swipe-confirm-delete" type="button">${esc(t('js.common.delete'))}</button>`;
         confirm.querySelector('span').textContent = options.deleteQuestion;
         wrapper.append(behind, row, confirm);
         row.classList.add('swipe-surface');

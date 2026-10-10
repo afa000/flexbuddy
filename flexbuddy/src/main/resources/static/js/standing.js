@@ -4,8 +4,8 @@
 // csrfHeaders, showToast, showMessage, hideMessage, formatDate, toIsoDate, escapeHtml, showScheduleScreen) at call time.
 (() => {
     const WINDOW_DAYS = 90;
-    const LABELS = {FANTASTIC: 'Fantastic', GREAT: 'Great', FAIR: 'Fair', AT_RISK: 'At Risk'};
-    const EVENT_LABELS = {LATE_FORFEIT: 'Late forfeit', FORFEITED: 'Forfeit', CANCELLED: 'Cancelled by Amazon'};
+    const LABELS = {FANTASTIC: 'js.standing.fantastic', GREAT: 'js.standing.great', FAIR: 'js.standing.fair', AT_RISK: 'js.standing.atRisk'};
+    const EVENT_LABELS = {LATE_FORFEIT: 'js.common.lateForfeit', FORFEITED: 'js.standing.forfeit', CANCELLED: 'js.common.cancelledByAmazon'};
     const el = {
         pill: document.querySelector('#standingPill'),
         link: document.querySelector('#standingLink'),
@@ -44,13 +44,13 @@
     function setPill(pill, current) {
         pill.classList.toggle('is-hidden', !current);
         pill.dataset.level = current?.level ?? '';
-        pill.textContent = current ? LABELS[current.level] : '';
-        pill.title = current ? `Logged ${formatDate(current.recordedOn)}` : '';
+        pill.textContent = current ? t(LABELS[current.level]) : '';
+        pill.title = current ? t('js.standing.logged', formatDate(current.recordedOn)) : '';
     }
 
     function renderTile() {
         setPill(el.pill, data.current);
-        el.link.textContent = data.current ? 'Update standing' : 'Log standing';
+        el.link.textContent = data.current ? t('js.standing.updateStanding') : t('js.standing.logStanding');
     }
 
     function renderCard() {
@@ -82,7 +82,7 @@
     /** Says so when the chosen day already has an entry, since logging it again replaces that one. */
     function updateHint() {
         const existing = data?.entries.find(entry => entry.recordedOn === el.date.value);
-        el.hint.textContent = existing ? `Replaces ${LABELS[existing.level]} logged for ${formatDate(existing.recordedOn)}.` : '';
+        el.hint.textContent = existing ? t('js.standing.replaces', t(LABELS[existing.level]), formatDate(existing.recordedOn)) : '';
     }
 
     function renderList() {
@@ -93,7 +93,7 @@
         if (!rows.length) {
             const empty = document.createElement('li');
             empty.className = 'history-empty';
-            empty.textContent = 'No standing logged yet. Log it from the Flex app when it changes.';
+            empty.textContent = t('js.standing.noneLogged');
             el.list.replaceChildren(empty);
             return;
         }
@@ -106,12 +106,12 @@
         item.innerHTML = `
             <div class="standing-row-main">
                 <strong>${escapeHtml(formatDate(entry.recordedOn))}</strong>
-                <span class="standing-pill" data-level="${escapeHtml(entry.level)}">${escapeHtml(LABELS[entry.level])}</span>
+                <span class="standing-pill" data-level="${escapeHtml(entry.level)}">${escapeHtml(t(LABELS[entry.level]))}</span>
                 ${entry.note ? `<p>${escapeHtml(entry.note)}</p>` : ''}
             </div>
             <div class="standing-row-actions">
-                <button class="text-button" type="button" data-action="edit" data-online-only>Edit</button>
-                <button class="text-button danger-text-button" type="button" data-action="delete" data-online-only>Delete</button>
+                <button class="text-button" type="button" data-action="edit" data-online-only>${escapeHtml(t('js.common.edit'))}</button>
+                <button class="text-button danger-text-button" type="button" data-action="delete" data-online-only>${escapeHtml(t('js.common.delete'))}</button>
             </div>`;
         item.querySelectorAll('button').forEach(button => button.disabled = offline());
         item.querySelector('[data-action="edit"]').addEventListener('click', () => edit(entry));
@@ -125,7 +125,7 @@
         item.innerHTML = `
             <div class="standing-row-main">
                 <strong>${escapeHtml(formatDate(event.date))}</strong>
-                <span class="standing-event-label" data-kind="${escapeHtml(event.kind)}">${escapeHtml(EVENT_LABELS[event.kind])}</span>
+                <span class="standing-event-label" data-kind="${escapeHtml(event.kind)}">${escapeHtml(t(EVENT_LABELS[event.kind]))}</span>
                 <p>${escapeHtml(event.station)} · ${escapeHtml(formatTime(event.startTime))}</p>
             </div>`;
         return item;
@@ -148,13 +148,13 @@
             headers: csrfHeaders({'Content-Type': 'application/json'}),
             body: JSON.stringify(body)
         });
-        if (!response.ok) throw new Error(await response.text() || 'The standing could not be saved.');
+        if (!response.ok) throw new Error(await response.text() || t('js.standing.saveFailed'));
     }
 
     async function save(event) {
         event.preventDefault();
         if (!level) {
-            showMessage(el.error, 'Choose a standing.');
+            showMessage(el.error, t('js.standing.chooseOne'));
             return;
         }
         hideMessage(el.error);
@@ -162,11 +162,11 @@
         el.save.disabled = true;
         try {
             await put(date, {level, note: el.note.value.trim() || null});
-            showToast('Standing logged', `${LABELS[level]} from ${formatDate(date)}.`);
+            showToast(t('js.standing.loggedTitle'), t('js.standing.loggedMessage', t(LABELS[level]), formatDate(date)));
             resetForm();
             await load();
         } catch (error) {
-            showMessage(el.error, error.message || 'The standing could not be saved.');
+            showMessage(el.error, error.message || t('js.standing.saveFailed'));
             el.save.disabled = !level;
         }
     }
@@ -177,20 +177,20 @@
             const response = await apiFetch(`/standing/${entry.recordedOn}`, {method: 'DELETE', headers: csrfHeaders()});
             if (!response.ok) throw new Error();
             await load();
-            showToast('Standing removed', `${LABELS[entry.level]} on ${formatDate(entry.recordedOn)} is gone.`, {
-                actionLabel: 'Undo',
+            showToast(t('js.standing.removedTitle'), t('js.standing.removedMessage', t(LABELS[entry.level]), formatDate(entry.recordedOn)), {
+                actionLabel: t('js.common.undo'),
                 duration: 8000,
                 onAction: async () => {
                     try {
                         await put(entry.recordedOn, {level: entry.level, note: entry.note});
                         await load();
                     } catch (error) {
-                        showToast('Standing not restored', error.message || 'It could not be put back.', {alert: true});
+                        showToast(t('js.standing.notRestoredTitle'), error.message || t('js.standing.notRestoredMessage'), {alert: true});
                     }
                 }
             });
         } catch {
-            showToast('Standing not removed', 'That entry could not be removed. Try again.', {alert: true});
+            showToast(t('js.standing.notRemovedTitle'), t('js.standing.notRemovedMessage'), {alert: true});
             button.disabled = false;
         }
     }

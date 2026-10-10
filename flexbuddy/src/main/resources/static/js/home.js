@@ -4,8 +4,9 @@
 // helpers of setup.js (flexbuddySetup) at call time. The pure helpers touch no page elements, so they run under `node --test`.
 (() => {
     const calendar = window.flexbuddyCalendar;
-    const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const DAYS = ['js.common.weekdaySun', 'js.common.weekdayMon', 'js.common.weekdayTue', 'js.common.weekdayWed',
+        'js.common.weekdayThu', 'js.common.weekdayFri', 'js.common.weekdaySat'];
+    const MONTHS = ['js.common.monthJan', 'js.common.monthFeb', 'js.common.monthMar', 'js.common.monthApr', 'js.common.monthMay', 'js.common.monthJun', 'js.common.monthJul', 'js.common.monthAug', 'js.common.monthSep', 'js.common.monthOct', 'js.common.monthNov', 'js.common.monthDec'];
     const RECENT_STATUSES = ['COMPLETED', 'CANCELLED', 'FORFEITED'];
     let el;
     let weekEarned = null;
@@ -13,7 +14,7 @@
     /** "Mon Sep 28" from a local YYYY-MM-DD string, read as written so the time zone can never shift the day. */
     function dayLabel(iso) {
         const date = calendar.parseIso(iso);
-        return `${DAYS[date.getDay()]} ${MONTHS[date.getMonth()]} ${date.getDate()}`;
+        return t('js.common.dayLabel', t(DAYS[date.getDay()]), t(MONTHS[date.getMonth()]), date.getDate());
     }
 
     /** The Monday-to-Sunday week that contains today, and its label, for example "Mon Sep 28 – Sun Oct 4". */
@@ -28,19 +29,15 @@
         return {from: calendar.addDays(todayIso, -6), to: todayIso};
     }
 
-    function count(number, one, many) {
-        return `${number} ${number === 1 ? one : many}`;
-    }
-
     /** The rows of the Needs attention card, in order, each with the text to show and the key of its action. */
     function attentionRows({needsConfirmation = 0, missingMiles = 0, backupDue = false, installable = false}) {
         const rows = [];
-        if (needsConfirmation > 0) rows.push({key: 'confirm', text: `${count(needsConfirmation, 'block', 'blocks')} to confirm`, action: 'Review'});
+        if (needsConfirmation > 0) rows.push({key: 'confirm', text: tn(needsConfirmation, 'js.home.blocksToConfirm'), action: t('js.home.review')});
         if (missingMiles > 0) {
-            rows.push({key: 'miles', text: `${count(missingMiles, 'block has', 'blocks have')} no miles`, action: 'Add miles'});
+            rows.push({key: 'miles', text: tn(missingMiles, 'js.home.blocksNoMiles'), action: t('js.home.addMiles')});
         }
-        if (backupDue) rows.push({key: 'backup', text: 'No backup in 30 days', action: 'Back up'});
-        if (installable) rows.push({key: 'install', text: 'Install FlexBuddy', action: 'Install'});
+        if (backupDue) rows.push({key: 'backup', text: t('js.home.noBackup'), action: t('js.home.backUp')});
+        if (installable) rows.push({key: 'install', text: t('js.home.installApp'), action: t('js.home.install')});
         return rows;
     }
 
@@ -72,7 +69,7 @@
 
     function renderToday() {
         init();
-        el.today.textContent = new Date().toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric'});
+        el.today.textContent = new Date().toLocaleDateString(appLocale(), {weekday: 'short', month: 'short', day: 'numeric'});
     }
 
     async function fetchJson(url) {
@@ -93,7 +90,7 @@
         renderToday();
         const today = calendar.toIso(new Date());
         const week = weekRange(today);
-        el.weekLabel.textContent = `This week · ${week.label}`;
+        el.weekLabel.textContent = t('js.home.thisWeek', week.label);
         const [weekStats, sevenStats, shifts] = await Promise.allSettled([
             fetchJson(statisticsUrl(week)),
             fetchJson(statisticsUrl(lastSevenRange(today))),
@@ -102,7 +99,7 @@
 
         if (weekStats.status === 'fulfilled') {
             weekEarned = weekStats.value.totalEarnings;
-            el.weekNetHourly.textContent = `${formatMoney(weekStats.value.netHourlyRate)}/hr`;
+            el.weekNetHourly.textContent = t('js.common.perHour', formatMoney(weekStats.value.netHourlyRate));
             needsConfirmation = weekStats.value.needsConfirmation ?? 0;
         } else {
             el.weekNetHourly.textContent = '—';
@@ -116,7 +113,7 @@
         if (sevenStats.status === 'fulfilled') {
             const stats = sevenStats.value;
             el.sevenHours.textContent = formatMinutes(stats.totalTimeWorked);
-            el.sevenDetail.textContent = `${formatMoney(stats.totalEarnings)} · ${count(stats.totalShifts ?? 0, 'block', 'blocks')}`;
+            el.sevenDetail.textContent = `${formatMoney(stats.totalEarnings)} · ${tn(stats.totalShifts ?? 0, 'js.common.blocks')}`;
         } else {
             el.sevenHours.textContent = '—';
             el.sevenDetail.textContent = '';
@@ -130,17 +127,17 @@
 
     /** What the week card says in place of "$93.50 of $400" when the driver has no weekly goal yet, or null until known. */
     function noGoalText() {
-        return weekEarned == null ? null : `${formatMoney(weekEarned)} earned`;
+        return weekEarned == null ? null : t('js.home.weekEarned', formatMoney(weekEarned));
     }
 
     function renderRecent(shifts) {
         if (!shifts) {
-            el.recentList.innerHTML = '<p class="history-empty">Recent blocks could not be loaded.</p>';
+            el.recentList.innerHTML = `<p class="history-empty">${escapeHtml(t('js.home.recentLoadFailed'))}</p>`;
             return;
         }
         const recent = recentBlocks(shifts);
         if (!recent.length) {
-            el.recentList.innerHTML = '<p class="history-empty">No blocks yet. Add one from the + button.</p>';
+            el.recentList.innerHTML = `<p class="history-empty">${escapeHtml(t('js.home.recentEmpty'))}</p>`;
             return;
         }
         el.recentList.replaceChildren(...recent.map(shift => {
@@ -152,13 +149,15 @@
             const total = shift.earnedPay ?? shift.totalPay ?? (Number(shift.basePay || 0) + Number(shift.tips || 0));
             const minutes = shift.details?.actualMinutes ?? shift.timeWorked;
             const detail = worked
-                ? `${formatMinutes(minutes)}${shift.miles == null ? '' : ` · ${Number(shift.miles).toFixed(1)} mi`}`
-                : shift.status === 'CANCELLED' ? 'Cancelled' : shift.lateForfeit ? 'Late forfeit' : 'Forfeited';
+                ? (shift.miles == null ? formatMinutes(minutes)
+                    : t('js.home.timeAndMiles', formatMinutes(minutes), Number(shift.miles).toFixed(1)))
+                : shift.status === 'CANCELLED' ? t('js.common.cancelled')
+                    : shift.lateForfeit ? t('js.common.lateForfeit') : t('js.common.forfeited');
             row.innerHTML = `
-                <span class="date-badge"><small>${MONTHS[date.getMonth()]}</small><strong>${date.getDate()}</strong></span>
+                <span class="date-badge"><small>${escapeHtml(t(MONTHS[date.getMonth()]))}</small><strong>${date.getDate()}</strong></span>
                 <span class="recent-main"><strong>${escapeHtml(shift.station)}</strong><span>${escapeHtml(detail)}</span></span>
-                <span class="recent-pay"><strong>${formatMoney(total)}</strong>${worked ? `<span>${formatMoney(shift.hourlyRate)}/hr</span>` : ''}</span>`;
-            row.setAttribute('aria-label', `Edit ${shift.station} block on ${shift.date}`);
+                <span class="recent-pay"><strong>${formatMoney(total)}</strong>${worked ? `<span>${escapeHtml(t('js.common.perHour', formatMoney(shift.hourlyRate)))}</span>` : ''}</span>`;
+            row.setAttribute('aria-label', t('js.home.editBlockOn', shift.station, shift.date));
             row.addEventListener('click', () => openEditModal(shift, row));
             return row;
         }));
