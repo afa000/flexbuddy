@@ -254,7 +254,10 @@ class PageControllerTest {
                 .andReturn().getResponse().getContentAsString();
 
         assertThat(page).contains("id=\"homeLink\"", "aria-label=\"FlexBuddy, go to Home\"");
-        assertThat(page).containsPattern("class=\"round-header-button account-button\"[^>]*>A</a>");
+        assertThat(page).containsPattern("class=\"round-header-button account-button\"[^>]*aria-label=\"Account and settings\"");
+        assertThat(page).containsPattern("(?s)class=\"round-header-button account-button\".*?<svg.*?</a>");
+        // The first letter of the name read as a profile picture, so it is gone.
+        assertThat(page).doesNotContainPattern("class=\"round-header-button account-button\"[^>]*>\\s*A\\s*</a>");
         assertThat(page).doesNotContain("id=\"logoutForm\"", "id=\"dashboardButton\"", "<small>Shift tracker</small>", "account-name");
     }
 

@@ -171,7 +171,8 @@ button {
 .brand-mark { width: 44px; height: 44px; display: grid; place-items: center; justify-self: start; }
 .brand-mark img { width: 36px; height: 36px; border-radius: 9px; }
 .brand-name { justify-self: center; color: var(--header-text); font-size: 20px; font-weight: 750; letter-spacing: .01em; }
-.account-button { color: var(--header-control-text); font-size: 18px; font-weight: 800; text-decoration: none; text-transform: uppercase; }
+.account-button { color: var(--header-control-text); text-decoration: none; }
+.round-header-button.account-button svg { width: 24px; }
 
 .round-header-button {
     width: 52px;
