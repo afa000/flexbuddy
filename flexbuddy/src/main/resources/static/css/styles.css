@@ -126,6 +126,18 @@ button {
     color: inherit;
 }
 
+/* Phones draw a translucent square on whatever is held; the buttons already show their own pressed state. */
+a,
+button,
+summary,
+label,
+input,
+select,
+textarea,
+[role="button"] {
+    -webkit-tap-highlight-color: transparent;
+}
+
 .app-shell {
     min-height: 100vh;
 }
@@ -1753,34 +1765,28 @@ input[data-reveal]::-ms-reveal { display: none; }
         border-radius: 14px 14px 0 0;
     }
 
+    /* The bar itself is the pill that floats over the page; nothing sits behind it. */
     .mobile-nav {
         position: fixed;
-        right: 0;
-        bottom: 0;
-        left: 0;
+        right: max(58px, calc((100vw - 340px) / 2));
+        bottom: calc(10px + env(safe-area-inset-bottom));
+        left: max(58px, calc((100vw - 340px) / 2));
         z-index: 30;
         width: auto;
-        height: calc(92px + env(safe-area-inset-bottom));
-        padding: 10px max(58px, calc((100vw - 340px) / 2)) calc(10px + env(safe-area-inset-bottom));
+        height: 72px;
+        padding: 0;
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 0;
         transform: none;
-        background: var(--mobile-nav);
-        border: 0;
-        border-top: 1px solid var(--mobile-nav-border);
-        border-radius: 0;
-        box-shadow: none;
-    }
-
-    .mobile-nav::before {
-        content: "";
-        position: absolute;
-        inset: 10px max(58px, calc((100vw - 340px) / 2)) calc(10px + env(safe-area-inset-bottom));
         background: var(--mobile-shell);
         border: 1px solid var(--mobile-shell-border);
         border-radius: 999px;
-        pointer-events: none;
+        box-shadow: var(--toast-shadow);
+    }
+
+    .mobile-nav::before {
+        content: none;
     }
 
     .mobile-nav-item {
@@ -1898,11 +1904,6 @@ input[data-reveal]::-ms-reveal { display: none; }
 @media (max-width: 620px) {
     .mobile-nav {
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        padding-left: max(12px, calc((100vw - 460px) / 2));
-        padding-right: max(12px, calc((100vw - 460px) / 2));
-    }
-
-    .mobile-nav::before {
         left: max(12px, calc((100vw - 460px) / 2));
         right: max(12px, calc((100vw - 460px) / 2));
     }
