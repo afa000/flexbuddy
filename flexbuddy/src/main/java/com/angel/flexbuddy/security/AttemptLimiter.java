@@ -33,6 +33,8 @@ public class AttemptLimiter {
     public static final String REGISTER_IP = "register-ip";
     public static final String RESET_EMAIL = "reset-email";
     public static final String RESET_IP = "reset-ip";
+    public static final String CODE_EMAIL = "code-email";
+    public static final String CODE_IP = "code-ip";
 
     static final int DEFAULT_MAX_KEYS = 50_000;
 
@@ -74,7 +76,9 @@ public class AttemptLimiter {
                         properties.login().lock()),
                 REGISTER_IP, new Policy(properties.registration().maxPerIp(), properties.registration().window(), null),
                 RESET_EMAIL, new Policy(properties.reset().maxPerEmail(), properties.reset().window(), null),
-                RESET_IP, new Policy(properties.reset().maxPerIp(), properties.reset().window(), null)),
+                RESET_IP, new Policy(properties.reset().maxPerIp(), properties.reset().window(), null),
+                CODE_EMAIL, new Policy(properties.codes().maxSendsPerEmail(), properties.codes().window(), null),
+                CODE_IP, new Policy(properties.codes().maxSendsPerIp(), properties.codes().window(), null)),
                 clock, DEFAULT_MAX_KEYS);
     }
 

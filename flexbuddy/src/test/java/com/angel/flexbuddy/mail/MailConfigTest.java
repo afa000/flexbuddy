@@ -94,6 +94,52 @@ class MailConfigTest {
     }
 
     @Test
+    void theCodeMailerFollowsTheSameHostRule() {
+        runner.run(context -> assertThat(context.getBean(EmailCodeMailer.class)).isInstanceOf(LoggingEmailCodeMailer.class));
+        runner.withPropertyValues("spring.mail.host=smtp.example.com")
+                .withBean(JavaMailSender.class, () -> mock(JavaMailSender.class))
+                .run(context -> assertThat(context.getBean(EmailCodeMailer.class)).isInstanceOf(SmtpEmailCodeMailer.class));
+    }
+
+    @Test
+    void aProductionLogNeverHoldsACode() {
+        runner.withPropertyValues("flexbuddy.mail.log-links=false").run(context ->
+                context.getBean(EmailCodeMailer.class).sendCode("angel@example.com", "Angel", "493817",
+                        com.angel.flexbuddy.model.EmailCodePurpose.VERIFY_EMAIL));
+
+        assertThat(messages()).hasSize(1);
+        assertThat(messages().get(0)).isEqualTo("email code not sent: mail is not configured");
+    }
+
+    @Test
+    void aCodeIsLoggedOnlyWhenLocalDevelopmentAsksForIt() {
+        runner.withPropertyValues("flexbuddy.mail.log-links=true").run(context ->
+                context.getBean(EmailCodeMailer.class).sendCode("angel@example.com", "Angel", "493817",
+                        com.angel.flexbuddy.model.EmailCodePurpose.VERIFY_EMAIL));
+
+        assertThat(messages()).hasSize(1);
+        assertThat(messages().get(0)).contains("493817").doesNotContain("angel@example.com");
+    }
+
+    @Test
+    void theCodeEmailPutsTheCodeInTheSubjectAndNeverLogsItOnFailure() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        new SmtpEmailCodeMailer(sender, "FlexBuddy <flexbuddysupport@gmail.com>")
+                .sendCode("angel@example.com", "Angel", "493817", com.angel.flexbuddy.model.EmailCodePurpose.VERIFY_EMAIL);
+
+        ArgumentCaptor<SimpleMailMessage> sent = ArgumentCaptor.forClass(SimpleMailMessage.class);
+        verify(sender).send(sent.capture());
+        assertThat(sent.getValue().getSubject()).isEqualTo("Your FlexBuddy code: 493817");
+        assertThat(sent.getValue().getTo()).containsExactly("angel@example.com");
+
+        doThrow(new MailSendException("550 mailbox angel@example.com unavailable 493817")).when(sender).send(any(SimpleMailMessage.class));
+        new SmtpEmailCodeMailer(sender, "FlexBuddy <flexbuddysupport@gmail.com>")
+                .sendCode("angel@example.com", "Angel", "493817", com.angel.flexbuddy.model.EmailCodePurpose.VERIFY_EMAIL);
+        assertThat(messages()).anyMatch(message -> message.contains("MailSendException"))
+                .noneMatch(message -> message.contains("493817") || message.contains("angel@example.com"));
+    }
+
+    @Test
     void theAlertMailerFollowsTheSameHostRule() {
         runner.run(context -> assertThat(context.getBean(ErrorAlertMailer.class)).isInstanceOf(LoggingErrorAlertMailer.class));
         runner.withPropertyValues("spring.mail.host=smtp.example.com")

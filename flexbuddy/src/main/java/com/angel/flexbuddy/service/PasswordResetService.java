@@ -115,6 +115,8 @@ public class PasswordResetService {
         Instant now = clock.instant();
         AppUser user = link.getOwner();
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // The link went to the address, so using it proves the driver owns it.
+        user.setEmailVerified(true);
         link.setUsedAt(now);
         tokenRepository.retireUnused(user.getId(), now);
         persistentTokenRepository.removeUserTokens(user.getEmail());

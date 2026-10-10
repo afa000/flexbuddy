@@ -67,6 +67,9 @@ class AccountControllerTest {
     private AccountSettingsService settingsService;
 
     @MockitoBean
+    private com.angel.flexbuddy.service.EmailVerificationService emailVerification;
+
+    @MockitoBean
     private Clock clock;
 
     @MockitoBean
@@ -166,16 +169,20 @@ class AccountControllerTest {
     }
 
     @Test
-    void register_createsAccountAndRedirectsToLogin() throws Exception {
+    void register_createsAccountAndSendsTheDriverToTheCodePage() throws Exception {
+        AppUser created = new AppUser("Angel", "angel@example.com", "hash");
+        created.setId(9L);
+        when(accountService.register(any(RegistrationRequest.class))).thenReturn(created);
         mockMvc.perform(post("/register")
                         .with(csrf())
                         .param("displayName", "Angel")
                         .param("email", "angel@example.com")
                         .param("password", "password123"))
                 .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/login?registered"));
+                .andExpect(redirectedUrl("/verify-email"));
 
         verify(accountService).register(any(RegistrationRequest.class));
+        verify(emailVerification).startVerification(org.mockito.ArgumentMatchers.same(created), org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test

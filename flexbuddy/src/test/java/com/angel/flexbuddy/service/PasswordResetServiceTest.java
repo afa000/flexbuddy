@@ -73,7 +73,8 @@ class PasswordResetServiceTest {
         SecurityLimitsProperties limits = new SecurityLimitsProperties(
                 new SecurityLimitsProperties.Login(5, 20, Duration.ofMinutes(15), Duration.ofMinutes(15)),
                 new SecurityLimitsProperties.Registration(10, Duration.ofHours(1)),
-                new SecurityLimitsProperties.Reset(3, 10, Duration.ofHours(1), Duration.ofMinutes(30)));
+                new SecurityLimitsProperties.Reset(3, 10, Duration.ofHours(1), Duration.ofMinutes(30)),
+                new SecurityLimitsProperties.Codes(Duration.ofMinutes(15), 5, 5, 20, Duration.ofHours(1)));
         service = new PasswordResetService(tokenRepository, userRepository, passwordEncoder, persistentTokenRepository,
                 limiter, mailer, clock, limits, "https://flexbuddy.onrender.com");
         angel = new AppUser("Angel", "angel@example.com", "old-hash");
@@ -179,6 +180,17 @@ class PasswordResetServiceTest {
         verify(tokenRepository).retireUnused(42L, NOW);
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
         verify(limiter).clear(AttemptLimiter.LOGIN_EMAIL, "angel@example.com");
+    }
+
+    @Test
+    void resettingAlsoConfirmsAnUnverifiedAddressBecauseTheLinkWentThere() throws Exception {
+        angel.setEmailVerified(false);
+        linkFor("token-value", NOW.plusSeconds(600), null);
+        when(passwordEncoder.encode("new-password-1")).thenReturn("new-hash");
+
+        service.resetPassword("token-value", "new-password-1");
+
+        assertThat(angel.isEmailVerified()).isTrue();
     }
 
     @Test

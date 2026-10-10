@@ -26,6 +26,18 @@ public class MailConfig {
         return new LoggingPasswordResetMailer(logLinks);
     }
 
+    @Bean
+    EmailCodeMailer emailCodeMailer(
+            @Value("${spring.mail.host:}") String host,
+            ObjectProvider<JavaMailSender> senderProvider,
+            @Value("${flexbuddy.mail.from}") String from,
+            @Value("${flexbuddy.mail.log-links:false}") boolean logCodes) {
+        if (StringUtils.hasText(host)) {
+            return new SmtpEmailCodeMailer(senderProvider.getObject(), from);
+        }
+        return new LoggingEmailCodeMailer(logCodes);
+    }
+
     /** Operator alerts follow the same host rule: with no mail server they are logged, not sent. */
     @Bean
     ErrorAlertMailer errorAlertMailer(

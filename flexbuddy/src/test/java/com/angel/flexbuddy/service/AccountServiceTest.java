@@ -69,6 +69,9 @@ class AccountServiceTest {
     @Mock
     private com.angel.flexbuddy.repository.PasswordResetTokenRepository passwordResetTokenRepository;
 
+    @Mock
+    private com.angel.flexbuddy.repository.EmailCodeRepository emailCodeRepository;
+
     @InjectMocks
     private AccountService accountService;
 
@@ -90,6 +93,52 @@ class AccountServiceTest {
         assertThat(saved.getEmail()).isEqualTo("angel@example.com");
         assertThat(saved.getPasswordHash()).isEqualTo("bcrypt-hash");
         assertThat(saved.getPasswordHash()).isNotEqualTo(request.getPassword());
+    }
+
+    @Test
+    void register_savesANewAccountAsNotYetVerified() {
+        RegistrationRequest request = new RegistrationRequest();
+        request.setDisplayName("Angel");
+        request.setEmail("angel@example.com");
+        request.setPassword("secret-password");
+        when(passwordEncoder.encode("secret-password")).thenReturn("bcrypt-hash");
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        AppUser saved = accountService.register(request);
+
+        assertThat(saved.isEmailVerified()).isFalse();
+    }
+
+    @Test
+    void register_replacesAnUnconfirmedSignUpForTheSameAddress() {
+        AppUser earlier = new AppUser("Someone Else", "angel@example.com", "old-hash");
+        earlier.setId(7L);
+        earlier.setEmailVerified(false);
+        when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(earlier));
+        when(passwordEncoder.encode("new-password")).thenReturn("new-hash");
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        RegistrationRequest request = new RegistrationRequest();
+        request.setDisplayName("Angel");
+        request.setEmail("angel@example.com");
+        request.setPassword("new-password");
+
+        AppUser saved = accountService.register(request);
+
+        // The same row is reused, so one address never has two accounts.
+        assertThat(saved).isSameAs(earlier);
+        assertThat(saved.getId()).isEqualTo(7L);
+        assertThat(saved.getDisplayName()).isEqualTo("Angel");
+        assertThat(saved.getPasswordHash()).isEqualTo("new-hash");
+        assertThat(saved.isEmailVerified()).isFalse();
+    }
+
+    @Test
+    void emailIsRegistered_onlyCountsVerifiedAccounts() {
+        when(userRepository.existsByEmailIgnoreCaseAndEmailVerifiedTrue("done@example.com")).thenReturn(true);
+        when(userRepository.existsByEmailIgnoreCaseAndEmailVerifiedTrue("pending@example.com")).thenReturn(false);
+
+        assertThat(accountService.emailIsRegistered("done@example.com")).isTrue();
+        assertThat(accountService.emailIsRegistered("pending@example.com")).isFalse();
     }
 
     @Test
@@ -117,7 +166,7 @@ class AccountServiceTest {
         accountService.deleteAccount("angel@example.com", "correct-password");
 
         InOrder deletionOrder = inOrder(expenseRepository, taxPaymentRepository, payoutDepositRepository,
-                standingEntryRepository, taxReminderLogRepository, reminderLogRepository, shiftRepository, pushSubscriptionRepository, persistentTokenRepository, passwordResetTokenRepository, userRepository);
+                standingEntryRepository, taxReminderLogRepository, reminderLogRepository, shiftRepository, pushSubscriptionRepository, persistentTokenRepository, passwordResetTokenRepository, emailCodeRepository, userRepository);
         deletionOrder.verify(expenseRepository).deleteAllByOwnerIdIncludingTrash(42L);
         deletionOrder.verify(taxPaymentRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(payoutDepositRepository).deleteAllByOwnerId(42L);
@@ -128,6 +177,7 @@ class AccountServiceTest {
         deletionOrder.verify(pushSubscriptionRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(persistentTokenRepository).removeUserTokens("angel@example.com");
         deletionOrder.verify(passwordResetTokenRepository).deleteAllByOwnerId(42L);
+        deletionOrder.verify(emailCodeRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(userRepository).deleteAccountById(42L);
     }
 

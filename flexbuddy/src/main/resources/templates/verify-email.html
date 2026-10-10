@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="description" content="Confirm your email to finish creating your FlexBuddy account.">
+    <title>Check your email | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <style>
+        html { background: #02080b; }
+        html[data-theme="light"] { background: #ffffff; }
+    </style>
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+</head>
+<body class="auth-page">
+<main class="auth-layout">
+    <section class="auth-card" aria-labelledby="verify-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+        </div>
+
+        <p class="eyebrow">ONE LAST STEP</p>
+        <h1 id="verify-title">Check your email</h1>
+        <p class="auth-copy">We sent a 6-digit code to <strong th:text="${maskedEmail}">a••••@gmail.com</strong>. It works for 15 minutes. Check your spam folder if it doesn't arrive.</p>
+
+        <p class="auth-copy" role="status" th:if="${param.resent}">We sent a new code.</p>
+        <div class="notice error-notice" role="alert" th:if="${error}" th:text="${error}"></div>
+
+        <form class="auth-form" th:action="@{/verify-email}" method="post">
+            <label class="field">
+                <span>Code</span>
+                <input class="code-input" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required autofocus>
+            </label>
+            <button class="primary-button auth-submit" type="submit">Verify email</button>
+        </form>
+
+        <form th:action="@{/verify-email/resend}" method="post">
+            <button class="text-button" type="submit">Send a new code</button>
+        </form>
+        <form th:action="@{/verify-email/cancel}" method="post">
+            <button class="text-button" type="submit">Use a different email</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

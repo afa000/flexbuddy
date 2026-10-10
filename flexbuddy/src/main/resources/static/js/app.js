@@ -2263,6 +2263,16 @@ const SHARE_INBOX = 'flexbuddy-share-inbox';
 const SHARED_UNAVAILABLE = 'The shared screenshot is no longer available. Choose it again.';
 
 /** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
+/** Right after the emailed code is accepted the address carries ?welcome; say so once and tidy the address. */
+function greetNewDriver() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('welcome')) return;
+    params.delete('welcome');
+    const query = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    showToast('Email confirmed', 'Welcome to FlexBuddy.');
+}
+
 async function importSharedScreenshot() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('shared');
@@ -2366,6 +2376,7 @@ document.addEventListener('flexbuddy:cache-ready', () => {
 updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
 openInitialScreen();
+greetNewDriver();
 importSharedScreenshot();
 urlSyncEnabled = true;
 loadStations();

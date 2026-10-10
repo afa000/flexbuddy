@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 /** How many failed sign-ins and sign-ups are allowed before the sign-in and sign-up forms lock. */
 @ConfigurationProperties("flexbuddy.security")
 public record SecurityLimitsProperties(@DefaultValue Login login, @DefaultValue Registration registration,
-        @DefaultValue Reset reset) {
+        @DefaultValue Reset reset, @DefaultValue Codes codes) {
 
     /** Failed sign-ins per email and per connection, and how long a lock lasts. */
     public record Login(
@@ -24,6 +24,15 @@ public record SecurityLimitsProperties(@DefaultValue Login login, @DefaultValue 
             @DefaultValue("10") int maxPerIp,
             @DefaultValue("1h") Duration window,
             @DefaultValue("30m") Duration linkValidFor) {
+    }
+
+    /** Emailed codes: how long one works, wrong tries allowed, and how many may be sent per address and connection. */
+    public record Codes(
+            @DefaultValue("15m") Duration validFor,
+            @DefaultValue("5") int maxAttempts,
+            @DefaultValue("5") int maxSendsPerEmail,
+            @DefaultValue("20") int maxSendsPerIp,
+            @DefaultValue("1h") Duration window) {
     }
 
     /** Sign-up attempts per connection within one window. */

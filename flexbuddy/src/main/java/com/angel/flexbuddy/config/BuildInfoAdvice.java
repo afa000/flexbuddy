@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ModelAttribute;
 
 import com.angel.flexbuddy.controller.AccountController;
+import com.angel.flexbuddy.controller.EmailVerificationController;
 import com.angel.flexbuddy.controller.PageController;
 import com.angel.flexbuddy.controller.PasswordResetController;
 
@@ -12,7 +13,8 @@ import com.angel.flexbuddy.controller.PasswordResetController;
  * Exposes the build id to templates so asset URLs carry the same version the service worker caches under.
  * Maven filters the id into application.properties; unfiltered runs (an IDE launch) fall back to "dev".
  */
-@ControllerAdvice(assignableTypes = {PageController.class, AccountController.class, PasswordResetController.class})
+@ControllerAdvice(assignableTypes = {PageController.class, AccountController.class, PasswordResetController.class,
+        EmailVerificationController.class})
 public class BuildInfoAdvice {
 
     private final String buildId;

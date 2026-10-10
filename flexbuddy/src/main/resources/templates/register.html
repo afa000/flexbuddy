@@ -56,6 +56,7 @@
                 <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
             </label>
             <p class="legal-consent">By creating an account, you agree to the <a href="/terms">Terms of Use</a> and acknowledge the <a href="/privacy">Privacy Policy</a>.</p>
+            <input id="appDisplayMode" name="app-display-mode" type="hidden" value="browser">
             <button class="primary-button auth-submit" type="submit">Create account</button>
         </form>
 
@@ -63,5 +64,12 @@
     </section>
 </main>
 <script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
+<script>
+    (() => {
+        const standalone = window.matchMedia('(display-mode: standalone)').matches
+            || window.navigator.standalone === true;
+        document.querySelector('#appDisplayMode').value = standalone ? 'standalone' : 'browser';
+    })();
+</script>
 </body>
 </html>

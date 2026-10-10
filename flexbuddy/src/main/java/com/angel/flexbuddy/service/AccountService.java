@@ -11,6 +11,7 @@ import com.angel.flexbuddy.dto.RegistrationRequest;
 import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.repository.EmailCodeRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
 import com.angel.flexbuddy.repository.PasswordResetTokenRepository;
 import com.angel.flexbuddy.repository.PushSubscriptionRepository;
@@ -33,6 +34,7 @@ public class AccountService {
     private final com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository;
     private final com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final EmailCodeRepository emailCodeRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
@@ -41,7 +43,7 @@ public class AccountService {
             com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
             com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository,
             com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository,
-            PasswordResetTokenRepository passwordResetTokenRepository) {
+            PasswordResetTokenRepository passwordResetTokenRepository, EmailCodeRepository emailCodeRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -54,20 +56,31 @@ public class AccountService {
         this.standingEntryRepository = standingEntryRepository;
         this.taxReminderLogRepository = taxReminderLogRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
+        this.emailCodeRepository = emailCodeRepository;
     }
 
+    /** True only for an address whose owner has entered the emailed code; an unconfirmed sign-up does not hold it. */
     public boolean emailIsRegistered(String email) {
-        return email != null && userRepository.existsByEmailIgnoreCase(email.trim());
+        return email != null && userRepository.existsByEmailIgnoreCaseAndEmailVerifiedTrue(email.trim());
     }
 
+    /**
+     * Creates the account, not yet verified. When the address only has an unconfirmed sign-up, that attempt is
+     * replaced instead, so nobody can keep someone else's address from them by registering it first.
+     */
     @Transactional
     public AppUser register(RegistrationRequest request) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
-        AppUser user = new AppUser(
-                request.getDisplayName().trim(),
-                email,
-                passwordEncoder.encode(request.getPassword())
-        );
+        String displayName = request.getDisplayName().trim();
+        String passwordHash = passwordEncoder.encode(request.getPassword());
+        AppUser existing = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (existing != null && !existing.isEmailVerified()) {
+            existing.setDisplayName(displayName);
+            existing.setPasswordHash(passwordHash);
+            return userRepository.save(existing);
+        }
+        AppUser user = new AppUser(displayName, email, passwordHash);
+        user.setEmailVerified(false);
         return userRepository.save(user);
     }
 
@@ -79,7 +92,12 @@ public class AccountService {
             throw new InvalidAccountPasswordException();
         }
 
-        Long ownerId = user.getId();
+        deleteAccountData(user.getId(), user.getEmail());
+    }
+
+    /** Removes everything an account owns, then the account, in the one order that satisfies every reference. */
+    @Transactional
+    void deleteAccountData(Long ownerId, String email) {
         expenseRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         taxPaymentRepository.deleteAllByOwnerId(ownerId);
         payoutDepositRepository.deleteAllByOwnerId(ownerId);
@@ -88,8 +106,9 @@ public class AccountService {
         reminderLogRepository.deleteAllByOwnerId(ownerId);
         shiftRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         pushSubscriptionRepository.deleteAllByOwnerId(ownerId);
-        persistentTokenRepository.removeUserTokens(user.getEmail());
+        persistentTokenRepository.removeUserTokens(email);
         passwordResetTokenRepository.deleteAllByOwnerId(ownerId);
+        emailCodeRepository.deleteAllByOwnerId(ownerId);
         userRepository.deleteAccountById(ownerId);
     }
 }

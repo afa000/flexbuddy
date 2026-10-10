@@ -27,6 +27,7 @@ import com.angel.flexbuddy.security.AttemptLimiter;
 import com.angel.flexbuddy.security.LockAwareFailureHandler;
 import com.angel.flexbuddy.security.LoginAttemptFilter;
 import com.angel.flexbuddy.security.SecurityLimitsProperties;
+import com.angel.flexbuddy.security.VerifiedLoginSuccessHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -87,9 +88,12 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             PersistentTokenBasedRememberMeServices rememberMeServices,
-            ObjectProvider<AttemptLimiter> limiterProvider) throws Exception {
+            ObjectProvider<AttemptLimiter> limiterProvider,
+            ObjectProvider<VerifiedLoginSuccessHandler> successHandlerProvider) throws Exception {
         // The limiter is always there in the running app; slice tests that do not load it simply sign in without limits.
         AttemptLimiter limiter = limiterProvider.getIfAvailable();
+        // Slice tests that do not load the handler send everyone home, as before.
+        VerifiedLoginSuccessHandler successHandler = successHandlerProvider.getIfAvailable();
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
@@ -97,6 +101,9 @@ public class SecurityConfig {
                                 "/register",
                                 "/forgot-password",
                                 "/reset-password",
+                                "/verify-email",
+                                "/verify-email/resend",
+                                "/verify-email/cancel",
                                 "/privacy",
                                 "/terms",
                                 "/delete-account",
@@ -115,9 +122,12 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .formLogin(form -> {
-                    form.loginPage("/login")
-                            .defaultSuccessUrl("/", true)
-                            .permitAll();
+                    form.loginPage("/login").permitAll();
+                    if (successHandler != null) {
+                        form.successHandler(successHandler);
+                    } else {
+                        form.defaultSuccessUrl("/", true);
+                    }
                     if (limiter != null) {
                         form.failureHandler(new LockAwareFailureHandler(limiter));
                     }

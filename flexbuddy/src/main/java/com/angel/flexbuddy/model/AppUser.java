@@ -56,6 +56,10 @@ public class AppUser {
 
     private Instant lastBackupAt;
 
+    /** False only for a new sign-up whose emailed code has not been entered yet. */
+    @Column(nullable = false)
+    private boolean emailVerified = true;
+
     /** When the driver dismissed Home's setup card; null while it should still show. Screen state, so it is not backed up. */
     private Instant setupDismissedAt;
 

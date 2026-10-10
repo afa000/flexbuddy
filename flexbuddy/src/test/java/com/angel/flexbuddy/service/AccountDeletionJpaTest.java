@@ -74,6 +74,9 @@ class AccountDeletionJpaTest {
     private com.angel.flexbuddy.repository.PasswordResetTokenRepository passwordResetTokenRepository;
 
     @Autowired
+    private com.angel.flexbuddy.repository.EmailCodeRepository emailCodeRepository;
+
+    @Autowired
     private JdbcTemplate jdbcTemplate;
 
     @Autowired
@@ -133,6 +136,13 @@ class AccountDeletionJpaTest {
         resetLink.setCreatedAt(NOW);
         resetLink.setExpiresAt(NOW.plusSeconds(1800));
         passwordResetTokenRepository.save(resetLink);
+        com.angel.flexbuddy.model.EmailCode code = new com.angel.flexbuddy.model.EmailCode();
+        code.setOwner(owner);
+        code.setPurpose(com.angel.flexbuddy.model.EmailCodePurpose.VERIFY_EMAIL);
+        code.setCodeHash("b".repeat(64));
+        code.setCreatedAt(NOW);
+        code.setExpiresAt(NOW.plusSeconds(900));
+        emailCodeRepository.save(code);
         entityManager.flush();
         when(passwordEncoder.matches("correct-password", "stored-hash")).thenReturn(true);
 
@@ -147,6 +157,7 @@ class AccountDeletionJpaTest {
         assertThat(rowCount("standing_entry")).isZero();
         assertThat(rowCount("tax_reminder_log")).isZero();
         assertThat(rowCount("password_reset_token")).isZero();
+        assertThat(rowCount("email_code")).isZero();
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
     }
 

@@ -33,6 +33,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
+import com.angel.flexbuddy.model.EmailCode;
 import com.angel.flexbuddy.model.PasswordResetToken;
 import com.angel.flexbuddy.model.PayoutDeposit;
 import com.angel.flexbuddy.model.PushSubscription;
@@ -68,6 +69,7 @@ class PostgresMigrationTest {
             assertBackfilledValues(schema);
             assertSetupBackfill(schema);
             assertMissingMilesPromptsStartOn(schema);
+            assertExistingAccountsAreVerified(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -166,6 +168,18 @@ class PostgresMigrationTest {
         }
     }
 
+    /** Accounts that existed before email confirmation are verified and never see the code page. */
+    private void assertExistingAccountsAreVerified(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery(
+                    "select count(*) as total, count(*) filter (where email_verified) as verified from app_users")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt("total")).isGreaterThan(0).isEqualTo(result.getInt("verified"));
+            }
+        }
+    }
+
     private void assertBackfilledValues(String schema) throws Exception {
         try (Connection connection = connection(); Statement statement = connection.createStatement()) {
             statement.execute("set search_path to " + schema);
@@ -213,7 +227,7 @@ class PostgresMigrationTest {
             Metadata metadata = new MetadataSources(registry)
                     .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class,
                             PayoutDeposit.class, StandingEntry.class, TaxPayment.class, TaxReminderLog.class,
-                            PasswordResetToken.class)
+                            PasswordResetToken.class, EmailCode.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }

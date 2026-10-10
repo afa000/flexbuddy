@@ -1134,6 +1134,7 @@ h1 {
     text-align: left;
 }
 
+.code-input { font-size: 24px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
 .password-field { position: relative; display: block; min-width: 0; }
 .password-field input { padding-right: 52px; }
 .password-toggle { position: absolute; top: 50%; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: var(--muted); background: none; border: 0; border-radius: 6px; transform: translateY(-50%); cursor: pointer; }

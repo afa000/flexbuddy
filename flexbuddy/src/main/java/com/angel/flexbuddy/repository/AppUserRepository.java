@@ -18,6 +18,12 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
     boolean existsByEmailIgnoreCase(String email);
 
+    /** An address is taken only once its owner has entered the emailed code. */
+    boolean existsByEmailIgnoreCaseAndEmailVerifiedTrue(String email);
+
+    /** Sign-ups whose code was never entered, for the daily clean-up. */
+    java.util.List<AppUser> findByEmailVerifiedFalseAndCreatedAtBefore(java.time.Instant cutoff);
+
     Optional<AppUser> findByCalendarToken(String calendarToken);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)

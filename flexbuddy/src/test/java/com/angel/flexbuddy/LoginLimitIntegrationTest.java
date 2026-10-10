@@ -219,7 +219,7 @@ class LoginLimitIntegrationTest {
     void registrationIsLimitedPerConnection() throws Exception {
         for (int i = 1; i <= 10; i++) {
             mockMvc.perform(register("driver" + i + "@example.com", "198.51.100.50"))
-                    .andExpect(redirectedUrl("/login?registered"));
+                    .andExpect(redirectedUrl("/verify-email"));
         }
 
         mockMvc.perform(register("driver11@example.com", "198.51.100.50"))
@@ -229,7 +229,7 @@ class LoginLimitIntegrationTest {
 
         // Another connection is not affected.
         mockMvc.perform(register("driver12@example.com", "198.51.100.51"))
-                .andExpect(redirectedUrl("/login?registered"));
+                .andExpect(redirectedUrl("/verify-email"));
     }
 
     private MockHttpServletRequestBuilder register(String email, String address) {

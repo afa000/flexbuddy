@@ -31,7 +31,9 @@ import com.angel.flexbuddy.dto.AccountBackupFile;
 import com.angel.flexbuddy.dto.RestorePreviewResponse;
 import com.angel.flexbuddy.dto.RestoreRequest;
 import com.angel.flexbuddy.dto.RestoreResult;
+import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.service.AccountService;
+import com.angel.flexbuddy.service.EmailVerificationService;
 import com.angel.flexbuddy.service.AccountBackupService;
 import com.angel.flexbuddy.service.AccountRestoreService;
 import com.angel.flexbuddy.service.AccountSettingsService;
@@ -62,11 +64,13 @@ public class AccountController {
     private final AccountSettingsService settingsService;
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
     private final AttemptLimiter attemptLimiter;
+    private final EmailVerificationService emailVerification;
 
     public AccountController(AccountService accountService, AccountBackupService backupService,
             AccountRestoreService restoreService, AppUserRepository userRepository, ObjectMapper objectMapper,
             Clock clock, AccountSettingsService settingsService,
-            PersistentTokenBasedRememberMeServices rememberMeServices, AttemptLimiter attemptLimiter) {
+            PersistentTokenBasedRememberMeServices rememberMeServices, AttemptLimiter attemptLimiter,
+            EmailVerificationService emailVerification) {
         this.accountService = accountService;
         this.backupService = backupService;
         this.restoreService = restoreService;
@@ -76,6 +80,7 @@ public class AccountController {
         this.settingsService = settingsService;
         this.rememberMeServices = rememberMeServices;
         this.attemptLimiter = attemptLimiter;
+        this.emailVerification = emailVerification;
     }
 
     @GetMapping("/login")
@@ -114,14 +119,24 @@ public class AccountController {
             return "register";
         }
 
+        AppUser created;
         try {
-            accountService.register(registration);
+            created = accountService.register(registration);
         } catch (DataIntegrityViolationException exception) {
             bindingResult.rejectValue("email", "email.registered", "An account already uses this email.");
             return "register";
         }
 
-        return "redirect:/login?registered";
+        // The driver is not signed in yet: the emailed code comes first, and the choice to stay signed in waits for it.
+        if (request.getSession(false) != null) {
+            request.changeSessionId();
+        }
+        HttpSession session = request.getSession(true);
+        session.setAttribute(EmailVerificationController.PENDING_USER, created.getId());
+        session.setAttribute(EmailVerificationController.PENDING_REMEMBER,
+                "standalone".equals(request.getParameter("app-display-mode")));
+        emailVerification.startVerification(created, address);
+        return "redirect:/verify-email";
     }
 
     /** The legal pages stay public, so a signed-in driver gets a way back into the app instead of a sign-in link. */
