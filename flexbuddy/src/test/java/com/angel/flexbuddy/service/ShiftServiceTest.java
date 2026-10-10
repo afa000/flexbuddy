@@ -473,26 +473,26 @@ class ShiftServiceTest {
     }
 
     @Test
-    void startShift_allowsExactlyFortyFiveMinutesBeforeTheBlock() {
+    void startShift_allowsExactlyFifteenMinutesBeforeTheBlock() {
         Shift scheduled = scheduled(7L);
         when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled));
         when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 14, 30));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 15, 0));
 
         ShiftResponse result = shiftService.startShift(OWNER_EMAIL, 7L);
 
-        assertThat(result.getDetails().actualStart()).isEqualTo(LocalTime.of(14, 30));
+        assertThat(result.getDetails().actualStart()).isEqualTo(LocalTime.of(15, 0));
         verify(shiftRepository).save(scheduled);
     }
 
     @Test
-    void startShift_opensFortyFiveMinutesBeforeTheBlockAndClosesAtItsEnd() {
+    void startShift_opensFifteenMinutesBeforeTheBlockAndClosesAtItsEnd() {
         when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(7L, OWNER_EMAIL)).thenReturn(Optional.of(scheduled(7L)));
 
-        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 14, 29));
+        when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 14, 59));
         assertThatThrownBy(() -> shiftService.startShift(OWNER_EMAIL, 7L))
                 .isInstanceOf(InvalidShiftException.class)
-                .hasMessage("A block can be started from 45 minutes before its scheduled start.");
+                .hasMessage("A block can be started from 15 minutes before its scheduled start.");
         when(userTime.now(OWNER_EMAIL)).thenReturn(LocalDateTime.of(2026, 9, 13, 19, 16));
         assertThatThrownBy(() -> shiftService.startShift(OWNER_EMAIL, 7L))
                 .isInstanceOf(InvalidShiftException.class)

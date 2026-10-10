@@ -42,7 +42,7 @@ public class ShiftService {
     private static final LocalDate EARLIEST_DATE = LocalDate.of(1, 1, 1);
     private static final LocalDate LATEST_DATE = LocalDate.of(9999, 12, 31);
     /** A block can be started this long before its scheduled start, for drivers who arrive early. */
-    static final int EARLIEST_START_MINUTES = 45;
+    static final int EARLIEST_START_MINUTES = 15;
 
     private final ShiftRepository shiftRepository;
     private final AppUserRepository userRepository;
