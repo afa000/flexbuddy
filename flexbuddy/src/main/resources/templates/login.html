@@ -66,10 +66,10 @@
             You have been signed out on every device.
         </div>
         <div class="notice error-notice auth-notice" th:if="${param.google}"
-             th:text="${param.google[0] == 'unverified' ? 'Your Google account\'s email isn\'t verified. Verify it with Google or sign up with email.'
+             th:text="${param.google[0] == 'unverified' ? 'Your Google account''s email isn''t verified. Verify it with Google or sign up with email.'
                      : param.google[0] == 'linked' ? 'That Google account is linked to a different FlexBuddy account.'
                      : param.google[0] == 'limit' ? 'Too many sign-ups from this connection. Try again in an hour.'
-                     : 'Google sign-in didn\'t finish. Try again.'}">
+                     : 'Google sign-in didn''t finish. Try again.'}">
         </div>
         <div class="notice success-notice" th:if="${param.deleted}">
             Your FlexBuddy account and its data have been deleted.

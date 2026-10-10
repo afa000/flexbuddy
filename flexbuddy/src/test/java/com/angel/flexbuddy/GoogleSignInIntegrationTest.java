@@ -119,6 +119,20 @@ class GoogleSignInIntegrationTest {
     }
 
     @Test
+    void eachGoogleFailureShowsItsOwnNoticeOnTheSignInPage() throws Exception {
+        String[][] notices = {
+                {"unverified", "email isn&#39;t verified."},
+                {"linked", "linked to a different FlexBuddy account."},
+                {"limit", "Too many sign-ups from this connection."},
+                {"failed", "Google sign-in didn&#39;t finish. Try again."}};
+        for (String[] notice : notices) {
+            mockMvc.perform(get("/login").param("google", notice[0]))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(Matchers.containsString(notice[1])));
+        }
+    }
+
+    @Test
     void startingGoogleSignInGoesToGoogleAndNotesKeepMeSignedIn() throws Exception {
         MockHttpSession session = new MockHttpSession();
 
