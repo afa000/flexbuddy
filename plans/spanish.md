@@ -50,9 +50,9 @@ more message files once testers ask.
   ("estimación"), and nothing reads as advice.
 
 **Out of scope:**
-- **Reading screenshots from the Flex app set to Spanish.** That needs
-  real Spanish screenshots to design the patterns. It's a follow-up,
-  `plan/spanish-screenshots`, once you send 3–5 samples (open question 3).
+- **Reading screenshots from the Flex app set to Spanish.** That's
+  `plan/spanish-screenshots`, which doesn't depend on the translation
+  plans and can ship earlier.
 - **The Play Store listing in Spanish:** a manual step in Play Console.
   A draft can go in `android/store-listing.md` later.
 - **Right-to-left languages.**
@@ -189,18 +189,34 @@ UTF-8, with the **same keys** in the same order and groups as
   the glossary and fix anything that reads as a literal translation.
   After release, Spanish-speaking testers report wording problems
   through Send feedback.
-- **Register:** use **tú** throughout ("Inicia sesión", "Tu código").
-  It's what Amazon's US Spanish apps and most consumer apps use.
+- **Register:** use **usted** throughout ("Inicie sesión", "Su código",
+  "Vuelva a intentarlo"). Drivers' screenshots of the Amazon Flex app in
+  Spanish show usted ("Su tablero", "Vuelva más tarde para revisar…"),
+  so FlexBuddy matches the app they already use.
 - **Placeholders:** keep `{0}` and `{1}` exactly. Apply the `''` rule
   from part 1 to values with arguments.
 - **Plurals:** `.one` and `.other`, the same as English.
 
-**Glossary.** Use these consistently, and check them against the Flex app
-in Spanish if you have it:
+**Glossary.** Use these consistently. Where the Amazon Flex app in
+Spanish has a natural term, FlexBuddy uses the same one; these were
+taken from screenshots of its menu, offers and schedule screens. Where
+Flex's Spanish is a machine-translation slip, don't copy it: it uses
+"Pagar" (to pay) for *Pay*, "Longitud" (length) for *Duration*, and
+"Tú eres fuera de línea".
 
 | English | Spanish |
 | --- | --- |
-| block | bloque (as in the Flex app) |
+| block | bloque |
+| offers | ofertas (as in Flex) |
+| start / end of a block | hora de inicio / hora de fin (Flex shows "Inicio" / "Terminar en") |
+| pay (of a block) | pago (not Flex's "Pagar") |
+| duration | duración (not Flex's "Longitud") |
+| stations | estaciones (as in Flex) |
+| earnings | ganancias (as in Flex) |
+| settings | configuración (as in Flex) |
+| updates | actualizaciones (as in Flex) |
+| help | ayuda (as in Flex) |
+| calendar | calendario (as in Flex) |
 | station | estación |
 | base pay | pago base |
 | tips | propinas |
@@ -212,7 +228,7 @@ in Spanish if you have it:
 | set aside | apartar |
 | estimate, not tax advice | estimación, no es asesoría fiscal |
 | backup / restore | copia de seguridad / restaurar |
-| Home / Reports / Schedule / Import / Expenses | Inicio / Informes / Horario / Importar / Gastos |
+| Home / Reports / Schedule / Import / Expenses | Inicio / Informes / Programación (as in Flex) / Importar / Gastos |
 | sign in / sign out / create account | iniciar sesión / cerrar sesión / crear cuenta |
 | two-step sign-in / recovery code | verificación en dos pasos / código de recuperación |
 
@@ -327,11 +343,11 @@ element, or a shorter Spanish word. Never fix it with smaller text below
 - **Native date and time pickers** follow the *phone's* language, not
   FlexBuddy's. That's an OS limitation. The value they produce is the
   same either way.
-- **Screenshot import** is still English-only. Until
-  `plan/spanish-screenshots` ships, a Spanish-language Flex screenshot
-  may read poorly, but the review form still lets drivers fix values.
-  Add one line under Import in Spanish only: "La lectura de capturas
-  funciona mejor con la app de Flex en inglés."
+- **Screenshot import** of Spanish Flex screenshots is handled by
+  `plan/spanish-screenshots`. If that plan hasn't shipped yet when this
+  one does, add one line under Import in Spanish only: "La lectura de
+  capturas funciona mejor con la app de Flex en inglés." Remove that
+  line when it ships.
 - **Money and tax:** every figure keeps "estimación" wording, and the
   tax pages' notes say "no es asesoría fiscal".
 - **Phone layout:** longer Spanish strings are the main risk. They're
@@ -402,7 +418,7 @@ Run `mvn test` and `node --test "src/test/js/*.test.js"`.
 3. Click through every screen and dialog in Spanish (the same list as
    `plan/i18n-scripts` step 1). Look for:
    - any English left over. The only expected exceptions are brand
-     names, standing tiers, the legal pages and the Import note;
+     names, standing tiers and the legal pages;
    - any raw key;
    - dates like `lun, 28 de sept`, and money like `$1,234.50`.
 4. Account → Language → English: the app reloads in English. Set it to
@@ -460,13 +476,11 @@ leaves a value untranslated.
 
 ## 9. Open questions
 
-1. ~~Who reviews the Spanish, and *tú* or *usted*?~~ **Decided:** *tú*
-   and "bloque". There's no separate reviewer; the implementer's
-   read-through plus tester feedback after release.
+1. ~~Who reviews the Spanish, and *tú* or *usted*?~~ **Decided:**
+   *usted*, matching the Flex app, and "bloque". There's no separate
+   reviewer: the implementer does a read-through, and testers send
+   feedback after release.
 2. ~~The legal pages?~~ **Decided:** they stay English, with the Spanish
    note.
-3. **Spanish screenshots:** you'll send 3–5 screenshots taken with the
-   Flex app in Spanish (completed and scheduled blocks, with the date,
-   times, station, pay and tips visible). `plan/spanish-screenshots` will
-   be planned from them. Until then, Import shows the Spanish note that
-   English Flex screenshots read best.
+3. ~~Spanish screenshots?~~ **Received:** planned in
+   `plan/spanish-screenshots`.
