@@ -1133,6 +1133,13 @@ h1 {
     text-align: left;
 }
 
+.password-field { position: relative; display: block; min-width: 0; }
+.password-field input { padding-right: 52px; }
+.password-toggle { position: absolute; top: 50%; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: var(--muted); background: none; border: 0; border-radius: 6px; transform: translateY(-50%); cursor: pointer; }
+.password-toggle:hover, .password-toggle:focus-visible { color: var(--text); }
+.password-toggle svg { width: 22px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+input[data-reveal]::-ms-reveal { display: none; }
+
 .input-with-prefix {
     position: relative;
 }

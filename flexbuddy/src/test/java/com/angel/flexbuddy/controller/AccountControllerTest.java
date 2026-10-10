@@ -93,6 +93,19 @@ class AccountControllerTest {
     }
 
     @Test
+    void everyPasswordBoxHasARevealButtonAndALoadedScript() throws Exception {
+        for (String page : new String[] {"/login", "/register"}) {
+            String html = mockMvc.perform(get(page)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            org.assertj.core.api.Assertions.assertThat(html.split("data-reveal", -1).length - 1).as(page).isEqualTo(1);
+            // An empty version would be cached forever by the service worker.
+            org.assertj.core.api.Assertions.assertThat(html).containsPattern("/js/password-toggle\\.js\\?v=[^\"]+\"");
+        }
+        String account = accountPage();
+        org.assertj.core.api.Assertions.assertThat(account).containsPattern("type=\"password\"[^>]*data-reveal");
+        org.assertj.core.api.Assertions.assertThat(account).containsPattern("/js/password-toggle\\.js\\?v=[^\"]+\"");
+    }
+
+    @Test
     void deleteAccountPageSendsVisitorsToSignInAndSignedInDriversToAccount() throws Exception {
         mockMvc.perform(get("/delete-account"))
                 .andExpect(status().isOk())

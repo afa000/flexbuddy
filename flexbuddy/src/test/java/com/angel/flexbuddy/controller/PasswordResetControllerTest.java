@@ -66,6 +66,18 @@ class PasswordResetControllerTest {
     }
 
     @Test
+    void bothNewPasswordBoxesCanBeRevealedAndTheScriptHasABuildId() throws Exception {
+        when(resetService.checkToken("good-token")).thenReturn(Optional.of(angel()));
+
+        String html = mockMvc.perform(get("/reset-password").param("token", "good-token"))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+
+        // This page used to get no build id, and the service worker would have cached an empty-version script forever.
+        org.assertj.core.api.Assertions.assertThat(html.split("data-reveal", -1).length - 1).isEqualTo(2);
+        org.assertj.core.api.Assertions.assertThat(html).containsPattern("/js/password-toggle\\.js\\?v=[^\"]+\"");
+    }
+
+    @Test
     void theConfirmationReplacesTheForm() throws Exception {
         mockMvc.perform(get("/forgot-password").param("sent", ""))
                 .andExpect(status().isOk())

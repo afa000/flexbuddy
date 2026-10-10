@@ -51,7 +51,7 @@
             </label>
             <label class="field">
                 <span>Password</span>
-                <input th:field="*{password}" type="password" autocomplete="new-password" minlength="8" maxlength="72" required>
+                <input th:field="*{password}" type="password" data-reveal autocomplete="new-password" minlength="8" maxlength="72" required>
                 <small class="field-hint">Use at least 8 characters.</small>
                 <small class="field-error" th:if="${#fields.hasErrors('password')}" th:errors="*{password}"></small>
             </label>
@@ -62,5 +62,6 @@
         <p class="auth-switch">Already have an account? <a href="/login">Sign in</a></p>
     </section>
 </main>
+<script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
 </body>
 </html>

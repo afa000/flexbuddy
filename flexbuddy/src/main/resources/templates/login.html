@@ -76,7 +76,7 @@
             </label>
             <label class="field">
                 <span>Password</span>
-                <input name="password" type="password" autocomplete="current-password" required>
+                <input name="password" type="password" data-reveal autocomplete="current-password" required>
             </label>
             <a class="text-link forgot-link" href="/forgot-password">Forgot password?</a>
             <label class="remember-me-row">
@@ -90,6 +90,7 @@
         <p class="auth-switch">New to FlexBuddy? <a href="/register">Create an account</a></p>
     </section>
 </main>
+<script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
 <script>
     (() => {
         const standalone = window.matchMedia('(display-mode: standalone)').matches
