@@ -7,6 +7,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class ShiftScreenshotParserTest {
 
@@ -34,6 +36,103 @@ class ShiftScreenshotParserTest {
         assertThat(result.basePay().value()).isEqualByComparingTo(new BigDecimal("124"));
         assertThat(result.tips().value()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(result.warnings()).isEmpty();
+    }
+
+
+    @Test
+    void parse_readsSpanishProgramacionCard() {
+        // Exactly what Tesseract's English model read from a Flex screenshot taken with the app in Spanish.
+        String rawText = """
+                = amazonFLex o
+                13 MARTES OCTUBRE
+                Inicio Pagar
+                16:45 $121.50
+                Terminar en
+                21:15
+                Ubicacion y otra informacion
+                North Haven CT (VEA7/BDL3) - Sub
+                Same-Day
+                409 Washington Avenue
+                ee
+                = EE
+                Actualizaciones Programaci6n
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.station().value()).isEqualTo("VEA7");
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 10, 13));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(21, 15));
+        assertThat(result.basePay().value()).isEqualByComparingTo(new BigDecimal("121.50"));
+        assertThat(result.tips().value()).isEqualByComparingTo(BigDecimal.ZERO);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "martes, 13 de octubre|2026-10-13",
+            "13 de oct.|2026-10-13",
+            "mar., 13 oct.|2026-10-13",
+            "5 MIERCOLES MARZO|2026-03-05",
+            "1 S4BADO NOVIEMBRE|2026-11-01",
+            "13 MARTES OCTUBRE|2026-10-13",
+            "3 de septiembre|2026-09-03",
+            "7 de Diciembre|2026-12-07"
+    })
+    void parse_readsSpanishDateForms(String text, LocalDate expected) {
+        ParsedShiftData result = parser.parse(text + "\nInicio\n9:00\nTerminar en\n10:00", 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @Test
+    void parse_readsSpanishNumericDateDayFirstAndEnglishMonthFirst() {
+        ParsedShiftData spanish = parser.parse("domingo, 6/9\nInicio\n9:00\nTerminar en\n10:00", 2026);
+        ParsedShiftData english = parser.parse("Sunday, 6/9\n15:15 - 19:15", 2026);
+
+        assertThat(spanish.date().value()).isEqualTo(LocalDate.of(2026, 9, 6));
+        assertThat(english.date().value()).isEqualTo(LocalDate.of(2026, 6, 9));
+    }
+
+    @Test
+    void parse_readsLabelledTwelveHourTimes() {
+        ParsedShiftData evening = parser.parse("Inicio\n4:45 p. m.\nTerminar en\n9:15 p. m.", 2026);
+        ParsedShiftData night = parser.parse("Inicio\n12:30 a. m.\nTerminar en\n4:00 a. m.", 2026);
+
+        assertThat(evening.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(evening.endTime().value()).isEqualTo(LocalTime.of(21, 15));
+        assertThat(night.startTime().value()).isEqualTo(LocalTime.of(0, 30));
+        assertThat(night.endTime().value()).isEqualTo(LocalTime.of(4, 0));
+    }
+
+    @Test
+    void parse_readsEnglishLabelledTimes() {
+        ParsedShiftData result = parser.parse("Start\n4:45 PM\nEnd\n9:15 PM", 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(21, 15));
+    }
+
+    @Test
+    void parse_readsPropinas() {
+        ParsedShiftData result = parser.parse("Propinas $12.50\n$80", 2026);
+
+        assertThat(result.tips().value()).isEqualByComparingTo(new BigDecimal("12.50"));
+    }
+
+    @Test
+    void parse_prefersARangeOverLabels() {
+        ParsedShiftData result = parser.parse("15:15 - 19:15\nInicio 16:45", 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(15, 15));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(19, 15));
+    }
+
+    @Test
+    void parse_doesNotReadMartesAsMarch() {
+        ParsedShiftData result = parser.parse("13 MARTES OCTUBRE", 2026);
+
+        assertThat(result.date().value().getMonthValue()).isEqualTo(10);
     }
 
     @Test
