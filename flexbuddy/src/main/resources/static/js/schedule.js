@@ -2,8 +2,8 @@
 // Loaded before app.js and uses its shared helpers (apiFetch, formatMoney, openEditModal, ...) at call time.
 (() => {
     const UPCOMING_DAYS = 14;
-    // Matches the server: a block can be started from 2 hours before its scheduled start.
-    const EARLIEST_START_MS = 2 * 60 * 60000;
+    // Matches the server: a block can be started from 45 minutes before its scheduled start.
+    const EARLIEST_START_MS = 45 * 60000;
     // The deadline turns amber this close to the forfeit cutoff.
     const DEADLINE_WARNING_MS = 15 * 60000;
     const PENCIL = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>';
@@ -404,7 +404,7 @@
     }
 
     /**
-     * The next block when the server would let it start now: scheduled, not started, from two hours before its start
+     * The next block when the server would let it start now: scheduled, not started, from 45 minutes before its start
      * until its scheduled end, by the schedule's own clock. Null when there is no such block or the schedule has not
      * loaded yet.
      */
