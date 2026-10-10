@@ -31,6 +31,8 @@
             <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{legal.privacy}">Privacy</small></div>
         </div>
 
+        <p class="notice language-note" lang="es" th:if="${#locale.language == 'es'}" th:text="#{legal.privacyOnlyInEnglish}">This page is available in English only.</p>
+
         <p class="eyebrow">PRIVACY POLICY</p>
         <h1 id="privacy-title">How FlexBuddy handles your data</h1>
         <p class="legal-meta">Effective October 11, 2026</p>
@@ -68,6 +70,7 @@
         <p>FlexBuddy does not sell your personal information, share it with advertisers, display ads, or use analytics services. Information is disclosed only when needed to operate the service, comply with law, or protect the service and its users.</p>
 
         <h2>Storage and security</h2>
+        <p>The functional fb_lang cookie remembers your language choice for one year. It is not used for tracking. Choosing Automatic in Account clears it so the app follows your device's language.</p>
         <p>FlexBuddy uses HTTPS in production, hashes passwords, and limits account data to the signed-in user. No internet service can guarantee absolute security, so download backups only to devices and locations you trust.</p>
         <p>Backup files you download are not stored by FlexBuddy. They remain on your device or wherever you choose to save them.</p>
 

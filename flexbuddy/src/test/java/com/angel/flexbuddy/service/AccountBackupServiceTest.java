@@ -63,6 +63,7 @@ class AccountBackupServiceTest {
         user.setMileageRate(new BigDecimal("0.655"));
         user.setRemindTax(true);
         user.setAskMissingMiles(false);
+        user.setLanguage("es");
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(user));
         when(shiftRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(active, deleted));
         when(expenseRepository.findAllIncludingDeleted("angel@example.com")).thenReturn(List.of(expense));
@@ -100,6 +101,7 @@ class AccountBackupServiceTest {
         assertThat(backup.settings().mileageRate()).isEqualTo("0.655");
         assertThat(backup.settings().remindTax()).isTrue();
         assertThat(backup.settings().askMissingMiles()).isFalse();
+        assertThat(backup.settings().language()).isEqualTo("es");
         assertThat(backup.version()).isEqualTo(4);
         assertThat(backup.standing()).containsExactly(
                 new com.angel.flexbuddy.dto.BackupStanding(LocalDate.of(2026, 9, 10), "FAIR", "After late forfeit"));

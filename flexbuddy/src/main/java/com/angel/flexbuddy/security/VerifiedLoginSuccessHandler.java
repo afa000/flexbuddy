@@ -8,9 +8,11 @@ import org.springframework.security.web.authentication.AuthenticationSuccessHand
 import org.springframework.security.web.authentication.logout.SecurityContextLogoutHandler;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.LocaleResolver;
 
 import com.angel.flexbuddy.controller.EmailVerificationController;
 import com.angel.flexbuddy.controller.TwoFactorController;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.model.TwoFactorMethod;
@@ -38,22 +40,28 @@ public class VerifiedLoginSuccessHandler implements AuthenticationSuccessHandler
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
     private final SignInCompleter signInCompleter;
     private final Clock clock;
+    private final LocaleResolver localeResolver;
 
     public VerifiedLoginSuccessHandler(AppUserRepository userRepository, EmailVerificationService verification,
             TwoFactorService twoFactor, PersistentTokenBasedRememberMeServices rememberMeServices,
-            SignInCompleter signInCompleter, Clock clock) {
+            SignInCompleter signInCompleter, Clock clock, LocaleResolver localeResolver) {
         this.userRepository = userRepository;
         this.verification = verification;
         this.twoFactor = twoFactor;
         this.rememberMeServices = rememberMeServices;
         this.signInCompleter = signInCompleter;
         this.clock = clock;
+        this.localeResolver = localeResolver;
     }
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) throws IOException, ServletException {
         AppUser user = userRepository.findByEmailIgnoreCase(authentication.getName()).orElse(null);
+        // A language the driver chose follows them to a new device, so the pages after sign-in are already in it.
+        if (user != null && UserLocales.isSupported(user.getLanguage())) {
+            localeResolver.setLocale(request, response, UserLocales.of(user));
+        }
         // Form sign-in says it in the remember-me field; Google's callback has none, so its choice was noted in the session.
         HttpSession noted = request.getSession(false);
         boolean googleRemember = noted != null && noted.getAttribute(GoogleRememberChoice.GOOGLE_REMEMBER) != null;

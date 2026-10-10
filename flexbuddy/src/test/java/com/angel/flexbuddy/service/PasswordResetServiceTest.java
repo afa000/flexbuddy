@@ -90,7 +90,7 @@ class PasswordResetServiceTest {
         when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(angel));
         service.requestReset("  Angel@Example.com ", "203.0.113.9");
         ArgumentCaptor<String> link = ArgumentCaptor.forClass(String.class);
-        verify(mailer).sendResetLink(eq("angel@example.com"), eq("Angel"), link.capture());
+        verify(mailer).sendResetLink(eq("angel@example.com"), eq("Angel"), link.capture(), eq(java.util.Locale.ENGLISH));
         verify(tokenRepository).save(saved.capture());
         assertThat(link.getValue()).startsWith(LINK_PREFIX);
         return link.getValue().substring(LINK_PREFIX.length());
@@ -238,4 +238,14 @@ class PasswordResetServiceTest {
         when(tokenRepository.findByTokenHash(sha256(token))).thenReturn(Optional.of(link));
         return link;
     }
+
+    @Test
+    void resetPassesTheAccountsLanguageToTheMailer() {
+        angel.setLanguage("es");
+        when(userRepository.findByEmailIgnoreCase("angel@example.com")).thenReturn(Optional.of(angel));
+        service.requestReset("angel@example.com", "203.0.113.9");
+        verify(mailer).sendResetLink(eq("angel@example.com"), eq("Angel"), any(String.class),
+                eq(java.util.Locale.forLanguageTag("es")));
+    }
+
 }

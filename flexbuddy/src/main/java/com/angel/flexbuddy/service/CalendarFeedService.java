@@ -7,6 +7,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.angel.flexbuddy.dto.ShiftFilter;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 import com.angel.flexbuddy.i18n.Messages;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
@@ -73,17 +75,18 @@ public class CalendarFeedService {
     private IcsWriter.Event event(Shift shift, AppUser owner, String appUrl) {
         ShiftStatus status = shift.getStatus();
         String station = shift.getStation();
+        Locale locale = UserLocales.of(owner);
         String summary = switch (status) {
-            case SCHEDULED -> Messages.english("calendar.summary.scheduled", station, money(shift.getBasePay()));
-            case COMPLETED -> Messages.english("calendar.summary.completed", station, money(shift.getEarnedPay()));
-            case CANCELLED -> Messages.english("calendar.summary.cancelled", station);
-            case FORFEITED -> Messages.english("calendar.summary.forfeited", station);
+            case SCHEDULED -> Messages.in(locale, "calendar.summary.scheduled", station, money(shift.getBasePay()));
+            case COMPLETED -> Messages.in(locale, "calendar.summary.completed", station, money(shift.getEarnedPay()));
+            case CANCELLED -> Messages.in(locale, "calendar.summary.cancelled", station);
+            case FORFEITED -> Messages.in(locale, "calendar.summary.forfeited", station);
         };
         String description = switch (status) {
-            case SCHEDULED -> Messages.english("calendar.description.scheduled", money(shift.getBasePay()));
-            case COMPLETED -> Messages.english("calendar.description.completed", money(shift.getEarnedPay()));
-            case CANCELLED -> Messages.english("calendar.description.cancelled");
-            case FORFEITED -> Messages.english("calendar.description.forfeited");
+            case SCHEDULED -> Messages.in(locale, "calendar.description.scheduled", money(shift.getBasePay()));
+            case COMPLETED -> Messages.in(locale, "calendar.description.completed", money(shift.getEarnedPay()));
+            case CANCELLED -> Messages.in(locale, "calendar.description.cancelled");
+            case FORFEITED -> Messages.in(locale, "calendar.description.forfeited");
         };
         Integer alarm = status != ShiftStatus.SCHEDULED ? null
                 : owner.getRemindBeforeMinutes() == null ? DEFAULT_ALARM_MINUTES : owner.getRemindBeforeMinutes();

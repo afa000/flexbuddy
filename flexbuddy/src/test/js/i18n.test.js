@@ -26,6 +26,8 @@ test('tn picks the singular for one and the plural for everything else', () => {
 test('appLocale follows the page language with the US region', () => {
     const spanish = loadScript('i18n.js', {document: {documentElement: {lang: 'es', dataset: {}}, getElementById: () => null}});
     assert.strictEqual(spanish.appLocale(), 'es-US');
+    assert.strictEqual(new Intl.NumberFormat(spanish.appLocale(), {style: 'currency', currency: 'USD'})
+        .format(1234.5), '$1,234.50');
     const british = loadScript('i18n.js', {document: {documentElement: {lang: 'en-GB', dataset: {}}, getElementById: () => null}});
     assert.strictEqual(british.appLocale(), 'en-US');
     assert.strictEqual(loadScript('i18n.js').appLocale(), 'en-US');

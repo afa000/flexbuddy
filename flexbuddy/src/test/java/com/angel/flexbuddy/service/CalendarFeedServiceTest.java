@@ -114,4 +114,15 @@ class CalendarFeedServiceTest {
         shift.setStatus(status);
         return shift;
     }
+
+    @Test
+    void spanishAccountGetsSpanishCalendarEvents() {
+        owner.setLanguage("es");
+        when(userRepository.findByCalendarToken(TOKEN)).thenReturn(Optional.of(owner));
+        when(shiftService.findFiltered(eq(EMAIL), any(ShiftFilter.class)))
+                .thenReturn(List.of(shift(7L, ShiftStatus.SCHEDULED, "84.00")));
+        assertThat(service.feed(TOKEN, APP_URL).orElseThrow())
+                .contains("SUMMARY:Bloque de Flex", "Bloque programado. Pago ofrecido: $84.00");
+    }
+
 }

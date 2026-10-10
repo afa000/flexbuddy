@@ -255,6 +255,9 @@ public class AccountRestoreService {
                         owner.setTaxSetAsidePercent(decimalOrNull(file.settings().taxSetAsidePercent()));
                         if (file.settings().remindTax() != null) owner.setRemindTax(file.settings().remindTax());
                         if (file.settings().askMissingMiles() != null) owner.setAskMissingMiles(file.settings().askMissingMiles());
+                        if (com.angel.flexbuddy.i18n.UserLocales.isSupported(file.settings().language())) {
+                            owner.setLanguage(file.settings().language());
+                        }
                     }
                 }
                 userRepository.save(owner);

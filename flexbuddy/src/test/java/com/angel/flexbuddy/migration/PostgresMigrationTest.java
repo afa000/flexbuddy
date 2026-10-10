@@ -73,6 +73,7 @@ class PostgresMigrationTest {
             assertExistingAccountsAreVerified(schema);
             assertTwoStepStartsOff(schema);
             assertGoogleStartsUnlinked(schema);
+            assertLanguageStartsAutomatic(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -320,4 +321,13 @@ class PostgresMigrationTest {
             }
         }
     }
+
+    private void assertLanguageStartsAutomatic(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement();
+                ResultSet result = statement.executeQuery("select language from " + schema + ".app_users")) {
+            assertThat(result.next()).isTrue();
+            assertThat(result.getString("language")).isNull();
+        }
+    }
+
 }

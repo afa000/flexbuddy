@@ -3,6 +3,7 @@ package com.angel.flexbuddy.controller;
 import java.security.Principal;
 import java.time.Clock;
 import java.time.LocalDate;
+import java.util.Locale;
 
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Controller;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.support.RequestContextUtils;
 
 import com.angel.flexbuddy.dto.AccountDeletionRequest;
 import com.angel.flexbuddy.dto.RegistrationRequest;
@@ -43,6 +46,7 @@ import com.angel.flexbuddy.service.AccountRestoreService;
 import com.angel.flexbuddy.service.AccountSettingsService;
 import com.angel.flexbuddy.dto.AccountSettingsRequest;
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
+import com.angel.flexbuddy.dto.LanguageRequest;
 import com.angel.flexbuddy.dto.ReminderSettingsRequest;
 import com.angel.flexbuddy.dto.TimeZoneRequest;
 import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
@@ -132,7 +136,7 @@ public class AccountController {
 
         AppUser created;
         try {
-            created = accountService.register(registration);
+            created = accountService.register(registration, RequestContextUtils.getLocale(request));
         } catch (DataIntegrityViolationException exception) {
             bindingResult.rejectValue("email", "validation.email.registered");
             return "register";
@@ -300,6 +304,22 @@ public class AccountController {
         return settingsService.updateGoals(principal.getName(), request);
     }
 
+    /**
+     * Saves the driver's language and, so the next page is already in it, remembers it in the browser too. Null means
+     * automatic: the account keeps no choice and the cookie goes, so the device's own preference applies again.
+     */
+    @PutMapping("/account/language")
+    @ResponseBody
+    public AccountSettingsResponse updateLanguage(Principal principal, @Valid @RequestBody LanguageRequest request,
+            HttpServletRequest http, HttpServletResponse response) {
+        AccountSettingsResponse settings = settingsService.updateLanguage(principal.getName(), request.language());
+        LocaleResolver resolver = RequestContextUtils.getLocaleResolver(http);
+        if (resolver != null) {
+            resolver.setLocale(http, response, request.language() == null ? null : Locale.forLanguageTag(request.language()));
+        }
+        return settings;
+    }
+
     @PutMapping("/account/time-zone")
     @ResponseBody
     public AccountSettingsResponse updateTimeZone(Principal principal, @Valid @RequestBody TimeZoneRequest request) {
@@ -339,8 +359,15 @@ public class AccountController {
 
     @PostMapping("/account/restore")
     public ResponseEntity<RestoreResult> restore(Principal principal, @Valid @RequestBody RestoreRequest request,
-            HttpSession session) {
-        return ResponseEntity.ok(restoreService.restore(principal.getName(), request, session));
+            HttpSession session, HttpServletRequest http, HttpServletResponse response) {
+        RestoreResult result = restoreService.restore(principal.getName(), request, session);
+        userRepository.findByEmailIgnoreCase(principal.getName()).ifPresent(user -> {
+            LocaleResolver resolver = RequestContextUtils.getLocaleResolver(http);
+            if (resolver != null) {
+                resolver.setLocale(http, response, user.getLanguage() == null ? null : Locale.forLanguageTag(user.getLanguage()));
+            }
+        });
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping("/account/restore/{batchId}/undo")

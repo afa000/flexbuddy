@@ -1,5 +1,7 @@
 package com.angel.flexbuddy.mail;
 
+import java.util.Locale;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
@@ -26,13 +28,18 @@ public class SmtpEmailCodeMailer implements EmailCodeMailer {
     }
 
     @Override
-    @Async("mailExecutor")
     public void sendCode(String toEmail, String displayName, String code, EmailCodePurpose purpose) {
+        sendCode(toEmail, displayName, code, purpose, Locale.ENGLISH);
+    }
+
+    @Override
+    @Async("mailExecutor")
+    public void sendCode(String toEmail, String displayName, String code, EmailCodePurpose purpose, Locale locale) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
-        message.setSubject(Messages.english("email.code.subject", code));
-        message.setText(Messages.english("email.code.body", displayName, code));
+        message.setSubject(Messages.in(locale, "email.code.subject", code));
+        message.setText(Messages.in(locale, "email.code.body", displayName, code));
         try {
             sender.send(message);
         } catch (RuntimeException exception) {

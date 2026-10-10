@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.PushMessage;
 import com.angel.flexbuddy.i18n.Messages;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.ReminderKind;
 import com.angel.flexbuddy.model.ReminderLog;
@@ -35,8 +36,6 @@ public class ReminderJob {
     static final Duration CONFIRM_UNTIL = Duration.ofHours(24);
     static final Duration MILES_AFTER = Duration.ofMinutes(20);
     private static final String SCHEDULE_URL = "/?screen=schedule";
-    private static final DateTimeFormatter START_TIME = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH);
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE MMM d", Locale.ENGLISH);
     private static final DateTimeFormatter CLOCK_TIME = DateTimeFormatter.ofPattern("HH:mm");
 
     private final ShiftRepository shiftRepository;
@@ -64,11 +63,12 @@ public class ReminderJob {
         int sent = 0;
         for (Shift shift : shiftRepository.findScheduledWithLeadTime(today.minusDays(1), today.plusDays(2))) {
             AppUser owner = shift.getOwner();
+            Locale locale = UserLocales.of(owner);
             Instant start = shift.getStartDateTime().atZone(userTime.zone(owner)).toInstant();
             Instant remindAt = start.minus(Duration.ofMinutes(owner.getRemindBeforeMinutes()));
             if (!isDue(remindAt, now) || !claim(shift, ReminderKind.BEFORE_START, now)) continue;
-            pushService.send(owner, new PushMessage(Messages.english("push.upcoming.title", shift.getStation()),
-                    Messages.english("push.upcoming.body", START_TIME.format(shift.getStartTime()),
+            pushService.send(owner, new PushMessage(Messages.in(locale, "push.upcoming.title", shift.getStation()),
+                    Messages.in(locale, "push.upcoming.body", Messages.timeFormat(locale).format(shift.getStartTime()),
                             money(shift.getBasePay())),
                     SCHEDULE_URL, "shift-" + shift.getId() + "-start"));
             sent++;
@@ -85,11 +85,12 @@ public class ReminderJob {
         int sent = 0;
         for (Shift shift : shiftRepository.findScheduledWithConfirmNudges(today.minusDays(2), today.plusDays(1))) {
             AppUser owner = shift.getOwner();
+            Locale locale = UserLocales.of(owner);
             Instant end = shift.getEndDateTime().atZone(userTime.zone(owner)).toInstant();
             boolean endedInWindow = !end.isAfter(now.minus(CONFIRM_AFTER)) && end.isAfter(now.minus(CONFIRM_UNTIL));
             if (!endedInWindow || !claim(shift, ReminderKind.CONFIRM, now)) continue;
-            pushService.send(owner, new PushMessage(Messages.english("push.confirm.title"),
-                    Messages.english("push.confirm.body", shift.getStation(), DAY.format(shift.getDate()),
+            pushService.send(owner, new PushMessage(Messages.in(locale, "push.confirm.title"),
+                    Messages.in(locale, "push.confirm.body", shift.getStation(), Messages.dayFormat(locale).format(shift.getDate()),
                             CLOCK_TIME.format(shift.getStartTime()), CLOCK_TIME.format(shift.getEndTime())),
                     SCHEDULE_URL, "shift-" + shift.getId() + "-confirm"));
             sent++;
@@ -108,10 +109,11 @@ public class ReminderJob {
         int sent = 0;
         for (Shift shift : shiftRepository.findMissingMilesWithNudges(today.minusDays(2), today.plusDays(1))) {
             AppUser owner = shift.getOwner();
+            Locale locale = UserLocales.of(owner);
             Instant end = shift.getEndDateTime().atZone(userTime.zone(owner)).toInstant();
             if (!isDue(end.plus(MILES_AFTER), now) || !claim(shift, ReminderKind.MILES, now)) continue;
-            pushService.send(owner, new PushMessage(Messages.english("push.miles.title", shift.getStation()),
-                    Messages.english("push.miles.body"), "/?finish=" + shift.getId(),
+            pushService.send(owner, new PushMessage(Messages.in(locale, "push.miles.title", shift.getStation()),
+                    Messages.in(locale, "push.miles.body"), "/?finish=" + shift.getId(),
                     "shift-" + shift.getId() + "-miles"));
             sent++;
         }

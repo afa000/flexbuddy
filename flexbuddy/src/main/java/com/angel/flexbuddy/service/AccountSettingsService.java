@@ -103,6 +103,14 @@ public class AccountSettingsService {
         return response(userRepository.save(user));
     }
 
+    /** Saves the driver's language ("en" or "es"); null follows the device. */
+    @Transactional
+    public AccountSettingsResponse updateLanguage(String email, String language) {
+        AppUser user = user(email);
+        user.setLanguage(language);
+        return response(userRepository.save(user));
+    }
+
     /** Issues a new feed token, which immediately invalidates any calendar subscribed to the old link. */
     @Transactional
     public AccountSettingsResponse regenerateCalendarToken(String email) {
@@ -132,7 +140,7 @@ public class AccountSettingsService {
                 java.util.List.copyOf(PayPeriodCalculator.parseDays(user.getPayoutDays())), user.getPayoutLagDays(),
                 user.getTaxSetAsidePercent(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics",
-                user.isRemindTax(), user.isAskMissingMiles());
+                user.isRemindTax(), user.isAskMissingMiles(), user.getLanguage());
     }
 
     private AppUser user(String email) {

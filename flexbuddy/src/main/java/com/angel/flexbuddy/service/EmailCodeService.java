@@ -19,6 +19,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.mail.EmailCodeMailer;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.EmailCode;
@@ -80,7 +81,7 @@ public class EmailCodeService {
         stored.setExpiresAt(now.plus(limits.validFor()));
         codeRepository.save(stored);
 
-        mailer.sendCode(user.getEmail(), user.getDisplayName(), code, purpose);
+        mailer.sendCode(user.getEmail(), user.getDisplayName(), code, purpose, UserLocales.of(user));
         return SendResult.SENT;
     }
 

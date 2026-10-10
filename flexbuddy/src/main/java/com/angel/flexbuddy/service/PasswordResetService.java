@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.exception.InvalidResetTokenException;
 import com.angel.flexbuddy.mail.PasswordResetMailer;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.PasswordResetToken;
 import com.angel.flexbuddy.repository.AppUserRepository;
@@ -96,7 +97,8 @@ public class PasswordResetService {
         stored.setExpiresAt(now.plus(linkValidFor));
         tokenRepository.save(stored);
 
-        mailer.sendResetLink(user.getEmail(), user.getDisplayName(), publicUrl + "/reset-password?token=" + token);
+        mailer.sendResetLink(user.getEmail(), user.getDisplayName(), publicUrl + "/reset-password?token=" + token,
+                UserLocales.of(user));
     }
 
     /** The account a link belongs to, but only while the link is unused and unexpired. */

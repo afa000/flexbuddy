@@ -148,4 +148,18 @@ class ReminderJobTest {
         verify(pushService, times(1)).send(owner, new PushMessage("How many miles for your VEA7 block?",
                 "Log them now while you remember.", "/?finish=7", "shift-7-miles"));
     }
+
+    @Test
+    void sendsSpanishReminderForSpanishAccount() {
+        owner.setLanguage("es");
+        when(pushService.isConfigured()).thenReturn(true);
+        when(shiftRepository.findScheduledWithLeadTime(LocalDate.of(2026, 9, 11), LocalDate.of(2026, 9, 14)))
+                .thenReturn(List.of(shift));
+        assertThat(job("2026-09-12T19:20:00Z").sendShiftReminders()).isEqualTo(1);
+        ArgumentCaptor<PushMessage> message = ArgumentCaptor.forClass(PushMessage.class);
+        verify(pushService).send(eq(owner), message.capture());
+        assertThat(message.getValue().title()).isEqualTo("Próximo bloque · VEA7");
+        assertThat(message.getValue().body()).contains("Comienza a las", "$84.00");
+    }
+
 }

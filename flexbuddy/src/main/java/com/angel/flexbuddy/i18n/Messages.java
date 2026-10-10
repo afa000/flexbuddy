@@ -1,6 +1,9 @@
 package com.angel.flexbuddy.i18n;
 
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.ResourceBundleMessageSource;
@@ -16,7 +19,20 @@ public final class Messages {
 
     private static final ResourceBundleMessageSource SOURCE = source();
 
+    private static final Map<Locale, DateTimeFormatter> DAYS = new ConcurrentHashMap<>();
+    private static final Map<Locale, DateTimeFormatter> TIMES = new ConcurrentHashMap<>();
+
     private Messages() {
+    }
+
+    /** A weekday, month and day such as "Mon Sep 28", written the way the language writes it. */
+    public static DateTimeFormatter dayFormat(Locale locale) {
+        return DAYS.computeIfAbsent(locale, l -> DateTimeFormatter.ofPattern(Messages.in(l, "format.day"), l));
+    }
+
+    /** A clock time such as "9:00 AM", written the way the language writes it. */
+    public static DateTimeFormatter timeFormat(Locale locale) {
+        return TIMES.computeIfAbsent(locale, l -> DateTimeFormatter.ofPattern(Messages.in(l, "format.time"), l));
     }
 
     private static ResourceBundleMessageSource source() {

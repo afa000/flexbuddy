@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 
@@ -92,6 +93,7 @@ public class GoogleAccountService extends OidcUserService {
                 user.setPasswordSet(false);
                 user.setEmailVerified(true);
                 user.setGoogleSubject(subject);
+                user.setLanguage(UserLocales.accountLanguage(requestedLanguage()));
             }
             userRepository.save(user);
         }
@@ -136,6 +138,12 @@ public class GoogleAccountService extends OidcUserService {
 
     private static OAuth2AuthenticationException error(String code) {
         return new OAuth2AuthenticationException(new OAuth2Error(code));
+    }
+
+    /** The language the sign-up page was in, read from the request because Google's callback runs before the servlet. */
+    private static Locale requestedLanguage() {
+        return RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes
+                ? UserLocales.requested(attributes.getRequest()) : UserLocales.ENGLISH;
     }
 
     private static String currentAddress() {

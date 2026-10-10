@@ -103,6 +103,12 @@ restoreButton.addEventListener('click', async () => {
         showToast(t('js.account.restoreComplete'), t('js.account.restoreCompleteMessage', result.inserted, result.expensesInserted || 0, result.skipped + (result.expensesSkipped || 0)),
             result.batchId ? {duration: 10000, onAction: () => undoRestore(result.batchId)} : {});
         restorePreview.classList.add('is-hidden');
+        const previousLanguage = latestSettings?.language;
+        await loadSettings();
+        if (latestSettings?.language !== previousLanguage) {
+            await window.flexbuddyPwa?.clearUserData?.({preserveOutbox: true});
+            window.location.reload();
+        }
     } catch (error) {
         showError(error.message || t('js.account.backupNotRestored'));
     } finally {
@@ -206,8 +212,32 @@ async function loadSettings() {
 
 let latestSettings = null;
 
+document.querySelector('#languageSelect').addEventListener('change', async event => {
+    const select = event.currentTarget;
+    const error = document.querySelector('#languageError');
+    error.classList.add('is-hidden');
+    select.disabled = true;
+    try {
+        const response = await apiFetch('/account/language', {
+            method: 'PUT',
+            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            body: JSON.stringify({language: select.value || null})
+        });
+        if (!response.ok) throw new Error(t('js.account.languageFailed'));
+        await window.flexbuddyPwa?.clearUserData?.({preserveOutbox: true});
+        window.location.reload();
+    } catch {
+        select.value = latestSettings?.language ?? '';
+        error.textContent = t('js.account.languageFailed');
+        error.classList.remove('is-hidden');
+    } finally {
+        select.disabled = window.flexbuddyPwa?.isOffline() ?? !navigator.onLine;
+    }
+});
+
 function renderSettings(settings) {
     latestSettings = settings;
+    document.querySelector('#languageSelect').value = settings.language ?? '';
     document.querySelector('#vehicleCostMethod').value = settings.vehicleCostMethod;
     document.querySelector('#accountMileageRate').value = settings.mileageRate;
     document.querySelector('#mileageRateHelp').textContent = t('js.account.mileageRateHelp', Number(settings.defaultMileageRate).toFixed(3), settings.mileageRateYear);

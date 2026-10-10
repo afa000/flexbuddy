@@ -1,5 +1,7 @@
 package com.angel.flexbuddy.mail;
 
+import java.util.Locale;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
@@ -26,13 +28,18 @@ public class SmtpPasswordResetMailer implements PasswordResetMailer {
     }
 
     @Override
-    @Async("mailExecutor")
     public void sendResetLink(String toEmail, String displayName, String link) {
+        sendResetLink(toEmail, displayName, link, Locale.ENGLISH);
+    }
+
+    @Override
+    @Async("mailExecutor")
+    public void sendResetLink(String toEmail, String displayName, String link, Locale locale) {
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom(from);
         message.setTo(toEmail);
-        message.setSubject(Messages.english("email.reset.subject"));
-        message.setText(Messages.english("email.reset.body", displayName, link));
+        message.setSubject(Messages.in(locale, "email.reset.subject"));
+        message.setText(Messages.in(locale, "email.reset.body", displayName, link));
         try {
             sender.send(message);
         } catch (RuntimeException exception) {

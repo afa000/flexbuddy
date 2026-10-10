@@ -282,6 +282,18 @@
                     <svg class="settings-section-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
                 </summary>
                 <div class="settings-section-body">
+                    <article class="panel data-card">
+                        <h3 th:text="#{account.language.title}">Language</h3>
+                        <label class="field"><span th:text="#{account.language.label}">App language</span>
+                            <select id="languageSelect" data-online-only>
+                                <option value="" th:text="#{account.language.auto}">Automatic (device)</option>
+                                <option value="en">English</option>
+                                <option value="es">Español</option>
+                            </select>
+                        </label>
+                        <p class="field-error is-hidden" id="languageError" role="alert"></p>
+                    </article>
+
                         <form id="accountSignOutForm" th:action="@{/logout}" method="post">
                             <button class="secondary-button" type="submit" th:text="#{accountSection.signOut}">Sign out</button>
                         </form>

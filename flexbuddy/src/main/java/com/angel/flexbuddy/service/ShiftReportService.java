@@ -18,6 +18,9 @@ import java.util.Map;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
+import org.springframework.context.i18n.LocaleContextHolder;
+import com.angel.flexbuddy.i18n.Messages;
+import com.angel.flexbuddy.i18n.UserLocales;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
@@ -36,7 +39,6 @@ import com.angel.flexbuddy.model.ShiftStatus;
 @Service
 public class ShiftReportService {
     private static final DateTimeFormatter MONTH_LABEL = DateTimeFormatter.ofPattern("MMM uuuu", Locale.ENGLISH);
-    private static final DateTimeFormatter WEEK_LABEL = DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH);
     private final ShiftService shiftService;
     private final ExpenseService expenseService;
     private final AccountSettingsService settingsService;
@@ -62,7 +64,11 @@ public class ShiftReportService {
 
     /** Start-time bands for the heatmap: before 8, 8 to 11, 11 to 2, 2 to 5, and 5 onward, by the block's start hour. */
     static final int[] HEATMAP_BAND_STARTS = {0, 8, 11, 14, 17};
-    static final List<String> HEATMAP_BANDS = List.of("Before 8 am", "8–11 am", "11 am–2 pm", "2–5 pm", "After 5 pm");
+    private static List<String> heatmapBands() {
+        return List.of(Messages.current("report.band.before8"), Messages.current("report.band.8to11"),
+                Messages.current("report.band.11to2"), Messages.current("report.band.2to5"),
+                Messages.current("report.band.after5"));
+    }
     static final int HEATMAP_MIN_SHIFTS = 2;
 
     /**
@@ -104,7 +110,7 @@ public class ShiftReportService {
                 .max(Comparator.comparing(com.angel.flexbuddy.dto.HeatmapCell::value)
                         .thenComparingInt(com.angel.flexbuddy.dto.HeatmapCell::shifts))
                 .orElse(null);
-        return new com.angel.flexbuddy.dto.HeatmapResponse(metric, HEATMAP_BANDS, cells, best, scale(values), shifts.size());
+        return new com.angel.flexbuddy.dto.HeatmapResponse(metric, heatmapBands(), cells, best, scale(values), shifts.size());
     }
 
     private static int band(int hour) {
@@ -364,19 +370,21 @@ public class ShiftReportService {
 
     private GroupKey groupKey(LocalDate date, String station, GroupBy groupBy) {
         if (groupBy == GroupBy.STATION) {
-            String value = station == null || station.isBlank() ? "Unlinked expenses" : station.trim();
-            return new GroupKey(value.toLowerCase(Locale.ROOT), value, null, null);
+            boolean unlinked = station == null || station.isBlank();
+            String value = unlinked ? Messages.current("report.unlinkedExpenses") : station.trim();
+            return new GroupKey(unlinked ? "unlinked expenses" : value.toLowerCase(Locale.ROOT), value, null, null);
         }
-        if (date == null) return new GroupKey("unknown", "Unknown date", null, null);
+        if (date == null) return new GroupKey("unknown", Messages.current("report.unknownDate"), null, null);
         return switch (groupBy) {
             case WEEK -> {
                 LocalDate start = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
                 yield new GroupKey(String.format("%d-W%02d", date.get(IsoFields.WEEK_BASED_YEAR),
-                        date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)), "Week of " + WEEK_LABEL.format(start), start, start.plusDays(6));
+                        date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)), Messages.current("report.weekOf", DateTimeFormatter.ofPattern(
+                                Messages.current("format.reportDay"), UserLocales.clamp(LocaleContextHolder.getLocale())).format(start)), start, start.plusDays(6));
             }
             case MONTH -> {
                 YearMonth month = YearMonth.from(date);
-                yield new GroupKey(month.toString(), MONTH_LABEL.format(month), month.atDay(1), month.atEndOfMonth());
+                yield new GroupKey(month.toString(), MONTH_LABEL.withLocale(UserLocales.clamp(LocaleContextHolder.getLocale())).format(month), month.atDay(1), month.atEndOfMonth());
             }
             case YEAR -> new GroupKey(String.valueOf(date.getYear()), String.valueOf(date.getYear()),
                     LocalDate.of(date.getYear(), 1, 1), LocalDate.of(date.getYear(), 12, 31));

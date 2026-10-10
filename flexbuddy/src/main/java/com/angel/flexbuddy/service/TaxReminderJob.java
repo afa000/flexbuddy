@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.angel.flexbuddy.dto.PushMessage;
 import com.angel.flexbuddy.dto.TaxQuarterResponse;
 import com.angel.flexbuddy.i18n.Messages;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.TaxReminderKind;
 import com.angel.flexbuddy.model.TaxReminderLog;
@@ -33,7 +34,6 @@ public class TaxReminderJob {
 
     static final int SEND_HOUR = 9;
     private static final String TAXES_URL = "/account#taxes";
-    private static final DateTimeFormatter DAY = DateTimeFormatter.ofPattern("EEE MMM d", Locale.ENGLISH);
 
     private final AppUserRepository userRepository;
     private final TaxReminderLogRepository logRepository;
@@ -78,13 +78,14 @@ public class TaxReminderJob {
     }
 
     private PushMessage message(AppUser owner, int taxYear, int quarter, LocalDate due, TaxReminderKind kind) {
+        Locale locale = UserLocales.of(owner);
         String title = kind == TaxReminderKind.WEEK_BEFORE
-                ? Messages.english("push.tax.weekBefore.title", DAY.format(due))
-                : Messages.english("push.tax.dueToday.title", String.valueOf(quarter));
+                ? Messages.in(locale, "push.tax.weekBefore.title", Messages.dayFormat(locale).format(due))
+                : Messages.in(locale, "push.tax.dueToday.title", String.valueOf(quarter));
         TaxQuarterResponse period = taxService.summary(owner.getEmail(), taxYear).quarters().get(quarter - 1);
         String body = period.setAside() == null
-                ? Messages.english("push.tax.noEstimate.body", String.valueOf(quarter))
-                : Messages.english("push.tax.estimate.body", String.valueOf(quarter), money(period.setAside()),
+                ? Messages.in(locale, "push.tax.noEstimate.body", String.valueOf(quarter))
+                : Messages.in(locale, "push.tax.estimate.body", String.valueOf(quarter), money(period.setAside()),
                         money(period.paid()));
         String tag = "tax-" + taxYear + "-q" + quarter + (kind == TaxReminderKind.WEEK_BEFORE ? "-week" : "-due");
         return new PushMessage(title, body, TAXES_URL, tag);

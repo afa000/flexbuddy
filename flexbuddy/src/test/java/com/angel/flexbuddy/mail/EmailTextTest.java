@@ -74,4 +74,27 @@ class EmailTextTest {
 
         assertThat(sentBy(sender).getText()).startsWith("Hi O'Neil {0},\n");
     }
+
+    @Test
+    void spanishResetEmailPreservesNameAndLink() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        new SmtpPasswordResetMailer(sender, "from@example.com")
+                .sendResetLink("spanish@example.test", "José", "https://flexbuddy.test/r",
+                        java.util.Locale.forLanguageTag("es"));
+        SimpleMailMessage message = sentBy(sender);
+        assertThat(message.getSubject()).isEqualTo("Restablezca su contraseña de FlexBuddy");
+        assertThat(message.getText()).startsWith("Hola José,").contains("https://flexbuddy.test/r", "30 minutos");
+    }
+
+    @Test
+    void spanishCodeEmailIncludesCodeAsText() {
+        JavaMailSender sender = mock(JavaMailSender.class);
+        new SmtpEmailCodeMailer(sender, "from@example.com")
+                .sendCode("spanish@example.test", "José", "493817", EmailCodePurpose.VERIFY_EMAIL,
+                        java.util.Locale.forLanguageTag("es"));
+        SimpleMailMessage message = sentBy(sender);
+        assertThat(message.getSubject()).isEqualTo("Su código de FlexBuddy: 493817");
+        assertThat(message.getText()).contains("493817", "15 minutos");
+    }
+
 }

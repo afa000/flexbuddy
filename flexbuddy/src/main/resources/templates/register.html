@@ -67,6 +67,11 @@
         </a>
 
         <p class="auth-switch" th:utext="#{register.alreadyHaveAnAccountSign.html}">Already have an account? <a href="/login">Sign in</a></p>
+        <p class="language-switch">
+            <a th:href="@{/register(lang='en')}" th:classappend="${#locale.language == 'en'} ? 'is-current'" th:aria-current="${#locale.language == 'en'} ? 'true'" lang="en" hreflang="en">English</a>
+            <span aria-hidden="true">·</span>
+            <a th:href="@{/register(lang='es')}" th:classappend="${#locale.language == 'es'} ? 'is-current'" th:aria-current="${#locale.language == 'es'} ? 'true'" lang="es" hreflang="es">Español</a>
+        </p>
     </section>
 </main>
 <script id="flexbuddyMessages" type="application/json" th:utext="${scriptMessages}">{}</script>

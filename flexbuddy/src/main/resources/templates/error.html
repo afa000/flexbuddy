@@ -42,6 +42,11 @@
                th:href="|mailto:flexbuddysupport@gmail.com?subject=${#uris.escapeQueryParam(#messages.msg('errorPage.reportSubject'))}&body=${#uris.escapeQueryParam(#messages.msg('errorPage.reportBody', '' + (status ?: 'unknown')))}|"
                href="mailto:flexbuddysupport@gmail.com" th:text="#{errorPage.contactSupport}">Contact support</a>
         </div>
+        <p class="language-switch">
+            <a th:href="@{/login(lang='en')}" th:classappend="${#locale.language == 'en'} ? 'is-current'" th:aria-current="${#locale.language == 'en'} ? 'true'" lang="en" hreflang="en">English</a>
+            <span aria-hidden="true">·</span>
+            <a th:href="@{/login(lang='es')}" th:classappend="${#locale.language == 'es'} ? 'is-current'" th:aria-current="${#locale.language == 'es'} ? 'true'" lang="es" hreflang="es">Español</a>
+        </p>
     </article>
 </main>
 </body>

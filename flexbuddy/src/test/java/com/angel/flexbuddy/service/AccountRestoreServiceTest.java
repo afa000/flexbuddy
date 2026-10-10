@@ -465,4 +465,21 @@ class AccountRestoreServiceTest {
         return new Shift(9L, station, LocalDate.of(2026, 9, 6), LocalTime.of(9, 0), LocalTime.of(13, 0),
                 new BigDecimal("100.00"), BigDecimal.ZERO, owner);
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.NullSource
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"es", "xx"})
+    void languageRestoresWhenSupportedAndOtherwiseKeepsTheCurrentValue(String language) throws Exception {
+        owner.setLanguage("en");
+        BackupSettings settings = new BackupSettings("STANDARD_MILEAGE", null, null, null, false, false,
+                45, null, null, null, null, null, null, false, true, language);
+        AccountBackupFile file = new AccountBackupFile("flexbuddy-backup", 4, NOW, "1.0",
+                backup.account(), List.of(), List.of(), settings, new BackupCounts(0, 0));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(file);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+        assertThat(owner.getLanguage()).isEqualTo("es".equals(language) ? "es" : "en");
+    }
+
 }

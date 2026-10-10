@@ -160,7 +160,7 @@
                 <button class="primary-button compact-button" type="submit">${escapeHtml(t('js.common.save'))}</button>
                 ${period.received == null && Number(period.earned) > 0
                     ? `<button class="secondary-button compact-button" type="button" data-action="exact">${escapeHtml(t('js.payouts.itWas', formatMoney(period.earned)))}</button>` : ''}
-                ${editing === period.payoutDate ? '<button class="text-button" type="button" data-action="cancel">${escapeHtml(t('js.common.cancel'))}</button>' : ''}
+                ${editing === period.payoutDate ? `<button class="text-button" type="button" data-action="cancel">${escapeHtml(t('js.common.cancel'))}</button>` : ''}
             </div>`;
         const amount = form.querySelector('input[type="number"]');
         const note = form.querySelector('input[type="text"]');

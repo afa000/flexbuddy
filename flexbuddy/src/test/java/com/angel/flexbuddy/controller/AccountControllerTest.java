@@ -175,7 +175,7 @@ class AccountControllerTest {
     void register_createsAccountAndSendsTheDriverToTheCodePage() throws Exception {
         AppUser created = new AppUser("Angel", "angel@example.com", "hash");
         created.setId(9L);
-        when(accountService.register(any(RegistrationRequest.class))).thenReturn(created);
+        when(accountService.register(any(RegistrationRequest.class), any(java.util.Locale.class))).thenReturn(created);
         mockMvc.perform(post("/register")
                         .with(csrf())
                         .param("displayName", "Angel")
@@ -184,7 +184,7 @@ class AccountControllerTest {
                 .andExpect(status().is3xxRedirection())
                 .andExpect(redirectedUrl("/verify-email"));
 
-        verify(accountService).register(any(RegistrationRequest.class));
+        verify(accountService).register(any(RegistrationRequest.class), any(java.util.Locale.class));
         verify(emailVerification).startVerification(org.mockito.ArgumentMatchers.same(created), org.mockito.ArgumentMatchers.anyString());
     }
 
@@ -236,7 +236,7 @@ class AccountControllerTest {
                 .andExpect(content().string(org.hamcrest.Matchers.containsString(
                         "Too many sign-ups from this connection. Try again in an hour.")));
 
-        verify(accountService, never()).register(any(RegistrationRequest.class));
+        verify(accountService, never()).register(any(RegistrationRequest.class), any(java.util.Locale.class));
         verify(attemptLimiter, never()).record(eq("register-ip"), any());
     }
 
@@ -266,13 +266,13 @@ class AccountControllerTest {
                 .andExpect(view().name("register"))
                 .andExpect(model().attributeHasFieldErrors("registration", "email"));
 
-        verify(accountService, never()).register(any(RegistrationRequest.class));
+        verify(accountService, never()).register(any(RegistrationRequest.class), any(java.util.Locale.class));
     }
 
     @Test
     void register_rejectsAnEmailThatWasTakenBetweenTheCheckAndTheInsert() throws Exception {
         org.mockito.Mockito.doThrow(new org.springframework.dao.DataIntegrityViolationException("duplicate key"))
-                .when(accountService).register(any(RegistrationRequest.class));
+                .when(accountService).register(any(RegistrationRequest.class), any(java.util.Locale.class));
 
         mockMvc.perform(post("/register")
                         .with(csrf())

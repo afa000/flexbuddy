@@ -31,6 +31,8 @@
             <div><strong th:text="#{app.name}">FlexBuddy</strong><small th:text="#{legal.terms}">Terms</small></div>
         </div>
 
+        <p class="notice language-note" lang="es" th:if="${#locale.language == 'es'}" th:text="#{legal.termsOnlyInEnglish}">This page is available in English only.</p>
+
         <p class="eyebrow">TERMS OF USE</p>
         <h1 id="terms-title">Using FlexBuddy</h1>
         <p class="legal-meta">Effective September 13, 2026</p>

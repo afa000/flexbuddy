@@ -113,6 +113,10 @@ public class AppUser {
     @Column(nullable = false)
     private boolean remindTax;
 
+    /** "en" or "es"; null means follow the device's language. */
+    @Column(length = 10)
+    private String language;
+
     @Column(nullable = false)
     private int forfeitCutoffMinutes = DEFAULT_FORFEIT_CUTOFF_MINUTES;
 

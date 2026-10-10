@@ -9,6 +9,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,7 +25,6 @@ import com.angel.flexbuddy.repository.ShiftRepository;
 public class ScheduledShiftMatcher {
 
     static final long MINIMUM_OVERLAP_MINUTES = 30;
-    private static final DateTimeFormatter DAY_LABEL = DateTimeFormatter.ofPattern("EEE MMM d", Locale.ENGLISH);
 
     private final ShiftRepository shiftRepository;
 
@@ -44,7 +44,7 @@ public class ScheduledShiftMatcher {
                 .filter(shift -> overlapMinutes(candidateStart, candidateEnd,
                         shift.getStartDateTime(), shift.getEndDateTime()) >= MINIMUM_OVERLAP_MINUTES)
                 .map(shift -> new DuplicateMatch(shift.getId(), DuplicateKind.SCHEDULED_MATCH,
-                        Messages.current("import.scheduledMatch", shift.getStation(), DAY_LABEL.format(shift.getDate()))))
+                        Messages.current("import.scheduledMatch", shift.getStation(), Messages.dayFormat(LocaleContextHolder.getLocale()).format(shift.getDate()))))
                 .toList();
     }
 

@@ -548,4 +548,26 @@ class ShiftReportServiceTest {
         assertThat(heatmap.scale()).isEmpty();
         assertThat(heatmap.bands()).hasSize(5);
     }
+
+    @Test
+    void spanishReportsTranslateLabelsWithoutChangingBucketKeys() {
+        org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.forLanguageTag("es"));
+        try {
+            when(shiftService.findFiltered(EMAIL, ALL))
+                    .thenReturn(List.of(shift("VEA7", LocalDate.of(2026, 9, 7), "120.00", "0", 240)));
+            var weeks = reportService.earnings(EMAIL, ALL, GroupBy.WEEK);
+            assertThat(weeks.buckets()).singleElement().satisfies(bucket -> {
+                assertThat(bucket.key()).isEqualTo("2026-W37");
+                assertThat(bucket.label()).isEqualTo("Semana del 7 de sept");
+            });
+            assertThat(reportService.earnings(EMAIL, ALL, GroupBy.MONTH).buckets().getFirst().label())
+                    .isEqualTo("sept 2026");
+            assertThat(reportService.heatmap(EMAIL, ALL, com.angel.flexbuddy.dto.HeatmapMetric.NET_HOURLY).bands())
+                    .containsExactly("Antes de las 8 a. m.", "8–11 a. m.", "11 a. m.–2 p. m.",
+                            "2–5 p. m.", "Después de las 5 p. m.");
+        } finally {
+            org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
+    }
+
 }

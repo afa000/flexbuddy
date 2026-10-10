@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.angel.flexbuddy.dto.RegistrationRequest;
 import com.angel.flexbuddy.exception.InvalidAccountPasswordException;
+import com.angel.flexbuddy.i18n.UserLocales;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.EmailCodeRepository;
@@ -74,6 +75,12 @@ public class AccountService {
      */
     @Transactional
     public AppUser register(RegistrationRequest request) {
+        return register(request, Locale.ENGLISH);
+    }
+
+    /** As {@link #register(RegistrationRequest)}, remembering Spanish when the sign-up page was in Spanish. */
+    @Transactional
+    public AppUser register(RegistrationRequest request, Locale language) {
         String email = request.getEmail().trim().toLowerCase(Locale.ROOT);
         String displayName = request.getDisplayName().trim();
         String passwordHash = passwordEncoder.encode(request.getPassword());
@@ -81,10 +88,12 @@ public class AccountService {
         if (existing != null && !existing.isEmailVerified()) {
             existing.setDisplayName(displayName);
             existing.setPasswordHash(passwordHash);
+            existing.setLanguage(UserLocales.accountLanguage(language));
             return userRepository.save(existing);
         }
         AppUser user = new AppUser(displayName, email, passwordHash);
         user.setEmailVerified(false);
+        user.setLanguage(UserLocales.accountLanguage(language));
         return userRepository.save(user);
     }
 

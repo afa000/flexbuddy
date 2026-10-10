@@ -129,15 +129,15 @@
         setOnline();
     });
 
-    async function clearUserData() {
+    async function clearUserData({preserveOutbox = false} = {}) {
         if ('caches' in window) {
             const keys = await caches.keys();
             await Promise.all(keys.filter(key => USER_CACHE_PREFIXES.some(prefix => key.startsWith(prefix)))
                 .map(key => caches.delete(key)));
         }
         navigator.serviceWorker?.controller?.postMessage({type: 'clear-data'});
-        // Unsent changes belong to this driver too, so every path that wipes cached data wipes the queue with it.
-        await window.flexbuddyOutbox?.clear();
+        // Language changes invalidate translated pages but must keep unsent edits.
+        if (!preserveOutbox) await window.flexbuddyOutbox?.clear();
     }
 
     function promptUpdate(worker) {

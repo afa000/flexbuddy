@@ -190,4 +190,17 @@ class AccountServiceTest {
         user.setId(id);
         return user;
     }
+
+    @Test
+    void spanishSignUpStoresTheLanguageForMailAndLaterDevices() {
+        RegistrationRequest request = new RegistrationRequest();
+        request.setDisplayName("Prueba");
+        request.setEmail("spanish@example.test");
+        request.setPassword("local-test-password");
+        when(passwordEncoder.encode("local-test-password")).thenReturn("hash");
+        when(userRepository.save(any(AppUser.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(accountService.register(request, java.util.Locale.forLanguageTag("es-MX")).getLanguage())
+                .isEqualTo("es");
+    }
+
 }
