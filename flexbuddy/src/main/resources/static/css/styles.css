@@ -1134,6 +1134,18 @@ h1 {
     text-align: left;
 }
 
+.qr-box { width: 216px; padding: 8px; background: #fff; border-radius: 8px; }
+.qr-box svg { display: block; width: 200px; height: 200px; }
+.setup-key { font-family: ui-monospace, monospace; font-size: 16px; letter-spacing: .08em; overflow-wrap: anywhere; }
+.recovery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; font-family: ui-monospace, monospace; font-size: 16px; }
+@media (max-width: 380px) { .recovery-grid { grid-template-columns: minmax(0, 1fr); } }
+.two-factor-page .panel { margin-bottom: 16px; }
+.two-factor-page .data-card form { margin-top: 12px; }
+.two-factor-page .setup-steps { margin: 0 0 14px; padding-left: 20px; display: grid; gap: 6px; }
+.two-factor-page .primary-button, .two-factor-page .secondary-button, .two-factor-page .danger-button, .two-factor-page .text-button { min-height: 44px; }
+.two-factor-page a.primary-button, .two-factor-page a.secondary-button { text-decoration: none; }
+.recovery-hint { margin-top: 12px; }
+.recovery-hint summary { min-height: 44px; display: flex; align-items: center; color: var(--cyan); font-weight: 700; cursor: pointer; }
 .code-input { font-size: 24px; letter-spacing: .35em; text-align: center; font-variant-numeric: tabular-nums; }
 .password-field { position: relative; display: block; min-width: 0; }
 .password-field input { padding-right: 52px; }

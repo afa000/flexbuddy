@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="description" content="Add a second step to signing in to FlexBuddy.">
+    <meta name="_csrf" th:content="${_csrf.token}">
+    <meta name="_csrf_header" th:content="${_csrf.headerName}">
+    <title>Two-step sign-in | FlexBuddy</title>
+    <script>document.documentElement.dataset.theme = localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';</script>
+    <style>
+        html { background: #02080b; }
+        html[data-theme="light"] { background: #ffffff; }
+    </style>
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+</head>
+<body>
+<div class="app-shell">
+    <header class="topbar">
+        <a class="round-header-button" href="/account" aria-label="Back to Account">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+        </a>
+        <a class="brand" href="/" aria-label="FlexBuddy home"><strong>FlexBuddy</strong></a>
+        <div class="header-actions">
+            <button class="round-header-button theme-toggle" id="themeToggleButton" type="button" aria-label="Switch theme">
+                <svg class="moon-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.2A8.4 8.4 0 0 1 8.8 4 8.5 8.5 0 1 0 20 15.2Z"/></svg>
+                <svg class="sun-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            </button>
+        </div>
+    </header>
+
+    <main class="account-main two-factor-page">
+        <header class="account-heading">
+            <h1>Two-step sign-in</h1>
+            <p>A second code, from your phone or your email, keeps your earnings private even if your password leaks.</p>
+        </header>
+
+        <div class="settings-sections">
+        <div class="notice error-notice" role="alert" th:if="${error}" th:text="${error}"></div>
+        <p class="notice success-notice" role="status" th:if="${param.off}">Two-step sign-in is off.</p>
+        <p class="notice success-notice" role="status" th:if="${param.sent}">We sent you a code.</p>
+
+        <!-- Recovery codes: shown once, right after turning a method on or making new codes. -->
+        <article class="panel data-card" th:if="${recoveryCodes != null}">
+            <h2>Save your recovery codes</h2>
+            <p class="field-hint">Save these now. Each works once if you lose your phone or can't get email. They won't be shown again.</p>
+            <div class="recovery-grid" id="recoveryCodes">
+                <span th:each="code : ${recoveryCodes}" data-recovery-code th:text="${code}">ABCDE-FGHJK</span>
+            </div>
+            <div class="legal-card-actions">
+                <button class="secondary-button" id="copyRecoveryCodes" type="button">Copy all</button>
+                <a class="secondary-button" id="downloadRecoveryCodes" href="#" download="flexbuddy-recovery-codes.txt">Download</a>
+                <a class="primary-button" href="/account">Done</a>
+            </div>
+        </article>
+
+        <th:block th:if="${recoveryCodes == null}">
+            <!-- Off, nothing started: choose a method. -->
+            <th:block th:if="${method == 'OFF' and setup == null and emailPending == null}">
+                <article class="panel data-card">
+                    <h2>Authenticator app <small>(recommended)</small></h2>
+                    <p>Works even if someone gets into your email. Use Google Authenticator, Microsoft Authenticator, 1Password, iCloud Passwords or any similar app.</p>
+                    <form th:action="@{/account/two-factor/app}" method="post">
+                        <button class="primary-button" type="submit">Set up</button>
+                    </form>
+                </article>
+                <article class="panel data-card">
+                    <h2>Email code</h2>
+                    <p>A code is emailed to <strong th:text="${maskedEmail}">a••••@gmail.com</strong> each time you sign in on a new device.</p>
+                    <form th:action="@{/account/two-factor/email}" method="post">
+                        <button class="secondary-button" type="submit">Use email codes</button>
+                    </form>
+                </article>
+            </th:block>
+
+            <!-- Authenticator setup. -->
+            <article class="panel data-card" th:if="${setup != null}">
+                <h2>Set up your authenticator app</h2>
+                <ol class="setup-steps">
+                    <li>Install an authenticator app if you don't have one.</li>
+                    <li>Scan this code with the app. On this phone, tap <a class="text-link" th:href="${setup.otpauthUri}">Open in authenticator app</a>, or type the setup key.</li>
+                    <li>Enter the 6-digit code the app shows.</li>
+                </ol>
+                <div class="qr-box" th:utext="${setup.qrSvg}"></div>
+                <p>Setup key: <code class="setup-key" id="setupKey" th:text="${setup.groupedSecret()}">ABCD EFGH</code></p>
+                <button class="text-button" type="button" id="copySetupKey" data-copy-from="setupKey">Copy key</button>
+                <form class="auth-form" th:action="@{/account/two-factor/app/confirm}" method="post">
+                    <label class="field">
+                        <span>6-digit code</span>
+                        <input class="code-input" name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="7" required autofocus>
+                    </label>
+                    <button class="primary-button" type="submit">Turn on</button>
+                </form>
+            </article>
+
+            <!-- Email setup: waiting for the code. -->
+            <article class="panel data-card" th:if="${emailPending != null}">
+                <h2>Confirm your email</h2>
+                <p>We sent a 6-digit code to <strong th:text="${maskedEmail}">a••••@gmail.com</strong>. Enter it to turn on email codes.</p>
+                <form class="auth-form" th:action="@{/account/two-factor/email/confirm}" method="post">
+                    <label class="field">
+                        <span>6-digit code</span>
+                        <input class="code-input" name="code" autocomplete="one-time-code" inputmode="numeric" maxlength="7" required autofocus>
+                    </label>
+                    <button class="primary-button" type="submit">Turn on</button>
+                </form>
+            </article>
+
+            <!-- On. -->
+            <th:block th:if="${method != 'OFF'}">
+                <article class="panel data-card">
+                    <h2>Two-step sign-in is on</h2>
+                    <p th:text="${method == 'APP' ? 'Your authenticator app makes the code.' : 'A code is emailed to you at each sign-in.'}">App.</p>
+                    <p><strong th:text="${recoveryLeft}">10</strong> recovery codes left.</p>
+                    <form th:if="${method == 'EMAIL'}" th:action="@{/account/two-factor/send-code}" method="post">
+                        <p class="field-hint">Making new recovery codes or turning this off needs a code. We'll email one.</p>
+                        <button class="secondary-button" type="submit">Email me a code</button>
+                    </form>
+                </article>
+                <article class="panel data-card">
+                    <h2>Make new recovery codes</h2>
+                    <p class="field-hint">This cancels the old ones.</p>
+                    <form class="auth-form" th:action="@{/account/two-factor/recovery-codes}" method="post">
+                        <label class="field">
+                            <span>Current code</span>
+                            <input name="code" autocomplete="one-time-code" inputmode="text" maxlength="11" required>
+                        </label>
+                        <button class="secondary-button" type="submit">Make new codes</button>
+                    </form>
+                </article>
+                <article class="panel data-card">
+                    <h2>Turn off</h2>
+                    <form class="auth-form" th:action="@{/account/two-factor/disable}" method="post">
+                        <label class="field">
+                            <span>Password</span>
+                            <input name="password" type="password" data-reveal autocomplete="current-password" maxlength="72" required>
+                        </label>
+                        <label class="field">
+                            <span>Current code</span>
+                            <input name="code" autocomplete="one-time-code" inputmode="text" maxlength="11" required>
+                        </label>
+                        <button class="danger-button" type="submit">Turn off two-step sign-in</button>
+                    </form>
+                </article>
+            </th:block>
+        </th:block>
+        </div>
+    </main>
+</div>
+<script th:src="@{/js/errors.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/toast.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/pwa.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/two-factor.js(v=${buildId})}" defer></script>
+</body>
+</html>

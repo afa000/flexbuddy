@@ -1,6 +1,7 @@
 package com.angel.flexbuddy.model;
 
-/** Why a code was emailed. Two-factor sign-in adds its own purpose later. */
+/** Why a code was emailed: to confirm a new address, or as the second step of signing in. */
 public enum EmailCodePurpose {
-    VERIFY_EMAIL
+    VERIFY_EMAIL,
+    SIGN_IN
 }

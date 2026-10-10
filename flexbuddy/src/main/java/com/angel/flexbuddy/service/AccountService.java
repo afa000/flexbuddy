@@ -15,6 +15,7 @@ import com.angel.flexbuddy.repository.EmailCodeRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
 import com.angel.flexbuddy.repository.PasswordResetTokenRepository;
 import com.angel.flexbuddy.repository.PushSubscriptionRepository;
+import com.angel.flexbuddy.repository.RecoveryCodeRepository;
 import com.angel.flexbuddy.repository.ReminderLogRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
 import com.angel.flexbuddy.repository.TaxPaymentRepository;
@@ -35,6 +36,7 @@ public class AccountService {
     private final com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailCodeRepository emailCodeRepository;
+    private final RecoveryCodeRepository recoveryCodeRepository;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
@@ -43,7 +45,8 @@ public class AccountService {
             com.angel.flexbuddy.repository.PayoutDepositRepository payoutDepositRepository,
             com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository,
             com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository,
-            PasswordResetTokenRepository passwordResetTokenRepository, EmailCodeRepository emailCodeRepository) {
+            PasswordResetTokenRepository passwordResetTokenRepository, EmailCodeRepository emailCodeRepository,
+            RecoveryCodeRepository recoveryCodeRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -57,6 +60,7 @@ public class AccountService {
         this.taxReminderLogRepository = taxReminderLogRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.emailCodeRepository = emailCodeRepository;
+        this.recoveryCodeRepository = recoveryCodeRepository;
     }
 
     /** True only for an address whose owner has entered the emailed code; an unconfirmed sign-up does not hold it. */
@@ -109,6 +113,7 @@ public class AccountService {
         persistentTokenRepository.removeUserTokens(email);
         passwordResetTokenRepository.deleteAllByOwnerId(ownerId);
         emailCodeRepository.deleteAllByOwnerId(ownerId);
+        recoveryCodeRepository.deleteAllByOwnerId(ownerId);
         userRepository.deleteAccountById(ownerId);
     }
 }

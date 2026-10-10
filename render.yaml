@@ -28,6 +28,10 @@ services:
           property: password
       - key: FLEXBUDDY_REMEMBER_ME_KEY
         generateValue: true
+      # Encrypts authenticator-app secrets. Render generates it once and keeps it: never regenerate it, or every driver
+      # using an authenticator app would lose access.
+      - key: FLEXBUDDY_TWO_FACTOR_KEY
+        generateValue: true
       # Password-reset email goes out through Gmail's SMTP server. The two secrets are asked for in Render's dashboard
       # and never stored in this file.
       - key: FLEXBUDDY_MAIL_HOST

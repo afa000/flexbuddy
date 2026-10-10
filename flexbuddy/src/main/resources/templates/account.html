@@ -286,6 +286,12 @@
                             <button class="secondary-button" type="submit">Sign out</button>
                         </form>
 
+                    <article class="panel data-card">
+                        <h3>Two-step sign-in</h3>
+                        <p th:text="${currentUser.twoFactorMethod == null ? 'Off. Add a code from your phone or email when you sign in on a new device.' : (currentUser.twoFactorMethod.name() == 'APP' ? 'On, with an authenticator app.' : 'On, with email codes.')}">Off.</p>
+                        <a class="secondary-button" href="/account/two-factor">Manage</a>
+                    </article>
+
                     <article class="panel data-card security-card">
                         <h3>Signed-in devices</h3>
                         <p>Remove every persistent sign-in for your account, including this device. You will need your password the next time you open FlexBuddy.</p>

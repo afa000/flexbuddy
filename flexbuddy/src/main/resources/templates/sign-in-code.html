@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#075c76" media="(prefers-color-scheme: light)">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="FlexBuddy">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <meta name="description" content="Enter your sign-in code to open FlexBuddy.">
+    <title>Enter your code | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <style>
+        html { background: #02080b; }
+        html[data-theme="light"] { background: #ffffff; }
+    </style>
+    <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
+</head>
+<body class="auth-page">
+<main class="auth-layout">
+    <section class="auth-card" aria-labelledby="code-title">
+        <div class="auth-brand">
+            <span class="auth-brand-mark">FB</span>
+            <div><strong>FlexBuddy</strong><small>Shift tracker</small></div>
+        </div>
+
+        <p class="eyebrow">TWO-STEP SIGN-IN</p>
+        <h1 id="code-title">Enter your code</h1>
+        <p class="auth-copy" th:if="${method == 'APP'}">Open your authenticator app and enter the 6-digit code for FlexBuddy.</p>
+        <p class="auth-copy" th:if="${method == 'EMAIL'}">We emailed a 6-digit code to <strong th:text="${maskedEmail}">a••••@gmail.com</strong>. It works for 15 minutes.</p>
+
+        <p class="auth-copy" role="status" th:if="${param.resent}">We sent a new code.</p>
+        <div class="notice error-notice" role="alert" th:if="${error}" th:text="${error}"></div>
+
+        <form class="auth-form" th:action="@{/sign-in/code}" method="post">
+            <label class="field">
+                <span>Code</span>
+                <input class="code-input" name="code" id="signInCode" autocomplete="one-time-code" inputmode="numeric" maxlength="11" required autofocus>
+            </label>
+            <button class="primary-button auth-submit" type="submit">Continue</button>
+        </form>
+
+        <form th:if="${method == 'EMAIL'}" th:action="@{/sign-in/code/resend}" method="post">
+            <button class="text-button" type="submit">Send a new code</button>
+        </form>
+        <details class="recovery-hint" ontoggle="if (this.open) document.getElementById('signInCode').inputMode = 'text'">
+            <summary>Use a recovery code</summary>
+            <p class="field-hint">Lost your phone or can't get email? Type one of the recovery codes you saved, like ABCDE-FGHJK, in the box above. Each works once.</p>
+        </details>
+        <form th:action="@{/sign-in/code/cancel}" method="post">
+            <button class="text-button" type="submit">Cancel</button>
+        </form>
+    </section>
+</main>
+</body>
+</html>

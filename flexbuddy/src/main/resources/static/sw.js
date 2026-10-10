@@ -9,7 +9,7 @@ const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
 
 const VERSIONED_ASSETS = [
     '/css/styles.css', '/js/errors.js', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/outbox.js', '/js/feedback.js', '/js/setup.js', '/js/reports.js', '/js/home.js', '/js/calendar.js',
-    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/payouts.js', '/js/standing.js', '/js/swipe.js', '/js/quick-actions.js', '/js/app.js', '/js/account-sections.js', '/js/account.js', '/js/tax.js', '/js/password-toggle.js'
+    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/payouts.js', '/js/standing.js', '/js/swipe.js', '/js/quick-actions.js', '/js/app.js', '/js/account-sections.js', '/js/account.js', '/js/tax.js', '/js/password-toggle.js', '/js/two-factor.js'
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [
     '/manifest.webmanifest', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png',
@@ -20,7 +20,9 @@ const SHELL_PAGES = new Set(['/', '/account']);
 const STATIC_PATHS = [/^\/css\//, /^\/js\//, /^\/icons\//, /^\/screenshots\//,
     /^\/manifest\.webmanifest$/, /^\/offline\.html$/];
 const DATA_PATHS = [/^\/shifts(\/|$)/, /^\/expenses(\/|$)/, /^\/account\/settings$/, /^\/tax\/summary$/, /^\/standing$/];
-const NETWORK_ONLY = [/\.csv$/, /\.ics$/, /^\/shifts\/import-preview$/, /^\/account\/backup$/, /^\/push\//];
+const NETWORK_ONLY = [/\.csv$/, /\.ics$/, /^\/shifts\/import-preview$/, /^\/account\/backup$/, /^\/push\//,
+    // A setup page can hold a secret key or recovery codes, so it is never kept.
+    /^\/account\/two-factor/];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(STATIC_CACHE).then(cache => cache.addAll([...VERSIONED_ASSETS, ...STATIC_ASSETS])));

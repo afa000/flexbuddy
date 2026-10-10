@@ -39,6 +39,9 @@ class PageControllerTest {
     private ShiftRepository shiftRepository;
 
     @MockitoBean
+    private com.angel.flexbuddy.repository.RecoveryCodeRepository recoveryCodeRepository;
+
+    @MockitoBean
     private Clock clock;
 
     @Test
@@ -231,6 +234,18 @@ class PageControllerTest {
         assertThat(on).containsPattern("id=\"missingMiles\"[^>]*data-ask=\"true\"");
         assertThat(off).containsPattern("id=\"missingMiles\"[^>]*data-ask=\"false\"");
         assertThat(on).containsPattern("<a[^>]*href=\"/account#reminders\"[^>]*>Stop asking</a>");
+    }
+
+    @Test
+    void homeCarriesTheRecoveryCodesLeftOnlyForADriverWithTwoStepSignIn() throws Exception {
+        AppUser plain = new AppUser("Angel", "angel@example.com", "hash");
+        assertThat(pageFor(plain, 3)).doesNotContain("data-recovery-left");
+
+        AppUser protectedUser = new AppUser("Angel", "angel@example.com", "hash");
+        protectedUser.setId(7L);
+        protectedUser.setTwoFactorMethod(com.angel.flexbuddy.model.TwoFactorMethod.APP);
+        org.mockito.Mockito.when(recoveryCodeRepository.countByOwnerIdAndUsedAtIsNull(7L)).thenReturn(9L);
+        assertThat(pageFor(protectedUser, 3)).contains("data-recovery-left=\"9\"");
     }
 
     @Test

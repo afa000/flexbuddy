@@ -26,7 +26,7 @@
     </style>
     <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
 </head>
-<body>
+<body th:attr="data-recovery-left=${recoveryLeft}">
 <div class="app-shell">
     <header class="topbar">
         <a class="brand-mark" href="/" id="homeLink" aria-label="FlexBuddy, go to Home">

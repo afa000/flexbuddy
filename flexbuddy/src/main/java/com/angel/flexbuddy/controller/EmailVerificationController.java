@@ -3,14 +3,6 @@ package com.angel.flexbuddy.controller;
 import java.util.Locale;
 import java.util.Set;
 
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContext;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
-import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,11 +11,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.repository.AppUserRepository;
+import com.angel.flexbuddy.security.SignInCompleter;
 import com.angel.flexbuddy.service.EmailCodeService;
 import com.angel.flexbuddy.service.EmailVerificationService;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 
@@ -41,15 +33,13 @@ public class EmailVerificationController {
 
     private final EmailVerificationService verification;
     private final AppUserRepository userRepository;
-    private final UserDetailsService userDetailsService;
-    private final PersistentTokenBasedRememberMeServices rememberMeServices;
+    private final SignInCompleter signInCompleter;
 
     public EmailVerificationController(EmailVerificationService verification, AppUserRepository userRepository,
-            UserDetailsService userDetailsService, PersistentTokenBasedRememberMeServices rememberMeServices) {
+            SignInCompleter signInCompleter) {
         this.verification = verification;
         this.userRepository = userRepository;
-        this.userDetailsService = userDetailsService;
-        this.rememberMeServices = rememberMeServices;
+        this.signInCompleter = signInCompleter;
     }
 
     /** Whether a remember-me or display-mode value means the driver wants to stay signed in. */
@@ -133,33 +123,11 @@ public class EmailVerificationController {
     private void signIn(AppUser user, HttpServletRequest request, HttpServletResponse response) {
         HttpSession session = request.getSession(false);
         boolean remember = session != null && Boolean.TRUE.equals(session.getAttribute(PENDING_REMEMBER));
-        request.changeSessionId();
-        UserDetails details = userDetailsService.loadUserByUsername(user.getEmail());
-        Authentication authentication = UsernamePasswordAuthenticationToken.authenticated(
-                details, null, details.getAuthorities());
-        SecurityContext context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        new HttpSessionSecurityContextRepository().saveContext(context, request, response);
-        if (remember) {
-            rememberMeServices.loginSuccess(new RememberMeRequest(request), response, authentication);
-        }
+        signInCompleter.complete(request, response, user, remember);
         HttpSession current = request.getSession(false);
         if (current != null) {
             current.removeAttribute(PENDING_USER);
             current.removeAttribute(PENDING_REMEMBER);
-        }
-    }
-
-    /** Presents the request as one that ticked Keep me signed in, which is what the remember-me service looks for. */
-    private static final class RememberMeRequest extends HttpServletRequestWrapper {
-        RememberMeRequest(HttpServletRequest request) {
-            super(request);
-        }
-
-        @Override
-        public String getParameter(String name) {
-            return "remember-me".equals(name) ? "true" : super.getParameter(name);
         }
     }
 }

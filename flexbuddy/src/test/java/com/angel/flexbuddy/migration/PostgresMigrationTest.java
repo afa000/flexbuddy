@@ -35,6 +35,7 @@ import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.EmailCode;
 import com.angel.flexbuddy.model.PasswordResetToken;
+import com.angel.flexbuddy.model.RecoveryCode;
 import com.angel.flexbuddy.model.PayoutDeposit;
 import com.angel.flexbuddy.model.PushSubscription;
 import com.angel.flexbuddy.model.ReminderLog;
@@ -70,6 +71,7 @@ class PostgresMigrationTest {
             assertSetupBackfill(schema);
             assertMissingMilesPromptsStartOn(schema);
             assertExistingAccountsAreVerified(schema);
+            assertTwoStepStartsOff(schema);
             assertRequiredColumns(schema);
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
@@ -180,6 +182,19 @@ class PostgresMigrationTest {
         }
     }
 
+    /** Nobody has two-step sign-in until they choose it. */
+    private void assertTwoStepStartsOff(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery(
+                    "select count(*) as total, count(two_factor_method) as chosen from app_users")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt("total")).isGreaterThan(0);
+                assertThat(result.getInt("chosen")).isZero();
+            }
+        }
+    }
+
     private void assertBackfilledValues(String schema) throws Exception {
         try (Connection connection = connection(); Statement statement = connection.createStatement()) {
             statement.execute("set search_path to " + schema);
@@ -227,7 +242,7 @@ class PostgresMigrationTest {
             Metadata metadata = new MetadataSources(registry)
                     .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class,
                             PayoutDeposit.class, StandingEntry.class, TaxPayment.class, TaxReminderLog.class,
-                            PasswordResetToken.class, EmailCode.class)
+                            PasswordResetToken.class, EmailCode.class, RecoveryCode.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }

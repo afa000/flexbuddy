@@ -19,11 +19,14 @@ public class PageController {
     private final AppUserRepository userRepository;
     private final ShiftRepository shiftRepository;
     private final Clock clock;
+    private final com.angel.flexbuddy.repository.RecoveryCodeRepository recoveryCodeRepository;
 
-    public PageController(AppUserRepository userRepository, ShiftRepository shiftRepository, Clock clock) {
+    public PageController(AppUserRepository userRepository, ShiftRepository shiftRepository, Clock clock,
+            com.angel.flexbuddy.repository.RecoveryCodeRepository recoveryCodeRepository) {
         this.userRepository = userRepository;
         this.shiftRepository = shiftRepository;
         this.clock = clock;
+        this.recoveryCodeRepository = recoveryCodeRepository;
     }
 
     @GetMapping("/")
@@ -31,6 +34,10 @@ public class PageController {
         userRepository.findByEmailIgnoreCase(principal.getName())
                 .ifPresent(user -> {
                     model.addAttribute("currentUser", user);
+                    // Only a driver with two-step sign-in can have used a recovery code, so only they cost a query.
+                    if (user.getTwoFactorMethod() != null) {
+                        model.addAttribute("recoveryLeft", recoveryCodeRepository.countByOwnerIdAndUsedAtIsNull(user.getId()));
+                    }
                     // One count serves the backup reminder and the setup card.
                     long shiftCount = shiftRepository.countByOwnerEmailIgnoreCase(user.getEmail());
                     boolean backupDue = shiftCount > 10

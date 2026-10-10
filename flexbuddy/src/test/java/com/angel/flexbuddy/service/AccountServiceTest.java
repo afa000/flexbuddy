@@ -72,6 +72,9 @@ class AccountServiceTest {
     @Mock
     private com.angel.flexbuddy.repository.EmailCodeRepository emailCodeRepository;
 
+    @Mock
+    private com.angel.flexbuddy.repository.RecoveryCodeRepository recoveryCodeRepository;
+
     @InjectMocks
     private AccountService accountService;
 
@@ -166,7 +169,7 @@ class AccountServiceTest {
         accountService.deleteAccount("angel@example.com", "correct-password");
 
         InOrder deletionOrder = inOrder(expenseRepository, taxPaymentRepository, payoutDepositRepository,
-                standingEntryRepository, taxReminderLogRepository, reminderLogRepository, shiftRepository, pushSubscriptionRepository, persistentTokenRepository, passwordResetTokenRepository, emailCodeRepository, userRepository);
+                standingEntryRepository, taxReminderLogRepository, reminderLogRepository, shiftRepository, pushSubscriptionRepository, persistentTokenRepository, passwordResetTokenRepository, emailCodeRepository, recoveryCodeRepository, userRepository);
         deletionOrder.verify(expenseRepository).deleteAllByOwnerIdIncludingTrash(42L);
         deletionOrder.verify(taxPaymentRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(payoutDepositRepository).deleteAllByOwnerId(42L);
@@ -178,6 +181,7 @@ class AccountServiceTest {
         deletionOrder.verify(persistentTokenRepository).removeUserTokens("angel@example.com");
         deletionOrder.verify(passwordResetTokenRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(emailCodeRepository).deleteAllByOwnerId(42L);
+        deletionOrder.verify(recoveryCodeRepository).deleteAllByOwnerId(42L);
         deletionOrder.verify(userRepository).deleteAccountById(42L);
     }
 

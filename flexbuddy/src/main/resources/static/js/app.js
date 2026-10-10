@@ -2264,6 +2264,17 @@ const SHARED_UNAVAILABLE = 'The shared screenshot is no longer available. Choose
 
 /** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
 /** Right after the emailed code is accepted the address carries ?welcome; say so once and tidy the address. */
+function noteRecoveryCodeUse() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has('recovery-used')) return;
+    params.delete('recovery-used');
+    const query = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
+    const left = Number(document.body.dataset.recoveryLeft);
+    const remaining = Number.isFinite(left) ? `${left} left. ` : '';
+    showToast('You used a recovery code', `${remaining}Make new ones in Account.`);
+}
+
 function greetNewDriver() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has('welcome')) return;
@@ -2377,6 +2388,7 @@ updateThemeToggle(document.documentElement.dataset.theme);
 initializeFilters();
 openInitialScreen();
 greetNewDriver();
+noteRecoveryCodeUse();
 importSharedScreenshot();
 urlSyncEnabled = true;
 loadStations();

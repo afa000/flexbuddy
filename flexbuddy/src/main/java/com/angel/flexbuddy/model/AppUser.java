@@ -60,6 +60,18 @@ public class AppUser {
     @Column(nullable = false)
     private boolean emailVerified = true;
 
+    /** How the second sign-in code is received; null while two-step sign-in is off. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private TwoFactorMethod twoFactorMethod;
+
+    /** The authenticator-app secret, encrypted by the app and never stored or logged in plain text. */
+    @Column(length = 255)
+    private String totpSecret;
+
+    /** The last time step an app code was accepted for, so one code cannot be used twice. */
+    private Long totpLastStep;
+
     /** When the driver dismissed Home's setup card; null while it should still show. Screen state, so it is not backed up. */
     private Instant setupDismissedAt;
 
