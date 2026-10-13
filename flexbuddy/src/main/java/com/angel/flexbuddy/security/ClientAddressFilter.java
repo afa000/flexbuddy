@@ -69,7 +69,7 @@ public class ClientAddressFilter extends OncePerRequestFilter {
         List<String> entries = entries(headerValue(raw, FORWARDED_FOR));
         Resolved resolved = resolve(properties.header(), properties.trustedHops(),
                 headerValue(raw, properties.header()), entries, peer);
-        if (dueForLog()) {
+        if (carriesForwardingHeaders(raw, entries) && dueForLog()) {
             diagnostics.accept(describe(raw, entries, resolved, peer));
         }
         chain.doFilter(new ResolvedAddressRequest(request, resolved.address()), response);
@@ -146,6 +146,12 @@ public class ClientAddressFilter extends OncePerRequestFilter {
         } catch (UnknownHostException e) {
             return false;
         }
+    }
+
+    /** Health probes and local runs arrive without any; they must not use up the hour's one line. */
+    private static boolean carriesForwardingHeaders(HttpServletRequest raw, List<String> entries) {
+        return !entries.isEmpty() || headerValue(raw, "CF-Connecting-IP") != null
+                || headerValue(raw, "True-Client-IP") != null || headerValue(raw, "X-Real-IP") != null;
     }
 
     private boolean dueForLog() {

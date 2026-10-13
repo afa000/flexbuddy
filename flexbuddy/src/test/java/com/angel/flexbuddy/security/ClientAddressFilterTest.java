@@ -159,6 +159,17 @@ class ClientAddressFilterTest {
         assertThat(lines).hasSize(2);
     }
 
+    @Test
+    void requestsWithoutForwardingHeadersDoNotUseUpTheHoursLine() throws Exception {
+        ClientAddressFilter filter = new ClientAddressFilter(defaults(), clock, lines::add);
+
+        runFilter(filter, request(null));
+        assertThat(lines).isEmpty();
+
+        runFilter(filter, request("198.51.100.7"));
+        assertThat(lines).hasSize(1).first().asString().contains("entries=1").contains("using entry 1 of 1");
+    }
+
     /** What Spring's forwarded-header filter does to a request: later readers no longer see X-Forwarded-For. */
     private static final class HiddenForwardedFor extends HttpServletRequestWrapper {
 
