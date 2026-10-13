@@ -368,7 +368,8 @@
                             </th:block>
                             <label class="field">
                                 <span th:utext="#{accountSection.typeDeleteToConfirm.html}">Type <strong>delete</strong> to confirm</span>
-                                <input th:field="*{confirmation}" type="text" autocomplete="off" maxlength="6" required>
+                                <input th:field="*{confirmation}" type="text" autocomplete="off" autocapitalize="none" autocorrect="off"
+                                       spellcheck="false" maxlength="12" required>
                                 <small class="field-error" th:if="${#fields.hasErrors('confirmation')}" th:errors="*{confirmation}"></small>
                             </label>
                             <button class="danger-button" type="submit" th:text="#{accountSection.deleteAccountPermanently}">Delete account permanently</button>

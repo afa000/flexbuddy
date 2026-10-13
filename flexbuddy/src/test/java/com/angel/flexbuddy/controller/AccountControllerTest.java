@@ -534,22 +534,44 @@ class AccountControllerTest {
     }
 
     @Test
-    void deleteAccount_requiresTheExactTypedConfirmation() throws Exception {
+    void deleteAccount_acceptsTheWordInAnyCase() throws Exception {
         when(userRepository.findByEmailIgnoreCase("angel@example.com"))
                 .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
 
-        mockMvc.perform(post("/account")
-                        .with(user("angel@example.com"))
-                        .with(csrf())
-                        .param("_method", "delete")
-                        .param("password", "correct-password")
-                        .param("confirmation", "DELETE"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("account"))
-                .andExpect(model().attributeHasFieldErrors("deletion", "confirmation"));
+        for (String typed : new String[] {"DELETE", "Delete", " delete "}) {
+            mockMvc.perform(post("/account")
+                            .with(user("angel@example.com"))
+                            .with(csrf())
+                            .param("_method", "delete")
+                            .param("password", "correct-password")
+                            .param("confirmation", typed))
+                    .andExpect(status().is3xxRedirection());
+        }
+
+        verify(accountService, org.mockito.Mockito.times(3)).deleteAccount("angel@example.com", "correct-password");
+    }
+
+    @Test
+    void deleteAccount_rejectsADifferentWord() throws Exception {
+        when(userRepository.findByEmailIgnoreCase("angel@example.com"))
+                .thenReturn(Optional.of(new AppUser("Angel", "angel@example.com", "hash")));
+
+        for (String typed : new String[] {"delet", "remove"}) {
+            mockMvc.perform(post("/account")
+                            .with(user("angel@example.com"))
+                            .with(csrf())
+                            .param("_method", "delete")
+                            .param("password", "correct-password")
+                            .param("confirmation", typed))
+                    .andExpect(status().isOk())
+                    .andExpect(view().name("account"))
+                    .andExpect(model().attributeHasFieldErrors("deletion", "confirmation"))
+                    .andExpect(model().attributeHasFieldErrorCode("deletion", "confirmation", "Pattern"));
+        }
 
         verify(accountService, never()).deleteAccount(any(), any());
     }
+
     @Test
     void deleteAccount_rejectsTheWrongPassword() throws Exception {
         when(userRepository.findByEmailIgnoreCase("angel@example.com"))

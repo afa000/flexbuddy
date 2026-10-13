@@ -1,5 +1,7 @@
 package com.angel.flexbuddy.dto;
 
+import java.util.Locale;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -23,4 +25,9 @@ public class AccountDeletionRequest {
     @NotBlank(message = "{validation.delete.required}")
     @Pattern(regexp = "delete", message = "{validation.delete.exact}")
     private String confirmation;
+
+    /** "Delete", "DELETE" and " delete " all count: the label is shown in capitals and phone keyboards capitalise. */
+    public void setConfirmation(String confirmation) {
+        this.confirmation = confirmation == null ? null : confirmation.strip().toLowerCase(Locale.ROOT);
+    }
 }
