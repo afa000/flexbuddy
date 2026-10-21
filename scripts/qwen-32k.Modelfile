@@ -1,0 +1,5 @@
+# Qwen 3.5 9B with a 32K context, the size OpenCode needs to see its tools. Ollama's own default is 4K, and the AMD AI
+# Bundle build ignores OLLAMA_CONTEXT_LENGTH, so the size lives in the model.
+# Create it with: ollama create qwen3.5:9b-32k -f scripts/qwen-32k.Modelfile
+FROM qwen3.5:9b
+PARAMETER num_ctx 32768
