@@ -79,6 +79,7 @@
         if (!state) return;
         window.clearTimeout(state.timer);
         elements.toast.classList.add('is-hidden');
+        elements.action.onclick = null;
         state = undefined;
         window.setTimeout(displayNext, 100);
     }
