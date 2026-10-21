@@ -1,6 +1,7 @@
 # FlexBuddy agent instructions
 
 These rules apply to every coding agent working in this repository. Read this file before making changes.
+[docs/agent-workflow.md](docs/agent-workflow.md) explains the tools and the day-to-day loop for people.
 
 ## Project
 
