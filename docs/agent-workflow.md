@@ -189,16 +189,26 @@ change. Store text and screenshots live in `android/store-listing.md` and `andro
 
 ## What to expect from the local model
 
-Two read-only trials of the first test prompt with Qwen 3.5 9B on the RX 7800 XT, on October 21, 2026:
+Trials with Qwen 3.5 9B on the RX 7800 XT, October 21, 2026, all fully on the GPU:
 
-| Context | Time | Result |
+| Run | Time | Result |
 |---|---|---|
-| 4K (Ollama default) | 81 s | Could not see its tools; guessed paths and gave a wrong build command |
-| 32K | about 3 min | Read the repository and named every controller and service correctly, but invented six Thymeleaf templates and a `shifts.js` |
+| Read-only prompt, 4K context (Ollama default) | 81 s | Could not see its tools; guessed paths and gave a wrong build command |
+| Read-only prompt, 32K | about 3 min | Named every controller and service correctly, but invented six Thymeleaf templates and a `shifts.js` |
+| FB-001 (tests for `toast.js`), attempt 1 | 165 s | Read the whole 84 KB message catalog, ran out of room and stopped; no files written |
+| FB-001, attempt 2 | 225 s | Wrote a test file that never reached the script (9 of 13 tests failed), then the run broke off; no handoff report |
 
-Both ran fully on the GPU and changed no files. Treat Qwen as a helper for narrow tasks: docs, CSS, single-file tests,
-small fixes. Stop it after two failed attempts, check what it reports, and keep timing real tasks. If it isn't saving
-time, drop it; nothing else depends on it.
+Claude Code finished FB-001 after the two failed attempts. Treat Qwen as a helper for narrow tasks: docs, CSS, small
+fixes. Stop it after two failed attempts, check what it reports, and keep timing real tasks. If it isn't saving time,
+drop it; nothing else depends on it.
+
+**Writing tasks for the local model.** Its 32K context is small next to this codebase:
+
+- Name the exact lines it needs from big files instead of the file. `messages.properties` alone is 84 KB, about 25K
+  tokens; give it the keys and their English text.
+- Point to one example to copy (an existing test or class), not several.
+- Ask it to work in steps: write a little, run the tests, then continue.
+- Don't count on a handoff report: check `git status` and the diff yourself after every run.
 
 ## Safety and cost
 
