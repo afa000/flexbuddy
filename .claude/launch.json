@@ -1,0 +1,32 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "flexbuddy",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "cd flexbuddy && .\\mvnw.cmd -q spring-boot:run"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "flexbuddy-links",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set FLEXBUDDY_MAIL_LOG_LINKS=true&& cd flexbuddy && .\\mvnw.cmd -q spring-boot:run"
+      ],
+      "port": 8080
+    },
+    {
+      "name": "flexbuddy-google",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set FLEXBUDDY_GOOGLE_CLIENT_ID=fake-local-client&& set FLEXBUDDY_GOOGLE_CLIENT_SECRET=fake-local-secret&& set FLEXBUDDY_MAIL_LOG_LINKS=true&& cd flexbuddy && .\\mvnw.cmd -q spring-boot:run"
+      ],
+      "port": 8080
+    }
+  ]
+}
