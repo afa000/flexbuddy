@@ -9,7 +9,7 @@ can pick up where another stopped.
 ## The loop
 
 1. A planner (Claude or ChatGPT) writes the task in `.ai/tasks/FB-xxx.md` and pushes it on a new `ai/FB-xxx` branch.
-2. One agent at a time implements it on that branch: Claude Code, Antigravity, or OpenCode with Qwen.
+2. One agent at a time implements it on that branch: Claude Code, Antigravity, or OpenCode with a local model.
 3. [`scripts/verify.ps1`](../scripts/verify.ps1) runs the Java and JavaScript suites; CI adds the PostgreSQL migration
    test on the pull request.
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
@@ -36,16 +36,18 @@ Open a new terminal afterwards so `gh` is on the PATH.
 Ollama 0.40 came with the AMD AI Bundle on this PC; elsewhere, install it from https://ollama.com/download/windows.
 
 ```powershell
-ollama pull qwen3.5:9b
-ollama pull gemma4:12b      # optional comparison model
+ollama pull gemma4:12b      # the local model to use
+ollama pull qwen3.5:9b      # optional fallback
 ```
 
 **Use a 32K copy of the model with OpenCode.** Ollama loads models with a 4K context, which cuts off OpenCode's tool
 list: at 4K the model cannot read a single file. The `OLLAMA_CONTEXT_LENGTH` setting doesn't help on this PC; the AMD
 AI Bundle build kept loading at 4K after a restart. So the size is stored in a copy of the model instead, from
-[`scripts/qwen-32k.Modelfile`](../scripts/qwen-32k.Modelfile):
+[`scripts/gemma-32k.Modelfile`](../scripts/gemma-32k.Modelfile) (and
+[`scripts/qwen-32k.Modelfile`](../scripts/qwen-32k.Modelfile) for the fallback):
 
 ```powershell
+ollama create gemma4:12b-32k -f scripts/gemma-32k.Modelfile
 ollama create qwen3.5:9b-32k -f scripts/qwen-32k.Modelfile
 ```
 
@@ -56,7 +58,7 @@ The copy shares the original's files, so it takes no extra disk. While it runs, 
 
 ```powershell
 npm install -g opencode-ai
-ollama launch opencode --model qwen3.5:9b-32k
+ollama launch opencode --model gemma4:12b-32k
 ```
 
 OpenCode reads `AGENTS.md`, the skills in `.agents/skills/` and the permissions in [`opencode.json`](../opencode.json):
@@ -85,8 +87,8 @@ and emulator work because it already follows the emulator rules.
 
 | Work | Tool |
 |---|---|
-| Docs, small CSS, single-file tests | OpenCode + Qwen (trial) |
-| Small Java or JavaScript bug | OpenCode + Qwen first; Antigravity after two failed attempts |
+| Docs, small CSS, single-file tests | OpenCode + Gemma |
+| Small Java or JavaScript bug | OpenCode + Gemma first; Antigravity after two failed attempts |
 | New UI, responsive work, browser checks | Antigravity Pro |
 | Spring Security, migrations, backup/restore, earnings | Antigravity Pro or Claude Code, plus CI and a separate review |
 | Android wrapper, emulator checks, Play listing | Claude Code |
@@ -191,7 +193,7 @@ change. Store text and screenshots live in `android/store-listing.md` and `andro
 
 ## What to expect from the local model
 
-Trials with Qwen 3.5 9B on the RX 7800 XT, October 21, 2026, all fully on the GPU:
+Trials on the RX 7800 XT, October 21, 2026. First Qwen 3.5 9B, all fully on the GPU:
 
 | Run | Time | Result |
 |---|---|---|
@@ -202,13 +204,25 @@ Trials with Qwen 3.5 9B on the RX 7800 XT, October 21, 2026, all fully on the GP
 | FB-002, tests after an Antigravity handoff, at 4K by mistake | 70 s | Printed a command as text instead of using its tools; nothing written |
 | FB-002, same handoff at 32K | 291 s | Read the handoff report and diff, added 3 tests and updated the report; 2 tests were useful, 1 could never fail but was reported as covering its criterion |
 
-Claude Code finished FB-001 after the two failed attempts and fixed FB-002's third test. Treat Qwen as a helper for
-narrow tasks with one example to copy: docs, CSS, small fixes, a test or two. Stop it after two failed attempts,
-check every test it writes fails without the change it guards, and don't take its handoff report's ticks on trust.
-If it isn't saving time, drop it; nothing else depends on it.
+Claude Code finished FB-001 after the two failed attempts and fixed FB-002's third test.
+
+Then the same two jobs with Gemma 4 12B at 32K, also fully on the GPU:
+
+| Run | Time | Result |
+|---|---|---|
+| Read-only prompt | 101 s | Every path and command right, nothing invented; less detail than Qwen (no file names) |
+| FB-002 tests, from the same handoff | 111 s | 2 new tests plus an assertion on the existing click test; all 3 fail without the fix. Its handoff report kept stale "no tests were written" lines |
+
+Gemma was faster and more accurate on both, so it is the local model to use, with Qwen as a fallback. One caveat:
+Gemma's FB-002 run started with the fix already committed and a shorter handoff report, a slightly easier start than
+Qwen had.
+
+Treat the local model as a helper for narrow tasks with one example to copy: docs, CSS, small fixes, a test or two.
+Stop it after two failed attempts, check every test it writes fails without the change it guards, and don't take its
+handoff report on trust. If it isn't saving time, drop it; nothing else depends on it.
 
 The first handoff test (FB-002) worked: Antigravity made the change, checked it in its own browser on localhost and
-wrote a handoff report clear enough for Qwen to pick up from without any chat history.
+wrote a handoff report clear enough for a local model to pick up from without any chat history.
 
 **Writing tasks for the local model.** Its 32K context is small next to this codebase:
 
