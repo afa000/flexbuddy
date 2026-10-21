@@ -82,19 +82,23 @@ Tablet screenshots use the same capture as the phone set: a 612 × 1088 viewport
 tablets and an 810 × 1440 viewport at 1.33x for 10-inch tablets, both in portrait so the app's
 tablet layout fills the frame.
 
-The screenshots were captured on September 14, 2026 from the Play-installed build signed in to the
-reviewer account with its sample data. They show the app's web content at a 414 × 736 phone viewport
-through Chrome DevTools, without the Android status bar. The update toast and backup reminder were
-hidden because they are transient prompts.
+The screenshots were retaken on October 20, 2026, after the Home and Reports screens, the floating
+menu and the header changed. The Play Reviewer account's sample data dates from September, so its
+Home showed an empty week; nothing may be added to that production account. They were captured
+instead from the same app run locally against a throwaway database, signed in to a made-up demo
+driver ("Sam", stations Downtown Hub, Airport Depot, Northside and Lakeview) with blocks, expenses,
+a weekly goal and a tax set-aside dated around that week. Chrome on the Pixel 10 Pro emulator
+rendered them through DevTools, so the fonts are Android's, at a 414 x 736 phone viewport at 3x,
+without the Android status bar. Chrome's install prompt, which never appears in the installed app,
+was suppressed, and transient toasts were hidden.
 
-Suggested upload order:
+Suggested upload order (the same order for both tablet sets, prefixed `tablet7-` and `tablet10-`):
 
-1. `01-dashboard.png`: earnings, shifts, hours, and the next scheduled block.
-2. `03-schedule.png`: the next block with its countdown, offered pay, and actions.
-3. `06-history.png`: shift history with pay, hours, miles, and a forfeited block.
-4. `04-expenses.png`: expense totals and the vehicle cost method.
-5. `02-earnings-report.png`: the weekly earnings breakdown.
-6. `05-import.png`: the screenshot import step (optional).
+1. `01-home.png`: this week's earnings against the goal, the next block and the next payout.
+2. `02-schedule.png`: the next block with its countdown, forfeit deadline and actions.
+3. `03-reports.png`: earned, estimated net, average hourly and base versus tips.
+4. `04-expenses.png`: expense totals and the expense form.
+5. `05-import.png`: the screenshot import step.
 
 A screenshot of the import review with parsed fields is not included: it would need a sample
 screenshot image, and it must not show another app's screen.
