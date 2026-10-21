@@ -1,0 +1,122 @@
+# Runs Antigravity or the local model (OpenCode + Ollama) on one task without opening either app, and saves the run's
+# output to .ai/artifacts/<task-id>/. Run it from the working tree the agent should edit, on the task's branch:
+#   .\scripts\run-agent.ps1 -Agent local -TaskId FB-003
+#   .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Prompt "Only do step 1 of the task's handoff plan."
+param(
+    [Parameter(Mandatory = $true)]
+    [ValidateSet('antigravity', 'local')]
+    [string]$Agent,
+
+    [Parameter(Mandatory = $true)]
+    [ValidatePattern('^[A-Za-z0-9_-]+$')]
+    [string]$TaskId,
+
+    # Replaces the default instruction, which is to implement the task with the implement-task skill.
+    [string]$Prompt,
+
+    [string]$Model = 'gemma4:12b-32k',
+
+    [int]$TimeoutMinutes = 30
+)
+
+$ErrorActionPreference = "Stop"
+$root = (git rev-parse --show-toplevel).Trim() -replace '/', '\'
+$logs = Join-Path $root ".ai\artifacts\$TaskId"
+New-Item -ItemType Directory -Force -Path $logs | Out-Null
+$stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+$log = Join-Path $logs "agent-$Agent-$stamp.log"
+
+$branch = (git -C $root branch --show-current).Trim()
+if ($branch -eq "main") {
+    throw "Agents never work on main. Switch to ai/$TaskId first."
+}
+if ($branch -ne "ai/$TaskId") {
+    Write-Warning "On branch $branch, not ai/$TaskId."
+}
+if (-not (Test-Path (Join-Path $root ".ai\tasks\$TaskId.md"))) {
+    throw "Task specification not found: .ai/tasks/$TaskId.md"
+}
+
+if (-not $Prompt) {
+    $checks = if ($Agent -eq 'local') {
+        'You cannot run verify.ps1 here; run the JavaScript tests with: node --test flexbuddy/src/test/js/*.test.js'
+    } else {
+        'Run the tests the task needs.'
+    }
+    $Prompt = "Use the implement-task skill for $TaskId. The task is in .ai/tasks/$TaskId.md and you are on its " +
+        "branch. $checks Write .ai/implementations/$TaskId.md before you stop. Do not commit or push."
+}
+
+if ($Agent -eq 'local') {
+    # The project opencode.json asks before every edit and command, which an unattended run can't answer. Inline
+    # config overrides it for this run only: edits are allowed, and only read-only git and node --test may run.
+    $env:OPENCODE_CONFIG_CONTENT = Get-Content (Join-Path $PSScriptRoot "opencode-headless.json") -Raw
+    $exe = "ollama"
+    $arguments = @("launch", "opencode", "--model", $Model, "--", "run", "--standalone", "--model", "ollama/$Model")
+} else {
+    $settings = Join-Path $env:USERPROFILE ".gemini\antigravity-cli\settings.json"
+    $wanted = Join-Path $PSScriptRoot "antigravity-cli-settings.json"
+    if (-not (Test-Path $settings)) {
+        Copy-Item $wanted $settings
+        Write-Host "Installed the Antigravity CLI permission rules in $settings"
+    } elseif ((Get-Content $settings -Raw) -ne (Get-Content $wanted -Raw)) {
+        Write-Warning "$settings differs from scripts/antigravity-cli-settings.json; using it as it is."
+    }
+    $exe = Join-Path $env:USERPROFILE ".gemini\bin\agy.exe"
+    $arguments = @("--mode", "accept-edits", "--print-timeout", "${TimeoutMinutes}m", "--output-format", "text", "-p")
+}
+$arguments += '"' + ($Prompt -replace '"', '\"') + '"'
+
+Write-Host "Running $Agent on $TaskId in $root (log: .ai/artifacts/$TaskId/agent-$Agent-$stamp.log)"
+$out = "$log.out"
+$err = "$log.err"
+$timer = [Diagnostics.Stopwatch]::StartNew()
+$process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $root -NoNewWindow -PassThru `
+    -RedirectStandardOutput $out -RedirectStandardError $err
+$context = $null
+while (-not $process.HasExited -and $timer.Elapsed.TotalMinutes -lt $TimeoutMinutes) {
+    Start-Sleep -Seconds 10
+    if ($Agent -eq 'local' -and -not $context) {
+        $loaded = ollama ps | Select-String ([regex]::Escape($Model))
+        if ($loaded) { $context = ($loaded.Line -split '\s{2,}')[4] }
+    }
+}
+if (-not $process.HasExited) {
+    $process.Kill()
+    Write-Warning "Stopped after $TimeoutMinutes minutes."
+}
+$elapsed = [int]$timer.Elapsed.TotalSeconds
+Remove-Item Env:\OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
+
+$changes = (git -C $root status --short) -join "`n"
+@"
+# $Agent on $TaskId, $stamp
+
+Branch: $branch
+Elapsed: $elapsed s
+$(if ($Agent -eq 'local') { "Model: $Model, context while running: $(if ($context) { $context } else { 'not seen' })" })
+
+## Prompt
+
+$Prompt
+
+## Output
+
+$(Get-Content $out -Raw)
+
+## Tool log
+
+$(Get-Content $err -Raw)
+
+## Working tree afterwards
+
+$changes
+"@ | Set-Content -Encoding UTF8 $log
+Remove-Item $out, $err
+
+Write-Host "Finished in $elapsed s."
+if ($Agent -eq 'local' -and $context -and $context -ne '32768') {
+    Write-Warning "The model ran with a $context context, not 32768; OpenCode can't use its tools below that."
+}
+Write-Host "Changed files:"
+Write-Host $(if ($changes) { $changes } else { "(none)" })

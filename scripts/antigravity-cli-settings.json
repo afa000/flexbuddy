@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "command(git status)",
+      "command(git diff)",
+      "command(git log)",
+      "command(git show)",
+      "command(git branch)",
+      "command(node --test)"
+    ],
+    "deny": [
+      "command(git push)",
+      "command(git commit)",
+      "command(git reset)",
+      "command(git clean)",
+      "command(git checkout)",
+      "command(git switch)",
+      "command(git rebase)",
+      "command(git merge)",
+      "write_file(.git/)"
+    ]
+  }
+}
