@@ -23,21 +23,58 @@ class ScreenshotPreprocessorTest {
     }
 
     @Test
-    void upscale_neverReturnsMoreThanFiveMegapixels() {
+    void scaledGrayscale_neverReturnsMoreThanFiveMegapixels() {
         // A long scrolling screenshot would otherwise be tripled to 1755 x 15000.
         BufferedImage strip = new BufferedImage(585, 5000, BufferedImage.TYPE_BYTE_GRAY);
 
-        BufferedImage result = preprocessor.upscale(strip);
+        BufferedImage result = preprocessor.scaledGrayscale(strip);
 
         assertThat((long) result.getWidth() * result.getHeight()).isLessThanOrEqualTo(5_000_000L);
         assertThat(result.getHeight()).isGreaterThan(5000);
     }
 
     @Test
-    void upscale_returnsTheSameImageWhenNoScalingIsNeeded() {
+    void prepare_holdsAboutTwoGrayscaleCopiesOfTheScreenshot() {
+        // Render gives the heap about 60 MB beside the app. Full-colour intermediate copies of a 5 megapixel scrolling
+        // screenshot used up to 40 MB of it on top of the decoded image.
+        BufferedImage strip = solidImage(1080, 4600, new Color(18, 18, 18));
+        var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long before = threads.getCurrentThreadAllocatedBytes();
+
+        BufferedImage result = preprocessor.prepare(strip);
+
+        long allocated = threads.getCurrentThreadAllocatedBytes() - before;
+        long outputBytes = (long) result.getWidth() * result.getHeight();
+        assertThat(allocated).isLessThan(outputBytes * 5 / 2);
+    }
+
+    @Test
+    void prepare_doesNotCopyAnUnscaledPngInFullColour() {
+        // ImageIO decodes a PNG screenshot with transparency as 4-byte ABGR; a 1440 x 3200 one is not upscaled.
+        BufferedImage screenshot = new BufferedImage(1440, 3200, BufferedImage.TYPE_4BYTE_ABGR);
+        var graphics = screenshot.createGraphics();
+        graphics.setColor(Color.WHITE);
+        graphics.fillRect(0, 0, screenshot.getWidth(), screenshot.getHeight());
+        graphics.dispose();
+        var threads = (com.sun.management.ThreadMXBean) java.lang.management.ManagementFactory.getThreadMXBean();
+        long before = threads.getCurrentThreadAllocatedBytes();
+
+        BufferedImage result = preprocessor.prepare(screenshot);
+
+        long allocated = threads.getCurrentThreadAllocatedBytes() - before;
+        long outputBytes = (long) result.getWidth() * result.getHeight();
+        assertThat(allocated).isLessThan(outputBytes * 5 / 2);
+    }
+
+    @Test
+    void scaledGrayscale_keepsTheSizeWhenNoScalingIsNeeded() {
         BufferedImage source = solidImage(1300, 2600, Color.WHITE);
 
-        assertThat(preprocessor.upscale(source)).isSameAs(source);
+        BufferedImage result = preprocessor.scaledGrayscale(source);
+
+        assertThat(result.getWidth()).isEqualTo(1300);
+        assertThat(result.getHeight()).isEqualTo(2600);
+        assertThat(result.getType()).isEqualTo(BufferedImage.TYPE_BYTE_GRAY);
     }
 
     @Test
@@ -45,9 +82,9 @@ class ScreenshotPreprocessorTest {
         BufferedImage dark = solidImage(20, 20, new Color(20, 20, 20));
         BufferedImage grayscale = preprocessor.grayscale(dark);
 
-        BufferedImage result = preprocessor.invertIfDark(grayscale);
+        preprocessor.invertIfDark(grayscale);
 
-        assertThat(result.getRaster().getSample(10, 10, 0)).isGreaterThan(230);
+        assertThat(grayscale.getRaster().getSample(10, 10, 0)).isGreaterThan(230);
     }
 
     @Test
@@ -57,11 +94,11 @@ class ScreenshotPreprocessorTest {
         image.getRaster().setSample(1, 0, 0, 120);
         image.getRaster().setSample(2, 0, 0, 230);
 
-        BufferedImage result = preprocessor.threshold(image);
+        preprocessor.threshold(image);
 
-        assertThat(result.getRaster().getSample(0, 0, 0)).isIn(0, 255);
-        assertThat(result.getRaster().getSample(1, 0, 0)).isIn(0, 255);
-        assertThat(result.getRaster().getSample(2, 0, 0)).isIn(0, 255);
+        assertThat(image.getRaster().getSample(0, 0, 0)).isIn(0, 255);
+        assertThat(image.getRaster().getSample(1, 0, 0)).isIn(0, 255);
+        assertThat(image.getRaster().getSample(2, 0, 0)).isIn(0, 255);
     }
 
     private BufferedImage solidImage(int width, int height, Color color) {
