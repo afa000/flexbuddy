@@ -20,3 +20,13 @@ android/*.idsig
 /build/
 /app-release-*.apk
 /app-release-*.aab
+
+# Local coding-agent working files: check logs, handoff reports and review packets. Task specifications in .ai/tasks/
+# and design references in .ai/design/ are committed.
+.ai/artifacts/
+.ai/implementations/
+.ai/reviews/
+
+# Claude Code's own worktrees and personal settings. CLAUDE.md and .claude/launch.json are committed.
+.claude/worktrees/
+.claude/settings.local.json
