@@ -124,7 +124,9 @@ git switch ai/FB-001
 If the tool doesn't load skills, say "Follow .agents/skills/implement-task/SKILL.md for FB-001."
 
 **Verify and open the pull request.** Commit first: the checks record the commit they tested, and the packet warns when
-that is no longer the latest one.
+that is no longer the latest one. Any untracked file counts as an uncommitted change: `verify.ps1` then reports "with
+uncommitted changes" and `review-packet.ps1` refuses to run. Commit it, delete it, or add it to `.gitignore` (or, for a
+file only on your machine, `.git/info/exclude`).
 
 ```powershell
 git add <changed files>

@@ -30,3 +30,6 @@ android/*.idsig
 # Claude Code's own worktrees and personal settings. CLAUDE.md and .claude/launch.json are committed.
 .claude/worktrees/
 .claude/settings.local.json
+
+# IntelliJ IDEA project settings.
+.idea/
