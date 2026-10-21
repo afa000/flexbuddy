@@ -1,22 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "command(git status)",
-      "command(git diff)",
-      "command(git log)",
-      "command(git show)",
-      "command(git branch)",
-      "command(node --test)"
+      "command(regex:^\"?git (status|diff|log|show|branch)( [^;&|<>$`]*)?\"?$)",
+      "command(regex:^\"?(Get-ChildItem|Get-Content|Get-Item|Select-String|Test-Path|ls|dir|cat|type)( [^;&|<>$`]*)?\"?$)",
+      "command(regex:^\"?node --test( [^;&|<>$`]*)?\"?$)",
+      "command(regex:^\"?(\\.[\\\\/])?mvnw(\\.cmd)? -B -ntp (verify|test)( -Dtest=[A-Za-z0-9_*,#]+)?\"?$)",
+      "command(regex:^\"?(\\.[\\\\/])?scripts[\\\\/]verify\\.ps1 -TaskId [A-Za-z0-9_-]+\"?$)"
     ],
     "deny": [
-      "command(git push)",
-      "command(git commit)",
-      "command(git reset)",
-      "command(git clean)",
-      "command(git checkout)",
-      "command(git switch)",
-      "command(git rebase)",
-      "command(git merge)",
+      "command(regex:^\"?git (push|commit|reset|clean|checkout|switch|rebase|merge)( .*)?$)",
       "write_file(.git/)"
     ]
   }

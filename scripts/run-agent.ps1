@@ -48,18 +48,22 @@ if (-not $Prompt) {
 }
 
 if ($Agent -eq 'local') {
-    # The project opencode.json asks before every edit and command, which an unattended run can't answer. Inline
-    # config overrides it for this run only: edits are allowed, and only read-only git and node --test may run.
-    $env:OPENCODE_CONFIG_CONTENT = Get-Content (Join-Path $PSScriptRoot "opencode-headless.json") -Raw
+    # The default agent asks before every edit and command, which an unattended run can't answer. The headless agent
+    # in opencode.json may edit files and run only read-only git and node --test. (Environment-variable overrides
+    # lose to the project opencode.json, so the rules live there.)
     $exe = "ollama"
-    $arguments = @("launch", "opencode", "--model", $Model, "--", "run", "--standalone", "--model", "ollama/$Model")
+    $arguments = @("launch", "opencode", "--model", $Model, "--", "run", "--standalone", "--agent", "headless",
+        "--model", "ollama/$Model")
 } else {
+    # The Antigravity CLI only reads user-wide rules. On Windows it checks each command wrapped in quotes, so plain
+    # prefix rules such as command(git status) never match; scripts/antigravity-cli-settings.json uses regexes. Copy,
+    # don't rewrite, that file: the CLI ignores a settings file that starts with a byte-order mark.
     $settings = Join-Path $env:USERPROFILE ".gemini\antigravity-cli\settings.json"
     $wanted = Join-Path $PSScriptRoot "antigravity-cli-settings.json"
     if (-not (Test-Path $settings)) {
         Copy-Item $wanted $settings
         Write-Host "Installed the Antigravity CLI permission rules in $settings"
-    } elseif ((Get-Content $settings -Raw) -ne (Get-Content $wanted -Raw)) {
+    } elseif (((Get-Content $settings) -join "`n") -ne ((Get-Content $wanted) -join "`n")) {
         Write-Warning "$settings differs from scripts/antigravity-cli-settings.json; using it as it is."
     }
     $exe = Join-Path $env:USERPROFILE ".gemini\bin\agy.exe"
@@ -86,9 +90,23 @@ if (-not $process.HasExited) {
     Write-Warning "Stopped after $TimeoutMinutes minutes."
 }
 $elapsed = [int]$timer.Elapsed.TotalSeconds
-Remove-Item Env:\OPENCODE_CONFIG_CONTENT -ErrorAction SilentlyContinue
 
 $changes = (git -C $root status --short) -join "`n"
+$commands = ""
+if ($Agent -eq 'antigravity') {
+    # In unattended mode one refused command ends the whole run, so record which commands it ran.
+    $brain = Get-ChildItem (Join-Path $env:USERPROFILE ".gemini\antigravity-cli\brain") -Directory |
+        Sort-Object LastWriteTime | Select-Object -Last 1
+    $transcript = Join-Path $brain.FullName ".system_generated\logs\transcript.jsonl"
+    if (Test-Path $transcript) {
+        $commands = (Select-String -Path $transcript -Pattern 'CommandLine":"\\"(.*?)\\""' -AllMatches |
+            ForEach-Object { $_.Matches } |
+            ForEach-Object { "- " + ($_.Groups[1].Value -replace '\\\\\\\\', '\' -replace '\\\\\\"', '"') }) -join "`n"
+    }
+    if ((Get-Content $err -Raw) -match 'cannot prompt for') {
+        Write-Warning "Antigravity stopped at a command its rules don't allow; it is the last one listed in the log."
+    }
+}
 @"
 # $Agent on $TaskId, $stamp
 
@@ -107,7 +125,7 @@ $(Get-Content $out -Raw)
 ## Tool log
 
 $(Get-Content $err -Raw)
-
+$(if ($commands) { "`n## Commands run`n`n$commands`n" })
 ## Working tree afterwards
 
 $changes
