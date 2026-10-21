@@ -1,0 +1,5 @@
+# Gemma 4 12B with a 32K context, the size OpenCode needs to see its tools. Ollama's own default is 4K, and the AMD AI
+# Bundle build ignores OLLAMA_CONTEXT_LENGTH, so the size lives in the model.
+# Create it with: ollama create gemma4:12b-32k -f scripts/gemma-32k.Modelfile
+FROM gemma4:12b
+PARAMETER num_ctx 32768
