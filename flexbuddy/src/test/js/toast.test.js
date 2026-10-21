@@ -205,3 +205,35 @@ test('a failure without a reason falls back to a general message', async t => {
     assert.strictEqual(el.title.textContent, 'Undo failed');
     assert.strictEqual(el.message.textContent, 'The action could not be undone.');
 });
+
+test('a notice that times out leaves no action on the button', t => {
+    const {toast, el, tick, init} = setUp(t);
+    init();
+    toast.show('Shift deleted', '', {onAction: () => {}, duration: 500});
+    assert.strictEqual(typeof el.action.onclick, 'function');
+    tick(500);
+    assert.strictEqual(toast.isVisible(), false);
+    assert.strictEqual(el.action.onclick, null);
+});
+
+test('a notice closed with hide() leaves no action on the button', t => {
+    const {toast, el, init} = setUp(t);
+    init();
+    toast.show('Shift deleted', '', {onAction: () => {}});
+    toast.hide();
+    assert.strictEqual(el.action.onclick, null);
+});
+
+test('clicking the action clears it from the button, so it runs only once', async t => {
+    const {toast, el, init} = setUp(t);
+    init();
+    let calls = 0;
+    let finish;
+    toast.show('Shift deleted', '', {onAction: () => new Promise(resolve => { calls++; finish = resolve; })});
+    const click = el.action.onclick();
+    // Still waiting for the restore: the button must already have no handler.
+    assert.strictEqual(el.action.onclick, null);
+    finish();
+    await click;
+    assert.strictEqual(calls, 1);
+});
