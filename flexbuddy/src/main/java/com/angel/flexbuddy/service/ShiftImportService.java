@@ -34,6 +34,7 @@ public class ShiftImportService {
     static final long DECODE_MAX_PIXELS = 5_000_000;
 
     private final ScreenshotTextExtractor textExtractor;
+    private final ScreenshotReadGate readGate;
     private final ShiftScreenshotParser screenshotParser;
     private final ImportWarningRules warningRules;
     private final ScheduledShiftMatcher scheduledShiftMatcher;
@@ -43,6 +44,7 @@ public class ShiftImportService {
 
     public ShiftImportService(
             ScreenshotTextExtractor textExtractor,
+            ScreenshotReadGate readGate,
             ShiftScreenshotParser screenshotParser,
             ImportWarningRules warningRules,
             ScheduledShiftMatcher scheduledShiftMatcher,
@@ -51,6 +53,7 @@ public class ShiftImportService {
             @Value("${flexbuddy.import.max-pixels:30000000}") long maxPixels
     ) {
         this.textExtractor = textExtractor;
+        this.readGate = readGate;
         this.screenshotParser = screenshotParser;
         this.warningRules = warningRules;
         this.scheduledShiftMatcher = scheduledShiftMatcher;
@@ -72,40 +75,7 @@ public class ShiftImportService {
             throw new InvalidScreenshotException("error.import.unsupportedType");
         }
 
-        OcrResult ocrResult;
-
-        try (ImageInputStream input = ImageIO.createImageInputStream(screenshot.getInputStream())) {
-            if (input == null) {
-                throw new InvalidScreenshotException(
-                        "error.import.notReadableImage"
-                );
-            }
-
-            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
-
-            if (!readers.hasNext()) {
-                throw new InvalidScreenshotException(
-                        "error.import.notReadableImage"
-                );
-            }
-
-            ImageReader reader = readers.next();
-
-            try {
-                reader.setInput(input);
-                BufferedImage image = readWithinLimits(reader);
-                ocrResult = textExtractor.extract(image);
-            }
-            finally {
-                reader.dispose();
-            }
-        }
-        catch (IOException exception) {
-            throw new InvalidScreenshotException(
-                    exception,
-                    "error.import.couldNotRead"
-            );
-        }
+        OcrResult ocrResult = readGate.read(() -> readText(screenshot));
 
         ZoneId zone = email == null ? clock.getZone() : userTime.zone(email);
         LocalDateTime now = LocalDateTime.ofInstant(clock.instant(), zone);
@@ -147,6 +117,41 @@ public class ShiftImportService {
                 ocrResult.lines(),
                 List.of(candidate)
         );
+    }
+
+    private OcrResult readText(MultipartFile screenshot) {
+        try (ImageInputStream input = ImageIO.createImageInputStream(screenshot.getInputStream())) {
+            if (input == null) {
+                throw new InvalidScreenshotException(
+                        "error.import.notReadableImage"
+                );
+            }
+
+            Iterator<ImageReader> readers = ImageIO.getImageReaders(input);
+
+            if (!readers.hasNext()) {
+                throw new InvalidScreenshotException(
+                        "error.import.notReadableImage"
+                );
+            }
+
+            ImageReader reader = readers.next();
+
+            try {
+                reader.setInput(input);
+                BufferedImage image = readWithinLimits(reader);
+                return textExtractor.extract(image);
+            }
+            finally {
+                reader.dispose();
+            }
+        }
+        catch (IOException exception) {
+            throw new InvalidScreenshotException(
+                    exception,
+                    "error.import.couldNotRead"
+            );
+        }
     }
 
     /** A block that starts after "now" in the driver's zone has not happened yet, so it is imported as scheduled. */

@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -13,6 +15,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -27,12 +30,14 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.angel.flexbuddy.dto.DuplicateKind;
 import com.angel.flexbuddy.dto.DuplicateMatch;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.exception.InvalidScreenshotException;
+import com.angel.flexbuddy.exception.ScreenshotBusyException;
 
 @ExtendWith(MockitoExtension.class)
 class ShiftImportServiceTest {
@@ -48,6 +53,8 @@ class ShiftImportServiceTest {
 
     private static final String EMAIL = "angel@example.com";
 
+    private final ScreenshotReadGate readGate = new ScreenshotReadGate(Duration.ofMillis(100));
+
     private ShiftImportService shiftImportService;
 
     @BeforeEach
@@ -59,6 +66,7 @@ class ShiftImportServiceTest {
         );
         shiftImportService = new ShiftImportService(
                 textExtractor,
+                readGate,
                 new ShiftScreenshotParser(),
                 new ImportWarningRules(),
                 scheduledShiftMatcher,
@@ -149,7 +157,7 @@ class ShiftImportServiceTest {
 
     @Test
     void createPreview_rejectsAnImageWithMorePixelsThanTheConfiguredLimit() throws IOException {
-        ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+        ShiftImportService limited = new ShiftImportService(textExtractor, readGate, new ShiftScreenshotParser(),
                 new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
         MockMultipartFile screenshot = new MockMultipartFile("screenshot", "huge.png", "image/png",
                 createPngBytes(200, 200));
@@ -161,7 +169,7 @@ class ShiftImportServiceTest {
 
     @Test
     void createPreview_rejectsAnExtremeAspectRatioOnTheSideCap() throws IOException {
-        ShiftImportService service = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+        ShiftImportService service = new ShiftImportService(textExtractor, readGate, new ShiftScreenshotParser(),
                 new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC),
                 30_000_000L);
         MockMultipartFile screenshot = new MockMultipartFile("screenshot", "wide.png", "image/png",
@@ -174,7 +182,7 @@ class ShiftImportServiceTest {
 
     @Test
     void createPreview_stillReadsAnImageInsideTheConfiguredLimit() throws IOException {
-        ShiftImportService limited = new ShiftImportService(textExtractor, new ShiftScreenshotParser(),
+        ShiftImportService limited = new ShiftImportService(textExtractor, readGate, new ShiftScreenshotParser(),
                 new ImportWarningRules(), scheduledShiftMatcher, userTime, Clock.fixed(Instant.parse("2026-09-07T12:00:00Z"), ZoneOffset.UTC), 10_000L);
         when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
                 line("Windsor (DCY1) - Amazon.com", 92, 0))));
@@ -276,6 +284,23 @@ class ShiftImportServiceTest {
 
         assertThat(candidate.suggestedStatus()).isEqualTo(ShiftStatus.COMPLETED);
         assertThat(candidate.duplicates()).containsExactly(match);
+    }
+
+    @Test
+    void createPreview_waitsForItsTurnBeforeDecodingTheScreenshot() throws Exception {
+        // A decoded screenshot is up to 20 MB, so uploads that queue for the reader must not each hold one while they wait.
+        MultipartFile screenshot = mock(MultipartFile.class);
+        when(screenshot.isEmpty()).thenReturn(false);
+        when(screenshot.getContentType()).thenReturn("image/png");
+        readGate.permit().acquire();
+        try {
+            assertThatThrownBy(() -> shiftImportService.createPreview(EMAIL, screenshot))
+                    .isInstanceOf(ScreenshotBusyException.class);
+        } finally {
+            readGate.permit().release();
+        }
+        verify(screenshot, never()).getInputStream();
+        verifyNoInteractions(textExtractor);
     }
 
     private MockMultipartFile png() throws IOException {
