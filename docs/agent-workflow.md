@@ -40,23 +40,23 @@ ollama pull qwen3.5:9b
 ollama pull gemma4:12b      # optional comparison model
 ```
 
-**Raise the context to 32K before using OpenCode.** Ollama otherwise loads models with 4K, which cuts off OpenCode's
-tool list: in the first trial the model could not read a single file. Set it once, then quit and reopen Ollama from
-the tray:
+**Use a 32K copy of the model with OpenCode.** Ollama loads models with a 4K context, which cuts off OpenCode's tool
+list: at 4K the model cannot read a single file. The `OLLAMA_CONTEXT_LENGTH` setting doesn't help on this PC; the AMD
+AI Bundle build kept loading at 4K after a restart. So the size is stored in a copy of the model instead, from
+[`scripts/qwen-32k.Modelfile`](../scripts/qwen-32k.Modelfile):
 
 ```powershell
-setx OLLAMA_CONTEXT_LENGTH 32768
+ollama create qwen3.5:9b-32k -f scripts/qwen-32k.Modelfile
 ```
 
-While a model runs, `ollama ps` should show `100% GPU` and `32768` in the CONTEXT column. Until Ollama restarts, the
-copy `qwen3.5:9b-32k` (made with `PARAMETER num_ctx 32768`) does the same job; remove it afterwards with
-`ollama rm qwen3.5:9b-32k`.
+The copy shares the original's files, so it takes no extra disk. While it runs, `ollama ps` should show `100% GPU` and
+`32768` in the CONTEXT column; check this before trusting a run, because a 4K run fails quietly.
 
 ### OpenCode
 
 ```powershell
 npm install -g opencode-ai
-ollama launch opencode --model qwen3.5:9b
+ollama launch opencode --model qwen3.5:9b-32k
 ```
 
 OpenCode reads `AGENTS.md`, the skills in `.agents/skills/` and the permissions in [`opencode.json`](../opencode.json):
@@ -199,10 +199,16 @@ Trials with Qwen 3.5 9B on the RX 7800 XT, October 21, 2026, all fully on the GP
 | Read-only prompt, 32K | about 3 min | Named every controller and service correctly, but invented six Thymeleaf templates and a `shifts.js` |
 | FB-001 (tests for `toast.js`), attempt 1 | 165 s | Read the whole 84 KB message catalog, ran out of room and stopped; no files written |
 | FB-001, attempt 2 | 225 s | Wrote a test file that never reached the script (9 of 13 tests failed), then the run broke off; no handoff report |
+| FB-002, tests after an Antigravity handoff, at 4K by mistake | 70 s | Printed a command as text instead of using its tools; nothing written |
+| FB-002, same handoff at 32K | 291 s | Read the handoff report and diff, added 3 tests and updated the report; 2 tests were useful, 1 could never fail but was reported as covering its criterion |
 
-Claude Code finished FB-001 after the two failed attempts. Treat Qwen as a helper for narrow tasks: docs, CSS, small
-fixes. Stop it after two failed attempts, check what it reports, and keep timing real tasks. If it isn't saving time,
-drop it; nothing else depends on it.
+Claude Code finished FB-001 after the two failed attempts and fixed FB-002's third test. Treat Qwen as a helper for
+narrow tasks with one example to copy: docs, CSS, small fixes, a test or two. Stop it after two failed attempts,
+check every test it writes fails without the change it guards, and don't take its handoff report's ticks on trust.
+If it isn't saving time, drop it; nothing else depends on it.
+
+The first handoff test (FB-002) worked: Antigravity made the change, checked it in its own browser on localhost and
+wrote a handoff report clear enough for Qwen to pick up from without any chat history.
 
 **Writing tasks for the local model.** Its 32K context is small next to this codebase:
 
