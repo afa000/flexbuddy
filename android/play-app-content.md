@@ -4,19 +4,27 @@ Draft for Stage 9, prepared September 14, 2026 from the code, privacy policy, te
 Play-installed build. Recheck each answer against the live app before submitting, and update this
 file, the privacy policy, and the Data safety form together whenever data handling changes.
 
+Rechecked on October 20, 2026 against the saved Data safety form in Play Console, the code and the
+privacy policy effective October 10, 2026. The form already covered Google sign-in, email codes and
+two-step sign-in; this file had fallen behind it and now matches it.
+
 Sources checked:
 
-- Data models: `AppUser`, `Shift`, `Expense`, `PushSubscription`, `ReminderLog`, and the
-  `persistent_logins` remember-me table.
-- Dependencies (`pom.xml`): Spring Boot, PostgreSQL, Flyway, Tess4J (on-server OCR), and web-push.
-  No ads, analytics, crash-reporting, or third-party SDKs.
+- Data models: `AppUser` (including the Google account ID and two-step settings), `Shift`,
+  `Expense`, `TaxPayment`, `PayoutDeposit`, `StandingEntry`, `PushSubscription`, `ReminderLog`,
+  `TaxReminderLog`, `PasswordResetToken`, `EmailCode`, `RecoveryCode`, and the `persistent_logins`
+  remember-me table.
+- Dependencies (`pom.xml`): Spring Boot (including mail and the OAuth client for Google sign-in),
+  PostgreSQL, Flyway, Tess4J (on-server OCR), and web-push. No ads, analytics, or third-party
+  SDKs; error reports are FlexBuddy's own and go to its support mailbox.
 - Templates and static files: no external scripts, trackers, or fonts.
 - Android build: `androidbrowserhelper` 2.6.2 only. The Play-installed APK requests
   `POST_NOTIFICATIONS`, its own receiver permission, and `CHECK_LICENSE` (added by Play). No
   `AD_ID` permission.
 - Screenshot import: images are processed in memory by Tess4J and never stored.
-- Account deletion (`AccountService.deleteAccount`): removes expenses and shifts including trash,
-  reminder history, push subscriptions, remember-me tokens, and the account.
+- Account deletion (`AccountService.deleteAccountData`): removes expenses and shifts including
+  trash, tax payments, payout deposits, standing entries, reminder history, push subscriptions,
+  remember-me tokens, password reset links, email codes, recovery codes, and the account.
 
 ## Already complete
 
@@ -89,14 +97,18 @@ keeps the app outside the Families policy.
 |---|---|
 | Does your app collect or share any of the required user data types? | **Yes** |
 | Is all of the user data collected by your app encrypted in transit? | **Yes**: the app loads only the HTTPS origin, and push payloads are encrypted |
-| Which account creation methods does your app support? | **Username and password** (email address and password) |
+| Which account creation methods does your app support? | **Username and password** (email address and password) and **OAuth** (Continue with Google) |
 | Link for users to request account and data deletion | `https://flexbuddy.onrender.com/delete-account` |
-| Can users request deletion of some data without deleting their account? | Optional; left unanswered. Answering Yes requires a second URL describing partial deletion, and `/delete-account` covers only full account deletion. Individual shifts and expenses can already be deleted in the app, so add a section to that page before answering Yes |
+| Can users request deletion of some data without deleting their account? | Optional; left unanswered in the live form. Answering Yes requires a second URL describing partial deletion, and `/delete-account` covers only full account deletion. Individual shifts and expenses can already be deleted in the app, so add a section to that page before answering Yes |
+
+Two-step sign-in is optional, so it does not change the account creation answer: no account needs
+more than a password or Google to be created.
 
 Data is **not shared**. Render (hosting and database), Google's Gmail service (which sends
-password-reset emails and the developer's error alerts) and browser push services (which deliver
-encrypted notifications) act as service providers on FlexBuddy's behalf, which Play does not count
-as sharing.
+password-reset links, sign-up and two-step codes, and the developer's error alerts) and browser push
+services (which deliver encrypted notifications) act as service providers on FlexBuddy's behalf,
+which Play does not count as sharing. Google sign-in sends data from Google to FlexBuddy, not the
+other way, so it is not sharing either.
 
 ### Data types
 
@@ -106,8 +118,8 @@ another purpose is listed.
 | Play category | Data type | Ephemeral? | Required or optional | Purposes | What it is |
 |---|---|---|---|---|---|
 | Personal info | Name | No | Required | App functionality, Account management | Display name entered at registration |
-| Personal info | Email address | No | Required | App functionality, Account management | Sign-in email; also where a password-reset link is sent (through Gmail's mail service) |
-| Personal info | User IDs | No | Required | App functionality | The account number, which a page error report carries so the developer can tell which account hit a problem. Added with error reports |
+| Personal info | Email address | No | Required | App functionality, Account management | Sign-in email; where sign-up codes, two-step codes and password-reset links are sent (through Gmail's mail service) |
+| Personal info | User IDs | No | Required | App functionality, Account management | The account number, which a page error report carries so the developer can tell which account hit a problem, and, for drivers who continue with Google, the Google account ID used to recognise them |
 | Financial info | Other financial info | No | Required | App functionality | Base pay, tips, cancellation pay, expense amounts, mileage rate, and vehicle-cost settings |
 | Photos and videos | Photos | **Yes** | Optional | App functionality | Screenshots uploaded for shift import; processed in memory and discarded |
 | Files and docs | Files and docs | No | Optional | App functionality | Backup files uploaded for restore; held in the server session for up to 15 minutes before import |
@@ -179,14 +191,13 @@ expenses entered by the user; no money is held, moved, lent, or invested."
 
 Productivity is preferred over Finance so the app is not presented as a financial service.
 
-## Privacy policy follow-ups (recommended before production)
+## Privacy policy follow-ups
 
-These do not block the declarations above, but reviewers compare the policy with the Data safety
-form:
+All three were done in the policy effective October 10, 2026, which reviewers compare with the Data
+safety form:
 
-1. Name the developer as it appears on Google Play (**Angel2458**) in the privacy policy, next to
-   the contact email.
-2. State that push reminders are delivered through the browser's push service (for example
-   Google's for Chrome) with encrypted contents.
-3. State that uploaded backup files are held briefly in the server session to preview a restore and
-   then discarded.
+1. Done: it names the developer as it appears on Google Play (**Angel2458**).
+2. Done: it states that push reminders go through the browser's push service with encrypted
+   contents.
+3. Done: it states that uploaded backup files are held in the server session for up to 15 minutes
+   to preview a restore and then discarded.
