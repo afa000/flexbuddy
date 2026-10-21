@@ -63,7 +63,9 @@ if ($Agent -eq 'local') {
     if (-not (Test-Path $settings)) {
         Copy-Item $wanted $settings
         Write-Host "Installed the Antigravity CLI permission rules in $settings"
-    } elseif (((Get-Content $settings) -join "`n") -ne ((Get-Content $wanted) -join "`n")) {
+    } elseif ((Get-Content $settings -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 5 -Compress) -ne
+            (Get-Content $wanted -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 5 -Compress)) {
+        # Compared as JSON: the CLI rewrites the file with & < > escaped, which is the same rules.
         Write-Warning "$settings differs from scripts/antigravity-cli-settings.json; using it as it is."
     }
     $exe = Join-Path $env:USERPROFILE ".gemini\bin\agy.exe"
