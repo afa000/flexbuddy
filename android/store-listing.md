@@ -21,46 +21,114 @@ Play limits app names to 30.
 
 ## Full description
 
+Updated October 20, 2026 for offline adding, Google and two-step sign-in, Spanish, goals, payouts,
+taxes and standing. Paste it into Play with a line break only between paragraphs and bullets; the
+wrapping below is for this file.
+
 ```text
 FlexBuddy is a private tracker for independent delivery drivers. Log every block, see what you
 really earned after costs, and plan the week ahead.
 
-TRACK EVERY SHIFT
-• Add shifts from a screenshot: FlexBuddy reads the station, date, times, and pay, and you review
-  every value before saving.
-• Record base pay, tips, and miles for each block.
-• Filter and sort your history by date, station, pay, hours, or hourly rate.
+TRACK EVERY BLOCK
+• Add a block from a screenshot: FlexBuddy reads the station, date, times, and pay, and you check
+  every value before saving. Screenshots in English or Spanish work, and you can share one straight
+  from your gallery.
+• Record base pay, tips, miles, actual start and finish times, and stops, packages, and returns.
+• Add blocks and expenses even without a signal; they sync when you are back online.
 
 SEE YOUR REAL EARNINGS
-• Totals for earnings, hours worked, average pay per shift, and hourly rate.
-• Estimated net earnings after mileage and expenses, using standard mileage or actual costs.
-• Reports by station, week, month, or year with charts and tables.
-• Export your shift and expense history to CSV.
+• A Home screen built around this week: earnings against your weekly goal, the next block, and the
+  next payout.
+• Estimated net pay after mileage and expenses, using standard mileage or actual costs.
+• Check each payout against what its blocks earned.
+• Reports by station, week, month, or year, with charts, your best times to work, and CSV export.
+• Evaluate an offer before you accept it: what it nets you per hour, and how much is surge over
+  your usual rate.
 
 PLAN YOUR SCHEDULE
 • Add scheduled blocks, then mark them completed, cancelled, or forfeited.
-• A countdown to your next block, a 14-day list, and a monthly calendar.
-• Cancelled blocks can record cancellation pay without adding hours.
+• A countdown to your next block and its forfeit deadline, a 14-day list, and a monthly calendar.
 • Subscribe to your schedule from your phone's calendar, or turn on optional reminders.
+• Log your standing and see it next to forfeits and cancellations.
 
-LOG EXPENSES
-• Fuel, tolls, parking, maintenance, and other costs, optionally linked to a shift.
+EXPENSES AND TAXES
+• Fuel, tolls, parking, maintenance, and other costs, optionally linked to a block.
+• An estimate of what to set aside for taxes, due-date reminders, and a printable year summary for
+  your tax preparer.
 
 YOUR DATA STAYS YOURS
-• A private account; your history is visible only to you.
+• A private account with email and password or Google sign-in, and optional two-step sign-in.
 • Recently deleted items can be restored for 30 days.
 • Download a full backup at any time and restore it later.
 • Delete your account and its data from inside the app.
 • No ads and no analytics.
+• Available in English and Spanish.
 
-Works with a connection; your most recent dashboard and schedule stay viewable when you are
-briefly offline.
-
-Earnings, mileage, and net figures are estimates for your own planning and are not tax or
+Earnings, mileage, net, and tax figures are estimates for your own planning and are not tax or
 financial advice.
 
 FlexBuddy is an independent app and is not affiliated with, endorsed by, or sponsored by Amazon
 or any delivery platform.
+```
+
+## Spanish listing (es-419 and es-US)
+
+The app is in Spanish, so the listing can be too. It uses the app's own Spanish wording and the
+formal "usted", as the app does.
+
+| Field | Value | Limit |
+|---|---|---|
+| Short description | `Registre bloques, ganancias, millas y gastos de reparto en un lugar privado.` (76 characters) | 80 |
+
+```text
+FlexBuddy es un registro privado para repartidores independientes. Anote cada bloque, vea lo
+que realmente ganó después de los costos y planifique la semana.
+
+REGISTRE CADA BLOQUE
+• Agregue un bloque desde una captura de pantalla: FlexBuddy lee la estación, la fecha, las horas
+  y el pago, y usted revisa cada valor antes de guardar. Funciona con capturas en inglés o en
+  español, y puede compartirlas directamente desde su galería.
+• Registre el pago base, las propinas, las millas, las horas reales de inicio y fin, y las paradas,
+  los paquetes y las devoluciones.
+• Agregue bloques y gastos aunque no tenga señal; se sincronizan cuando vuelve a tener conexión.
+
+VEA SUS GANANCIAS REALES
+• Una pantalla de Inicio centrada en esta semana: sus ganancias frente a su meta semanal, el
+  próximo bloque y el próximo depósito.
+• Pago neto estimado después del millaje y los gastos, con la tarifa estándar por milla o con los
+  costos reales.
+• Compare cada depósito con lo que ganaron sus bloques.
+• Informes por estación, semana, mes o año, con gráficos, sus mejores horarios para trabajar y
+  exportación a CSV.
+• Evalúe una oferta antes de aceptarla: cuánto le deja por hora y cuánto es aumento sobre su
+  tarifa habitual.
+
+PLANIFIQUE SU SEMANA
+• Agregue bloques programados y luego márquelos como completados, cancelados o perdidos.
+• Una cuenta regresiva para su próximo bloque y su límite para perderlo, una lista de 14 días y un
+  calendario mensual.
+• Suscríbase a su programación desde el calendario de su teléfono o active recordatorios opcionales.
+• Registre su nivel y véalo junto a los bloques perdidos y cancelados.
+
+GASTOS E IMPUESTOS
+• Combustible, peajes, estacionamiento, mantenimiento y otros costos, con la opción de vincularlos
+  a un bloque.
+• Un estimado de cuánto apartar para impuestos, recordatorios de fechas de pago y un resumen anual
+  imprimible para su preparador de impuestos.
+
+SUS DATOS SON SUYOS
+• Una cuenta privada con correo y contraseña o con Google, y verificación en dos pasos opcional.
+• Los elementos eliminados recientemente se pueden restaurar durante 30 días.
+• Descargue una copia de seguridad completa en cualquier momento y restáurela después.
+• Elimine su cuenta y sus datos desde la app.
+• Sin anuncios y sin analíticas.
+• Disponible en inglés y español.
+
+Las ganancias, el millaje, el neto y los impuestos son estimaciones para su propia planificación y
+no constituyen asesoría fiscal ni financiera.
+
+FlexBuddy es una app independiente y no está afiliada, respaldada ni patrocinada por Amazon ni por
+ninguna plataforma de reparto.
 ```
 
 ## Graphics
