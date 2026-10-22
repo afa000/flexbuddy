@@ -17,7 +17,10 @@
   and tested on the emulator: sharing an image from Google Photos opened the import screen with
   it read
 - Uploaded to Closed testing - Alpha on September 26, 2026 as `2 (share-to-import and new icon)`
-  (version 1 not carried over) and sent to Google for review
+  (version 1 not carried over) and sent to Google for review. Approved: on October 22, 2026 Play Console showed it
+  available to testers in 178 of 178 countries, full rollout
+- Production access applied for on October 22, 2026, after Play Console showed all three closed-test
+  requirements met; answers in `production-access.md`
 
 ## Version code 1 — initial internal-test build
 
