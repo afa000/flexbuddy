@@ -88,17 +88,20 @@ class ScreenshotPreprocessorTest {
     }
 
     @Test
-    void threshold_producesOnlyBlackAndWhitePixels() {
-        BufferedImage image = new BufferedImage(3, 1, BufferedImage.TYPE_BYTE_GRAY);
-        image.getRaster().setSample(0, 0, 0, 30);
-        image.getRaster().setSample(1, 0, 0, 120);
-        image.getRaster().setSample(2, 0, 0, 230);
+    void prepare_keepsGrayLevelsForTesseractToThreshold() {
+        // A grey dark-mode card: one cutoff for the whole image used to make the card and its text one black block.
+        BufferedImage card = solidImage(400, 800, new Color(5, 7, 10));
+        var graphics = card.createGraphics();
+        graphics.setColor(new Color(37, 41, 47));
+        graphics.fillRect(0, 0, 400, 300);
+        graphics.dispose();
 
-        preprocessor.threshold(image);
+        BufferedImage result = preprocessor.prepare(card);
 
-        assertThat(image.getRaster().getSample(0, 0, 0)).isIn(0, 255);
-        assertThat(image.getRaster().getSample(1, 0, 0)).isIn(0, 255);
-        assertThat(image.getRaster().getSample(2, 0, 0)).isIn(0, 255);
+        int cardShade = result.getRaster().getSample(result.getWidth() / 2, 100, 0);
+        int backgroundShade = result.getRaster().getSample(result.getWidth() / 2, result.getHeight() - 100, 0);
+        assertThat(cardShade).isBetween(200, 230);
+        assertThat(backgroundShade).isGreaterThan(cardShade);
     }
 
     private BufferedImage solidImage(int width, int height, Color color) {

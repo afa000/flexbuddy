@@ -39,6 +39,9 @@ public class TesseractScreenshotTextExtractor implements ScreenshotTextExtractor
         tesseract.setPageSegMode(preparedImage.getHeight() > preparedImage.getWidth() * 1.6 ? 4 : 6);
         tesseract.setVariable("user_defined_dpi", "300");
         tesseract.setVariable("preserve_interword_spaces", "1");
+        // Sauvola thresholds each area against its neighbourhood. One cutoff for the whole image turned a grey
+        // dark-mode card and the text on it into one black block.
+        tesseract.setVariable("thresholding_method", "2");
 
         try {
             List<Word> words = tesseract.getWords(
