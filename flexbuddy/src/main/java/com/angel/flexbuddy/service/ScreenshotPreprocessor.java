@@ -20,14 +20,14 @@ public class ScreenshotPreprocessor {
     static final long MAX_OUTPUT_PIXELS = 5_000_000;
 
     /**
-     * Only two images beside the caller's are ever allocated: the scaled grayscale copy, which is then inverted and
-     * thresholded in place, and the padded result. A full-colour scaled copy of a 5 megapixel screenshot was 20 MB on
-     * its own, and Render leaves the heap about 60 MB beside the app.
+     * Only two images beside the caller's are ever allocated: the scaled grayscale copy, which is then inverted in
+     * place, and the padded result. A full-colour scaled copy of a 5 megapixel screenshot was 20 MB on its own, and
+     * Render leaves the heap about 60 MB beside the app. The image stays grayscale: Tesseract's Sauvola thresholding
+     * turns it black and white area by area.
      */
     public BufferedImage prepare(BufferedImage source) {
         BufferedImage grayscale = scaledGrayscale(source);
         invertIfDark(grayscale);
-        threshold(grayscale);
         return pad(grayscale);
     }
 
@@ -94,33 +94,6 @@ public class ScreenshotPreprocessor {
         }
     }
 
-    /** Turns a grayscale image into pure black and white in place, unless it already nearly is. */
-    void threshold(BufferedImage image) {
-        WritableRaster raster = image.getRaster();
-        int[] histogram = new int[256];
-        int total = image.getWidth() * image.getHeight();
-        int extremePixels = 0;
-        boolean hasDark = false;
-        boolean hasLight = false;
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                int value = raster.getSample(x, y, 0);
-                histogram[value]++;
-                if (value <= 20 || value >= 235) extremePixels++;
-                if (value <= 20) hasDark = true;
-                if (value >= 235) hasLight = true;
-            }
-        }
-        if (total > 0 && extremePixels >= total * .95 && hasDark && hasLight) return;
-
-        int cutoff = otsuThreshold(histogram, total);
-        for (int y = 0; y < image.getHeight(); y++) {
-            for (int x = 0; x < image.getWidth(); x++) {
-                raster.setSample(x, y, 0, raster.getSample(x, y, 0) > cutoff ? 255 : 0);
-            }
-        }
-    }
-
     BufferedImage pad(BufferedImage source) {
         BufferedImage result = new BufferedImage(
                 source.getWidth() + PADDING * 2,
@@ -136,31 +109,5 @@ public class ScreenshotPreprocessor {
             graphics.dispose();
         }
         return result;
-    }
-
-    private int otsuThreshold(int[] histogram, int total) {
-        long weightedSum = 0;
-        for (int i = 0; i < histogram.length; i++) weightedSum += (long) i * histogram[i];
-
-        long backgroundSum = 0;
-        int backgroundWeight = 0;
-        double bestVariance = -1;
-        int bestThreshold = 127;
-        for (int i = 0; i < histogram.length; i++) {
-            backgroundWeight += histogram[i];
-            if (backgroundWeight == 0) continue;
-            int foregroundWeight = total - backgroundWeight;
-            if (foregroundWeight == 0) break;
-            backgroundSum += (long) i * histogram[i];
-            double backgroundMean = (double) backgroundSum / backgroundWeight;
-            double foregroundMean = (double) (weightedSum - backgroundSum) / foregroundWeight;
-            double variance = (double) backgroundWeight * foregroundWeight
-                    * Math.pow(backgroundMean - foregroundMean, 2);
-            if (variance > bestVariance) {
-                bestVariance = variance;
-                bestThreshold = i;
-            }
-        }
-        return bestThreshold;
     }
 }

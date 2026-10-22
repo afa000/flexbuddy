@@ -215,4 +215,101 @@ class ShiftScreenshotParserTest {
         assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 12, 28));
         assertThat(result.warnings()).extracting(ImportWarning::code).contains("YEAR_ROLLOVER");
     }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // Flex leaves out ":00" on the hour; « and • are how OCR reads the bullet before the duration.
+            "16:30 - 21 « (4 hr 30 min)|16:30|21:00",
+            "10 - 14:30 • (4 hr 30 min)|10:00|14:30",
+            "19 - 22 «(3 hr)|19:00|22:00",
+            "04 - 08 • (4 hr)|04:00|08:00",
+            "5:30 p.m. - 8 p.m.|17:30|20:00",
+            "3:30 AM - 8 AM|03:30|08:00",
+            "12 AM - 12:30 AM|00:00|00:30",
+            "9 PM - 11 PM|21:00|23:00",
+            "6:30 a.m. — 10:30 a.m.|06:30|10:30"
+    })
+    void parse_readsRangesThatLeaveOutMinutesOnTheHour(String line, LocalTime start, LocalTime end) {
+        ParsedShiftData result = parser.parse("Thursday, 10/8\n" + line + "\n$90.00", 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(start);
+        assertThat(result.endTime().value()).isEqualTo(end);
+    }
+
+    @Test
+    void parse_doesNotReadAZipCodeAsHours() {
+        ParsedShiftData result = parser.parse("12 Sample Rd, Springfield, CT, US, 06095-1345\nStart\n4:00 AM", 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(4, 0));
+        assertThat(result.endTime().value()).isNull();
+    }
+
+    @Test
+    void parse_joinsARangeWrappedOntoTheNextLine() {
+        String rawText = """
+                Thursday, 9/17
+                11:45 AM -                $66
+                2:45 PM
+                3 hr
+                Springfield (DXX9)-Amazon.com
+                3:00 PM - 7:00 PM
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(11, 45));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(14, 45));
+        assertThat(result.basePay().value()).isEqualByComparingTo(new BigDecimal("66"));
+    }
+
+    @Test
+    void parse_skipsTheOrdersFilterAndFixesALetterReadForTheLastDigit() {
+        ParsedShiftData filter = parser.parse("Orders (Any)\nSpringfield (DXX9) - Amazon.com", 2026);
+        ParsedShiftData lookalike = parser.parse("Springfield CT (VXXG/BXX4) - Sub Same-Day", 2026);
+
+        assertThat(filter.station().value()).isEqualTo("DXX9");
+        assertThat(lookalike.station().value()).isEqualTo("VXX6");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // A date that only works one way round is read that way.
+            "Monday 27/02|£47.50|2026-02-27",
+            "Friday, 16/12|$176.00|2026-12-16",
+            "martes, 06/15|$54|2026-06-15",
+            // British and Mexican screenshots write the day first, zero-padded US Spanish ones the month first.
+            "Tuesday 06/10|£46.50|2026-10-06",
+            "domingo 4/10|$325.00|2026-10-04",
+            "martes, 06/10|$54|2026-06-10",
+            "Tuesday, 6/10|$54|2026-06-10",
+            "MONDAY FEBRUARY 7|$142|2026-02-07",
+            "SATURDAY JANUARY 24 (2 OF 3)|$20.50|2026-01-24"
+    })
+    void parse_readsTheDateInTheOrderTheScreenshotUses(String dateLine, String payLine, LocalDate expected) {
+        ParsedShiftData result = parser.parse(dateLine + "\n18:15 - 21:15\n" + payLine, 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "£47.50|47.50",
+            "MXN 397|397",
+            "MXN800.00|800.00",
+            "16:15 - 19:15             51,00 GBP|51.00",
+            "$1,000|1000"
+    })
+    void parse_readsPayInOtherCurrencies(String line, BigDecimal expected) {
+        ParsedShiftData result = parser.parse("Wednesday, 10/7\n" + line, 2026);
+
+        assertThat(result.basePay().value()).isEqualByComparingTo(expected);
+    }
+
+    @Test
+    void parse_readsTheSpanishFinalizarLabel() {
+        ParsedShiftData result = parser.parse("HOY\nInicio\n19:30\nFinalizar a las\n21:30\n18:36", 2026);
+
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(19, 30));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(21, 30));
+    }
 }
