@@ -12,5 +12,23 @@
       "git reset --hard*": "deny",
       "git clean*": "deny"
     }
+  },
+  "agent": {
+    "headless": {
+      "description": "Unattended runs from scripts/run-agent.ps1: edits files, runs only read-only git and node --test",
+      "mode": "primary",
+      "permission": {
+        "edit": "allow",
+        "bash": {
+          "*": "deny",
+          "git status*": "allow",
+          "git diff*": "allow",
+          "git log*": "allow",
+          "git show*": "allow",
+          "git branch*": "allow",
+          "node --test*": "allow"
+        }
+      }
+    }
   }
 }

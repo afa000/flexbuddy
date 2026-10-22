@@ -144,7 +144,49 @@ Read the packet for secrets before it becomes the pull request description. The 
 and stops before pushing.
 
 **Review and merge.** Wait for the Java and JS checks, then ask Claude Code to review the branch (for example with
-`/code-review`), or give ChatGPT the PR link. Merging to `main` deploys to Render.
+`/code-review`), or give ChatGPT the PR link. Merging to `main` deploys to Render; GitHub refuses the merge until both
+checks pass.
+
+## Running everything from one Claude Code session
+
+Claude Code can hand a task to Antigravity or the local model without either app being opened, using
+[`scripts/run-agent.ps1`](../scripts/run-agent.ps1). Run it on the task's branch, in the working tree the agent should
+edit (a separate Git worktree if you are working in the main one at the same time):
+
+```powershell
+.\scripts\run-agent.ps1 -Agent local -TaskId FB-003
+.\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Prompt "Only do step 1 of the task's handoff plan."
+```
+
+Without `-Prompt`, the agent implements the task with the `implement-task` skill and writes its handoff report. The
+run is timed and saved to `.ai/artifacts/<task-id>/agent-<agent>-<time>.log`, with the agent's answer, its tool log,
+the commands it ran and the files it changed. Then Claude Code checks the work and carries on with `verify.ps1`, the
+packet and the pull request.
+
+Nobody is there to approve anything during these runs, so each agent gets fixed rules instead:
+
+- **Local model:** OpenCode runs as the `headless` agent defined in [`opencode.json`](../opencode.json). It may edit
+  files and run only read-only git commands and `node --test`; everything else is refused. Your own interactive
+  OpenCode sessions keep asking as before.
+- **Antigravity:** the CLI (`agy`, installed with the app in `~/.gemini/bin`) runs with
+  [`scripts/antigravity-cli-settings.json`](../scripts/antigravity-cli-settings.json), which the script installs as
+  `~/.gemini/antigravity-cli/settings.json` the first time. It allows read-only git, read-only PowerShell
+  (`Get-ChildItem`, `Get-Content`, `Select-String`, `Test-Path`), `node --test`, the Maven `verify`/`test` runs and
+  `verify.ps1`, none of them chained with `;`, `&`, `|` or redirects, and it refuses commits, pushes and branch
+  changes. Those settings apply to every Antigravity CLI run on this PC, not the desktop app.
+
+Things to know:
+
+- **One refused command ends an Antigravity run** without an answer; the log's "Commands run" list ends with the one
+  it tried. Allow it in `scripts/antigravity-cli-settings.json` if it is safe, then copy the file over the installed
+  one (the script only installs it when none exists).
+- **Antigravity rules must be regexes.** On Windows the CLI checks each command wrapped in quotes, so plain rules such
+  as `command(git status)` never match. Copy the settings file rather than rewriting it: the CLI silently ignores one
+  that starts with a byte-order mark, which PowerShell's `Set-Content -Encoding UTF8` adds.
+- **Every Antigravity run uses Pro quota**, about 30K tokens even for a one-word answer.
+- **Antigravity's browser checks don't run this way.** Claude Code checks UI changes itself, with its own browser on
+  `localhost`.
+- **Still yours to do:** sign-ins, Ollama updates and restarts (this session can't close Ollama), and GitHub settings.
 
 ## Handing a task to another agent
 
