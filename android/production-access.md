@@ -1,5 +1,28 @@
 # FlexBuddy — Play Console production access application
 
+## Result: more testing required (October 24, 2026)
+
+Google replied by email on October 24, 2026: the app "requires more testing before you can access production". It
+named two possible reasons, testers not engaged with the app during the closed test, and not following testing best
+practices "which may include gathering and acting on user feedback through updates to your app". It asks for another
+14 days of closed testing with real testers before applying again.
+
+What Google could see against what the answers below claimed:
+
+- **No updates during the test.** The closed track received version 2 on September 26, 2026 and nothing after it.
+  Every change in the answers (offline adding, Spanish, Google sign-in, password reset and the rest) shipped through
+  Render, as the closed test plan said to, so none of it appeared as an update to the app. The answers say the app
+  changed because of feedback; the release history shows one update, near the start.
+- **Tester recruitment.** Testers came partly from the Testers Community app, a tester-exchange service whose members
+  tend to open apps to stay counted rather than use them. The answers themselves say few testers tried taxes or
+  backups.
+- **Vague feedback.** The feedback summary lists topics, not what a tester reported, when, and what changed because of
+  it.
+
+The next attempt follows [closed-test-round-2.md](closed-test-round-2.md).
+
+## First application
+
 Submitted in Play Console on October 22, 2026 at 1:50 AM with the answers below, exactly as written. Play shows them to
 Google only, not on the store listing. Google said it usually replies by email to the account owner within 7 days.
 
