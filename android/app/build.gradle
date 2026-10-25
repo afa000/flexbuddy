@@ -55,7 +55,7 @@ android {
     namespace "com.angel.flexbuddy"
     defaultConfig {
         applicationId "com.angel.flexbuddy"
-        minSdkVersion 21
+        minSdkVersion 24
         targetSdkVersion 36
         versionCode 3
         versionName "3"

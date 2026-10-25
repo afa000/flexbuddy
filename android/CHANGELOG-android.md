@@ -2,7 +2,10 @@
 
 ## Version code 3 — everything since version 2, for the second closed test
 
-- No shell changes: `appVersionCode` and `appVersionName` raised to 3 for the second closed test
+- Minimum Android version raised from 5.0 (`minSdkVersion` 21) to 7.0 (24). Play Console refused the
+  first version 3 bundle on October 26, 2026: "Play automatic protection requires a minimum SDK
+  version of 24 or higher". Phones on Android 5 or 6 can no longer install updates.
+- `appVersionCode` and `appVersionName` raised to 3 for the second closed test
   ([closed-test-round-2.md](closed-test-round-2.md)). It brings the web app's changes since September 26,
   2026 to testers as an update Play can see.
 - Generated with `bubblewrap update --skipVersionUpgrade`. Afterwards the hand-drawn icons, splash
