@@ -1,5 +1,22 @@
 # Android release history
 
+## Version code 3 — everything since version 2, for the second closed test
+
+- No shell changes: `appVersionCode` and `appVersionName` raised to 3 for the second closed test
+  ([closed-test-round-2.md](closed-test-round-2.md)). It brings the web app's changes since September 26,
+  2026 to testers as an update Play can see.
+- Generated with `bubblewrap update --skipVersionUpgrade`. Afterwards the hand-drawn icons, splash
+  images and `store_icon.png` were restored, and so were the Java and XML files whose only change was
+  whitespace. `shortcuts.xml` is reset to an empty template by both `update` and `build`; the build
+  fills it from `twa-manifest.json`, so the committed copy is kept as it was.
+  `res/raw/web_app_manifest.json` now matches the live site's manifest, which adds the share target and
+  the Evaluate shortcut to that copy; the launcher shortcuts are still the three in `twa-manifest.json`.
+- Built unsigned with Bubblewrap on October 25, 2026. The APK reads `versionCode='3'
+  versionName='3'` and has the Import, Expenses and Schedule launcher shortcuts, as version 2 did.
+- Signing, emulator check and upload: _to fill in_
+- Release notes (English and Spanish): as written in `closed-test-round-2.md`
+- Uploaded to Closed testing - Alpha on _date_ as `3 (second closed test)` and sent for review: _to fill in_
+
 ## Version code 2 — redrawn app icon and share-to-import
 
 - Share target: FlexBuddy appears in Android's share sheet for PNG and JPEG images. The shared
