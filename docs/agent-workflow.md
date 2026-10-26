@@ -8,13 +8,17 @@ can pick up where another stopped.
 
 ## The loop
 
-1. A planner (Claude or ChatGPT) writes the task in `.ai/tasks/FB-xxx.md` and pushes it on a new `ai/FB-xxx` branch.
-2. One agent at a time implements it on that branch: Claude Code, Antigravity, or OpenCode with a local model.
+1. Claude Code with Opus writes the task in `.ai/tasks/FB-xxx.md`, including its risk and who implements it, and
+   pushes it on a new `ai/FB-xxx` branch.
+2. The implementer the task names works on that branch, one agent at a time: Claude Code with Sonnet, Antigravity, or
+   OpenCode with the local model ([which one](#which-tool-for-which-task)).
 3. [`scripts/verify.ps1`](../scripts/verify.ps1) runs the Java and JavaScript suites; CI adds the PostgreSQL migration
    test on the pull request.
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
    the pull request description.
-5. Claude Code reviews the branch (or ChatGPT reviews the PR on GitHub). Merging to `main` deploys to Render.
+5. A fresh Claude Code session with Opus reviews the pull request with the `review-task` skill
+   (`.agents/skills/review-task/SKILL.md`). Merging to `main`
+   deploys to Render.
 
 ## One-time setup
 
@@ -85,21 +89,55 @@ and emulator work because it already follows the emulator rules.
 
 ## Which tool for which task
 
-| Work | Tool |
-|---|---|
-| Docs, small CSS, single-file tests | OpenCode + Gemma |
-| Small Java or JavaScript bug | OpenCode + Gemma first; Antigravity after two failed attempts |
-| New UI, responsive work, browser checks | Antigravity Pro |
-| Spring Security, migrations, backup/restore, earnings | Antigravity Pro or Claude Code, plus CI and a separate review |
-| Android wrapper, emulator checks, Play listing | Claude Code |
-| Planning a feature, large design choices | Claude or ChatGPT |
-| Final review | Claude Code (local diff) or ChatGPT (GitHub PR) |
+Claude's usage limits are the scarce resource, so Claude plans and reviews everything and writes only the code where a
+mistake is expensive. Antigravity and the local model have their own quotas, so they take the volume.
+
+**Every task, whoever implements it:**
+
+- **Plan:** Claude Code with **Opus**. The spec names the files to read, so the implementer doesn't explore.
+- **Review:** a fresh Claude Code session with **Opus** and the `review-task` skill, before merging.
+
+**Who implements, by the risk the spec gives it:**
+
+| Risk | What it covers | Implementer |
+|---|---|---|
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data | Claude Code with **Sonnet** |
+| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | **Antigravity** (its Pro model) |
+| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
+
+- **Escalate after two failed attempts:** local model → Antigravity → Claude Sonnet. Record the attempts in the handoff
+  report so the next tool doesn't repeat them.
+- **Android wrapper, emulator and Play Console work** stay with Claude Code; it follows the emulator and signing rules.
+- **The native Android app (Kotlin, later):** Antigravity or Gemini in Android Studio for screens, Claude for anything
+  touching sign-in, payments or background location, and Claude review for all of it.
+- **Inside Claude Code**, pick the model in the model picker:
+  - **Opus** for specs, design decisions, reviews and debugging a failure nobody else could fix;
+  - **Sonnet** for implementing;
+  - **Haiku**, or the Explore subagent, for broad searches and reading logs.
 
 Never let two agents edit the same working tree at once. Take turns, or give the second agent its own Git worktree.
 
+## Saving tokens
+
+Each tool has a limit: Claude's usage limits, about 30K tokens of Antigravity quota per run, and 32K of context for the
+local model. These habits keep tasks inside them:
+
+1. **The spec does the exploring.** It lists the files to read under "Files to read" and states the facts the
+   implementer would otherwise go and find (class names, current behaviour, the next migration number).
+2. **One task per session.** Start a new Claude Code session, or `/clear`, for each task, and another for its review. A
+   long session re-reads its whole history on every message.
+3. **Opus to plan and review, Sonnet to build.** Switch with the model picker.
+4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 84 KB) and other large files for the keys
+   you need. Use an Explore subagent for "where is X" questions.
+5. **Read summaries.** `verify.ps1` writes `.ai/artifacts/<task-id>/summary.md`; open the full Maven log only when a
+   check failed, and then only around the failure.
+6. **Review the diff, not the chat.** The reviewer reads the task, the review packet and `git diff`, nothing else.
+7. **Keep AGENTS.md short.** Every tool loads it on every turn. Rules go there; explanations go on this page.
+8. **Lower reasoning effort for routine work.** Small fixes don't need high effort.
+
 ## A task from start to merge
 
-**Plan.** Give the planner this prompt:
+**Plan.** In a new Claude Code session with Opus, give this prompt:
 
 ```text
 You are the software architect for FlexBuddy.
@@ -109,12 +147,15 @@ Feature request: [DESCRIBE FEATURE]
 Pick the next free FB-number: check .ai/tasks/ on main and the ai/FB-* branches on origin.
 Create branch ai/<task-id> from main, write .ai/tasks/<task-id>.md from .ai/tasks/TEMPLATE.md,
 commit it and push the branch. Do not implement the feature.
-Keep the task small enough for one agent session.
+Set Risk and Implementer from the table in docs/agent-workflow.md, and list every file the
+implementer needs under "Files to read". Keep the task small enough for one agent session.
 ```
 
 Pushing an `ai/` branch deploys nothing; Render only deploys `main`. The old `plan/<slug>` branches stay as history.
 
-**Implement.** Fetch the branch and ask the agent to use the `implement-task` skill:
+**Implement.** Use the implementer the task names: from Claude Code, `run-agent.ps1` starts Antigravity or the local
+model ([below](#running-everything-from-one-claude-code-session)); for a Claude task, start a new session with Sonnet.
+To do it by hand, fetch the branch and ask the agent to use the `implement-task` skill:
 
 ```powershell
 git fetch origin
@@ -143,9 +184,14 @@ gh pr create --base main --title "feat(scope): ..." --body-file .ai/reviews/FB-0
 Read the packet for secrets before it becomes the pull request description. The `prepare-review` skill does these steps
 and stops before pushing.
 
-**Review and merge.** Wait for the Java and JS checks, then ask Claude Code to review the branch (for example with
-`/code-review`), or give ChatGPT the PR link. Merging to `main` deploys to Render; GitHub refuses the merge until both
-checks pass.
+**Review and merge.** Wait for the Java and JS checks. Then, in a new Claude Code session with Opus (not the one that
+wrote the code):
+
+> Follow .agents/skills/review-task/SKILL.md for FB-001.
+
+The review reads only the task, the packet and the diff, and reports findings without changing code. Fixes go back to
+the implementer, or to Claude Sonnet for a high-risk task, and the review runs again on the new commit. Merging to
+`main` deploys to Render; GitHub refuses the merge until both checks pass.
 
 ## Running everything from one Claude Code session
 
@@ -278,7 +324,8 @@ wrote a handoff report clear enough for a local model to pick up from without an
 
 - No new subscriptions: local inference is free, and Claude, ChatGPT and Antigravity Pro are existing plans. Don't add
   paid API keys to OpenCode or scripts without checking billing.
-- Spend Claude and ChatGPT on planning, hard changes and review, not routine build failures.
+- Spend Claude on planning, high-risk changes and review, not routine build failures; see
+  [Saving tokens](#saving-tokens).
 - Keep Ollama bound to localhost.
 - Treat migrations, backup/restore and earnings changes as high-risk even when tests pass.
 - Logs, handoff reports and review packets are ignored by Git; read them before sharing.

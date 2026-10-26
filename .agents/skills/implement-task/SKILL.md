@@ -11,11 +11,14 @@ Input: a task id such as `FB-001`, with its specification in `.ai/tasks/<task-id
 2. Check the branch and the working tree (`git status`, `git diff`). Work on `ai/<task-id>`;
    if you are on `main`, stop and ask. If `.ai/implementations/<task-id>.md` exists, another
    agent started this task: read it and continue only the unfinished work.
-3. Read the code the task touches and its existing tests.
+3. Read the files under "Files to read" in the task and their existing tests. Search (grep)
+   before opening any other file, and never read a message catalog whole. If the task names an
+   implementer and it isn't you, and the owner hasn't handed it to you, stop and say so.
 4. Implement only what the task asks for, following the existing patterns.
 5. Add or update tests for the change.
 6. Run the checks: `.\scripts\verify.ps1 -TaskId <task-id>` from the repository root.
-   If something fails, fix it or report it. Never hide a failure.
+   Read `.ai/artifacts/<task-id>/summary.md`; open the logs only for a failed check, and only
+   around the failure. If something fails, fix it or report it. Never hide a failure.
 7. Read your own diff and remove anything unrelated to the task.
 8. Write `.ai/implementations/<task-id>.md` with:
    - a summary and the changed files

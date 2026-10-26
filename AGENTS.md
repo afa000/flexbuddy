@@ -22,14 +22,20 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
   branch `ai/<task-id>`. The specification is committed on that branch before implementation starts.
 - Design references for a task go in `.ai/design/<task-id>/`.
 - Repeatable procedures live in `.agents/skills/`: `implement-task` to build a task, `prepare-review` to get it ready for
-  a pull request. If your tool does not load skills, read the `SKILL.md` and follow it.
+  a pull request, and `review-task` to review that pull request in a fresh session. If your tool does not load skills,
+  read the `SKILL.md` and follow it.
 - `.ai/implementations/<task-id>.md` is the handoff report between agents and `.ai/reviews/<task-id>.md` is the review
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
+- Each task names its risk and its implementer. High-risk work (sign-in, payments, migrations, backup/restore,
+  earnings and tax figures, deleting data) is implemented by Claude Code. If you are not the named implementer and the
+  owner hasn't handed the task to you, stop and say so.
+- Read `verify.ps1`'s `summary.md`, not the full logs, unless a check failed.
 
 ## Before changing anything
 
-1. Read the task you were given, then only the files it touches and their existing tests.
+1. Read the task you were given, then the files under its "Files to read" and their existing tests. Search before
+   opening anything else, and never read the message catalogs whole: grep for the keys you need.
 2. Follow the patterns already in the code. Keep business logic in services, not controllers or templates.
 3. Make the smallest change that does the task. Do not touch unrelated code, CI, `render.yaml` or the Android signing
    setup unless the task says to.
