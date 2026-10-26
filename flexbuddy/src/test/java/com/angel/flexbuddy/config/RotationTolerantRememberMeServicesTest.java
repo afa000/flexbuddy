@@ -1,7 +1,6 @@
 package com.angel.flexbuddy.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -12,15 +11,19 @@ import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.Date;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import jakarta.servlet.http.Cookie;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.User;
-import org.springframework.security.web.authentication.rememberme.CookieTheftException;
 import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.PersistentRememberMeToken;
 
@@ -64,22 +67,60 @@ class RotationTolerantRememberMeServicesTest {
 
         clock.advanceSeconds(RotationTolerantRememberMeServices.ROTATION_GRACE.toSeconds() + 1);
 
-        assertThatThrownBy(() -> autoLogin(ORIGINAL_TOKEN, new MockHttpServletResponse()))
-                .isInstanceOf(CookieTheftException.class);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        assertThat(autoLogin(ORIGINAL_TOKEN, response)).isNull();
         assertThat(tokenRepository.getTokenForSeries(SERIES)).isNull();
+        assertThat(response.getCookie(COOKIE).getMaxAge()).isZero();
     }
 
     @Test
     void tokenThatWasNeverIssuedIsTreatedAsTheft() {
-        assertThatThrownBy(() -> autoLogin("forged-token", new MockHttpServletResponse()))
-                .isInstanceOf(CookieTheftException.class);
+        assertThat(autoLogin("forged-token", new MockHttpServletResponse())).isNull();
         assertThat(tokenRepository.getTokenForSeries(SERIES)).isNull();
     }
 
+    @Test
+    void rejectedCookieMarksTheRequestAndLogsOneWarningWithoutSecrets() {
+        assertThat(autoLogin(ORIGINAL_TOKEN, new MockHttpServletResponse())).isNotNull();
+        String rotatedToken = tokenRepository.getTokenForSeries(SERIES).getTokenValue();
+        clock.advanceSeconds(RotationTolerantRememberMeServices.ROTATION_GRACE.toSeconds() + 1);
+        MockHttpServletRequest request = request(ORIGINAL_TOKEN);
+
+        Logger logger = (Logger) LoggerFactory.getLogger(RotationTolerantRememberMeServices.class);
+        ListAppender<ILoggingEvent> appender = new ListAppender<>();
+        appender.start();
+        logger.addAppender(appender);
+        try {
+            assertThat(services.autoLogin(request, new MockHttpServletResponse())).isNull();
+        } finally {
+            logger.detachAppender(appender);
+        }
+
+        assertThat(request.getAttribute(RotationTolerantRememberMeServices.REJECTED_COOKIE_ATTRIBUTE)).isNotNull();
+        assertThat(appender.list).hasSize(1);
+        ILoggingEvent event = appender.list.get(0);
+        assertThat(event.getLevel()).isEqualTo(Level.WARN);
+        assertThat(event.getThrowableProxy()).isNull();
+        assertThat(event.getFormattedMessage()).doesNotContain(USERNAME, SERIES, ORIGINAL_TOKEN, rotatedToken);
+    }
+
+    @Test
+    void cookieThatIsAcceptedDoesNotMarkTheRequest() {
+        MockHttpServletRequest request = request(ORIGINAL_TOKEN);
+
+        assertThat(services.autoLogin(request, new MockHttpServletResponse())).isNotNull();
+
+        assertThat(request.getAttribute(RotationTolerantRememberMeServices.REJECTED_COOKIE_ATTRIBUTE)).isNull();
+    }
+
     private Authentication autoLogin(String token, MockHttpServletResponse response) {
+        return services.autoLogin(request(token), response);
+    }
+
+    private static MockHttpServletRequest request(String token) {
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setCookies(new Cookie(COOKIE, encode(SERIES + ":" + token)));
-        return services.autoLogin(request, response);
+        return request;
     }
 
     private static String encode(String value) {
