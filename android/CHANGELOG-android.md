@@ -16,9 +16,12 @@
   the Evaluate shortcut to that copy; the launcher shortcuts are still the three in `twa-manifest.json`.
 - Built unsigned with Bubblewrap on October 25, 2026. The APK reads `versionCode='3'
   versionName='3'` and has the Import, Expenses and Schedule launcher shortcuts, as version 2 did.
-- Signing, emulator check and upload: _to fill in_
+- Signed interactively with the upload key on October 25, 2026; `apksigner` and `jarsigner` verified both
+  files with the upload key (`A3:EC:82:…:FE:37`). Emulator check: update from the Play Store, read-only, still to do.
 - Release notes (English and Spanish): as written in `closed-test-round-2.md`
-- Uploaded to Closed testing - Alpha on _date_ as `3 (second closed test)` and sent for review: _to fill in_
+- Uploaded to Closed testing - Alpha on October 25, 2026 (Play accepted it once the minimum was Android 7, after
+  confirming the drop of 1,921 device models on Android 5–6) and approved by Google on October 25, 2026. Day 0 of the
+  second closed test.
 
 ## Version code 2 — redrawn app icon and share-to-import
 
