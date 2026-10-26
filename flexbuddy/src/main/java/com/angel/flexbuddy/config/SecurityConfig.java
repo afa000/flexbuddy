@@ -4,6 +4,8 @@ import java.time.Clock;
 
 import javax.sql.DataSource;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -17,6 +19,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.rememberme.InMemoryTokenRepositoryImpl;
 import org.springframework.security.web.authentication.rememberme.JdbcTokenRepositoryImpl;
@@ -89,6 +92,13 @@ public class SecurityConfig {
         return services;
     }
 
+    private static boolean isPageNavigationAfterRejectedCookie(HttpServletRequest request) {
+        String accept = request.getHeader("Accept");
+        return request.getAttribute(RotationTolerantRememberMeServices.REJECTED_COOKIE_ATTRIBUTE) != null
+                && "GET".equals(request.getMethod())
+                && accept != null && accept.contains("text/html");
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
             PersistentTokenBasedRememberMeServices rememberMeServices,
@@ -102,6 +112,8 @@ public class SecurityConfig {
         AttemptLimiter limiter = limiterProvider.getIfAvailable();
         // Slice tests that do not load the handler send everyone home, as before.
         VerifiedLoginSuccessHandler successHandler = successHandlerProvider.getIfAvailable();
+        LoginUrlAuthenticationEntryPoint loginEntryPoint = new LoginUrlAuthenticationEntryPoint("/login");
+        LoginUrlAuthenticationEntryPoint expiredEntryPoint = new LoginUrlAuthenticationEntryPoint("/login?expired");
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
@@ -148,6 +160,11 @@ public class SecurityConfig {
                 .rememberMe(remember -> remember
                         .rememberMeServices(rememberMeServices)
                 )
+                // A page opened with a rejected remember-me cookie explains why it is asking for a sign-in.
+                .exceptionHandling(handling -> handling.authenticationEntryPoint(
+                        (request, response, exception) -> (isPageNavigationAfterRejectedCookie(request)
+                                ? expiredEntryPoint : loginEntryPoint).commence(request, response, exception)
+                ))
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login?logout")
                 );
