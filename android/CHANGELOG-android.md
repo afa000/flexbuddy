@@ -1,5 +1,28 @@
 # Android release history
 
+## Version code 3 — everything since version 2, for the second closed test
+
+- Minimum Android version raised from 5.0 (`minSdkVersion` 21) to 7.0 (24). Play Console refused the
+  first version 3 bundle on October 26, 2026: "Play automatic protection requires a minimum SDK
+  version of 24 or higher". Phones on Android 5 or 6 can no longer install updates.
+- `appVersionCode` and `appVersionName` raised to 3 for the second closed test
+  ([closed-test-round-2.md](closed-test-round-2.md)). It brings the web app's changes since September 26,
+  2026 to testers as an update Play can see.
+- Generated with `bubblewrap update --skipVersionUpgrade`. Afterwards the hand-drawn icons, splash
+  images and `store_icon.png` were restored, and so were the Java and XML files whose only change was
+  whitespace. `shortcuts.xml` is reset to an empty template by both `update` and `build`; the build
+  fills it from `twa-manifest.json`, so the committed copy is kept as it was.
+  `res/raw/web_app_manifest.json` now matches the live site's manifest, which adds the share target and
+  the Evaluate shortcut to that copy; the launcher shortcuts are still the three in `twa-manifest.json`.
+- Built unsigned with Bubblewrap on October 25, 2026. The APK reads `versionCode='3'
+  versionName='3'` and has the Import, Expenses and Schedule launcher shortcuts, as version 2 did.
+- Signed interactively with the upload key on October 25, 2026; `apksigner` and `jarsigner` verified both
+  files with the upload key (`A3:EC:82:…:FE:37`). Emulator check: update from the Play Store, read-only, still to do.
+- Release notes (English and Spanish): as written in `closed-test-round-2.md`
+- Uploaded to Closed testing - Alpha on October 25, 2026 (Play accepted it once the minimum was Android 7, after
+  confirming the drop of 1,921 device models on Android 5–6) and approved by Google on October 25, 2026. Day 0 of the
+  second closed test.
+
 ## Version code 2 — redrawn app icon and share-to-import
 
 - Share target: FlexBuddy appears in Android's share sheet for PNG and JPEG images. The shared
@@ -17,7 +40,10 @@
   and tested on the emulator: sharing an image from Google Photos opened the import screen with
   it read
 - Uploaded to Closed testing - Alpha on September 26, 2026 as `2 (share-to-import and new icon)`
-  (version 1 not carried over) and sent to Google for review
+  (version 1 not carried over) and sent to Google for review. Approved: on October 22, 2026 Play Console showed it
+  available to testers in 178 of 178 countries, full rollout
+- Production access applied for on October 22, 2026, after Play Console showed all three closed-test
+  requirements met; answers in `production-access.md`
 
 ## Version code 1 — initial internal-test build
 

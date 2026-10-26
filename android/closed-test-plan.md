@@ -66,7 +66,8 @@ what the app needs.
 ## During the test
 
 - Check feedback and the Play Console pre-launch report and Android vitals every few days.
-- Ship web-only fixes through Render; they reach testers without a new release.
+- Ship web-only fixes through Render, and also release a new closed-track version for each batch
+  so Play sees the update (see `closed-test-round-2.md`).
 - For Android shell changes, increment `versionCode`, rebuild, sign interactively, upload to the
   closed track, and record the release in `CHANGELOG-android.md`.
 
