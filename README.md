@@ -4,25 +4,50 @@ FlexBuddy is a shift and earnings tracker for delivery drivers. It can read shif
 
 ## [Open the live app](https://flexbuddy.onrender.com)
 
-The app is hosted on Render. Because it uses a free web service, the first request after a period of inactivity may take up to about 50 seconds while the service wakes up.
+The app is hosted on Render. The Android app is in closed testing on Google Play; see
+[Install on your phone](#install-on-your-phone).
 
 ## Features
 
-- Import shift details from PNG or JPEG screenshots
-- Create a private account and sign in securely
-- Review and correct OCR results before saving
-- View, edit, and delete only your own saved shifts
-- Track total earnings, base pay, tips, time worked, and average earnings
-- Log mileage and fuel, toll, parking, maintenance, or other driver expenses
-- Compare gross and net earnings using standard-mileage or actual-expense vehicle costs
-- Filter and search history by date or station, then sort by pay, hours, or hourly rate
-- Compare earnings by station, ISO week, month, or year with accessible charts and tables
+**Logging blocks**
+
+- Import a block from a Flex screenshot (PNG or JPEG), including screenshots taken with Flex in Spanish, and review
+  every field before saving. Share a screenshot to FlexBuddy from the phone's share sheet to import it directly.
+- Add blocks by hand, with actual start and finish times, stops, packages, returns, and miles from odometer readings
 - Plan scheduled blocks, then confirm them as completed, cancelled, or forfeited
-- See upcoming blocks, a live countdown to the next one, and a month calendar
+- Log fuel, tolls, parking, maintenance, and other expenses, linked to a block or not
+- Add blocks, expenses, and block details offline; they sync when the phone reconnects
+- A quick-action button for the four most common tasks
+
+**Seeing what you earned**
+
+- Home is built around this week: earnings, a weekly or monthly goal, the next block, and the next payout
+- Check each payout against what its blocks earned
+- Reports with charts, filters, history, and the best times to work, by station, week, month, or year
+- Gross and net earnings with standard-mileage or actual-expense vehicle costs
+- A block value calculator that shows how much of an offer is surge
+- Track your Flex standing next to forfeits, with a countdown to the forfeit deadline
+
+**Taxes**
+
+- An estimate of what to set aside, reminders before estimated tax due dates, and a printable year summary for a tax
+  preparer. These are planning estimates, not tax advice.
+
+**Schedule and reminders**
+
+- Upcoming blocks, a live countdown to the next one, and a month calendar
 - Subscribe to your schedule from Google Calendar or iOS Calendar, or get optional push reminders
-- Install the app on Android or iOS and open the last synced dashboard and schedule offline
-- Switch between light and dark themes
-- Store shift data in PostgreSQL
+- Reminders to log missing miles, which can be turned off
+
+**Account and privacy**
+
+- Sign in with a password or Google, with optional two-step sign-in by authenticator app or emailed code
+- New accounts confirm their email with a six-digit code; forgotten passwords are reset by email
+- Repeated failed sign-ins and sign-ups are limited
+- English and Spanish, with a language setting
+- Backups you can download and restore, a 30-day Recently deleted, and in-app account deletion
+- Light and dark themes
+- Every account sees only its own data
 
 ## Built with
 
@@ -54,7 +79,21 @@ cd flexbuddy
 
 Then open <http://localhost:8080>.
 
+Email (sign-up codes, two-step codes, password resets) is optional locally. With no `FLEXBUDDY_MAIL_HOST` set, the app
+starts and logs that mail isn't configured. Set `FLEXBUDDY_MAIL_LOG_LINKS=true` to have codes and reset links written
+to the console instead; never set it in production. Google sign-in appears only when `FLEXBUDDY_GOOGLE_CLIENT_ID` and
+`FLEXBUDDY_GOOGLE_CLIENT_SECRET` are set. [`.claude/launch.json`](.claude/launch.json) has ready-made local
+configurations for both.
+
 ## Run the tests
+
+From the repository root, one command runs both suites and writes a summary to `.ai/artifacts/<task-id>/`:
+
+```powershell
+.\scripts\verify.ps1 -TaskId FB-001
+```
+
+Or run the Java suite on its own:
 
 ```powershell
 cd flexbuddy
@@ -87,6 +126,15 @@ functions they export.
 ## Deployment
 
 The root [`render.yaml`](render.yaml) defines the Render web service and PostgreSQL database. Render deploys a push to `main` once its GitHub checks pass. A commit with a failing test is never deployed.
+
+When the server or a page hits an error, the operator gets an email (`FLEXBUDDY_ALERT_TO`, once mail is configured).
+
+## How changes are made
+
+Work is planned as tasks in `.ai/tasks/`, built on `ai/<task-id>` branches, checked with `scripts/verify.ps1`, and
+reviewed before merging. Claude Code, Antigravity, and a local model share this workflow; each task names the tool
+that implements it, based on its risk. [`AGENTS.md`](AGENTS.md) holds the rules every coding agent follows, and
+[`docs/agent-workflow.md`](docs/agent-workflow.md) explains the tools and the day-to-day loop.
 
 ## Reporting API
 
@@ -163,20 +211,21 @@ FLEXBUDDY_VAPID_PRIVATE_KEY=<private key>
 FLEXBUDDY_VAPID_SUBJECT=mailto:you@example.com
 ```
 
-Reminders are best-effort. Render's free instance sleeps when idle, so a reminder can arrive late or, if the
-instance wakes after the block starts, not in time to help. The calendar feed does not depend on the server being
-awake and is the reliable option. On iPhone, push requires iOS 16.4 or later and FlexBuddy installed to the home
-screen.
+Reminders are best-effort: push delivery depends on the phone and browser, so the calendar feed is the more
+reliable option. On iPhone, push requires iOS 16.4 or later and FlexBuddy installed to the home screen.
 
 ## Install on your phone
 
-- **Android (Chrome):** open the app, then use the Install button on the dashboard or account page, or Chrome's
-  menu > Install app.
+- **Android (Google Play):** FlexBuddy is in closed testing on Google Play. Testers join from an opt-in link, then
+  install it from the Play Store. It is the same app as the website, in a full-screen wrapper (a Trusted Web
+  Activity, see [`android/`](android/README.md)), and needs Android 7.0 or later.
+- **Android (Chrome):** open the site, then use the Install button on Home or Account, or Chrome's menu > Install app.
 - **iPhone (Safari):** tap Share, then Add to Home Screen.
 
-The installed app opens full screen. After you have opened the dashboard and schedule online, they open offline
-with your last synced data and a banner showing when it was synced; changes are disabled until you reconnect.
-Signing out clears the cached data from the device.
+The installed app opens full screen. After you have opened Home and the schedule online, they open offline with your
+last synced data and a banner showing when it was synced. Blocks, expenses, and block details added offline wait on
+the phone and sync when it reconnects; other changes need a connection. Signing out clears the cached data from the
+device.
 
 ## Export, backup, and recovery
 
@@ -185,7 +234,7 @@ All of these require a signed-in session and only ever touch the caller's own da
 | Endpoint | Purpose |
 |---|---|
 | `GET /shifts/export.csv` | Downloads the filtered shift history as CSV. Accepts the same filters as `GET /shifts`. |
-| `GET /account/backup` | Downloads a version 3 `flexbuddy-backup` JSON file with shifts and their status, mileage, expenses, settings, and recently deleted items. It never contains the password hash. |
+| `GET /account/backup` | Downloads a version 4 `flexbuddy-backup` JSON file with shifts and their status, mileage, expenses, settings, tax payments, payouts, Flex standing, and recently deleted items. It never contains the password hash. |
 | `POST /account/restore/preview` | Multipart upload of a backup file (5 MB max). Returns what a restore would do — totals, new, existing, already in Recently deleted, duplicate backup rows, and invalid rows — and stages the file against a one-shot token. One staged backup per session; the token expires after 15 minutes. |
 | `POST /account/restore` | Commits the staged restore. Takes the preview `token`, a `mode` of `MERGE` or `REPLACE`, `includeDeleted`, and `acknowledgeReplace`. `REPLACE` moves the current history to Recently deleted first and returns a batch id. |
 | `POST /account/restore/{batchId}/undo` | Reverses a `REPLACE` restore: removes the inserted rows and restores the batch that was moved to Recently deleted. |
@@ -195,7 +244,7 @@ All of these require a signed-in session and only ever touch the caller's own da
 | `DELETE /shifts/trash/{id}` | Permanently removes one shift. |
 | `DELETE /shifts/trash` | Permanently removes everything in Recently deleted. |
 
-Version 1 and 2 backups remain restorable, and their shifts restore as completed. Version 2 and later restores remap expense-to-shift links and deduplicates both record types. Replace and Undo operate on shifts and expenses together.
+Versions 1 to 3 remain restorable; version 1 and 2 shifts restore as completed. Version 2 and later restores remap expense-to-shift links and deduplicate both record types. Replace and Undo operate on shifts and expenses together.
 
 Deleted shifts and expenses stay recoverable for **30 days**. A nightly job purges anything past that cutoff, and opening either trash listing purges expired rows.
 
