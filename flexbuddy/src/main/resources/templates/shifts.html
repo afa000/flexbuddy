@@ -491,6 +491,11 @@
                         <button class="secondary-button compact-button" id="completeScheduledButton" type="button" data-online-only th:text="#{import.completeThisScheduledShift}">Complete this scheduled shift</button>
                     </div>
 
+                    <div class="notice schedule-match-notice is-hidden field-wide" id="duplicateNotice" role="status">
+                        <span id="duplicateMessage"></span>
+                        <button class="secondary-button compact-button" id="openDuplicateButton" type="button" data-online-only th:text="#{import.openIt}">Open it</button>
+                    </div>
+
                     <label class="field field-wide">
                         <span th:text="#{import.status}">Status</span>
                         <select id="importStatus" name="status">
@@ -906,6 +911,7 @@
 <script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
