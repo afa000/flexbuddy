@@ -89,5 +89,15 @@
         };
     }
 
-    window.flexbuddyAccountSections = {sectionForHash, summaries, costMethod, payouts};
+    /**
+     * The rate the vehicle costs form saves: null (follow the IRS rate) while the account has no rate of its own and
+     * the driver left the field as rendered, otherwise the number in the field.
+     */
+    function mileageRateToSend(settings, fieldValue) {
+        const typed = Number(fieldValue);
+        if (settings && !settings.customMileageRate && typed === Number(settings.mileageRate)) return null;
+        return typed;
+    }
+
+    window.flexbuddyAccountSections = {sectionForHash, summaries, costMethod, payouts, mileageRateToSend};
 })();

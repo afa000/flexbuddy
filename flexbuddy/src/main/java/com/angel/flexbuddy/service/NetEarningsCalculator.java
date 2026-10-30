@@ -17,12 +17,13 @@ import com.angel.flexbuddy.model.VehicleCostMethod;
 @Service
 public class NetEarningsCalculator {
     public NetEarningsResult calculate(List<Shift> shifts, List<Expense> expenses,
-            VehicleCostMethod method, BigDecimal mileageRate) {
+            VehicleCostMethod method, MileageRates rates) {
         BigDecimal gross = money(shifts.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add));
         int minutes = shifts.stream().mapToInt(Shift::getWorkedMinutes).sum();
         BigDecimal miles = shifts.stream().map(Shift::getCountedMiles).filter(v -> v != null)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(1, RoundingMode.HALF_UP);
-        BigDecimal mileageCost = money(miles.multiply(mileageRate == null ? BigDecimal.ZERO : mileageRate));
+        BigDecimal mileageCost = money(shifts.stream().map(shift -> mileage(shift, rates))
+                .reduce(BigDecimal.ZERO, BigDecimal::add));
         EnumMap<ExpenseCategory, BigDecimal> categories = new EnumMap<>(ExpenseCategory.class);
         for (ExpenseCategory category : ExpenseCategory.values()) categories.put(category, money(BigDecimal.ZERO));
         expenses.forEach(expense -> categories.compute(expense.getCategory(),
@@ -40,6 +41,14 @@ public class NetEarningsCalculator {
                 miles.signum() == 0 ? null : gross.divide(miles, 2, RoundingMode.HALF_UP),
                 gross.signum() == 0 ? BigDecimal.ZERO.setScale(1)
                         : net.multiply(BigDecimal.valueOf(100)).divide(gross, 1, RoundingMode.HALF_UP));
+    }
+
+    /** One block's counted miles at its date's rate, unrounded; the total is rounded once. */
+    private static BigDecimal mileage(Shift shift, MileageRates rates) {
+        BigDecimal counted = shift.getCountedMiles();
+        if (counted == null || rates == null) return BigDecimal.ZERO;
+        BigDecimal rate = rates.rateOn(shift.getDate());
+        return rate == null ? BigDecimal.ZERO : counted.multiply(rate);
     }
 
     private static BigDecimal money(BigDecimal value) {

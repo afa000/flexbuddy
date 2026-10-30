@@ -125,6 +125,6 @@ class PayoutServiceTest {
 
     private static AccountSettingsResponse defaultSchedule() {
         return new AccountSettingsResponse(VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
-                new BigDecimal("0.70"), 2026);
+                new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1));
     }
 }

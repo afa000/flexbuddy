@@ -75,3 +75,20 @@ test('costMethod is the method part of the costs summary on its own', () => {
     assert.strictEqual(sections.costMethod({vehicleCostMethod: 'ACTUAL_EXPENSES', mileageRate: 0.7}), 'Actual expenses');
     assert.strictEqual(typeof sections.payouts, 'function');
 });
+
+test('the vehicle costs form leaves an unchanged IRS default alone', () => {
+    const irs = {mileageRate: 0.76, customMileageRate: false};
+    assert.strictEqual(sections.mileageRateToSend(irs, '0.76'), null);
+    assert.strictEqual(sections.mileageRateToSend(irs, '0.760'), null);
+});
+
+test('a rate typed over the IRS default is sent as the number', () => {
+    const irs = {mileageRate: 0.76, customMileageRate: false};
+    assert.strictEqual(sections.mileageRateToSend(irs, '0.68'), 0.68);
+});
+
+test('an account with its own rate keeps sending its value', () => {
+    const own = {mileageRate: 0.65, customMileageRate: true};
+    assert.strictEqual(sections.mileageRateToSend(own, '0.65'), 0.65);
+    assert.strictEqual(sections.mileageRateToSend(own, '0.7'), 0.7);
+});

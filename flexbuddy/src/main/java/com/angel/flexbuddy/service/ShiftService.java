@@ -404,11 +404,11 @@ public class ShiftService {
 
     private ShiftResponse toResponse(Shift shift, List<Expense> expenses, AccountSettingsResponse settings) {
         NetEarningsResult net = netCalculator.calculate(List.of(shift), expenses,
-                settings.vehicleCostMethod(), settings.mileageRate());
+                settings.vehicleCostMethod(), settings.mileageRates());
         return new ShiftResponse(
                 shift.getId(), shift.getStation(), shift.getDate(), shift.getStartTime(), shift.getEndTime(),
                 shift.getBasePay(), shift.getTips(), shift.getTotalPay(), shift.getTimeWorked(), shift.getHourlyRate(),
-                shift.getMiles(), shift.getMileageCost(settings.mileageRate()), shift.getEarningsPerMile(),
+                shift.getMiles(), shift.getMileageCost(settings.mileageRates().rateOn(shift.getDate())), shift.getEarningsPerMile(),
                 net.cashSpent(), net.netEarnings(), net.netHourlyRate(),
                 shift.getCreatedAt(), shift.getUpdatedAt(), shift.getDeletedAt(),
                 shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP),

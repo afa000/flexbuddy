@@ -173,7 +173,7 @@ settingsForm.addEventListener('submit', async event => {
     try {
         const response = await apiFetch('/account/settings', {method: 'PUT', headers: csrfHeaders({'Content-Type':'application/json'}),
             body: JSON.stringify({vehicleCostMethod: document.querySelector('#vehicleCostMethod').value,
-                mileageRate: Number(document.querySelector('#accountMileageRate').value)})});
+                mileageRate: flexbuddyAccountSections.mileageRateToSend(latestSettings, document.querySelector('#accountMileageRate').value)})});
         if (!response.ok) throw new Error(await response.text());
         const settings = await response.json();
         renderSettings(settings);
@@ -235,12 +235,18 @@ document.querySelector('#languageSelect').addEventListener('change', async event
     }
 });
 
+/** The date an IRS rate took effect ("2026-07-01"), written for the driver's language. */
+function formatIrsRateDate(isoDate) {
+    const [year, month, day] = String(isoDate).split('-').map(Number);
+    return new Date(year, month - 1, day).toLocaleDateString(appLocale(), {year: 'numeric', month: 'short', day: 'numeric'});
+}
+
 function renderSettings(settings) {
     latestSettings = settings;
     document.querySelector('#languageSelect').value = settings.language ?? '';
     document.querySelector('#vehicleCostMethod').value = settings.vehicleCostMethod;
     document.querySelector('#accountMileageRate').value = settings.mileageRate;
-    document.querySelector('#mileageRateHelp').textContent = t('js.account.mileageRateHelp', Number(settings.defaultMileageRate).toFixed(3), settings.mileageRateYear);
+    document.querySelector('#mileageRateHelp').textContent = t('js.account.irsRateHelp', Number(settings.defaultMileageRate).toFixed(3), formatIrsRateDate(settings.defaultMileageRateSince));
     renderReminders(settings);
     renderGoals(settings);
     renderPayouts(settings);

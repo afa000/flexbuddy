@@ -68,7 +68,7 @@ class ShiftServiceTest {
         org.mockito.Mockito.lenient().when(settingsService.get(OWNER_EMAIL)).thenReturn(
                 new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
         org.mockito.Mockito.lenient().when(expenseService.findForShifts(eq(OWNER_EMAIL), any())).thenReturn(List.of());
     }
 
@@ -85,6 +85,23 @@ class ShiftServiceTest {
         assertThat(result.getTotalPay()).isEqualByComparingTo("155.50");
         assertThat(result.getTimeWorked()).isEqualTo(480);
         assertThat(result.getHourlyRate()).isEqualByComparingTo("19.44");
+    }
+
+    @Test
+    void anAccountOnTheIrsRatePricesABlockAtTheRateForItsDate() {
+        when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.760"), new BigDecimal("0.760"),
+                java.time.LocalDate.of(2026, 7, 1), "America/New_York", null, false, false, 45, null, null,
+                com.angel.flexbuddy.model.GoalBasis.GROSS,
+                List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null, false, true, null, false));
+        Shift march = shift(1L, "VEA7", LocalDate.of(2026, 3, 10), "120", "10");
+        march.setMiles(new BigDecimal("100.0"));
+        when(shiftRepository.findFiltered(OWNER_EMAIL, LocalDate.of(1, 1, 1), LocalDate.of(9999, 12, 31), "", "", ShiftStatus.EARNINGS))
+                .thenReturn(List.of(march));
+
+        ShiftResponse result = shiftService.getAllShifts(OWNER_EMAIL).getFirst();
+
+        assertThat(result.getMileageCost()).isEqualByComparingTo("72.50");
     }
 
     @Test
@@ -746,7 +763,7 @@ class ShiftServiceTest {
 
         when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
                 com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
-                new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null, null,
+                new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 60, null, null,
                 com.angel.flexbuddy.model.GoalBasis.GROSS,
                 java.util.List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null));
         ShiftResponse edited = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));

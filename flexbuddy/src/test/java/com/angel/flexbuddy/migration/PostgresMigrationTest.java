@@ -87,6 +87,48 @@ class PostgresMigrationTest {
         }
     }
 
+    @Test
+    void v28ResetsOnlyTheMileageRateThatTheOldFormPinned() throws Exception {
+        String schema = "flexbuddy_migration_test_" + UUID.randomUUID().toString().replace("-", "");
+        Flyway throughV27 = flyway(schema, MigrationVersion.fromVersion("27"));
+        Flyway latest = flyway(schema, MigrationVersion.LATEST);
+
+        try {
+            throughV27.migrate();
+            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+                statement.execute("set search_path to " + schema);
+                statement.execute("""
+                        insert into app_users (created_at, display_name, email, password_hash, mileage_rate)
+                        values (timestamp with time zone '2026-09-01 12:00:00+00', 'Pinned', 'pinned@example.com', 'hash', 0.700),
+                               (timestamp with time zone '2026-09-01 12:00:00+00', 'Own', 'own@example.com', 'hash', 0.650),
+                               (timestamp with time zone '2026-09-01 12:00:00+00', 'Default', 'default@example.com', 'hash', null)
+                        """);
+            }
+
+            latest.migrate();
+
+            try (Connection connection = connection(); Statement statement = connection.createStatement();
+                    ResultSet result = statement.executeQuery(
+                            "select email, mileage_rate from " + schema + ".app_users order by email")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("email")).isEqualTo("default@example.com");
+                assertThat(result.getBigDecimal("mileage_rate")).isNull();
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("email")).isEqualTo("own@example.com");
+                assertThat(result.getBigDecimal("mileage_rate")).isEqualByComparingTo("0.650");
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("email")).isEqualTo("pinned@example.com");
+                assertThat(result.getBigDecimal("mileage_rate")).isNull();
+                assertThat(result.next()).isFalse();
+            }
+        } finally {
+            latest.clean();
+            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+                statement.execute("drop schema if exists " + schema + " cascade");
+            }
+        }
+    }
+
     private void assertDriverExpenseSchema(String schema) throws Exception {
         try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("""
                 select count(*) from information_schema.columns
