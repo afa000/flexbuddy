@@ -43,6 +43,9 @@ import org.springframework.security.test.context.support.WithAnonymousUser;
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.BlockEvaluationRequest;
 import com.angel.flexbuddy.dto.BlockEvaluationResponse;
+import com.angel.flexbuddy.dto.DuplicateKind;
+import com.angel.flexbuddy.dto.DuplicateMatch;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
@@ -408,6 +411,38 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.shifts[0].basePay.value").value(124.00))
                 .andExpect(jsonPath("$.shifts[0].tips.value").value(0))
                 .andExpect(jsonPath("$.shifts[0].warnings").isEmpty());
+    }
+
+    @Test
+    void importPreviewReportsABlockThatIsAlreadyLoggedInTheDriversLanguage() throws Exception {
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1});
+        when(shiftImportService.createPreview(any(), any())).thenAnswer(invocation -> {
+            DuplicateMatch match = new DuplicateMatch(41L, DuplicateKind.EXACT,
+                    Messages.current("import.alreadyLogged", "VEA7", "Sun Sep 6", "3:15 PM"));
+            return new ShiftImportPreviewResponse("shift.png", "image/png", 1, "Found 1 shift.", "Schedule Details", 2026, 92,
+                    List.of(), List.of(new ShiftCandidate(0,
+                            ParsedField.defaulted("VEA7"),
+                            ParsedField.defaulted(LocalDate.of(2026, 9, 6)),
+                            ParsedField.defaulted(LocalTime.of(15, 15)),
+                            ParsedField.defaulted(LocalTime.of(19, 15)),
+                            ParsedField.defaulted(new BigDecimal("124.00")),
+                            ParsedField.defaulted(BigDecimal.ZERO),
+                            List.of(), List.of(match), List.of(0, 0))));
+        });
+
+        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot)
+                        .with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].kind").value("EXACT"))
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].shiftId").value(41))
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].message")
+                        .value("You already have a VEA7 block on Sun Sep 6 at 3:15 PM."));
+
+        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot).locale(java.util.Locale.of("es"))
+                        .with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].message")
+                        .value("Ya tiene un bloque de VEA7 el Sun Sep 6 a las 3:15 PM."));
     }
 
     @Test

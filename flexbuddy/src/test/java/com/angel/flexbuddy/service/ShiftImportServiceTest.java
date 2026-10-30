@@ -265,7 +265,24 @@ class ShiftImportServiceTest {
         assertThat(candidate.warnings()).filteredOn(warning -> warning.code().equals("FUTURE_DATE"))
                 .singleElement()
                 .satisfies(warning -> assertThat(warning.severity()).isEqualTo(WarningSeverity.INFO));
-        verifyNoInteractions(scheduledShiftMatcher);
+    }
+
+    @Test
+    void createPreview_looksForTheSameBlockAlreadyScheduledWhenTheImportIsInTheFuture() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1) - Amazon.com", 92, 0),
+                line("Sunday, 9/27", 90, 1),
+                line("04:00 - 07:30 (3 hr 30 min)", 88, 2),
+                line("$124.50", 86, 3))));
+        DuplicateMatch match = new DuplicateMatch(41L, DuplicateKind.EXACT,
+                "You already have a DCY1 block on Sun Sep 27 at 4:00 AM.");
+        when(scheduledShiftMatcher.match(EMAIL, LocalDate.of(2026, 9, 27), LocalTime.of(4, 0), LocalTime.of(7, 30), "DCY1",
+                ShiftStatus.SCHEDULED)).thenReturn(java.util.List.of(match));
+
+        var candidate = shiftImportService.createPreview(EMAIL, png()).shifts().getFirst();
+
+        assertThat(candidate.suggestedStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(candidate.duplicates()).containsExactly(match);
     }
 
     @Test
@@ -277,8 +294,8 @@ class ShiftImportServiceTest {
                 line("$124.50", 86, 3))));
         DuplicateMatch match = new DuplicateMatch(41L, DuplicateKind.SCHEDULED_MATCH,
                 "This looks like your scheduled DCY1 block on Sun Sep 6. Complete it?");
-        when(scheduledShiftMatcher.match(EMAIL, LocalDate.of(2026, 9, 6), LocalTime.of(4, 0), LocalTime.of(7, 30), "DCY1"))
-                .thenReturn(java.util.List.of(match));
+        when(scheduledShiftMatcher.match(EMAIL, LocalDate.of(2026, 9, 6), LocalTime.of(4, 0), LocalTime.of(7, 30), "DCY1",
+                ShiftStatus.COMPLETED)).thenReturn(java.util.List.of(match));
 
         var candidate = shiftImportService.createPreview(EMAIL, png()).shifts().getFirst();
 

@@ -164,6 +164,9 @@ const elements = {
     importStatus: document.querySelector('#importStatus'),
     scheduleMatchNotice: document.querySelector('#scheduleMatchNotice'),
     scheduleMatchMessage: document.querySelector('#scheduleMatchMessage'),
+    duplicateNotice: document.querySelector('#duplicateNotice'),
+    duplicateMessage: document.querySelector('#duplicateMessage'),
+    openDuplicateButton: document.querySelector('#openDuplicateButton'),
     completeScheduledButton: document.querySelector('#completeScheduledButton'),
     editDialogTitle: document.querySelector('#editDialogTitle'),
     editDialogDescription: document.querySelector('#editDialogDescription'),
@@ -201,6 +204,7 @@ let editMode = 'edit';
 let editOriginalStatus;
 let importCandidate;
 let importWarnings = [];
+let importDuplicateEdited = false;
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 const previewFields = {
@@ -259,6 +263,13 @@ elements.reportsNavButton.addEventListener('click', () => showReportsScreen());
 elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
 elements.importStatus.addEventListener('change', applyImportStatusRules);
 elements.completeScheduledButton.addEventListener('click', completeScheduledShift);
+elements.openDuplicateButton.addEventListener('click', openDuplicateShift);
+[elements.station, elements.date, elements.startTime, elements.endTime].forEach(input =>
+    input.addEventListener('input', () => {
+        if (importDuplicateEdited) return;
+        importDuplicateEdited = true;
+        applyImportStatusRules();
+    }));
 elements.editStatus.addEventListener('change', () => applyEditStatusRules(true));
 elements.expensesNavButton.addEventListener('click', showExpensesScreen);
 // The logo goes Home without a reload; its address still works for a middle-click or with scripts off.
@@ -627,6 +638,7 @@ function populatePreview(preview) {
     setPreviewField('basePay', candidate.basePay);
     setPreviewField('tips', candidate.tips, value => value ?? 0);
     importCandidate = candidate;
+    importDuplicateEdited = false;
     elements.importStatus.value = candidate.suggestedStatus === 'SCHEDULED' ? 'SCHEDULED' : 'COMPLETED';
     renderRawText(preview.lines, preview.rawText);
     renderReadQuality(preview.meanConfidence);
@@ -650,7 +662,8 @@ function applyImportStatusRules() {
         elements.tips.value = 0;
         elements.miles.value = '';
     }
-    elements.saveButton.querySelector('span').textContent = scheduled ? t('js.common.addScheduledShift') : t('js.common.addShift');
+    renderImportNotices();
+    elements.saveButton.querySelector('span').textContent = saveLabel();
     // A future date is expected for a scheduled block and suspicious for a completed one.
     const warnings = importWarnings.map(warning => warning.code !== 'FUTURE_DATE' ? warning : {
         ...warning,
@@ -659,16 +672,42 @@ function applyImportStatusRules() {
     });
     renderWarnings(warnings);
     elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
-    renderScheduleMatch();
 }
 
-function renderScheduleMatch() {
-    const match = elements.importStatus.value === 'COMPLETED'
-        ? importCandidate?.duplicates?.find(duplicate => duplicate.kind === 'SCHEDULED_MATCH')
-        : undefined;
-    elements.scheduleMatchNotice.classList.toggle('is-hidden', !match);
-    elements.scheduleMatchNotice.dataset.shiftId = match ? match.shiftId : '';
-    elements.scheduleMatchMessage.textContent = match ? match.message : '';
+function importNotices() {
+    return window.flexbuddyImportDuplicates.choose(importCandidate, elements.importStatus.value, importDuplicateEdited);
+}
+
+function renderImportNotices() {
+    const {logged, schedule} = importNotices();
+    elements.duplicateNotice.classList.toggle('is-hidden', !logged);
+    elements.duplicateNotice.dataset.shiftId = logged ? logged.shiftId : '';
+    elements.duplicateMessage.textContent = logged ? logged.message : '';
+    elements.scheduleMatchNotice.classList.toggle('is-hidden', !schedule);
+    elements.scheduleMatchNotice.dataset.shiftId = schedule ? schedule.shiftId : '';
+    elements.scheduleMatchMessage.textContent = schedule ? schedule.message : '';
+}
+
+/** The save button's label: "Add anyway" while the duplicate notice shows, otherwise by status. */
+function saveLabel() {
+    if (importNotices().logged) return t('js.app.addAnyway');
+    return elements.importStatus.value === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
+}
+
+async function openDuplicateShift() {
+    hideMessage(elements.saveError);
+    const shiftId = elements.duplicateNotice.dataset.shiftId;
+    if (!shiftId) return;
+    elements.openDuplicateButton.disabled = true;
+    try {
+        const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}`);
+        if (!response.ok) throw new Error(await response.text() || t('js.app.requestFailed'));
+        openEditModal(await response.json(), elements.openDuplicateButton);
+    } catch (error) {
+        showMessage(elements.saveError, error.message || t('js.app.requestFailed'));
+    } finally {
+        elements.openDuplicateButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
+    }
 }
 
 async function completeScheduledShift() {
@@ -1705,7 +1744,9 @@ function resetImport() {
     elements.importStatus.value = 'COMPLETED';
     elements.tips.disabled = false;
     elements.miles.disabled = false;
+    importDuplicateEdited = false;
     elements.scheduleMatchNotice.classList.add('is-hidden');
+    elements.duplicateNotice.classList.add('is-hidden');
     setSaving(false);
 }
 
@@ -1716,7 +1757,7 @@ function setProcessing(processing) {
 function setSaving(saving) {
     elements.saveButton.disabled = saving;
     elements.saveButton.querySelector('span').textContent = saving ? t('js.app.addingShift')
-        : elements.importStatus.value === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
+        : saveLabel();
 }
 
 /** Editing, deleting and duplicating a saved shift need a connection; adding one does not, because it can be queued. */
