@@ -60,6 +60,8 @@ public class ShiftStatisticsResponse {
     /** Forfeits made inside the cutoff, in the filtered range and in the current month. */
     private int lateForfeitedShifts;
     private int lateForfeitedThisMonth;
+    /** Worked blocks whose miles were never entered; with standard mileage they make estimated net too high. */
+    private int blocksWithoutMiles;
 
     public ShiftStatisticsResponse(int totalShifts, BigDecimal totalBasePay, BigDecimal totalTips,
             BigDecimal totalEarnings, BigDecimal averagePayPerShift, int totalTimeWorked,
@@ -72,6 +74,6 @@ public class ShiftStatisticsResponse {
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, totalEarnings, averageHourlyEarnings,
                 null, BigDecimal.ZERO, Map.of(), BigDecimal.ZERO, BigDecimal.ZERO, averagePayPerShift,
                 VehicleCostMethod.STANDARD_MILEAGE, BigDecimal.ZERO, 0,
-                0, 0, BigDecimal.ZERO, 0, 0, 0, 0, 0, totalTimeWorked, averageHourlyEarnings, null, 0, 0);
+                0, 0, BigDecimal.ZERO, 0, 0, 0, 0, 0, totalTimeWorked, averageHourlyEarnings, null, 0, 0, 0);
     }
 }

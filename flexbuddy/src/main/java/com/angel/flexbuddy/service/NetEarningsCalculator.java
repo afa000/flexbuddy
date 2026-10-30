@@ -40,7 +40,8 @@ public class NetEarningsCalculator {
                 hourly(gross, minutes), hourly(net, minutes), divide(net, shifts.size()),
                 miles.signum() == 0 ? null : gross.divide(miles, 2, RoundingMode.HALF_UP),
                 gross.signum() == 0 ? BigDecimal.ZERO.setScale(1)
-                        : net.multiply(BigDecimal.valueOf(100)).divide(gross, 1, RoundingMode.HALF_UP));
+                        : net.multiply(BigDecimal.valueOf(100)).divide(gross, 1, RoundingMode.HALF_UP),
+                (int) shifts.stream().filter(shift -> shift.countsTowardHours() && shift.getMiles() == null).count());
     }
 
     /** One block's counted miles at its date's rate, unrounded; the total is rounded once. */

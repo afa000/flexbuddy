@@ -142,7 +142,7 @@ const elements = {
     expenseList: document.querySelector('#expenseList'), expenseSummaryTotal: document.querySelector('#expenseSummaryTotal'),
     expenseSummaryCount: document.querySelector('#expenseSummaryCount'), expenseFuel: document.querySelector('#expenseFuel'),
     expenseRoad: document.querySelector('#expenseRoad'), exportExpensesButton: document.querySelector('#exportExpensesButton'),
-    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
+    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseFuelNote: document.querySelector('#expenseFuelNote'),expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
     expenseTrashSection: document.querySelector('#expenseTrashSection'), expenseTrashList: document.querySelector('#expenseTrashList'),
     expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton'),
     scheduleNavButton: document.querySelector('#scheduleNavButton'),
@@ -1045,7 +1045,10 @@ async function loadStatistics(query, signal) {
         elements.tipsShare.textContent = t('js.app.percentFromTips', tipShare.toFixed(1));
         elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
         elements.netHourly.textContent = t('js.app.netHourlyEst', formatMoney(statistics.netHourlyRate));
-        elements.netMargin.textContent = t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
+        const missingMiles = window.flexbuddyHome?.netMissingMiles(statistics) ?? 0;
+        elements.netMargin.textContent = missingMiles
+            ? tn(missingMiles, 'js.app.netMissingMiles')
+            : t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
         elements.expenseTotal.textContent = formatMoney(statistics.totalExpenses);
         elements.totalMiles.textContent = t('js.common.miles', Number(statistics.totalMiles || 0).toFixed(1));
         elements.mileageCost.textContent = t('js.app.mileageCost', formatMoney(statistics.mileageCost));
@@ -2143,6 +2146,7 @@ async function loadExpenses() {
         const settings = await settingsResponse.json();
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
             ? t('js.app.costActual') : t('js.app.costStandard', formatMoney(settings.mileageRate));
+        elements.expenseFuelNote.hidden = settings.vehicleCostMethod === 'ACTUAL_EXPENSES';
     } catch (error) {
         elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || t('js.app.expensesNotLoaded'))}</p>`;
     }

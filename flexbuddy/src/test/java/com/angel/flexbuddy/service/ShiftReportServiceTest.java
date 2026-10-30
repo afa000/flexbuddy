@@ -191,6 +191,19 @@ class ShiftReportServiceTest {
     }
 
     @Test
+    void statistics_passesTheCountOfWorkedBlocksWithoutMilesThrough() {
+        Shift never = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift entered = shift("VEA7", LocalDate.of(2026, 9, 7), "100.00", "0.00", 240);
+        entered.setMiles(new BigDecimal("12.0"));
+        Shift scheduled = withStatus(shift("VEA7", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(never, entered, scheduled));
+
+        ShiftStatisticsResponse result = reportService.statistics(EMAIL, ALL);
+
+        assertThat(result.getBlocksWithoutMiles()).isEqualTo(1);
+    }
+
+    @Test
     void statistics_countCancellationsAndForfeitsInTheRangeAndThisMonth() {
         Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 8, 7), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
         Shift forfeited = withStatus(shift("VEA7", LocalDate.of(2026, 8, 9), "0.00", "0.00", 240), ShiftStatus.FORFEITED);

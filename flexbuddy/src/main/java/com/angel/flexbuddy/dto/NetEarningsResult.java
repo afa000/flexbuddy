@@ -11,5 +11,5 @@ public record NetEarningsResult(
         BigDecimal vehicleCost, BigDecimal outOfPocketExpenses, BigDecimal totalDeductions,
         BigDecimal cashSpent, BigDecimal netEarnings, BigDecimal grossHourlyRate,
         BigDecimal netHourlyRate, BigDecimal netPerShift, BigDecimal earningsPerMile,
-        BigDecimal netMargin
+        BigDecimal netMargin, int blocksWithoutMiles
 ) {}
