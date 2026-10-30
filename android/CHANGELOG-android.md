@@ -13,9 +13,13 @@
   newline).
 - Built unsigned with Bubblewrap on October 30, 2026. The APK reads `versionCode='4' versionName='4'`,
   `minSdkVersion 24`, and has the three launcher shortcuts (Import, Expenses, Schedule), as version 3 did.
-- Release notes (English and Spanish): as written in `closed-test-round-2.md`.
-- Still to do by the owner: sign interactively with the upload key, check the build on the emulator, upload to Closed
-  testing - Alpha, send it for review, and record the upload and approval here.
+- Release notes (English and Spanish): as written in `closed-test-round-2.md`, entered for en-US, es-419 and es-US.
+- Signed interactively with the upload key on October 30, 2026; `apksigner` verified the APK and `jarsigner` the bundle,
+  both with the upload key (`A3:EC:82:…:FE:37`).
+- Uploaded to Closed testing - Alpha on October 30, 2026 as `4 (October 30 fixes)`, version 4 (4), API 24+, target
+  SDK 36; version 3 not carried over, and no supported devices dropped. Sent for review the same day.
+- Still to do: record Google's approval, then update from the Play Store on the emulator (read-only, Play Reviewer
+  account).
 
 ## Version code 3 — everything since version 2, for the second closed test
 
