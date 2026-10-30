@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.model.VehicleCostMethod;
 
 class NetEarningsCalculatorTest {
@@ -107,6 +108,44 @@ class NetEarningsCalculatorTest {
                 new BigDecimal("100"), BigDecimal.ZERO);
         shift.setMiles(new BigDecimal(miles));
         return shift;
+    }
+
+    @Test
+    void countsOnlyWorkedBlocksWhoseMilesWereNeverEntered() {
+        Shift never = shift("100", "20", null);
+        Shift noMiles = shift("100", "0", "0.0");
+        Shift withMiles = shift("100", "0", "10.0");
+        Shift scheduled = shift("100", "0", null);
+        scheduled.setStatus(ShiftStatus.SCHEDULED);
+        Shift cancelled = shift("18", "0", null);
+        cancelled.setStatus(ShiftStatus.CANCELLED);
+        Shift forfeited = shift("0", "0", null);
+        forfeited.setStatus(ShiftStatus.FORFEITED);
+
+        var result = calculator.calculate(List.of(never, noMiles, withMiles, scheduled, cancelled, forfeited), List.of(),
+                VehicleCostMethod.STANDARD_MILEAGE, MileageRates.fixed(new BigDecimal("0.700")));
+
+        assertThat(result.blocksWithoutMiles()).isEqualTo(1);
+    }
+
+    @Test
+    void countingBlocksWithoutMilesLeavesEveryOtherFigureUnchanged() {
+        var result = calculator.calculate(List.of(shift("100", "20", null), shift("100", "0", "10.0")),
+                List.of(expense(ExpenseCategory.FUEL, "30"), expense(ExpenseCategory.TOLL, "5")),
+                VehicleCostMethod.STANDARD_MILEAGE, MileageRates.fixed(new BigDecimal("0.700")));
+
+        assertThat(result.blocksWithoutMiles()).isEqualTo(1);
+        assertThat(result.grossEarnings()).isEqualByComparingTo("220.00");
+        assertThat(result.miles()).isEqualByComparingTo("10.0");
+        assertThat(result.mileageCost()).isEqualByComparingTo("7.00");
+        assertThat(result.vehicleCost()).isEqualByComparingTo("7.00");
+        assertThat(result.totalDeductions()).isEqualByComparingTo("12.00");
+        assertThat(result.cashSpent()).isEqualByComparingTo("35.00");
+        assertThat(result.netEarnings()).isEqualByComparingTo("208.00");
+        assertThat(result.netHourlyRate()).isEqualByComparingTo("26.00");
+        assertThat(result.netPerShift()).isEqualByComparingTo("104.00");
+        assertThat(result.earningsPerMile()).isEqualByComparingTo("22.00");
+        assertThat(result.netMargin()).isEqualByComparingTo("94.5");
     }
 
     private Shift shift(String base, String tips, String miles) {

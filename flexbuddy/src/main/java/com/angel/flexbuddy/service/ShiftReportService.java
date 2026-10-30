@@ -257,7 +257,7 @@ public class ShiftReportService {
                 schedule.needsConfirmation(), schedule.cancelled(), schedule.forfeited(),
                 schedule.forfeitedThisMonth(), timed(shifts).size(), clockedMinutes(shifts),
                 hourly(net.grossEarnings(), clockedMinutes(shifts)), averageFinishedEarly(shifts),
-                schedule.lateForfeited(), schedule.lateForfeitedThisMonth());
+                schedule.lateForfeited(), schedule.lateForfeitedThisMonth(), net.blocksWithoutMiles());
     }
 
     /** Worked blocks with both actual times recorded. */

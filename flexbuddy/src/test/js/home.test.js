@@ -35,6 +35,14 @@ test('attentionRows lists only what applies, in order', () => {
     assert.strictEqual(home.attentionRows({missingMiles: 1})[0].text, '1 block has no miles');
 });
 
+test('netMissingMiles gives the count only for standard mileage with blocks missing miles', () => {
+    assert.strictEqual(home.netMissingMiles({vehicleCostMethod: 'STANDARD_MILEAGE', blocksWithoutMiles: 3}), 3);
+    assert.strictEqual(home.netMissingMiles({vehicleCostMethod: 'ACTUAL_EXPENSES', blocksWithoutMiles: 3}), 0);
+    assert.strictEqual(home.netMissingMiles({vehicleCostMethod: 'STANDARD_MILEAGE', blocksWithoutMiles: 0}), 0);
+    assert.strictEqual(home.netMissingMiles({vehicleCostMethod: 'STANDARD_MILEAGE'}), 0);
+    assert.strictEqual(home.netMissingMiles(null), 0);
+});
+
 test('attentionRows puts the install prompt last', () => {
     const rows = home.attentionRows({needsConfirmation: 1, backupDue: true, installable: true});
     assert.deepStrictEqual(keys(rows), ['confirm', 'backup', 'install']);

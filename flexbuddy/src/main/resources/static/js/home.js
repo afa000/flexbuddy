@@ -56,6 +56,7 @@
             sevenHours: document.querySelector('#rollingSevenDayTime'),
             sevenDetail: document.querySelector('#lastSevenDetail'),
             weekNetHourly: document.querySelector('#weekNetHourly'),
+            weekNetHourlyNote: document.querySelector('#weekNetHourlyNote'),
             attention: document.querySelector('#homeAttention'),
             attentionList: document.querySelector('#attentionList'),
             missingMiles: document.querySelector('#missingMiles'),
@@ -84,6 +85,16 @@
 
     let needsConfirmation = 0;
 
+    /**
+     * How many blocks have no miles when that makes estimated net too high, otherwise 0. Only standard mileage
+     * prices miles, so with actual expenses a missing mileage doesn't change net.
+     */
+    function netMissingMiles(statistics) {
+        if (!statistics || statistics.vehicleCostMethod === 'ACTUAL_EXPENSES') return 0;
+        const count = Number(statistics.blocksWithoutMiles);
+        return count > 0 ? count : 0;
+    }
+
     /** Loads every figure on Home. One call failing leaves a dash in its own place and does not blank the rest. */
     async function load() {
         init();
@@ -97,12 +108,17 @@
             fetchJson('/shifts?sort=date&dir=desc')
         ]);
 
+        // The page renders "estimate" itself; keep it so the caption can go back after miles are added.
+        el.weekNetHourlyNote.dataset.estimate ??= el.weekNetHourlyNote.textContent;
         if (weekStats.status === 'fulfilled') {
             weekEarned = weekStats.value.totalEarnings;
             el.weekNetHourly.textContent = t('js.common.perHour', formatMoney(weekStats.value.netHourlyRate));
+            el.weekNetHourlyNote.textContent = netMissingMiles(weekStats.value)
+                ? t('js.home.missingMiles') : el.weekNetHourlyNote.dataset.estimate;
             needsConfirmation = weekStats.value.needsConfirmation ?? 0;
         } else {
             el.weekNetHourly.textContent = '—';
+            el.weekNetHourlyNote.textContent = el.weekNetHourlyNote.dataset.estimate;
         }
         // With no weekly goal there is no "of $400", so the card shows what was earned.
         if (el.goalCard.dataset.state === 'none') {
@@ -200,5 +216,6 @@
         }
     }
 
-    window.flexbuddyHome = {load, renderToday, noGoalText, weekRange, lastSevenRange, attentionRows, recentBlocks};
+    window.flexbuddyHome = {load, renderToday, noGoalText, weekRange, lastSevenRange, attentionRows, recentBlocks,
+        netMissingMiles};
 })();
