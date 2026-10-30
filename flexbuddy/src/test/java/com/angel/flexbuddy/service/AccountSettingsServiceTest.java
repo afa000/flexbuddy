@@ -84,6 +84,15 @@ class AccountSettingsServiceTest {
     }
 
     @Test
+    void anInvalidStoredTimeZoneFallsBackToTheDefaultInsteadOfFailing() {
+        user.setTimeZone("Not/AZone");
+
+        var settings = service.get(EMAIL);
+
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.760");
+    }
+
+    @Test
     void updatePersistsTheSelectedMethodAndCustomRate() {
         when(userRepository.save(user)).thenReturn(user);
 

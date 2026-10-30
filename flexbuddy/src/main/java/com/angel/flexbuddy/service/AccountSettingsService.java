@@ -120,8 +120,13 @@ public class AccountSettingsService {
 
     /** Today's date where the driver is, which is the date the IRS rate shown to them is for. */
     private LocalDate today(AppUser user) {
-        String zone = user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone();
-        return LocalDate.ofInstant(clock.instant(), java.time.ZoneId.of(zone));
+        java.time.ZoneId zone;
+        try {
+            zone = java.time.ZoneId.of(user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone());
+        } catch (java.time.DateTimeException exception) {
+            zone = java.time.ZoneId.of(AppUser.DEFAULT_TIME_ZONE);
+        }
+        return LocalDate.ofInstant(clock.instant(), zone);
     }
 
     static String newCalendarToken() {

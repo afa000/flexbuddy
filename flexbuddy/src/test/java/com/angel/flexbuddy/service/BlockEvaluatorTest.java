@@ -215,6 +215,21 @@ class BlockEvaluatorTest {
         assertThat(result.verdict()).isEqualTo(verdict);
     }
 
+    @Test
+    void anAccountOnTheIrsRateUsesTodaysRateForTheEstimatedVehicleCost() {
+        lenient().when(settingsService.get(EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+            com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.760"), new BigDecimal("0.760"),
+            java.time.LocalDate.of(2026, 7, 1), "America/New_York", null, false, false, 45, null, null,
+            com.angel.flexbuddy.model.GoalBasis.GROSS,
+            List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null, false, true, null, false));
+        for (int day = 1; day <= 12; day++) block("VEA7", TODAY.minusDays(day), 240, "84.00", "6.00", "22.0");
+
+        BlockEvaluationResponse result = evaluate("VEA7", "4", "90.00", null);
+
+        // 22 miles at the 76 cents in effect on 2026-09-26.
+        assertThat(result.estimatedVehicleCost()).isEqualByComparingTo("16.72");
+    }
+
     private BlockEvaluationResponse evaluate(String station, String hours, String pay, String tips) {
         return evaluator.evaluate(EMAIL, new BlockEvaluationRequest(station, new BigDecimal(hours), new BigDecimal(pay),
                 tips == null ? null : new BigDecimal(tips)));
