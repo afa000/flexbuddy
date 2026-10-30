@@ -11,16 +11,19 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Locale;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.angel.flexbuddy.dto.DuplicateKind;
 import com.angel.flexbuddy.dto.DuplicateMatch;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -71,9 +74,10 @@ class ScheduledShiftMatcherTest {
         LocalDate monday = SUNDAY.plusDays(1);
         when(shiftRepository.findByOwnerEmailIgnoreCaseAndStatusInAndDateBetweenOrderByDateAscStartTimeAsc(
                 EMAIL, LOGGED, SUNDAY, monday))
-                .thenReturn(List.of(block(42L, ShiftStatus.SCHEDULED, "VEA7", SUNDAY, LocalTime.of(22, 0), LocalTime.of(2, 0))));
+                .thenReturn(List.of(block(42L, ShiftStatus.SCHEDULED, "VEA7", monday, LocalTime.of(22, 0), LocalTime.of(2, 0))));
 
-        assertThat(matcher.match(EMAIL, monday, LocalTime.of(0, 30), LocalTime.of(1, 30), "VEA7", ShiftStatus.COMPLETED))
+        // The import itself ends after midnight, which is the minutes < 0 branch of the matcher.
+        assertThat(matcher.match(EMAIL, monday, LocalTime.of(23, 30), LocalTime.of(1, 30), "VEA7", ShiftStatus.COMPLETED))
                 .extracting(DuplicateMatch::shiftId).containsExactly(42L);
     }
 
@@ -126,6 +130,27 @@ class ScheduledShiftMatcherTest {
         assertThat(matcher.match(EMAIL, SUNDAY, LocalTime.of(0, 30), LocalTime.of(2, 0), "VEA7", ShiftStatus.COMPLETED))
                 .extracting(DuplicateMatch::shiftId, DuplicateMatch::kind)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple(53L, DuplicateKind.LIKELY));
+    }
+
+    @Test
+    void writesTheAlreadyLoggedMessageInTheDriversLanguage() {
+        when(shiftRepository.findByOwnerEmailIgnoreCaseAndStatusInAndDateBetweenOrderByDateAscStartTimeAsc(
+                EMAIL, LOGGED, SUNDAY.minusDays(1), SUNDAY))
+                .thenReturn(List.of(block(50L, ShiftStatus.COMPLETED, "VEA7", SUNDAY, LocalTime.of(15, 15), LocalTime.of(19, 15))));
+        Locale spanish = Locale.of("es");
+        Locale previous = LocaleContextHolder.getLocale();
+        LocaleContextHolder.setLocale(spanish);
+        try {
+            String day = Messages.dayFormat(spanish).format(SUNDAY);
+            String time = Messages.timeFormat(spanish).format(LocalTime.of(15, 15));
+
+            assertThat(matcher.match(EMAIL, SUNDAY, LocalTime.of(15, 15), LocalTime.of(19, 15), "VEA7", ShiftStatus.COMPLETED))
+                    .extracting(DuplicateMatch::message)
+                    .containsExactly("Ya tiene un bloque de VEA7 el " + day + " a las " + time + ".");
+            assertThat(day).startsWith("dom").contains("de");
+        } finally {
+            LocaleContextHolder.setLocale(previous);
+        }
     }
 
     @Test
