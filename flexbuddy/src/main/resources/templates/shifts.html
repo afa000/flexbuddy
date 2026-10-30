@@ -577,7 +577,7 @@
                 <article class="panel expense-history-panel">
                     <div class="panel-heading"><div><h2 th:text="#{expenses.expenseHistory}">Expense history</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download th:text="#{expenses.exportCsv}">Export CSV</a></div>
                     <p class="expense-cost-note" th:utext="#{expenses.vehicleCostsUseStandardMileage.html}">Vehicle costs use <span id="expenseCostMethod">standard mileage</span> · <a class="text-link" href="/account#costs">Change</a></p>
-                    <p class="expense-cost-note" id="expenseFuelNote" th:text="#{expenses.fuelCoveredByMileage}">Fuel and maintenance are covered by the mileage rate, so they don't lower your estimated net.</p>
+                    <p class="expense-cost-note" id="expenseFuelNote" hidden th:text="#{expenses.fuelCoveredByMileage}">Fuel and maintenance are covered by the mileage rate, so they don't lower your estimated net.</p>
                     <div class="filter-row expense-filters">
                         <label class="filter-field"><span th:text="#{expenses.from}">From</span><input id="expenseFrom" type="date"></label>
                         <label class="filter-field"><span th:text="#{expenses.to}">To</span><input id="expenseTo" type="date"></label>

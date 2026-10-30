@@ -142,7 +142,7 @@ const elements = {
     expenseList: document.querySelector('#expenseList'), expenseSummaryTotal: document.querySelector('#expenseSummaryTotal'),
     expenseSummaryCount: document.querySelector('#expenseSummaryCount'), expenseFuel: document.querySelector('#expenseFuel'),
     expenseRoad: document.querySelector('#expenseRoad'), exportExpensesButton: document.querySelector('#exportExpensesButton'),
-    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseFuelNote: document.querySelector('#expenseFuelNote'),expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
+    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseFuelNote: document.querySelector('#expenseFuelNote'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
     expenseTrashSection: document.querySelector('#expenseTrashSection'), expenseTrashList: document.querySelector('#expenseTrashList'),
     expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton'),
     scheduleNavButton: document.querySelector('#scheduleNavButton'),
@@ -2146,7 +2146,7 @@ async function loadExpenses() {
         const settings = await settingsResponse.json();
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
             ? t('js.app.costActual') : t('js.app.costStandard', formatMoney(settings.mileageRate));
-        elements.expenseFuelNote.hidden = settings.vehicleCostMethod === 'ACTUAL_EXPENSES';
+        elements.expenseFuelNote.hidden = settings.vehicleCostMethod !== 'STANDARD_MILEAGE';
     } catch (error) {
         elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || t('js.app.expensesNotLoaded'))}</p>`;
     }

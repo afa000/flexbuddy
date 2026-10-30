@@ -119,8 +119,10 @@ class NetEarningsCalculatorTest {
         scheduled.setStatus(ShiftStatus.SCHEDULED);
         Shift cancelled = shift("18", "0", null);
         cancelled.setStatus(ShiftStatus.CANCELLED);
+        Shift forfeited = shift("0", "0", null);
+        forfeited.setStatus(ShiftStatus.FORFEITED);
 
-        var result = calculator.calculate(List.of(never, noMiles, withMiles, scheduled, cancelled), List.of(),
+        var result = calculator.calculate(List.of(never, noMiles, withMiles, scheduled, cancelled, forfeited), List.of(),
                 VehicleCostMethod.STANDARD_MILEAGE, MileageRates.fixed(new BigDecimal("0.700")));
 
         assertThat(result.blocksWithoutMiles()).isEqualTo(1);

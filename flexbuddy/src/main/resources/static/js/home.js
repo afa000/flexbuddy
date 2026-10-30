@@ -108,16 +108,17 @@
             fetchJson('/shifts?sort=date&dir=desc')
         ]);
 
+        // The page renders "estimate" itself; keep it so the caption can go back after miles are added.
+        el.weekNetHourlyNote.dataset.estimate ??= el.weekNetHourlyNote.textContent;
         if (weekStats.status === 'fulfilled') {
             weekEarned = weekStats.value.totalEarnings;
             el.weekNetHourly.textContent = t('js.common.perHour', formatMoney(weekStats.value.netHourlyRate));
-            // The page renders "estimate" itself; keep it so the caption can go back after miles are added.
-            el.weekNetHourlyNote.dataset.estimate ??= el.weekNetHourlyNote.textContent;
             el.weekNetHourlyNote.textContent = netMissingMiles(weekStats.value)
                 ? t('js.home.missingMiles') : el.weekNetHourlyNote.dataset.estimate;
             needsConfirmation = weekStats.value.needsConfirmation ?? 0;
         } else {
             el.weekNetHourly.textContent = '—';
+            el.weekNetHourlyNote.textContent = el.weekNetHourlyNote.dataset.estimate;
         }
         // With no weekly goal there is no "of $400", so the card shows what was earned.
         if (el.goalCard.dataset.state === 'none') {
