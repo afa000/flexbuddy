@@ -94,7 +94,7 @@ public class ShiftReportService {
             List<Shift> cellShifts = group.getValue();
             List<Expense> cellExpenses = cellShifts.stream()
                     .flatMap(shift -> linked.getOrDefault(shift.getId(), List.of()).stream()).toList();
-            NetEarningsResult net = calculator.calculate(cellShifts, cellExpenses, settings.vehicleCostMethod(), settings.mileageRate());
+            NetEarningsResult net = calculator.calculate(cellShifts, cellExpenses, settings.vehicleCostMethod(), settings.mileageRates());
             BigDecimal value = switch (metric) {
                 case NET_HOURLY -> net.netHourlyRate();
                 case GROSS_HOURLY -> net.grossHourlyRate();
@@ -229,7 +229,7 @@ public class ShiftReportService {
     private NetEarningsResult earningsBetween(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {
         ShiftFilter filter = ShiftFilter.report(from, to, null, null);
         return calculator.calculate(shiftService.findFiltered(email, filter), reportExpenses(email, filter),
-                settings.vehicleCostMethod(), settings.mileageRate());
+                settings.vehicleCostMethod(), settings.mileageRates());
     }
 
     @Transactional(readOnly = true)
@@ -239,7 +239,7 @@ public class ShiftReportService {
         int rollingSevenDayMinutes = rollingSevenDayMinutes(email, now.toLocalDate());
         List<Expense> expenses = reportExpenses(email, filter);
         AccountSettingsResponse settings = settingsService.get(email);
-        NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
+        NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRates());
         BigDecimal base = sum(shifts, true);
         BigDecimal tips = sum(shifts, false);
         int count = shifts.size();
@@ -342,7 +342,7 @@ public class ShiftReportService {
         if (groupBy == GroupBy.STATION) buckets.sort(Comparator.comparing(EarningsBucket::netEarnings).reversed()
                 .thenComparing(EarningsBucket::label, String.CASE_INSENSITIVE_ORDER));
         else buckets.sort(Comparator.comparing(EarningsBucket::periodStart, Comparator.nullsLast(Comparator.naturalOrder())));
-        NetEarningsResult total = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
+        NetEarningsResult total = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRates());
         EarningsTotals totals = new EarningsTotals(shifts.size(), money(sum(shifts, true)), money(sum(shifts, false)),
                 total.grossEarnings(), total.minutesWorked(), total.grossHourlyRate(), total.miles(), total.mileageCost(),
                 total.cashSpent(), total.totalDeductions(), total.netEarnings(), total.netHourlyRate());
@@ -415,7 +415,7 @@ public class ShiftReportService {
         private final List<Expense> expenses = new ArrayList<>();
         private GroupAccumulator(GroupKey key) { this.key = key; }
         private EarningsBucket bucket(AccountSettingsResponse settings) {
-            NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRate());
+            NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRates());
             return new EarningsBucket(key.key(), key.label(), key.start(), key.end(), shifts.size(), money(sum(shifts, true)),
                     money(sum(shifts, false)), net.grossEarnings(), net.minutesWorked(), net.grossHourlyRate(), net.miles(),
                     net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),

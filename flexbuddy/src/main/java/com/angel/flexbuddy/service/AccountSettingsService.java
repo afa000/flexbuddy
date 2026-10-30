@@ -4,9 +4,9 @@ import java.math.BigDecimal;
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Base64;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,17 +23,11 @@ public class AccountSettingsService {
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private final AppUserRepository userRepository;
-    private final BigDecimal defaultMileageRate;
-    private final int mileageRateYear;
     private final Clock clock;
 
     public AccountSettingsService(AppUserRepository userRepository,
-            @Value("${flexbuddy.mileage.default-rate:${flexbuddy.mileage-rate:0.70}}") BigDecimal defaultMileageRate,
-            @Value("${flexbuddy.mileage.default-rate-year:${flexbuddy.mileage-rate-year:2025}}") int mileageRateYear,
             Clock clock) {
         this.userRepository = userRepository;
-        this.defaultMileageRate = defaultMileageRate;
-        this.mileageRateYear = mileageRateYear;
         this.clock = clock;
     }
 
@@ -119,8 +113,15 @@ public class AccountSettingsService {
         return response(userRepository.save(user));
     }
 
+    /** The rate in effect today: the account's own, or today's IRS rate. */
     public BigDecimal effectiveMileageRate(AppUser user) {
-        return user.getMileageRate() == null ? defaultMileageRate : user.getMileageRate();
+        return user.getMileageRate() == null ? IrsMileageRates.rateOn(today(user)) : user.getMileageRate();
+    }
+
+    /** Today's date where the driver is, which is the date the IRS rate shown to them is for. */
+    private LocalDate today(AppUser user) {
+        String zone = user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone();
+        return LocalDate.ofInstant(clock.instant(), java.time.ZoneId.of(zone));
     }
 
     static String newCalendarToken() {
@@ -132,7 +133,8 @@ public class AccountSettingsService {
     private AccountSettingsResponse response(AppUser user) {
         VehicleCostMethod method = user.getVehicleCostMethod() == null
                 ? VehicleCostMethod.STANDARD_MILEAGE : user.getVehicleCostMethod();
-        return new AccountSettingsResponse(method, effectiveMileageRate(user), defaultMileageRate, mileageRateYear,
+        return new AccountSettingsResponse(method, effectiveMileageRate(user),
+                IrsMileageRates.rateOn(today(user)), IrsMileageRates.sinceOn(today(user)),
                 user.getTimeZone() == null ? AppUser.DEFAULT_TIME_ZONE : user.getTimeZone(),
                 user.getRemindBeforeMinutes(), user.isRemindConfirm(), user.isRemindMiles(), user.getForfeitCutoffMinutes(),
                 user.getWeeklyGoal(), user.getMonthlyGoal(),
@@ -140,7 +142,8 @@ public class AccountSettingsService {
                 java.util.List.copyOf(PayPeriodCalculator.parseDays(user.getPayoutDays())), user.getPayoutLagDays(),
                 user.getTaxSetAsidePercent(),
                 user.getCalendarToken() == null ? null : "/calendar/" + user.getCalendarToken() + ".ics",
-                user.isRemindTax(), user.isAskMissingMiles(), user.getLanguage());
+                user.isRemindTax(), user.isAskMissingMiles(), user.getLanguage(),
+                user.getMileageRate() != null);
     }
 
     private AppUser user(String email) {

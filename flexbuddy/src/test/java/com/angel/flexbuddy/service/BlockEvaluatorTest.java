@@ -222,7 +222,7 @@ class BlockEvaluatorTest {
 
     private void useMethod(VehicleCostMethod method) {
         lenient().when(settingsService.get(EMAIL)).thenReturn(
-                new AccountSettingsResponse(method, new BigDecimal("0.70"), new BigDecimal("0.70"), 2026));
+                new AccountSettingsResponse(method, new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
     }
 
     private Shift block(String station, LocalDate date, int minutes, String base, String tips, String miles) {

@@ -308,9 +308,66 @@ class TaxServiceTest {
         assertThat(service.dueDate(2026, 4)).isEqualTo(LocalDate.of(2027, 1, 15));
     }
 
+    @Test
+    void onTheIrsRateEachMonthShowsItsOwnRateAndTheYearTotalShowsNone() throws Exception {
+        useIrsRate();
+        block(LocalDate.of(2026, 3, 10), "100.00", "0.00").setMiles(new BigDecimal("100.0"));
+        block(LocalDate.of(2026, 8, 10), "100.00", "0.00").setMiles(new BigDecimal("100.0"));
+
+        List<com.angel.flexbuddy.dto.TaxYearRow> rows = service.yearRows(EMAIL, 2026);
+
+        assertThat(rows.subList(0, 6)).extracting(com.angel.flexbuddy.dto.TaxYearRow::mileageRate)
+                .allSatisfy(rate -> assertThat(rate).isEqualByComparingTo("0.725"));
+        assertThat(rows.subList(6, 12)).extracting(com.angel.flexbuddy.dto.TaxYearRow::mileageRate)
+                .allSatisfy(rate -> assertThat(rate).isEqualByComparingTo("0.760"));
+        assertThat(rows.get(2).mileageCost()).isEqualByComparingTo("72.50");
+        assertThat(rows.get(7).mileageCost()).isEqualByComparingTo("76.00");
+        assertThat(rows.getLast().mileageRate()).isNull();
+        assertThat(rows.getLast().mileageCost()).isEqualByComparingTo("148.50");
+
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        service.writeYearCsv(EMAIL, 2026, output);
+        String[] lines = new String(output.toByteArray(), 3, output.size() - 3, StandardCharsets.UTF_8).split("\r\n");
+        assertThat(lines[3].split(",")[6]).isEqualTo("0.725");
+        assertThat(lines[8].split(",")[6]).isEqualTo("0.760");
+        assertThat(lines[13].split(",", -1)[6]).isEmpty();
+        assertThat(lines[13].split(",", -1)[7]).isEqualTo("148.50");
+        assertThat(service.yearReport(EMAIL, "Angel", 2026).mileageRate()).isNull();
+    }
+
+    @Test
+    void aYearWithOneIrsRateKeepsTheSingleRateHeaderAndTotal() {
+        useIrsRate();
+
+        List<com.angel.flexbuddy.dto.TaxYearRow> rows = service.yearRows(EMAIL, 2025);
+
+        assertThat(rows.getLast().mileageRate()).isEqualByComparingTo("0.700");
+        assertThat(service.yearReport(EMAIL, "Angel", 2025).mileageRate()).isEqualByComparingTo("0.700");
+    }
+
+    @Test
+    void aCustomRateIsTheSameForEveryRowAndTheHeader() {
+        when(settingsService.get(EMAIL)).thenReturn(settings(new BigDecimal("0.650"), true));
+
+        List<com.angel.flexbuddy.dto.TaxYearRow> rows = service.yearRows(EMAIL, 2026);
+
+        assertThat(rows).allSatisfy(row -> assertThat(row.mileageRate()).isEqualByComparingTo("0.650"));
+        assertThat(service.yearReport(EMAIL, "Angel", 2026).mileageRate()).isEqualByComparingTo("0.650");
+    }
+
+    private void useIrsRate() {
+        when(settingsService.get(EMAIL)).thenReturn(settings(new BigDecimal("0.760"), false));
+    }
+
+    private static AccountSettingsResponse settings(BigDecimal rate, boolean custom) {
+        return new AccountSettingsResponse(VehicleCostMethod.STANDARD_MILEAGE, rate, new BigDecimal("0.760"),
+                LocalDate.of(2026, 7, 1), "America/New_York", null, false, false, 45, null, null, GoalBasis.GROSS,
+                List.of(DayOfWeek.TUESDAY, DayOfWeek.FRIDAY), 1, new BigDecimal("25"), null, false, true, null, custom);
+    }
+
     private void useRate(BigDecimal percent) {
         lenient().when(settingsService.get(EMAIL)).thenReturn(new AccountSettingsResponse(VehicleCostMethod.STANDARD_MILEAGE,
-                new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45, null,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 45, null,
                 null, GoalBasis.GROSS, List.of(DayOfWeek.TUESDAY, DayOfWeek.FRIDAY), 1, percent, null));
     }
 

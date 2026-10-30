@@ -68,7 +68,7 @@ class ShiftServiceTest {
         org.mockito.Mockito.lenient().when(settingsService.get(OWNER_EMAIL)).thenReturn(
                 new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
         org.mockito.Mockito.lenient().when(expenseService.findForShifts(eq(OWNER_EMAIL), any())).thenReturn(List.of());
     }
 
@@ -746,7 +746,7 @@ class ShiftServiceTest {
 
         when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
                 com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.70"),
-                new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 60, null, null,
+                new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 60, null, null,
                 com.angel.flexbuddy.model.GoalBasis.GROSS,
                 java.util.List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null));
         ShiftResponse edited = shiftService.changeStatus(OWNER_EMAIL, 7L, new ShiftStatusRequest(ShiftStatus.FORFEITED));

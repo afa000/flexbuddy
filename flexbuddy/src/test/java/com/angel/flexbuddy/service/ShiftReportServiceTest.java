@@ -57,7 +57,7 @@ class ShiftReportServiceTest {
         org.mockito.Mockito.lenient().when(settingsService.get(EMAIL)).thenReturn(
                 new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
     }
 
     @Test
@@ -388,7 +388,7 @@ class ShiftReportServiceTest {
     private static com.angel.flexbuddy.dto.AccountSettingsResponse goalSettings(String weekly, String monthly,
             com.angel.flexbuddy.model.GoalBasis basis) {
         return new com.angel.flexbuddy.dto.AccountSettingsResponse(com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 45,
                 weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis,
                 List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null);
     }

@@ -232,7 +232,7 @@ public class AccountRestoreService {
         if (file.version() >= 2 && file.settings() != null) {
             try {
                 owner.setVehicleCostMethod(VehicleCostMethod.valueOf(file.settings().vehicleCostMethod()));
-                owner.setMileageRate(file.settings().mileageRate() == null ? null : new BigDecimal(file.settings().mileageRate()));
+                owner.setMileageRate(restoredMileageRate(file.settings().mileageRate()));
                 if (file.version() >= 3) {
                     if (file.settings().timeZone() != null) owner.setTimeZone(file.settings().timeZone());
                     owner.setRemindBeforeMinutes(file.settings().remindBeforeMinutes());
@@ -617,5 +617,15 @@ public class AccountRestoreService {
 
     record StagedBackup(String token, String email, AccountBackupFile file, Instant expiresAt)
             implements java.io.Serializable {
+    }
+
+    /**
+     * The account's own rate from a backup. A rate of 0.70 is dropped: the vehicle costs form used to store the
+     * displayed default, which was 0.70, so it means "follow the IRS rate" and not a rate the driver chose.
+     */
+    private static BigDecimal restoredMileageRate(String stored) {
+        if (stored == null) return null;
+        BigDecimal rate = new BigDecimal(stored);
+        return rate.compareTo(new BigDecimal("0.70")) == 0 ? null : rate;
     }
 }

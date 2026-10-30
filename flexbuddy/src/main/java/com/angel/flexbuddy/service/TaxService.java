@@ -167,7 +167,8 @@ public class TaxService {
         writer.write(String.join(",", CSV_HEADERS) + "\r\n");
         for (TaxYearRow row : rows) {
             writer.write(String.join(",", row.label(), String.valueOf(row.shifts()), money(row.basePay()), money(row.tips()),
-                    money(row.gross()), row.miles().toPlainString(), row.mileageRate().toPlainString(),
+                    money(row.gross()), row.miles().toPlainString(),
+                    row.mileageRate() == null ? "" : row.mileageRate().toPlainString(),
                     money(row.mileageCost()), money(row.fuel()), money(row.tolls()), money(row.parking()),
                     money(row.maintenance()), money(row.other()), row.vehicleCostMethod().name(),
                     money(row.vehicleCost()), money(row.totalDeductions()), money(row.net())) + "\r\n");
@@ -190,16 +191,18 @@ public class TaxService {
                         expense.getShift() == null ? null : expense.getShift().getStation(), expense.getNote()))
                 .toList();
         return new TaxYearReport(year, userTime.today(email), displayName, settings.vehicleCostMethod(),
-                settings.mileageRate(), rows.subList(0, 12), rows.get(12), summary(email, year), listed);
+                settings.mileageRates().singleRate(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)),
+                rows.subList(0, 12), rows.get(12), summary(email, year), listed);
     }
 
     private TaxYearRow yearRow(String label, LocalDate from, LocalDate to, String email, AccountSettingsResponse settings) {
         List<com.angel.flexbuddy.model.Shift> shifts = shiftService.findFiltered(email, ShiftFilter.report(from, to, null, null));
         NetEarningsResult net = calculator.calculate(shifts, expenses(email, from, to), settings.vehicleCostMethod(),
-                settings.mileageRate());
+                settings.mileageRates());
         BigDecimal base = shifts.stream().map(com.angel.flexbuddy.model.Shift::getEarnedBasePay).reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal tips = shifts.stream().map(com.angel.flexbuddy.model.Shift::getEarnedTips).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new TaxYearRow(label, shifts.size(), base, tips, net.grossEarnings(), net.miles(), settings.mileageRate(),
+        return new TaxYearRow(label, shifts.size(), base, tips, net.grossEarnings(), net.miles(),
+                settings.mileageRates().singleRate(from, to),
                 net.mileageCost(), net.expenseTotals().get(ExpenseCategory.FUEL), net.expenseTotals().get(ExpenseCategory.TOLL),
                 net.expenseTotals().get(ExpenseCategory.PARKING), net.expenseTotals().get(ExpenseCategory.MAINTENANCE),
                 net.expenseTotals().get(ExpenseCategory.OTHER), settings.vehicleCostMethod(), net.vehicleCost(),
@@ -208,7 +211,7 @@ public class TaxService {
 
     private NetEarningsResult net(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {
         return calculator.calculate(shiftService.findFiltered(email, ShiftFilter.report(from, to, null, null)),
-                expenses(email, from, to), settings.vehicleCostMethod(), settings.mileageRate());
+                expenses(email, from, to), settings.vehicleCostMethod(), settings.mileageRates());
     }
 
     /** Expenses linked to a block that has not happened yet are not counted, as in the reports. */

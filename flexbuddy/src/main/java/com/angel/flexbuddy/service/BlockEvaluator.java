@@ -66,10 +66,10 @@ public class BlockEvaluator {
         int minutes = request.hours().multiply(BigDecimal.valueOf(60)).setScale(0, RoundingMode.HALF_UP).intValueExact();
 
         BigDecimal tips = request.expectedTips() != null ? request.expectedTips() : rates.tipsPerMinute().multiply(BigDecimal.valueOf(minutes));
-        NetEarningsResult offer = estimate(request.offeredPay(), tips, minutes, rates, settings);
+        NetEarningsResult offer = estimate(request.offeredPay(), tips, minutes, rates, settings, today);
         NetEarningsResult usual = sample.shifts().isEmpty() ? null : estimate(
                 rates.basePerMinute().multiply(BigDecimal.valueOf(minutes)),
-                rates.tipsPerMinute().multiply(BigDecimal.valueOf(minutes)), minutes, rates, settings);
+                rates.tipsPerMinute().multiply(BigDecimal.valueOf(minutes)), minutes, rates, settings, today);
         BigDecimal difference = usual == null ? null : differencePercent(offer.netHourlyRate(), usual.netHourlyRate());
         BigDecimal baseHourly = usualBaseHourly(sample.shifts());
 
@@ -167,9 +167,9 @@ public class BlockEvaluator {
 
     /** Runs the offer through the same calculator as the reports, as one block with the expected costs attached. */
     private NetEarningsResult estimate(BigDecimal pay, BigDecimal tips, int minutes, Rates rates,
-            AccountSettingsResponse settings) {
+            AccountSettingsResponse settings, LocalDate today) {
         BigDecimal length = BigDecimal.valueOf(minutes);
-        Shift block = new Shift(null, "", null, LocalTime.MIDNIGHT, LocalTime.MIDNIGHT.plusMinutes(minutes), pay, tips);
+        Shift block = new Shift(null, "", today, LocalTime.MIDNIGHT, LocalTime.MIDNIGHT.plusMinutes(minutes), pay, tips);
         BigDecimal miles = rates.milesPerMinute() == null ? null
                 : rates.milesPerMinute().multiply(length).setScale(1, RoundingMode.HALF_UP);
         block.setMiles(miles);
@@ -181,7 +181,7 @@ public class BlockEvaluator {
                     ? rates.vehiclePerMile().multiply(miles) : rates.vehiclePerMinute().multiply(length);
             costs.add(cost(ExpenseCategory.FUEL, vehicle));
         }
-        return calculator.calculate(List.of(block), costs, settings.vehicleCostMethod(), settings.mileageRate());
+        return calculator.calculate(List.of(block), costs, settings.vehicleCostMethod(), settings.mileageRates());
     }
 
     private static Expense cost(ExpenseCategory category, BigDecimal amount) {
