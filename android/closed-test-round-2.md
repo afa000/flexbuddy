@@ -165,6 +165,26 @@ millas por odómetro, recordatorios de millas, botones más grandes e importaci�
 **Versions 4 and 5:** "Fixed after tester feedback:" followed by each fix in the driver's words, for example "Reports
 totals no longer cut off on small phones".
 
+**Version 4, English.** These fixes came from the owner's own walkthrough as a driver on October 30, 2026 (FB-008,
+FB-009 and FB-010), not from testers, so the notes don't credit testers. If tester reports arrive before the upload, log
+them in [closed-test-feedback.md](closed-test-feedback.md) and name any that version 4 fixes under "Fixed after tester
+feedback:".
+
+```text
+New in version 4: FlexBuddy warns you before importing a screenshot of a block you already logged, so it isn't counted
+twice. Standard mileage now uses the IRS rate for each block's date (72.5¢ from January 2026, 76¢ from July). Reports
+and Home now say when estimated net is too high because blocks have no miles.
+```
+
+**Version 4, Spanish**
+
+```text
+Novedades de la versión 4: FlexBuddy te avisa antes de importar una captura de un bloque que ya registraste, para que
+no se cuente dos veces. El millaje estándar ahora usa la tarifa del IRS de la fecha de cada bloque (72.5¢ desde enero
+de 2026 y 76¢ desde julio). Informes e Inicio ahora indican cuándo la ganancia neta estimada es demasiado alta porque
+hay bloques sin millas.
+```
+
 ## If something goes wrong
 
 | Problem | What to do |
