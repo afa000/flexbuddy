@@ -17,9 +17,11 @@
 - Signed interactively with the upload key on October 30, 2026; `apksigner` verified the APK and `jarsigner` the bundle,
   both with the upload key (`A3:EC:82:…:FE:37`).
 - Uploaded to Closed testing - Alpha on October 30, 2026 as `4 (October 30 fixes)`, version 4 (4), API 24+, target
-  SDK 36; version 3 not carried over, and no supported devices dropped. Sent for review the same day.
-- Still to do: record Google's approval, then update from the Play Store on the emulator (read-only, Play Reviewer
-  account).
+  SDK 36; version 3 not carried over, and no supported devices dropped. Sent for review the same day and approved by
+  Google on October 30, 2026 (Publishing overview: nothing in review, last published October 30, 2026).
+- Emulator check, October 31, 2026 (read-only, Play Reviewer account): Play had updated the app to version 4 (4)
+  overnight. A cold launch opened Home full screen with no URL bar, so the site verification still holds; the page's
+  "FlexBuddy updated" notice reloaded into the current web build. Nothing was added or changed.
 
 ## Version code 3 — everything since version 2, for the second closed test
 
