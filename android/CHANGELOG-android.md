@@ -1,5 +1,28 @@
 # Android release history
 
+## Version code 4 — the October 30 web fixes, day 5 of the second closed test
+
+- No shell changes. `appVersionCode`, `appVersionName` and `appVersion` raised to 4 in `twa-manifest.json`
+  (`app/build.gradle` and `manifest-checksum.txt` follow). It brings three web changes, live on Render since
+  October 30, 2026, to testers as an update Play can see: the duplicate-import warning (FB-008, PR #15), the IRS
+  mileage rate for each block's date (FB-010, PR #16) and the missing-miles notes on Reports, Home and Expenses
+  (FB-009, PR #17).
+- Generated with `bubblewrap update --skipVersionUpgrade` on October 30, 2026. Afterwards the hand-drawn icons, splash
+  images, `store_icon.png` and `shortcuts.xml` were restored, and so were `Application.java`, `LauncherActivity.java`,
+  `ic_launcher.xml` and `strings.xml` (only whitespace changed) and `DelegationService.java` (only a trailing
+  newline).
+- Built unsigned with Bubblewrap on October 30, 2026. The APK reads `versionCode='4' versionName='4'`,
+  `minSdkVersion 24`, and has the three launcher shortcuts (Import, Expenses, Schedule), as version 3 did.
+- Release notes (English and Spanish): as written in `closed-test-round-2.md`, entered for en-US, es-419 and es-US.
+- Signed interactively with the upload key on October 30, 2026; `apksigner` verified the APK and `jarsigner` the bundle,
+  both with the upload key (`A3:EC:82:…:FE:37`).
+- Uploaded to Closed testing - Alpha on October 30, 2026 as `4 (October 30 fixes)`, version 4 (4), API 24+, target
+  SDK 36; version 3 not carried over, and no supported devices dropped. Sent for review the same day and approved by
+  Google on October 30, 2026 (Publishing overview: nothing in review, last published October 30, 2026).
+- Emulator check, October 31, 2026 (read-only, Play Reviewer account): Play had updated the app to version 4 (4)
+  overnight. A cold launch opened Home full screen with no URL bar, so the site verification still holds; the page's
+  "FlexBuddy updated" notice reloaded into the current web build. Nothing was added or changed.
+
 ## Version code 3 — everything since version 2, for the second closed test
 
 - Minimum Android version raised from 5.0 (`minSdkVersion` 21) to 7.0 (24). Play Console refused the
