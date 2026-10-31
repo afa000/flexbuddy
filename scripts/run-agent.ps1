@@ -46,6 +46,14 @@ if (-not $Prompt) {
     $Prompt = "Use the implement-task skill for $TaskId. The task is in .ai/tasks/$TaskId.md and you are on its " +
         "branch. $checks Write .ai/implementations/$TaskId.md before you stop. Do not commit or push."
 }
+if ($Agent -eq 'antigravity') {
+    # The terminal sandbox can read this working tree but not write to it, and has no network. Tests write build
+    # output, so they have to leave the sandbox, which the allow rules approve.
+    $Prompt += " Terminal commands run in a sandbox that can read this repository but not write to it: make every " +
+        "file change with your file-editing tools, not the terminal. Run tests outside the sandbox (BypassSandbox), " +
+        "from the repository root and on their own: .\scripts\verify.ps1 -TaskId $TaskId for the full check, or " +
+        "node --test flexbuddy/src/test/js/<name>.test.js for one script's tests."
+}
 
 if ($Agent -eq 'local') {
     # The default agent asks before every edit and command, which an unattended run can't answer. The headless agent
@@ -55,21 +63,19 @@ if ($Agent -eq 'local') {
     $arguments = @("launch", "opencode", "--model", $Model, "--", "run", "--standalone", "--agent", "headless",
         "--model", "ollama/$Model")
 } else {
-    # The Antigravity CLI only reads user-wide rules. On Windows it checks each command wrapped in quotes, so plain
-    # prefix rules such as command(git status) never match; scripts/antigravity-cli-settings.json uses regexes. Copy,
-    # don't rewrite, that file: the CLI ignores a settings file that starts with a byte-order mark.
-    $settings = Join-Path $env:USERPROFILE ".gemini\antigravity-cli\settings.json"
-    $wanted = Join-Path $PSScriptRoot "antigravity-cli-settings.json"
-    if (-not (Test-Path $settings)) {
-        Copy-Item $wanted $settings
-        Write-Host "Installed the Antigravity CLI permission rules in $settings"
-    } elseif ((Get-Content $settings -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 5 -Compress) -ne
-            (Get-Content $wanted -Raw | ConvertFrom-Json | ConvertTo-Json -Depth 5 -Compress)) {
-        # Compared as JSON: the CLI rewrites the file with & < > escaped, which is the same rules.
-        Write-Warning "$settings differs from scripts/antigravity-cli-settings.json; using it as it is."
-    }
+    # scripts/antigravity-cli-settings.json applies to this run only (--settings); its allow and deny lists replace
+    # the ones in ~/.gemini/antigravity-cli/settings.json. On Windows the CLI checks each command wrapped in quotes,
+    # so plain prefix rules such as command(git status) never match and the rules use regexes. The sandbox refuses
+    # to start with a relative path in a file rule, so those are made absolute here. WriteAllText writes no
+    # byte-order mark, which the CLI won't read.
+    $rootForRules = $root -replace '\\', '/'
+    $rules = (Get-Content (Join-Path $PSScriptRoot "antigravity-cli-settings.json") -Raw) -replace
+        '(read_file|write_file)\((?![A-Za-z]:|/|~)', "`$1($rootForRules/"
+    $settings = Join-Path $logs "agent-$Agent-$stamp.settings.json"
+    [IO.File]::WriteAllText($settings, $rules)
     $exe = Join-Path $env:USERPROFILE ".gemini\bin\agy.exe"
-    $arguments = @("--mode", "accept-edits", "--print-timeout", "${TimeoutMinutes}m", "--output-format", "text", "-p")
+    $arguments = @("--settings", "`"$settings`"", "--mode", "accept-edits", "--print-timeout", "${TimeoutMinutes}m",
+        "--output-format", "json", "-p")
 }
 $arguments += '"' + ($Prompt -replace '"', '\"') + '"'
 
@@ -94,18 +100,30 @@ if (-not $process.HasExited) {
 $elapsed = [int]$timer.Elapsed.TotalSeconds
 
 $changes = (git -C $root status --short) -join "`n"
+# Both CLIs write UTF-8; Windows PowerShell would read it as the ANSI code page.
+$output = Get-Content $out -Raw -Encoding UTF8
+$toolLog = Get-Content $err -Raw -Encoding UTF8
 $commands = ""
 if ($Agent -eq 'antigravity') {
-    # In unattended mode one refused command ends the whole run, so record which commands it ran.
-    $brain = Get-ChildItem (Join-Path $env:USERPROFILE ".gemini\antigravity-cli\brain") -Directory |
-        Sort-Object LastWriteTime | Select-Object -Last 1
-    $transcript = Join-Path $brain.FullName ".system_generated\logs\transcript.jsonl"
-    if (Test-Path $transcript) {
-        $commands = (Select-String -Path $transcript -Pattern 'CommandLine":"\\"(.*?)\\""' -AllMatches |
-            ForEach-Object { $_.Matches } |
-            ForEach-Object { "- " + ($_.Groups[1].Value -replace '\\\\\\\\', '\' -replace '\\\\\\"', '"') }) -join "`n"
+    $result = $null
+    try { $result = $output | ConvertFrom-Json } catch { }
+    if ($result) {
+        $output = "Status: $($result.status)`n`n$($result.response)"
+        # In unattended mode one refused command ends the whole run, so record which commands it ran. The
+        # conversation id finds this run's transcript even when another run is going at the same time.
+        $transcript = Join-Path $env:USERPROFILE `
+            ".gemini\antigravity-cli\brain\$($result.conversation_id)\.system_generated\logs\transcript.jsonl"
+        if (Test-Path $transcript) {
+            # Each argument is itself JSON-encoded, so CommandLine is decoded twice.
+            $commands = (Get-Content $transcript -Encoding UTF8 | ForEach-Object { ($_ | ConvertFrom-Json).tool_calls } |
+                Where-Object { $_.name -eq 'run_command' } |
+                ForEach-Object {
+                    $where = if ($_.args.BypassSandbox -eq 'true') { ' (outside the sandbox)' } else { '' }
+                    "- " + ($_.args.CommandLine | ConvertFrom-Json) + $where
+                }) -join "`n"
+        }
     }
-    if ((Get-Content $err -Raw) -match 'cannot prompt for') {
+    if ($toolLog -match 'cannot prompt for') {
         Write-Warning "Antigravity stopped at a command its rules don't allow; it is the last one listed in the log."
     }
 }
@@ -122,11 +140,11 @@ $Prompt
 
 ## Output
 
-$(Get-Content $out -Raw)
+$output
 
 ## Tool log
 
-$(Get-Content $err -Raw)
+$toolLog
 $(if ($commands) { "`n## Commands run`n`n$commands`n" })
 ## Working tree afterwards
 

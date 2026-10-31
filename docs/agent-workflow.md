@@ -215,20 +215,26 @@ Nobody is there to approve anything during these runs, so each agent gets fixed 
   files and run only read-only git commands and `node --test`; everything else is refused. Your own interactive
   OpenCode sessions keep asking as before.
 - **Antigravity:** the CLI (`agy`, installed with the app in `~/.gemini/bin`) runs with
-  [`scripts/antigravity-cli-settings.json`](../scripts/antigravity-cli-settings.json), which the script installs as
-  `~/.gemini/antigravity-cli/settings.json` the first time. It allows read-only git, read-only PowerShell
-  (`Get-ChildItem`, `Get-Content`, `Select-String`, `Test-Path`), `node --test`, the Maven `verify`/`test` runs and
-  `verify.ps1`, none of them chained with `;`, `&`, `|` or redirects, and it refuses commits, pushes and branch
-  changes. Those settings apply to every Antigravity CLI run on this PC, not the desktop app.
+  [`scripts/antigravity-cli-settings.json`](../scripts/antigravity-cli-settings.json) for that run only (`--settings`;
+  your own `~/.gemini/antigravity-cli/settings.json` and interactive `agy` sessions are left alone). Its terminal
+  commands run in the CLI's sandbox, which can read the repository but can't write to it, reach the network or write
+  `.git`, so any read-only command runs without asking: searches with `<` in them, pipes, `powershell -Command ...`.
+  The agent makes file changes with its own editing tools. Tests write build output, so they leave the sandbox, and
+  only the allow-listed ones may: `node --test`, the Maven `verify`/`test` runs and `verify.ps1`, none of them chained
+  with `;`, `&`, `|` or redirects. Commits, pushes and branch changes are refused everywhere.
 
 Things to know:
 
 - **One refused command ends an Antigravity run** without an answer; the log's "Commands run" list ends with the one
-  it tried. Allow it in `scripts/antigravity-cli-settings.json` if it is safe, then copy the file over the installed
-  one (the script only installs it when none exists).
+  it tried, marked "(outside the sandbox)" if it asked to leave it. Only a command that must leave the sandbox needs a
+  rule; add it to `scripts/antigravity-cli-settings.json` if it is safe.
 - **Antigravity rules must be regexes.** On Windows the CLI checks each command wrapped in quotes, so plain rules such
-  as `command(git status)` never match. Copy the settings file rather than rewriting it: the CLI silently ignores one
-  that starts with a byte-order mark, which PowerShell's `Set-Content -Encoding UTF8` adds.
+  as `command(git status)` never match. The sandbox won't start with a relative path in a `write_file`/`read_file`
+  rule, so the script writes a copy with absolute paths next to the run's log.
+- **The sandbox can't write to the working tree on this PC** (it is given only traverse rights on the folder, which
+  is in OneDrive inside the user profile), so `run-agent.ps1` tells the agent to edit with its file tools and run `verify.ps1` or `node --test` outside the sandbox from the repository root.
+  It needs Windows 11 24H2 or later.
+- **Two runs can go at once**, each in its own worktree: the script finds each run's transcript by its conversation id.
 - **Every Antigravity run uses Pro quota**, about 30K tokens even for a one-word answer.
 - **Antigravity's browser checks don't run this way.** Claude Code checks UI changes itself, with its own browser on
   `localhost`.
