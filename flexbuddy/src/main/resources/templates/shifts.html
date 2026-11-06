@@ -557,6 +557,7 @@
         <section class="expenses-screen is-hidden" id="expensesScreen" aria-labelledby="expenses-title">
             <div class="screen-title">
                 <h1 id="expenses-title" th:text="#{expenses.expenses}">Expenses</h1>
+                <button class="text-button expense-history-jump" id="expenseHistoryJump" type="button" th:text="#{expenses.goToHistory}">Go to expense history</button>
             </div>
             <section class="stats-grid expense-stats" th:aria-label="#{expenses.expenseTotals}">
                 <article class="stat-card stat-card-accent"><span th:text="#{expenses.filteredExpenses}">Filtered expenses</span><strong id="expenseSummaryTotal">$0.00</strong><small id="expenseSummaryCount" th:text="#{expenses.0Entries}">0 entries</small></article>
@@ -577,7 +578,7 @@
                     </form>
                 </article>
                 <article class="panel expense-history-panel">
-                    <div class="panel-heading"><div><h2 th:text="#{expenses.expenseHistory}">Expense history</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download th:text="#{expenses.exportCsv}">Export CSV</a></div>
+                    <div class="panel-heading"><div><h2 id="expenseHistoryTitle" tabindex="-1" th:text="#{expenses.expenseHistory}">Expense history</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download th:text="#{expenses.exportCsv}">Export CSV</a></div>
                     <p class="expense-cost-note" th:utext="#{expenses.vehicleCostsUseStandardMileage.html}">Vehicle costs use <span id="expenseCostMethod">standard mileage</span> · <a class="text-link" href="/account#costs">Change</a></p>
                     <p class="expense-cost-note" id="expenseFuelNote" hidden th:text="#{expenses.fuelCoveredByMileage}">Fuel and maintenance are covered by the mileage rate, so they don't lower your estimated net.</p>
                     <div class="filter-row expense-filters">

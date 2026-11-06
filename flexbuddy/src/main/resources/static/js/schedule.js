@@ -161,7 +161,13 @@
         }, 30000));
     }
 
+    /** The "Next 14 days" panel is only worth its space when something is coming; Next up already says when nothing is. */
+    function showsUpcomingPanel(upcoming) {
+        return Boolean(upcoming?.next) || (upcoming?.days?.length ?? 0) > 0;
+    }
+
     function renderUpcomingList() {
+        el.upcomingList.closest('.upcoming-panel')?.classList.toggle('is-empty', !showsUpcomingPanel(state.upcoming));
         const {days, weeks, conflicts} = state.upcoming;
         const overlapping = new Set(conflicts.flatMap(conflict => [conflict.firstShiftId, conflict.secondShiftId]));
         const weekTotals = new Map(weeks.map(week => [week.weekStart, week]));
@@ -481,6 +487,6 @@
         return calendar.parseIso(date).toLocaleDateString(appLocale(), {weekday: 'long', month: 'long', day: 'numeric'});
     }
 
-    window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock, renderNextInto,
+    window.flexbuddySchedule = {show, refresh, changeStatus, startable, start: startBlock, renderNextInto, showsUpcomingPanel,
         add: trigger => addScheduled(state.selected || today(), trigger)};
 })();

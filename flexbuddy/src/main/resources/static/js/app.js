@@ -391,6 +391,11 @@ elements.emptyTrashButton.addEventListener('click', () => openConfirm(
 elements.expenseForm.addEventListener('submit', saveExpense);
 elements.expenseCategory.addEventListener('change', renderExpenseCategoryHint);
 elements.expenseShift.addEventListener('change', renderExpenseCategoryHint);
+// On a phone the form comes first; this goes straight to the list and puts keyboard focus on its heading.
+document.querySelector('#expenseHistoryJump')?.addEventListener('click', () => {
+    document.querySelector('.expense-history-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+    document.querySelector('#expenseHistoryTitle').focus({preventScroll: true});
+});
 elements.cancelExpenseEdit.addEventListener('click', resetExpenseForm);
 elements.expenseDate.addEventListener('change', () => populateExpenseShifts(currentShifts));
 [elements.expenseFrom, elements.expenseTo, elements.expenseFilterCategory].forEach(input => input.addEventListener('change', loadExpenses));
