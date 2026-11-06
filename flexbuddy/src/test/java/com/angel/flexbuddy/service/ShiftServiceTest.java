@@ -216,7 +216,7 @@ class ShiftServiceTest {
 
     private CreateShiftRequest request() {
         return new CreateShiftRequest("VEA7", LocalDate.of(2026, 9, 3), LocalTime.of(9, 0),
-                LocalTime.of(17, 0), new BigDecimal("120.00"), new BigDecimal("35.50"));
+                LocalTime.of(17, 0), new BigDecimal("120.00"), new BigDecimal("35.50"), null, ShiftStatus.COMPLETED);
     }
 
     private UpdateShiftRequest updateRequest() {
@@ -241,6 +241,17 @@ class ShiftServiceTest {
         assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
         assertThat(result.getEarnedPay()).isEqualByComparingTo("0.00");
         assertThat(result.getNetPay()).isEqualByComparingTo("0.00");
+    }
+
+    @Test
+    void createShift_neverAssumesABlockWithNoStatusWasWorked() {
+        CreateShiftRequest noStatus = new CreateShiftRequest("VEA7", LocalDate.of(2026, 9, 3), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("120.00"), new BigDecimal("35.50"));
+
+        assertThatThrownBy(() -> shiftService.createShift(OWNER_EMAIL, noStatus, KEY))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("Choose whether the block is completed or scheduled.");
+        verify(shiftRepository, never()).save(any());
     }
 
     @Test
@@ -360,6 +371,19 @@ class ShiftServiceTest {
         ArgumentCaptor<Shift> saved = ArgumentCaptor.forClass(Shift.class);
         verify(shiftRepository).save(saved.capture());
         assertThat(saved.getValue().getCreateRequestId()).isNull();
+    }
+
+    @Test
+    void aRepeatedCreateIsAnsweredWithItsShiftBeforeTheStatusIsChecked() {
+        Shift first = shift(5L, "VEA7", LocalDate.of(2026, 9, 3), "120", "35.50");
+        when(shiftRepository.findByCreateRequestIdIncludingDeleted(OWNER_EMAIL, KEY)).thenReturn(Optional.of(first));
+        CreateShiftRequest noStatus = new CreateShiftRequest("VEA7", LocalDate.of(2026, 9, 3), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("120.00"), new BigDecimal("35.50"));
+
+        ShiftResponse result = shiftService.createShift(OWNER_EMAIL, noStatus, KEY);
+
+        assertThat(result.getId()).isEqualTo(5L);
+        verify(shiftRepository, never()).save(any(Shift.class));
     }
 
     @Test

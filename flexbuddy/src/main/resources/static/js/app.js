@@ -162,6 +162,7 @@ const elements = {
     goalLink: document.querySelector('#goalLink'),
     forfeitsDetail: document.querySelector('#forfeitsDetail'),
     importStatus: document.querySelector('#importStatus'),
+    importStatusHint: document.querySelector('#importStatusHint'),
     scheduleMatchNotice: document.querySelector('#scheduleMatchNotice'),
     scheduleMatchMessage: document.querySelector('#scheduleMatchMessage'),
     duplicateNotice: document.querySelector('#duplicateNotice'),
@@ -639,7 +640,9 @@ function populatePreview(preview) {
     setPreviewField('tips', candidate.tips, value => value ?? 0);
     importCandidate = candidate;
     importDuplicateEdited = false;
-    elements.importStatus.value = candidate.suggestedStatus === 'SCHEDULED' ? 'SCHEDULED' : 'COMPLETED';
+    // The driver says whether they worked the block; the screenshot's suggestion is only a hint.
+    elements.importStatus.value = window.flexbuddyImportStatus.INITIAL_STATUS;
+    elements.importStatusHint.textContent = t(window.flexbuddyImportStatus.hintKey(candidate));
     renderRawText(preview.lines, preview.rawText);
     renderReadQuality(preview.meanConfidence);
 
@@ -1744,7 +1747,8 @@ function resetImport() {
     hideMessage(elements.saveError);
     importCandidate = undefined;
     importWarnings = [];
-    elements.importStatus.value = 'COMPLETED';
+    elements.importStatus.value = window.flexbuddyImportStatus.INITIAL_STATUS;
+    elements.importStatusHint.textContent = '';
     elements.tips.disabled = false;
     elements.miles.disabled = false;
     importDuplicateEdited = false;

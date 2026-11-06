@@ -686,7 +686,23 @@ class ShiftControllerTest {
     }
 
     private static final String CREATE_JSON =
-            "{\"station\":\"VEA7\",\"date\":\"2026-09-12\",\"startTime\":\"09:00\",\"endTime\":\"13:00\",\"basePay\":80,\"tips\":10}";
+            "{\"station\":\"VEA7\",\"date\":\"2026-09-12\",\"startTime\":\"09:00\",\"endTime\":\"13:00\",\"basePay\":80,\"tips\":10,\"status\":\"COMPLETED\"}";
+
+    @Test
+    void aCreateWithNoStatusIsRejectedInTheDriversLanguage() throws Exception {
+        when(shiftService.createShift(eq("angel@example.com"), any(), any()))
+                .thenThrow(new InvalidShiftException("error.shift.statusRequired"));
+        String noStatus = CREATE_JSON.replace(",\"status\":\"COMPLETED\"", "");
+
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(noStatus))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Choose whether the block is completed or scheduled."));
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf()).locale(java.util.Locale.of("es"))
+                        .contentType(MediaType.APPLICATION_JSON).content(noStatus))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Elija si el bloque está completado o programado."));
+    }
 
     @Test
     void anIdempotencyKeyThatIsNotAUuidIsRejected() throws Exception {

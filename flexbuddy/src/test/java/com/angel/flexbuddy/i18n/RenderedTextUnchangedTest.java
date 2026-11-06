@@ -58,7 +58,7 @@ class RenderedTextUnchangedTest {
         userRepository.save(new AppUser("Text Tester", EMAIL, encoder.encode("text-password-1")));
         mockMvc.perform(post("/shifts").with(user(EMAIL)).with(csrf()).contentType("application/json")
                 .content("{\"station\":\"VEA7\",\"date\":\"2026-05-02\",\"startTime\":\"09:00\",\"endTime\":\"13:00\","
-                        + "\"basePay\":80,\"tips\":10,\"miles\":42.5}"));
+                        + "\"basePay\":80,\"tips\":10,\"miles\":42.5,\"status\":\"COMPLETED\"}"));
     }
 
     @AfterEach

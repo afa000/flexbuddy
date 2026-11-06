@@ -122,13 +122,15 @@ public class ShiftService {
             Shift existing = shiftRepository.findByCreateRequestIdIncludingDeleted(email, requestId).orElse(null);
             if (existing != null) return toResponse(existing, List.of(), settingsService.get(email));
         }
+        // Whether the block was worked decides whether it counts toward earnings, so it is never assumed.
+        if (request.getStatus() == null) throw new InvalidShiftException("error.shift.statusRequired");
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
 
         Shift shift = new Shift();
         shift.setCreateRequestId(requestId);
         shift.setLastRequestId(requestId);
-        ShiftStatus status = request.getStatus() == null ? ShiftStatus.COMPLETED : request.getStatus();
+        ShiftStatus status = request.getStatus();
         applyRequest(shift, status, request.getStation(), request.getDate(), request.getStartTime(),
                 request.getEndTime(), request.getBasePay(), request.getTips(), request.getMiles());
         applyDetails(shift, request.getDetails() == null ? BlockDetailsRequest.EMPTY : request.getDetails(),
