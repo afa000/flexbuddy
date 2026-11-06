@@ -150,9 +150,9 @@ public class BlockEvaluator {
      * across the miles driven in it, or across the hours worked when no miles were logged.
      */
     private VehicleRate vehicleRate(String email, LocalDate from, LocalDate today) {
-        BigDecimal spent = expenseService.findFiltered(email, new ExpenseFilter(from, today, null, null, null, null)).stream()
+        BigDecimal spent = expenseService.countable(email,
+                        expenseService.findFiltered(email, new ExpenseFilter(from, today, null, null, null, null))).stream()
                 .filter(expense -> VEHICLE.contains(expense.getCategory()))
-                .filter(expense -> expense.getShift() == null || expense.getShift().getStatus() != ShiftStatus.SCHEDULED)
                 .map(Expense::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         if (spent.signum() == 0) return VehicleRate.NONE;

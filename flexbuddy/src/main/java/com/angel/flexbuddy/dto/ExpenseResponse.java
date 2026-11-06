@@ -16,5 +16,7 @@ public record ExpenseResponse(
         String station,
         Instant createdAt,
         Instant updatedAt,
-        Instant deletedAt
+        Instant deletedAt,
+        /** True when the linked block is in Recently deleted; the expense then counts as unlinked, by its date. */
+        boolean shiftDeleted
 ) {}

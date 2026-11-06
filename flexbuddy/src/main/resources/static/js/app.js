@@ -2270,6 +2270,12 @@ function renderExpenseSummary(summary) {
     }));
 }
 
+/** Where an expense belongs: its block's station, marked when that block is in Recently deleted. */
+function expenseStationLabel(expense) {
+    if (!expense.station) return '';
+    return expense.shiftDeleted ? t('js.app.stationDeletedBlock', expense.station) : expense.station;
+}
+
 function renderExpenses(expenses) {
     elements.expenseList.replaceChildren();
     if (!expenses.length) {
@@ -2279,7 +2285,7 @@ function renderExpenses(expenses) {
     expenses.forEach(expense => {
         const row = document.createElement('article');
         row.className = 'expense-row';
-        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(categoryName(expense.category).slice(0, 1).toUpperCase())}</div><div class="expense-main"><strong>${escapeHtml(categoryName(expense.category).toUpperCase())}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || t('js.app.noNote'))}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">${escapeHtml(t('js.common.edit'))}</button><button class="danger-text-button delete-expense" type="button">${escapeHtml(t('js.common.delete'))}</button></div>`;
+        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(categoryName(expense.category).slice(0, 1).toUpperCase())}</div><div class="expense-main"><strong>${escapeHtml(categoryName(expense.category).toUpperCase())}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expenseStationLabel(expense))}` : ''}</span><small>${escapeHtml(expense.note || t('js.app.noNote'))}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">${escapeHtml(t('js.common.edit'))}</button><button class="danger-text-button delete-expense" type="button">${escapeHtml(t('js.common.delete'))}</button></div>`;
         row.querySelector('.edit-expense').addEventListener('click', () => editExpense(expense));
         row.querySelector('.delete-expense').addEventListener('click', () => deleteExpense(expense));
         elements.expenseList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
@@ -2392,7 +2398,10 @@ async function loadExpenseTrash() {
     if (!expenses.length) return elements.expenseTrashList.innerHTML = `<p>${escapeHtml(t('js.app.noExpenseTrash'))}</p>`;
     expenses.forEach(expense => {
         const row = document.createElement('article'); row.className = 'trash-row';
-        row.innerHTML = `<div><strong>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}</span></div><div><button class="text-button" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
+        // The note and station tell similar expenses apart; the note is text, cut to one line with its full text on hover.
+        row.innerHTML = `<div><strong>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expenseStationLabel(expense))}` : ''}</span>${expense.note ? `<small class="trash-note">${escapeHtml(expense.note)}</small>` : ''}</div><div><button class="text-button" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
+        const note = row.querySelector('.trash-note');
+        if (note) note.title = expense.note;
         const [restore, remove] = row.querySelectorAll('button');
         restore.addEventListener('click', async () => { await apiFetch(`/expenses/${expense.id}/restore`, {method:'POST',headers:csrfHeaders()}); await loadExpenseTrash(); await loadExpenses(); await loadDashboard(); });
         remove.addEventListener('click', () => openConfirm(t('js.app.deleteExpensePermanentlyTitle'), t('js.app.deleteExpensePermanentlyMessage'), async () => { await apiFetch(`/expenses/trash/${expense.id}`, {method:'DELETE',headers:csrfHeaders()}); await loadExpenseTrash(); }));

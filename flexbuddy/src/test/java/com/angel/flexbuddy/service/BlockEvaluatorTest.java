@@ -54,6 +54,7 @@ class BlockEvaluatorTest {
     /** The fakes filter like the repositories do: station case-insensitively, dates inclusive, statuses by set. */
     @BeforeEach
     void setUp() {
+        ExpenseLinkStubs.readLinksFromEntities(expenseService);
         lenient().when(userTime.today(EMAIL)).thenReturn(TODAY);
         useMethod(VehicleCostMethod.STANDARD_MILEAGE);
         lenient().when(shiftService.findFiltered(eq(EMAIL), any(ShiftFilter.class))).thenAnswer(invocation -> {

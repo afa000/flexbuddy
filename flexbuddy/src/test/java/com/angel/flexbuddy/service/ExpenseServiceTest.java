@@ -60,6 +60,8 @@ class ExpenseServiceTest {
     void createLinksOnlyAnOwnedShiftAndNormalizesTheAmountAndNote() {
         when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(owner));
         when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(8L, EMAIL)).thenReturn(Optional.of(shift));
+        when(shiftRepository.findLinkedIncludingDeleted(EMAIL, java.util.Set.of(8L)))
+                .thenReturn(java.util.List.of(linkedRow(8L, "VEA7", "COMPLETED", false)));
         when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
             Expense expense = invocation.getArgument(0);
             expense.setId(20L);
@@ -167,5 +169,15 @@ class ExpenseServiceTest {
         org.mockito.ArgumentCaptor<Expense> saved = org.mockito.ArgumentCaptor.forClass(Expense.class);
         verify(expenseRepository).save(saved.capture());
         assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
+    }
+
+    private static com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow linkedRow(Long id, String station,
+            String status, boolean deleted) {
+        return new com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow() {
+            public Long getId() { return id; }
+            public String getStation() { return station; }
+            public String getStatus() { return status; }
+            public Boolean getDeleted() { return deleted; }
+        };
     }
 }
