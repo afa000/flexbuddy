@@ -108,6 +108,19 @@ class PageControllerTest {
     }
 
     @Test
+    void theImportCardSpeaksToTouchAndPointerAndSaysWhichScreensWork() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<strong class=\"pointer-copy\">Drop your screenshot here</strong>",
+                "<strong class=\"touch-copy\">Choose a screenshot</strong>",
+                "<span class=\"touch-copy\">Tap to pick one from your photos</span>",
+                "Works with a Schedule Details screenshot of a block you accepted",
+                "An offers list with no block selected can&#39;t be imported.");
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

@@ -423,9 +423,15 @@
                     <span class="upload-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M12 15V5m0 0L8 9m4-4 4 4M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5"/></svg>
                     </span>
-                    <strong th:text="#{import.dropYourScreenshotHere}">Drop your screenshot here</strong>
-                    <span th:text="#{import.orClickToBrowseYour}">or click to browse your files</span>
+                    <strong class="pointer-copy" th:text="#{import.dropYourScreenshotHere}">Drop your screenshot here</strong>
+                    <span class="pointer-copy" th:text="#{import.orClickToBrowseYour}">or click to browse your files</span>
+                    <strong class="touch-copy" th:text="#{import.chooseAScreenshot}">Choose a screenshot</strong>
+                    <span class="touch-copy" th:text="#{import.tapToPickFromPhotos}">Tap to pick one from your photos</span>
                 </button>
+                <div class="import-guidance">
+                    <small class="field-hint" th:text="#{import.worksWith}">Works with a Schedule Details screenshot of a block you accepted, or an Earnings screenshot of a block you worked.</small>
+                    <small class="field-hint" th:text="#{import.notOffersList}">An offers list with no block selected can't be imported.</small>
+                </div>
 
                 <div class="file-card is-hidden" id="fileCard">
                     <img id="imagePreview" th:alt="#{import.selectedShiftScreenshot}">

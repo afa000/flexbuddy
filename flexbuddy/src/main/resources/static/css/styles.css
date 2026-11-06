@@ -838,6 +838,14 @@ h1 {
     transition: border-color .16s ease, background .16s ease;
 }
 
+/* A touch screen has nothing to drop and nothing to click, so the card speaks of tapping and photos there. */
+.drop-zone .touch-copy { display: none; }
+@media (hover: none) and (pointer: coarse) {
+    .drop-zone .pointer-copy { display: none; }
+    .drop-zone .touch-copy { display: block; }
+}
+.import-guidance { margin-top: 10px; display: grid; gap: 4px; }
+
 .drop-zone:hover,
 .drop-zone.is-dragging {
     background: var(--drop-hover);
@@ -1903,6 +1911,8 @@ input[data-reveal]::-ms-reveal { display: none; }
     .expense-layout { grid-template-columns: 1fr; }
     .expense-filters { grid-template-columns: 1fr 1fr; }
     .screen-title .expense-history-jump { display: inline-flex; }
+    /* The upload card was 260px tall before the review form even started. */
+    .drop-zone { min-height: 140px; padding: 18px; }
     /* The sticky top bar would cover the heading the jump lands on. */
     .expense-history-panel { scroll-margin-top: 100px; }
     /* An empty "Next 14 days" panel repeats Next up; desktop keeps it to hold the two-column layout. */
