@@ -193,6 +193,8 @@ let importTimer;
 const IMPORT_TIMEOUT_MS = 60000;
 let editingShiftId;
 let editSnapshot;
+/** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
+let notWorkedSending = false;
 let pendingConfirmAction;
 let lastFocusedElement;
 let visibleShiftCount = 25;
@@ -1558,6 +1560,7 @@ async function markEditedShiftNotWorked() {
     const previous = editSnapshot;
     if (shiftId === undefined || !previous) return;
     hideMessage(elements.editError);
+    notWorkedSending = true;
     elements.confirmNotWorkedButton.disabled = true;
     try {
         const response = await apiFetch(`/shifts/${shiftId}/not-worked`, {
@@ -1582,6 +1585,7 @@ async function markEditedShiftNotWorked() {
     } catch (error) {
         showMessage(elements.editError, error.message || t('js.notWorked.failed'));
     } finally {
+        notWorkedSending = false;
         elements.confirmNotWorkedButton.disabled = false;
         applyOfflineEditState();
     }
@@ -1846,6 +1850,7 @@ function applyOfflineEditState() {
         button.disabled = blocked;
         button.title = blocked ? t('js.pwa.availableWhenOnline') : '';
     });
+    if (notWorkedSending) elements.confirmNotWorkedButton.disabled = true;
 }
 
 function setEditSaving(saving) {

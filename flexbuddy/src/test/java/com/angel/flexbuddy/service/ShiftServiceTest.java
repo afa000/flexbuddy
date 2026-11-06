@@ -590,6 +590,52 @@ class ShiftServiceTest {
         assertThat(shift.getStatus()).isEqualTo(status);
     }
 
+    @Test
+    void markNotWorked_isUndoneByPuttingTheSavedValuesBackAsCompleted() {
+        Shift shift = workedByMistake(3L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(shift));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, KEY);
+
+        // What the dialog's Undo sends: the snapshot it opened, status included.
+        UpdateShiftRequest undo = new UpdateShiftRequest("VEA7", LocalDate.of(2026, 9, 20), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("84.00"), new BigDecimal("12.00"), new BigDecimal("38.0"),
+                ShiftStatus.COMPLETED);
+        undo.setDetails(new com.angel.flexbuddy.dto.BlockDetailsRequest(LocalTime.of(9, 5), LocalTime.of(12, 41),
+                new BigDecimal("1000.0"), new BigDecimal("1038.0"), 30, 42, 1));
+        ShiftResponse result = shiftService.updateShift(OWNER_EMAIL, 3L, undo, OTHER_KEY);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.COMPLETED);
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("96.00");
+        assertThat(shift.getTips()).isEqualByComparingTo("12.00");
+        assertThat(shift.getMiles()).isEqualByComparingTo("38.0");
+        assertThat(shift.getOdometerStart()).isEqualByComparingTo("1000.0");
+        assertThat(shift.getOdometerEnd()).isEqualByComparingTo("1038.0");
+        assertThat(shift.getActualStart()).isEqualTo(LocalTime.of(9, 5));
+        assertThat(shift.getActualEnd()).isEqualTo(LocalTime.of(12, 41));
+        assertThat(shift.getStops()).isEqualTo(30);
+        assertThat(shift.getPackages()).isEqualTo(42);
+        assertThat(shift.getReturns()).isEqualTo(1);
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ShiftStatus.class, names = "SCHEDULED",
+            mode = org.junit.jupiter.params.provider.EnumSource.Mode.EXCLUDE)
+    void updateShift_stillRefusesToMoveABlockThatHappenedBackToScheduled(ShiftStatus status) {
+        Shift shift = shift(3L, "VEA7", LocalDate.of(2026, 9, 20), "84.00", "0");
+        shift.setStatus(status);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(shift));
+        UpdateShiftRequest backToScheduled = new UpdateShiftRequest("VEA7", LocalDate.of(2026, 9, 20),
+                LocalTime.of(9, 0), LocalTime.of(17, 0), new BigDecimal("84.00"), BigDecimal.ZERO, null,
+                ShiftStatus.SCHEDULED);
+
+        assertThatThrownBy(() -> shiftService.updateShift(OWNER_EMAIL, 3L, backToScheduled))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessageContaining("cannot be moved back to scheduled");
+        verify(shiftRepository, never()).save(any());
+        assertThat(shift.getStatus()).isEqualTo(status);
+    }
+
     private Shift scheduled(Long id) {
         Shift shift = new Shift(id, "VEA7", LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15),
                 new BigDecimal("84.00"), BigDecimal.ZERO, owner);
