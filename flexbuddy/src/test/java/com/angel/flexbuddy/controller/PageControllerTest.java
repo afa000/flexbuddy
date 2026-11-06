@@ -117,7 +117,7 @@ class PageControllerTest {
                 "<strong class=\"touch-copy\">Choose a screenshot</strong>",
                 "<span class=\"touch-copy\">Tap to pick one from your photos</span>",
                 "Works with a Schedule Details screenshot of a block you accepted",
-                "An offers list with no block selected can&#39;t be imported.");
+                "An empty Offers screen has no block to import.");
     }
 
     @Test

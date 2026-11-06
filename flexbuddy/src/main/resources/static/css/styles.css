@@ -845,6 +845,8 @@ h1 {
     .drop-zone .touch-copy { display: block; }
 }
 .import-guidance { margin-top: 10px; display: grid; gap: 4px; }
+/* Once a screenshot is chosen the card is gone, and so is the advice about which one to choose. */
+.drop-zone.is-hidden + .import-guidance { display: none; }
 
 .drop-zone:hover,
 .drop-zone.is-dragging {
@@ -858,7 +860,7 @@ h1 {
     font-size: 16px;
 }
 
-.drop-zone > span:last-child {
+.drop-zone > span:not(.upload-icon) {
     font-size: 12px;
 }
 
@@ -1912,7 +1914,7 @@ input[data-reveal]::-ms-reveal { display: none; }
     .expense-filters { grid-template-columns: 1fr 1fr; }
     .screen-title .expense-history-jump { display: inline-flex; }
     /* The upload card was 260px tall before the review form even started. */
-    .drop-zone { min-height: 140px; padding: 18px; }
+    #dropZone { min-height: 140px; padding: 18px; }
     /* The sticky top bar would cover the heading the jump lands on. */
     .expense-history-panel { scroll-margin-top: 100px; }
     /* An empty "Next 14 days" panel repeats Next up; desktop keeps it to hold the two-column layout. */
