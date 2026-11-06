@@ -196,6 +196,8 @@ let editingShiftId;
 let editSnapshot;
 /** The account's vehicle cost method, once the Expenses page has loaded the settings. */
 let expenseCostMethod;
+/** The block an expense being edited is linked to, kept in the form when the Shift list doesn't hold it. */
+let editingExpenseLink;
 /** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
 let notWorkedSending = false;
 let pendingConfirmAction;
@@ -2200,8 +2202,29 @@ function populateExpenseShifts(shifts) {
         option.dataset.status = shift.status ?? '';
         elements.expenseShift.append(option);
     });
+    keepEditingExpenseLink();
     if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
     renderExpenseCategoryHint();
+}
+
+/**
+ * The Shift list only holds blocks from History's current results, never deleted ones. An expense being edited keeps
+ * its own link as an option, so saving it doesn't quietly unlink it.
+ */
+function keepEditingExpenseLink() {
+    const link = editingExpenseLink;
+    if (!link || [...elements.expenseShift.options].some(option => option.value === String(link.id))) return;
+    const option = document.createElement('option');
+    option.value = link.id;
+    option.textContent = link.label;
+    option.dataset.status = link.status;
+    option.dataset.keptLink = 'true';
+    elements.expenseShift.append(option);
+}
+
+/** Takes a kept link back out of the Shift list, so it is never offered for another expense. */
+function dropKeptExpenseLink() {
+    elements.expenseShift.querySelectorAll('option[data-kept-link]').forEach(option => option.remove());
 }
 
 const EXPENSE_CATEGORY_KEYS = {
@@ -2304,6 +2327,15 @@ function editExpense(expense) {
     elements.expenseDate.value = expense.date;
     elements.expenseCategory.value = expense.category;
     elements.expenseAmount.value = expense.amount;
+    dropKeptExpenseLink();
+    // A block History knows reads like the other options; a deleted one is named by its station.
+    const known = expense.shiftId == null ? undefined : currentShifts.find(shift => shift.id === expense.shiftId);
+    editingExpenseLink = expense.shiftId == null ? undefined : {
+        id: expense.shiftId,
+        label: known ? `${formatDate(known.date)} · ${known.station}` : expenseStationLabel(expense) || t('js.app.linkedShift'),
+        status: known?.status ?? ''
+    };
+    keepEditingExpenseLink();
     elements.expenseShift.value = expense.shiftId ?? '';
     elements.expenseNote.value = expense.note ?? '';
     renderExpenseCategoryHint();
@@ -2320,6 +2352,8 @@ function applyOfflineExpenseState() {
 
 function resetExpenseForm() {
     editingExpenseId = undefined;
+    editingExpenseLink = undefined;
+    dropKeptExpenseLink();
     elements.expenseForm.reset();
     elements.expenseDate.value = toIsoDate(new Date());
     elements.expenseFormTitle.textContent = t('js.app.logExpense');

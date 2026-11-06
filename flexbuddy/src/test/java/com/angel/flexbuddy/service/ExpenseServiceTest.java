@@ -171,6 +171,38 @@ class ExpenseServiceTest {
         assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
     }
 
+    @Test
+    void anEditThatKeepsTheSameBlockKeepsTheLinkWithoutLookingTheBlockUp() {
+        Expense saved = linkedTo(8L);
+        saved.setId(20L);
+        when(expenseRepository.findByIdAndOwnerEmailIgnoreCase(20L, EMAIL)).thenReturn(Optional.of(saved));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // The block is in Recently deleted, so a lookup would fail; the link must survive anyway.
+        service.update(EMAIL, 20L, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL,
+                new BigDecimal("5.00"), "new note", 8L));
+
+        assertThat(ExpenseService.linkedShiftId(saved)).isEqualTo(8L);
+        org.mockito.Mockito.verify(shiftRepository, org.mockito.Mockito.never()).findByIdAndOwnerEmailIgnoreCase(any(), any());
+    }
+
+    @Test
+    void anEditToAnotherBlockStillChecksItAndNoBlockUnlinks() {
+        Expense saved = linkedTo(8L);
+        saved.setId(20L);
+        when(expenseRepository.findByIdAndOwnerEmailIgnoreCase(20L, EMAIL)).thenReturn(Optional.of(saved));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(9L, EMAIL)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.update(EMAIL, 20L, new ExpenseRequest(
+                LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL, new BigDecimal("5.00"), null, 9L)))
+                .isInstanceOf(com.angel.flexbuddy.exception.ShiftNotFoundException.class);
+
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        service.update(EMAIL, 20L, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL,
+                new BigDecimal("5.00"), null, null));
+        assertThat(saved.getShift()).isNull();
+    }
+
     private Expense linkedTo(long shiftId) {
         Expense expense = new Expense();
         expense.setOwner(owner);

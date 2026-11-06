@@ -202,7 +202,13 @@ public class ExpenseService {
         expense.setCategory(request.category());
         expense.setAmount(money(request.amount()));
         expense.setNote(request.note() == null || request.note().isBlank() ? null : request.note().trim());
-        expense.setShift(request.shiftId() == null ? null : ownedShift(email, request.shiftId()));
+        Long requested = request.shiftId();
+        if (requested == null) {
+            expense.setShift(null);
+        } else if (!requested.equals(linkedShiftId(expense))) {
+            expense.setShift(ownedShift(email, requested));
+        }
+        // An unchanged link is kept as it is, even when its block is in Recently deleted and can't be looked up.
     }
 
     private Shift ownedShift(String email, Long id) {
