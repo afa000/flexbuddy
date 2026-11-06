@@ -568,7 +568,7 @@
                     <div class="panel-heading"><div><h2 id="expenseFormTitle" th:text="#{expenses.logAnExpense}">Log an expense</h2></div></div>
                     <form class="preview-form" id="expenseForm" data-queueable>
                         <label class="field"><span th:text="#{expenses.date}">Date</span><input id="expenseDate" type="date" required></label>
-                        <label class="field"><span th:text="#{expenses.category}">Category</span><select id="expenseCategory" required><option value="FUEL" th:text="#{expenses.fuel}">Fuel</option><option value="TOLL" th:text="#{expenses.toll}">Toll</option><option value="PARKING" th:text="#{expenses.parking}">Parking</option><option value="MAINTENANCE" th:text="#{expenses.maintenance}">Maintenance</option><option value="OTHER" th:text="#{expenses.other}">Other</option></select></label>
+                        <label class="field"><span th:text="#{expenses.category}">Category</span><select id="expenseCategory" required><option value="FUEL" th:text="#{expenses.fuel}">Fuel</option><option value="TOLL" th:text="#{expenses.toll}">Toll</option><option value="PARKING" th:text="#{expenses.parking}">Parking</option><option value="MAINTENANCE" th:text="#{expenses.maintenance}">Maintenance</option><option value="OTHER" th:text="#{expenses.other}">Other</option></select><small class="field-hint" id="expenseCategoryHint" aria-live="polite"></small></label>
                         <label class="field money-field"><span th:text="#{expenses.amount}">Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
                         <label class="field"><span th:utext="#{expenses.shiftOptional.html}">Shift <small>(optional)</small></span><select id="expenseShift"><option value="" th:text="#{expenses.noLinkedShift}">No linked shift</option></select><small class="field-hint" th:text="#{expenses.linkItToAShift}">Link it to a shift when the cost belongs to one block.</small></label>
                         <label class="field field-wide"><span th:utext="#{expenses.noteOptional.html}">Note <small>(optional)</small></span><input id="expenseNote" type="text" maxlength="255" th:placeholder="#{expenses.gasStationReceiptOrDetails}"></label>
@@ -927,6 +927,7 @@
 <script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/not-worked.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/expense-effect.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
