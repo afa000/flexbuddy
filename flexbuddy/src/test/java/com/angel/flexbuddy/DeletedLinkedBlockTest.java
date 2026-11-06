@@ -99,6 +99,22 @@ class DeletedLinkedBlockTest {
     }
 
     @Test
+    void editingTheExpenseWhileItsBlockIsDeletedKeepsTheLink() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put("/expenses/{id}", expenseId)
+                        .with(user(EMAIL)).with(csrf()).contentType("application/json")
+                        .content("{\"date\":\"2026-05-03\",\"category\":\"TOLL\",\"amount\":5,\"note\":\"Bridge\","
+                                + "\"shiftId\":" + shiftId + "}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shiftDeleted").value(true));
+        mockMvc.perform(post("/shifts/{id}/restore", shiftId).with(user(EMAIL)).with(csrf())).andExpect(status().isOk());
+
+        mockMvc.perform(get("/expenses").with(user(EMAIL)))
+                .andExpect(jsonPath("$[0].shiftId").value(shiftId))
+                .andExpect(jsonPath("$[0].shiftDeleted").value(false))
+                .andExpect(jsonPath("$[0].amount").value(5));
+    }
+
+    @Test
     void restoringTheBlockLinksTheExpenseAgain() throws Exception {
         mockMvc.perform(post("/shifts/{id}/restore", shiftId).with(user(EMAIL)).with(csrf())).andExpect(status().isOk());
 

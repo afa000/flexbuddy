@@ -196,6 +196,8 @@ let editingShiftId;
 let editSnapshot;
 /** The account's vehicle cost method, once the Expenses page has loaded the settings. */
 let expenseCostMethod;
+/** The block an expense being edited is linked to, kept in the form when the Shift list doesn't hold it. */
+let editingExpenseLink;
 /** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
 let notWorkedSending = false;
 let pendingConfirmAction;
@@ -2200,8 +2202,23 @@ function populateExpenseShifts(shifts) {
         option.dataset.status = shift.status ?? '';
         elements.expenseShift.append(option);
     });
+    keepEditingExpenseLink(selected);
     if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
     renderExpenseCategoryHint();
+}
+
+/**
+ * The Shift list only holds blocks from History's current results, never deleted ones. An expense being edited keeps
+ * its own link as an option, so saving it doesn't quietly unlink it.
+ */
+function keepEditingExpenseLink(selected) {
+    const link = editingExpenseLink;
+    if (!link || String(link.id) !== selected) return;
+    if ([...elements.expenseShift.options].some(option => option.value === selected)) return;
+    const option = document.createElement('option');
+    option.value = link.id;
+    option.textContent = link.label;
+    elements.expenseShift.append(option);
 }
 
 const EXPENSE_CATEGORY_KEYS = {
@@ -2304,6 +2321,9 @@ function editExpense(expense) {
     elements.expenseDate.value = expense.date;
     elements.expenseCategory.value = expense.category;
     elements.expenseAmount.value = expense.amount;
+    editingExpenseLink = expense.shiftId == null ? undefined
+        : {id: expense.shiftId, label: expenseStationLabel(expense) || t('js.app.linkedShift')};
+    keepEditingExpenseLink(String(expense.shiftId ?? ''));
     elements.expenseShift.value = expense.shiftId ?? '';
     elements.expenseNote.value = expense.note ?? '';
     renderExpenseCategoryHint();
@@ -2320,6 +2340,7 @@ function applyOfflineExpenseState() {
 
 function resetExpenseForm() {
     editingExpenseId = undefined;
+    editingExpenseLink = undefined;
     elements.expenseForm.reset();
     elements.expenseDate.value = toIsoDate(new Date());
     elements.expenseFormTitle.textContent = t('js.app.logExpense');
