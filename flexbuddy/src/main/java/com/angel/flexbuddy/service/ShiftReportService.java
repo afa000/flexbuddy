@@ -35,6 +35,7 @@ import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
+import com.angel.flexbuddy.model.VehicleCostMethod;
 
 @Service
 public class ShiftReportService {
@@ -421,7 +422,8 @@ public class ShiftReportService {
                     net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
                     timed(shifts).size(), clockedMinutes(shifts), hourly(net.grossEarnings(), clockedMinutes(shifts)),
                     averageFinishedEarly(shifts), routeShifts(shifts).size(), averageStops(shifts),
-                    averageMinutesPerStop(shifts), returnsRate(shifts));
+                    averageMinutesPerStop(shifts), returnsRate(shifts),
+                    settings.vehicleCostMethod() == VehicleCostMethod.ACTUAL_EXPENSES ? 0 : net.blocksWithoutMiles());
         }
     }
 }

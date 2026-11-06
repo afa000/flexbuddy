@@ -459,7 +459,9 @@ public class ShiftService {
                 shift.getStatus(), shift.getStatusChangedAt(), shift.getEarnedPay().setScale(2, RoundingMode.HALF_UP),
                 details(shift),
                 shift.getStatus() == ShiftStatus.SCHEDULED ? forfeitDeadline(shift, settings) : null,
-                shift.getStatus() == ShiftStatus.FORFEITED && shift.isLateForfeit()
+                shift.getStatus() == ShiftStatus.FORFEITED && shift.isLateForfeit(),
+                settings.vehicleCostMethod() != com.angel.flexbuddy.model.VehicleCostMethod.ACTUAL_EXPENSES
+                        && net.blocksWithoutMiles() > 0
         );
     }
 

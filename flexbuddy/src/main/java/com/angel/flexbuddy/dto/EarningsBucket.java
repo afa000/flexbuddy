@@ -27,5 +27,7 @@ public record EarningsBucket(
         int shiftsWithRouteData,
         BigDecimal averageStops,
         BigDecimal averageMinutesPerStop,
-        BigDecimal returnsRate
+        BigDecimal returnsRate,
+        /** Blocks in this group whose missing miles make its estimated net too high; 0 with actual expenses. */
+        int netMissingMiles
 ) {}
