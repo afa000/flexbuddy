@@ -1895,9 +1895,19 @@ input[data-reveal]::-ms-reveal { display: none; }
 .settings-form { display: grid; gap: 14px; margin-top: 18px; }
 .settings-form .field { width: 100%; }
 
+.screen-title .expense-history-jump { display: none; }
+#expenseHistoryTitle:focus { outline: none; }
+#expenseHistoryTitle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+
 @media (max-width: 900px) {
     .expense-layout { grid-template-columns: 1fr; }
     .expense-filters { grid-template-columns: 1fr 1fr; }
+    .screen-title .expense-history-jump { display: inline-flex; }
+    /* The sticky top bar would cover the heading the jump lands on. */
+    .expense-history-panel { scroll-margin-top: 100px; }
+    /* While a field has focus, the fixed navigation and + button step aside (field-focus.js). */
+    body.field-focus .mobile-nav,
+    body.field-focus #quickActionButton { visibility: hidden; }
 }
 
 @media (max-width: 760px) {
