@@ -717,6 +717,7 @@
                 <div class="form-actions field-wide">
                     <button class="danger-text-button delete-shift-button" id="deleteShiftButton" type="button" th:text="#{dialog.edit.deleteShift}">Delete shift</button>
                     <button class="text-button" id="duplicateShiftButton" type="button" th:text="#{dialog.edit.duplicate}">Duplicate</button>
+                    <button class="text-button is-hidden" id="notWorkedButton" type="button" th:text="#{dialog.edit.notWorkedYet}">Not worked yet?</button>
                     <span class="action-spacer"></span>
                     <button class="secondary-button" id="cancelEditButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
                     <button class="primary-button" id="saveEditButton" type="submit">
@@ -728,6 +729,15 @@
                     <span><strong th:text="#{dialog.edit.deleteThisShift}">Delete this shift?</strong><small th:text="#{dialog.edit.youCanUndoForA}">You can undo for a few seconds or restore it later.</small></span>
                     <button class="secondary-button" id="cancelDeleteButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
                     <button class="danger-button" id="confirmDeleteButton" type="button" th:text="#{dialog.edit.delete}">Delete</button>
+                </div>
+                <div class="not-worked-confirm field-wide is-hidden" id="notWorkedConfirm" role="group" aria-labelledby="notWorkedTitle">
+                    <strong id="notWorkedTitle" th:text="#{dialog.edit.moveBackToScheduled}">Move this block back to Scheduled?</strong>
+                    <small th:text="#{dialog.edit.notWorkedExplain}">It stops counting toward earnings, hours and net. Linked expenses stay as they are, and unsaved changes here aren't saved.</small>
+                    <small id="notWorkedCleared"></small>
+                    <div class="not-worked-actions">
+                        <button class="secondary-button" id="cancelNotWorkedButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
+                        <button class="primary-button" id="confirmNotWorkedButton" type="button" th:text="#{dialog.edit.moveToScheduled}">Move to Scheduled</button>
+                    </div>
                 </div>
             </form>
         </section>
@@ -916,6 +926,7 @@
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/not-worked.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>

@@ -759,6 +759,61 @@ class ShiftControllerTest {
     }
 
     @Test
+    void notWorkedPassesTheSeenVersionAndKeyToTheService() throws Exception {
+        ShiftResponse moved = new ShiftResponse();
+        moved.setId(5L);
+        moved.setStatus(com.angel.flexbuddy.model.ShiftStatus.SCHEDULED);
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any())).thenReturn(moved);
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"));
+
+        verify(shiftService).markNotWorked("angel@example.com", 5L, java.time.Instant.parse("2026-09-10T00:00:00Z"),
+                "11111111-1111-4111-8111-111111111111");
+    }
+
+    @Test
+    void notWorkedNeedsTheVersionTheDriverSaw() throws Exception {
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
+    void notWorkedOnAChangedBlockIs409WithTheCurrentShift() throws Exception {
+        ShiftResponse current = new ShiftResponse();
+        current.setId(5L);
+        current.setUpdatedAt(java.time.Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any()))
+                .thenThrow(new com.angel.flexbuddy.exception.ShiftConflictException(current));
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.current.id").value(5));
+    }
+
+    @Test
+    void notWorkedOnABlockThatIsNotCompletedIsRefusedInTheDriversLanguage() throws Exception {
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any()))
+                .thenThrow(new InvalidShiftException("error.shift.onlyCompletedNotWorked"));
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .locale(java.util.Locale.of("es")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Solo un bloque completado puede volver a programado."));
+    }
+
+    @Test
     void aDuplicateInsertIs409Duplicate() throws Exception {
         when(shiftService.createShift(eq("angel@example.com"), any(), any()))
                 .thenThrow(new org.springframework.dao.DataIntegrityViolationException("could not execute statement",

@@ -81,6 +81,21 @@ class PageControllerTest {
     }
 
     @Test
+    void theEditDialogOffersToMoveAWronglyCompletedBlockBackBehindAConfirmation() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Hidden until the script sees a saved completed block; the confirmation is hidden until asked for.
+        assertThat(page).containsPattern("<button class=\"text-button is-hidden\" id=\"notWorkedButton\" type=\"button\">"
+                + "Not worked yet\\?</button>");
+        assertThat(page).containsPattern("<div class=\"not-worked-confirm field-wide is-hidden\" id=\"notWorkedConfirm\"");
+        assertThat(page).contains("Move this block back to Scheduled?", "id=\"notWorkedCleared\"",
+                "id=\"cancelNotWorkedButton\"", ">Move to Scheduled</button>", "/js/not-worked.js?v=");
+        assertThat(page.indexOf("/js/not-worked.js?v=")).isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

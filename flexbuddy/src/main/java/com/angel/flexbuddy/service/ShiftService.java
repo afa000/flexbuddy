@@ -186,12 +186,7 @@ public class ShiftService {
         if (requestId != null && requestId.equals(shift.getLastRequestId())) {
             return toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email));
         }
-        if (request.expectedUpdatedAt() != null && shift.getUpdatedAt() != null
-                && !shift.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS)
-                        .equals(request.expectedUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS))) {
-            throw new com.angel.flexbuddy.exception.ShiftConflictException(
-                    toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email)));
-        }
+        refuseIfChangedSince(email, shift, request.expectedUpdatedAt());
         if (requestId != null) shift.setLastRequestId(requestId);
         ShiftStatus target = request.status();
         ShiftStatus previous = shift.getStatus();
@@ -209,6 +204,54 @@ public class ShiftService {
         recordForfeitTiming(shift, previous, email, settings);
         Shift saved = shiftRepository.save(shift);
         return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settings);
+    }
+
+    /**
+     * Moves a block that was marked completed by mistake back to scheduled. This is the only way a block that happened
+     * goes back to scheduled, and only from completed. What only a worked block can hold is cleared: tips, miles, the
+     * odometer, actual times and the route. The base pay stays as the offered pay and linked expenses stay linked. A
+     * repeat under the same request id returns the block as it is, and a block changed since the driver saw it is
+     * refused with the current block.
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public ShiftResponse markNotWorked(String email, Long id, java.time.Instant expectedUpdatedAt, String requestId) {
+        Shift shift = shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
+                .orElseThrow(() -> new ShiftNotFoundException(id));
+        if (requestId != null && requestId.equals(shift.getLastRequestId())) {
+            return toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email));
+        }
+        refuseIfChangedSince(email, shift, expectedUpdatedAt);
+        if (shift.getStatus() != ShiftStatus.COMPLETED) {
+            throw new InvalidShiftException("error.shift.onlyCompletedNotWorked");
+        }
+        if (requestId != null) shift.setLastRequestId(requestId);
+        shift.setStatus(ShiftStatus.SCHEDULED);
+        shift.setStatusChangedAt(Instant.now(clock));
+        shift.setTips(BigDecimal.ZERO);
+        shift.setMiles(null);
+        shift.setOdometerStart(null);
+        shift.setOdometerEnd(null);
+        shift.setActualStart(null);
+        shift.setActualEnd(null);
+        shift.setStops(null);
+        shift.setPackages(null);
+        shift.setReturns(null);
+        shift.setLateForfeit(false);
+        Shift saved = shiftRepository.save(shift);
+        return toResponse(saved, expenseService.findForShifts(email, List.of(saved)), settingsService.get(email));
+    }
+
+    /**
+     * Refuses a change made against an earlier version of the shift, compared at microsecond precision since that is
+     * what the database keeps. Nothing is checked when the change names no version.
+     */
+    private void refuseIfChangedSince(String email, Shift shift, java.time.Instant expectedUpdatedAt) {
+        if (expectedUpdatedAt != null && shift.getUpdatedAt() != null
+                && !shift.getUpdatedAt().truncatedTo(java.time.temporal.ChronoUnit.MICROS)
+                        .equals(expectedUpdatedAt.truncatedTo(java.time.temporal.ChronoUnit.MICROS))) {
+            throw new com.angel.flexbuddy.exception.ShiftConflictException(
+                    toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email)));
+        }
     }
 
     /**
