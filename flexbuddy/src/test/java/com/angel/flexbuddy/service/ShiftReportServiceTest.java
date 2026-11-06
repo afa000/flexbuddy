@@ -51,6 +51,7 @@ class ShiftReportServiceTest {
 
     @BeforeEach
     void setUp() {
+        ExpenseLinkStubs.readLinksFromEntities(expenseService);
         org.mockito.Mockito.lenient().when(userTime.now(EMAIL)).thenReturn(NOW);
         org.mockito.Mockito.lenient().when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
@@ -274,6 +275,33 @@ class ShiftReportServiceTest {
         assertThat(result.getScheduledMinutes()).isEqualTo(420);
         assertThat(result.getExpectedPay()).isEqualByComparingTo("140.00");
         assertThat(result.getNeedsConfirmation()).isEqualTo(1);
+    }
+
+    private com.angel.flexbuddy.model.Expense toll(String amount, Shift linked) {
+        com.angel.flexbuddy.model.Expense expense = new com.angel.flexbuddy.model.Expense();
+        expense.setDate(LocalDate.of(2026, 9, 7));
+        expense.setCategory(com.angel.flexbuddy.model.ExpenseCategory.TOLL);
+        expense.setAmount(new BigDecimal(amount));
+        expense.setShift(linked);
+        return expense;
+    }
+
+    @Test
+    void anExpenseOnADeletedBlockCountsByDateWhileOneOnALiveScheduledBlockWaits() {
+        Shift worked = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift deleted = withStatus(shift("DCY1", LocalDate.of(2026, 9, 7), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        deleted.setId(2L);
+        deleted.setDeletedAt(java.time.Instant.parse("2026-09-08T12:00:00Z"));
+        Shift upcoming = withStatus(shift("DCY1", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        upcoming.setId(3L);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(worked));
+        when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(toll("5.00", deleted), toll("7.00", upcoming)));
+
+        assertThat(reportService.statistics(EMAIL, ALL).getTotalExpenses()).isEqualByComparingTo("5.00");
+        // The deleted block's expense groups as unlinked, not under the deleted block's station.
+        assertThat(reportService.earnings(EMAIL, ALL, GroupBy.STATION).buckets())
+                .noneMatch(bucket -> "DCY1".equals(bucket.label()));
     }
 
     private Shift withStatus(Shift shift, ShiftStatus status) {

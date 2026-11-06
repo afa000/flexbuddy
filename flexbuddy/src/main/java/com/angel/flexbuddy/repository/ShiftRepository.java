@@ -116,6 +116,26 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
             """, nativeQuery = true)
     List<Shift> findTrash(@Param("email") String email);
 
+    /** What an expense needs to know about the blocks it is linked to, read in one query and including deleted ones. */
+    interface LinkedShiftRow {
+        Long getId();
+        String getStation();
+        String getStatus();
+        Boolean getDeleted();
+    }
+
+    /**
+     * The given blocks of this account, deleted ones included. Loading a deleted block through an expense's link fails,
+     * because Shift hides deleted rows, so expenses read their blocks here instead.
+     */
+    @Query(value = """
+            select s.id as id, s.station as station, s.status as status,
+                   case when s.deleted_at is null then false else true end as deleted
+            from shift s join app_users u on u.id = s.owner_id
+            where lower(u.email) = lower(:email) and s.id in (:ids)
+            """, nativeQuery = true)
+    List<LinkedShiftRow> findLinkedIncludingDeleted(@Param("email") String email, @Param("ids") Collection<Long> ids);
+
     @Modifying
     @Query(value = """
             update shift set deleted_at = :deletedAt, delete_batch = :batch

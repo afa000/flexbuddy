@@ -1456,7 +1456,8 @@ input[data-reveal]::-ms-reveal { display: none; }
 .trash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .trash-toolbar p, .trash-list > p { color: var(--muted); font-size: 12px; }
 .trash-row { padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-top: 1px solid var(--line-soft); }
-.trash-row > div:first-child { display: grid; gap: 4px; }
+.trash-row > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.trash-row .trash-note { overflow: hidden; color: var(--muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
 .trash-row span { color: var(--muted); font-size: 11px; }
 .trash-row > div:last-child { display: flex; align-items: center; gap: 15px; }
 

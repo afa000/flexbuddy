@@ -57,6 +57,7 @@ class TaxServiceTest {
 
     @BeforeEach
     void setUp() {
+        ExpenseLinkStubs.readLinksFromEntities(expenseService);
         service = new TaxService(shiftService, expenseService, settingsService, new NetEarningsCalculator(), userTime,
                 payments, userRepository, Clock.fixed(Instant.parse("2026-09-10T12:00:00Z"), ZoneOffset.UTC),
                 "04-15,06-15,09-15,01-15");

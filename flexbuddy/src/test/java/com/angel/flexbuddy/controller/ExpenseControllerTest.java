@@ -60,7 +60,7 @@ class ExpenseControllerTest {
     void createValidatesAndPassesTheSignedInOwnerToTheService() throws Exception {
         when(expenseService.create(eq(EMAIL), any(ExpenseRequest.class), org.mockito.ArgumentMatchers.isNull())).thenReturn(new ExpenseResponse(
                 20L, LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL, new BigDecimal("6.25"),
-                "Bridge", 8L, "VEA7", null, null, null));
+                "Bridge", 8L, "VEA7", null, null, null, false));
 
         mockMvc.perform(post("/expenses").with(user(EMAIL)).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

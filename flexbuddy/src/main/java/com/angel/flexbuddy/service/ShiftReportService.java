@@ -337,7 +337,8 @@ public class ShiftReportService {
         AccountSettingsResponse settings = settingsService.get(email);
         Map<String, GroupAccumulator> groups = new LinkedHashMap<>();
         shifts.forEach(shift -> addShift(groups, shift, groupBy));
-        expenses.forEach(expense -> addExpense(groups, expense, groupBy));
+        Map<Long, ExpenseService.LinkedShift> links = expenseService.linkedShifts(email, expenses);
+        expenses.forEach(expense -> addExpense(groups, expense, groupBy, links));
         List<EarningsBucket> buckets = new ArrayList<>(groups.values().stream()
                 .map(group -> group.bucket(settings)).toList());
         if (groupBy == GroupBy.STATION) buckets.sort(Comparator.comparing(EarningsBucket::netEarnings).reversed()
@@ -355,18 +356,17 @@ public class ShiftReportService {
         groups.computeIfAbsent(key.key(), ignored -> new GroupAccumulator(key)).shifts.add(shift);
     }
 
-    private void addExpense(Map<String, GroupAccumulator> groups, Expense expense, GroupBy groupBy) {
-        String station = expense.getShift() == null ? null : expense.getShift().getStation();
+    private void addExpense(Map<String, GroupAccumulator> groups, Expense expense, GroupBy groupBy,
+            Map<Long, ExpenseService.LinkedShift> links) {
+        String station = ExpenseService.countedStation(expense, links);
         GroupKey key = groupKey(expense.getDate(), station, groupBy);
         groups.computeIfAbsent(key.key(), ignored -> new GroupAccumulator(key)).expenses.add(expense);
     }
 
-    /** Expenses linked to a block that has not happened yet are not counted. */
+    /** Expenses linked to a block that has not happened yet are not counted; ones on a deleted block count by date. */
     private List<Expense> reportExpenses(String email, ShiftFilter filter) {
-        return expenseService.findFiltered(email, new ExpenseFilter(filter.from(), filter.to(), filter.station(),
-                filter.query(), null, null)).stream()
-                .filter(expense -> expense.getShift() == null || expense.getShift().getStatus() != ShiftStatus.SCHEDULED)
-                .toList();
+        return expenseService.countable(email, expenseService.findFiltered(email, new ExpenseFilter(filter.from(),
+                filter.to(), filter.station(), filter.query(), null, null)));
     }
 
     private GroupKey groupKey(LocalDate date, String station, GroupBy groupBy) {

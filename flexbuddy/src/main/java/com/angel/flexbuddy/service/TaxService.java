@@ -184,11 +184,13 @@ public class TaxService {
     public TaxYearReport yearReport(String email, String displayName, int year) {
         List<TaxYearRow> rows = yearRows(email, year);
         AccountSettingsResponse settings = settingsService.get(email);
-        List<TaxYearExpense> listed = expenses(email, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)).stream()
+        List<Expense> counted = expenses(email, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+        java.util.Map<Long, ExpenseService.LinkedShift> links = expenseService.linkedShifts(email, counted);
+        List<TaxYearExpense> listed = counted.stream()
                 .sorted(Comparator.comparing(Expense::getDate).thenComparing(Expense::getId,
                         Comparator.nullsFirst(Comparator.naturalOrder())))
                 .map(expense -> new TaxYearExpense(expense.getDate(), expense.getCategory(), expense.getAmount(),
-                        expense.getShift() == null ? null : expense.getShift().getStation(), expense.getNote()))
+                        ExpenseService.countedStation(expense, links), expense.getNote()))
                 .toList();
         return new TaxYearReport(year, userTime.today(email), displayName, settings.vehicleCostMethod(),
                 settings.mileageRates().singleRate(LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31)),
@@ -216,9 +218,8 @@ public class TaxService {
 
     /** Expenses linked to a block that has not happened yet are not counted, as in the reports. */
     private List<Expense> expenses(String email, LocalDate from, LocalDate to) {
-        return expenseService.findFiltered(email, new ExpenseFilter(from, to, null, null, null, null)).stream()
-                .filter(expense -> expense.getShift() == null || expense.getShift().getStatus() != ShiftStatus.SCHEDULED)
-                .toList();
+        return expenseService.countable(email,
+                expenseService.findFiltered(email, new ExpenseFilter(from, to, null, null, null, null)));
     }
 
     /** The configured due date of a tax year's quarter (1 to 4); the fourth quarter's falls in the following January. */
