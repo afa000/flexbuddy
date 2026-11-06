@@ -136,6 +136,9 @@ reviewed before merging. Claude Code, Antigravity, and a local model share this 
 that implements it, based on its risk. [`AGENTS.md`](AGENTS.md) holds the rules every coding agent follows, and
 [`docs/agent-workflow.md`](docs/agent-workflow.md) explains the tools and the day-to-day loop.
 
+The [driver experience improvement plan](docs/driver-experience-plan.md) turns the November 2026 emulator audit into
+prioritized work, acceptance criteria, and validation requirements.
+
 ## Reporting API
 
 Authenticated requests to `GET /shifts`, `GET /shifts/statistics`, and `GET /shifts/reports/earnings` accept the same optional `from`, `to`, `station`, `q`, and `status` filters. `status` takes a comma-separated list such as `scheduled,completed`, or `all`; history defaults to completed, cancelled, and forfeited shifts, while statistics, reports, and CSV export default to completed and cancelled. Shift history also accepts `sort` and `dir`; reports require `groupBy=station|week|month|year`. `GET /shifts/stations` returns the signed-in user's station choices.
