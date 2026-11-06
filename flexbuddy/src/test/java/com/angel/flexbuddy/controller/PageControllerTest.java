@@ -65,6 +65,22 @@ class PageControllerTest {
     }
 
     @Test
+    void theImportReviewMakesTheDriverChooseWhetherTheBlockWasWorked() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Required, and the empty choice is the selected first option, so neither a new screenshot nor a form reset
+        // lands on Completed.
+        assertThat(page).containsPattern("<select id=\"importStatus\"[^>]*\\brequired\\b[^>]*>\\s*"
+                + "<option value=\"\" selected>Choose one</option>\\s*"
+                + "<option value=\"COMPLETED\">Completed · I worked this block</option>\\s*"
+                + "<option value=\"SCHEDULED\">Scheduled · accepted, not worked yet</option>");
+        assertThat(page).contains("id=\"importStatusHint\"", "/js/import-status.js?v=");
+        assertThat(page.indexOf("/js/import-status.js?v=")).isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

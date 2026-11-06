@@ -374,6 +374,19 @@ class ShiftServiceTest {
     }
 
     @Test
+    void aRepeatedCreateIsAnsweredWithItsShiftBeforeTheStatusIsChecked() {
+        Shift first = shift(5L, "VEA7", LocalDate.of(2026, 9, 3), "120", "35.50");
+        when(shiftRepository.findByCreateRequestIdIncludingDeleted(OWNER_EMAIL, KEY)).thenReturn(Optional.of(first));
+        CreateShiftRequest noStatus = new CreateShiftRequest("VEA7", LocalDate.of(2026, 9, 3), LocalTime.of(9, 0),
+                LocalTime.of(17, 0), new BigDecimal("120.00"), new BigDecimal("35.50"));
+
+        ShiftResponse result = shiftService.createShift(OWNER_EMAIL, noStatus, KEY);
+
+        assertThat(result.getId()).isEqualTo(5L);
+        verify(shiftRepository, never()).save(any(Shift.class));
+    }
+
+    @Test
     void aCreateWhoseShiftWasTrashedStillReturnsIt() {
         Shift trashed = shift(6L, "VEA7", LocalDate.of(2026, 9, 3), "120", "0");
         trashed.setDeletedAt(Instant.parse("2026-09-10T00:00:00Z"));
