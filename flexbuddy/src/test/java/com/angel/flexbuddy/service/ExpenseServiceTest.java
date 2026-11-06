@@ -171,6 +171,34 @@ class ExpenseServiceTest {
         assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
     }
 
+    private Expense linkedTo(long shiftId) {
+        Expense expense = new Expense();
+        expense.setOwner(owner);
+        if (shiftId > 0) {
+            Shift link = new Shift();
+            link.setId(shiftId);
+            expense.setShift(link);
+        }
+        return expense;
+    }
+
+    @Test
+    void onlyAnExpenseOnALiveScheduledBlockWaitsAndOneOnADeletedBlockCountsByDate() {
+        Expense liveScheduled = linkedTo(1L), deletedScheduled = linkedTo(2L), completed = linkedTo(3L),
+                legacyNoStatus = linkedTo(4L), unlinked = linkedTo(0L);
+        when(shiftRepository.findLinkedIncludingDeleted(EMAIL, java.util.Set.of(1L, 2L, 3L, 4L))).thenReturn(java.util.List.of(
+                linkedRow(1L, "VEA7", "SCHEDULED", false), linkedRow(2L, "DCY1", "SCHEDULED", true),
+                linkedRow(3L, "VEA7", "COMPLETED", false), linkedRow(4L, "VEA6", null, false)));
+        java.util.List<Expense> all = java.util.List.of(liveScheduled, deletedScheduled, completed, legacyNoStatus, unlinked);
+
+        assertThat(service.countable(EMAIL, all)).containsExactly(deletedScheduled, completed, legacyNoStatus, unlinked);
+
+        var links = service.linkedShifts(EMAIL, all);
+        assertThat(ExpenseService.countedStation(deletedScheduled, links)).isNull();
+        assertThat(ExpenseService.countedStation(completed, links)).isEqualTo("VEA7");
+        assertThat(ExpenseService.countedStation(unlinked, links)).isNull();
+    }
+
     private static com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow linkedRow(Long id, String station,
             String status, boolean deleted) {
         return new com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow() {
