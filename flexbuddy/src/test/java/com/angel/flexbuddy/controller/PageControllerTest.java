@@ -96,6 +96,18 @@ class PageControllerTest {
     }
 
     @Test
+    void theExpenseFormSaysWhatTheChosenCategoryDoesToNet() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // The hint sits inside the Category label, so it is part of the select's name without aria-describedby.
+        assertThat(page).containsPattern("<select id=\"expenseCategory\" required>.*?</select>"
+                + "<small class=\"field-hint\" id=\"expenseCategoryHint\" aria-live=\"polite\"></small></label>");
+        assertThat(page.indexOf("/js/expense-effect.js?v=")).isPositive().isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

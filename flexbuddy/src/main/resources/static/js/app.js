@@ -388,6 +388,7 @@ elements.emptyTrashButton.addEventListener('click', () => openConfirm(
 ));
 elements.expenseForm.addEventListener('submit', saveExpense);
 elements.expenseCategory.addEventListener('change', renderExpenseCategoryHint);
+elements.expenseShift.addEventListener('change', renderExpenseCategoryHint);
 elements.cancelExpenseEdit.addEventListener('click', resetExpenseForm);
 elements.expenseDate.addEventListener('change', () => populateExpenseShifts(currentShifts));
 [elements.expenseFrom, elements.expenseTo, elements.expenseFilterCategory].forEach(input => input.addEventListener('change', loadExpenses));
@@ -2207,9 +2208,11 @@ function populateExpenseShifts(shifts) {
         const option = document.createElement('option');
         option.value = shift.id;
         option.textContent = `${formatDate(shift.date)} · ${shift.station}`;
+        option.dataset.status = shift.status ?? '';
         elements.expenseShift.append(option);
     });
     if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
+    renderExpenseCategoryHint();
 }
 
 const EXPENSE_CATEGORY_KEYS = {
@@ -2334,12 +2337,15 @@ function resetExpenseForm() {
 
 /** What the chosen category does to estimated net, or nothing while the cost method isn't known. */
 function expenseEffectText(category) {
-    const key = window.flexbuddyExpenseEffect.effectKey(category, expenseCostMethod);
+    const linkedToScheduled = elements.expenseShift.selectedOptions[0]?.dataset.status === 'SCHEDULED';
+    const key = window.flexbuddyExpenseEffect?.effectKey(category, expenseCostMethod, linkedToScheduled);
     return key ? t(key) : '';
 }
 
+/** Rewrites the hint only when it changes, so a screen reader doesn't announce the same words again. */
 function renderExpenseCategoryHint() {
-    elements.expenseCategoryHint.textContent = expenseEffectText(elements.expenseCategory.value);
+    const text = expenseEffectText(elements.expenseCategory.value);
+    if (elements.expenseCategoryHint.textContent !== text) elements.expenseCategoryHint.textContent = text;
 }
 
 async function saveExpense(event) {
