@@ -167,7 +167,7 @@
     }
 
     function renderUpcomingList() {
-        el.upcomingList.closest('.upcoming-panel')?.classList.toggle('is-hidden', !showsUpcomingPanel(state.upcoming));
+        el.upcomingList.closest('.upcoming-panel')?.classList.toggle('is-empty', !showsUpcomingPanel(state.upcoming));
         const {days, weeks, conflicts} = state.upcoming;
         const overlapping = new Set(conflicts.flatMap(conflict => [conflict.firstShiftId, conflict.secondShiftId]));
         const weekTotals = new Map(weeks.map(week => [week.weekStart, week]));

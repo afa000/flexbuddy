@@ -1905,9 +1905,10 @@ input[data-reveal]::-ms-reveal { display: none; }
     .screen-title .expense-history-jump { display: inline-flex; }
     /* The sticky top bar would cover the heading the jump lands on. */
     .expense-history-panel { scroll-margin-top: 100px; }
-    /* While a field has focus, the fixed navigation and + button step aside (field-focus.js). */
-    body.field-focus .mobile-nav,
-    body.field-focus #quickActionButton { visibility: hidden; }
+    /* An empty "Next 14 days" panel repeats Next up; desktop keeps it to hold the two-column layout. */
+    .upcoming-panel.is-empty { display: none; }
+    /* While the on-screen keyboard is open the navigation steps aside, like the + (quick-actions.js). */
+    body.keyboard-open .mobile-nav { visibility: hidden; }
 }
 
 @media (max-width: 760px) {
