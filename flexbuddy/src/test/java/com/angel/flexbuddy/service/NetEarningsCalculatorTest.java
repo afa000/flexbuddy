@@ -18,6 +18,27 @@ import com.angel.flexbuddy.model.VehicleCostMethod;
 class NetEarningsCalculatorTest {
     private final NetEarningsCalculator calculator = new NetEarningsCalculator();
 
+    /**
+     * Which categories lower estimated net under each method. The Expenses page tells the driver this when they save
+     * (expense-effect.js), and src/test/js/expense-effect.test.js checks the same table, so the two stay in step.
+     */
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+            "STANDARD_MILEAGE, FUEL, false", "STANDARD_MILEAGE, TOLL, true", "STANDARD_MILEAGE, PARKING, true",
+            "STANDARD_MILEAGE, MAINTENANCE, false", "STANDARD_MILEAGE, OTHER, true",
+            "ACTUAL_EXPENSES, FUEL, true", "ACTUAL_EXPENSES, TOLL, true", "ACTUAL_EXPENSES, PARKING, true",
+            "ACTUAL_EXPENSES, MAINTENANCE, true", "ACTUAL_EXPENSES, OTHER, true"})
+    void eachCategoryLowersNetOnlyWhereTheExpenseMessageSaysSo(VehicleCostMethod method, ExpenseCategory category,
+            boolean lowersNet) {
+        Shift shift = shift("100", "0", "40.0");
+        MileageRates rates = MileageRates.fixed(new BigDecimal("0.700"));
+        BigDecimal without = calculator.calculate(List.of(shift), List.of(), method, rates).netEarnings();
+        BigDecimal with = calculator.calculate(List.of(shift), List.of(expense(category, "12.50")), method, rates)
+                .netEarnings();
+
+        assertThat(without.subtract(with)).isEqualByComparingTo(lowersNet ? "12.50" : "0");
+    }
+
     @Test
     void standardMileageUsesMilesAndOnlyAddsNonVehicleCashCosts() {
         Shift shift = shift("100", "20", "40.0");

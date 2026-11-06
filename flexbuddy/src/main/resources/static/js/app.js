@@ -139,6 +139,7 @@ const elements = {
     acceptConfirmButton: document.querySelector('#acceptConfirmButton'),
     expenseForm: document.querySelector('#expenseForm'), expenseFormTitle: document.querySelector('#expenseFormTitle'),
     expenseDate: document.querySelector('#expenseDate'), expenseCategory: document.querySelector('#expenseCategory'),
+    expenseCategoryHint: document.querySelector('#expenseCategoryHint'),
     expenseAmount: document.querySelector('#expenseAmount'), expenseShift: document.querySelector('#expenseShift'),
     expenseNote: document.querySelector('#expenseNote'), expenseError: document.querySelector('#expenseError'),
     saveExpenseButton: document.querySelector('#saveExpenseButton'), cancelExpenseEdit: document.querySelector('#cancelExpenseEdit'),
@@ -193,6 +194,8 @@ let importTimer;
 const IMPORT_TIMEOUT_MS = 60000;
 let editingShiftId;
 let editSnapshot;
+/** The account's vehicle cost method, once the Expenses page has loaded the settings. */
+let expenseCostMethod;
 /** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
 let notWorkedSending = false;
 let pendingConfirmAction;
@@ -384,6 +387,7 @@ elements.emptyTrashButton.addEventListener('click', () => openConfirm(
     emptyTrash
 ));
 elements.expenseForm.addEventListener('submit', saveExpense);
+elements.expenseCategory.addEventListener('change', renderExpenseCategoryHint);
 elements.cancelExpenseEdit.addEventListener('click', resetExpenseForm);
 elements.expenseDate.addEventListener('change', () => populateExpenseShifts(currentShifts));
 [elements.expenseFrom, elements.expenseTo, elements.expenseFilterCategory].forEach(input => input.addEventListener('change', loadExpenses));
@@ -2245,6 +2249,8 @@ async function loadExpenses() {
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
             ? t('js.app.costActual') : t('js.app.costStandard', formatMoney(settings.mileageRate));
         elements.expenseFuelNote.hidden = settings.vehicleCostMethod !== 'STANDARD_MILEAGE';
+        expenseCostMethod = settings.vehicleCostMethod;
+        renderExpenseCategoryHint();
     } catch (error) {
         elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || t('js.app.expensesNotLoaded'))}</p>`;
     }
@@ -2302,6 +2308,7 @@ function editExpense(expense) {
     elements.expenseAmount.value = expense.amount;
     elements.expenseShift.value = expense.shiftId ?? '';
     elements.expenseNote.value = expense.note ?? '';
+    renderExpenseCategoryHint();
     elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
     applyOfflineExpenseState();
 }
@@ -2321,7 +2328,18 @@ function resetExpenseForm() {
     elements.saveExpenseButton.textContent = t('js.app.addExpense');
     elements.cancelExpenseEdit.classList.add('is-hidden');
     hideMessage(elements.expenseError);
+    renderExpenseCategoryHint();
     applyOfflineExpenseState();
+}
+
+/** What the chosen category does to estimated net, or nothing while the cost method isn't known. */
+function expenseEffectText(category) {
+    const key = window.flexbuddyExpenseEffect.effectKey(category, expenseCostMethod);
+    return key ? t(key) : '';
+}
+
+function renderExpenseCategoryHint() {
+    elements.expenseCategoryHint.textContent = expenseEffectText(elements.expenseCategory.value);
 }
 
 async function saveExpense(event) {
@@ -2332,6 +2350,7 @@ async function saveExpense(event) {
         amount: Number(elements.expenseAmount.value), note: elements.expenseNote.value.trim() || null,
         shiftId: elements.expenseShift.value ? Number(elements.expenseShift.value) : null};
     const id = editingExpenseId;
+    const effect = expenseEffectText(body.category) || t('js.expenseEffect.saved');
     elements.saveExpenseButton.disabled = true;
     try {
         let response;
@@ -2353,7 +2372,7 @@ async function saveExpense(event) {
         }
         if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text());
         resetExpenseForm();
-        showToast(id ? t('js.app.expenseUpdated') : t('js.app.expenseAdded'), t('js.account.netRecalculated'));
+        showToast(id ? t('js.app.expenseUpdated') : t('js.app.expenseAdded'), effect);
         await Promise.all([loadExpenses(), loadDashboard()]);
     } catch (error) { showMessage(elements.expenseError, error.message || t('js.app.expenseNotSaved')); }
     finally { elements.saveExpenseButton.disabled = false; applyOfflineExpenseState(); }
