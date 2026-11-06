@@ -1345,7 +1345,7 @@ input[data-reveal]::-ms-reveal { display: none; }
     text-align: right;
 }
 
-.shift-pay .add-miles-button { padding: 4px 0 0; color: var(--warning); font-size: 11px; font-weight: 750; }
+.shift-pay .add-miles-button { min-height: 24px; padding: 4px 0; color: var(--warning); font-size: 11px; font-weight: 750; }
 .missing-miles-flag { display: block; color: var(--warning); font-size: 10px; font-weight: 700; white-space: nowrap; }
 
 .shift-pay strong {

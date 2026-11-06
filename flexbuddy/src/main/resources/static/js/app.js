@@ -1211,7 +1211,7 @@ function renderShifts(shifts) {
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? `<small class="edited-tag">${escapeHtml(t('js.app.edited'))}</small>` : ''}${statusBadge}</strong><span>${escapeHtml(t('js.app.weekdayShift', weekday))}</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>${escapeHtml(t('js.app.scheduledTime'))}</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span title="${escapeHtml(netLine)}">${escapeHtml(netLine)}</span>${shift.netMissingMiles ? `<button class="text-button add-miles-button" type="button">${escapeHtml(t('js.home.addMiles'))}</button>` : ''}${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span class="net-line">${escapeHtml(netLine)}</span>${shift.netMissingMiles ? `<button class="text-button add-miles-button" type="button">${escapeHtml(t('js.home.addMiles'))}</button>` : ''}${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -1221,6 +1221,8 @@ function renderShifts(shifts) {
         const editButton = row.querySelector('.edit-shift-button');
         editButton.setAttribute('aria-label', t('js.app.editShiftOn', shift.station, shift.date));
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
+        // The line can be cut off on a narrow phone, so its full text is also its tooltip.
+        row.querySelector('.net-line').title = netLine;
         const addMilesButton = row.querySelector('.add-miles-button');
         if (addMilesButton) {
             addMilesButton.setAttribute('aria-label', t('js.app.addMilesTo', shift.station, formatDate(shift.date)));

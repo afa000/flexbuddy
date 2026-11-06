@@ -171,9 +171,6 @@
         return value == null ? '—' : Number(value).toFixed(1);
     }
 
-    /** The breakdown columns that show estimated net: Net and Net / hr. */
-    const NET_COLUMNS = [8, 9];
-
     function renderTable(tbody, report, onDrill) {
         tbody.replaceChildren();
         const buckets = report?.buckets ?? [];
@@ -192,11 +189,13 @@
             const row = document.createElement('tr');
             row.tabIndex = 0;
             row.title = t('js.charts.filterTo', bucket.label);
+            // Net and net per hour are marked, so their missing-miles tag follows them if columns move.
+            const net = text => ({text, net: true});
             const values = [
                 bucket.label, bucket.shifts, hours(bucket.minutesWorked),
                 fullMoney(bucket.totalEarnings), Number(bucket.miles || 0).toFixed(1),
                 fullMoney(bucket.mileageCost), fullMoney(bucket.expenses), fullMoney(bucket.deductions),
-                fullMoney(bucket.netEarnings), fullMoney(bucket.netHourlyRate), pace(bucket.averageFinishedEarlyMinutes),
+                net(fullMoney(bucket.netEarnings)), net(fullMoney(bucket.netHourlyRate)), pace(bucket.averageFinishedEarlyMinutes),
                 optional(bucket.averageStops), optional(bucket.averageMinutesPerStop),
                 bucket.returnsRate == null ? '—' : `${Number(bucket.returnsRate).toFixed(1)}%`
             ];
@@ -204,9 +203,9 @@
             values.forEach((value, index) => {
                 const cell = document.createElement(index === 0 ? 'th' : 'td');
                 if (index === 0) cell.scope = 'row';
-                cell.textContent = value;
+                cell.textContent = value?.net ? value.text : value;
                 // Net and net per hour leave out the vehicle cost of blocks without miles.
-                if (missingMiles && NET_COLUMNS.includes(index)) {
+                if (missingMiles && value?.net) {
                     const flag = document.createElement('small');
                     flag.className = 'missing-miles-flag';
                     flag.textContent = t('js.home.missingMiles');
