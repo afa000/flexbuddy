@@ -143,7 +143,7 @@ prioritized work, acceptance criteria, and validation requirements.
 
 Authenticated requests to `GET /shifts`, `GET /shifts/statistics`, and `GET /shifts/reports/earnings` accept the same optional `from`, `to`, `station`, `q`, and `status` filters. `status` takes a comma-separated list such as `scheduled,completed`, or `all`; history defaults to completed, cancelled, and forfeited shifts, while statistics, reports, and CSV export default to completed and cancelled. Shift history also accepts `sort` and `dir`; reports require `groupBy=station|week|month|year`. `GET /shifts/stations` returns the signed-in user's station choices.
 
-Shift create and update requests accept optional `miles`. Shift responses include mileage cost, earnings per mile, linked expenses, net pay, and net hourly rate. The statistics and grouped report endpoints include mileage, cash expenses, deductions, and net earnings. These figures are planning estimates and are not tax advice.
+`POST /shifts` requires a `status` (`COMPLETED`, `SCHEDULED`, `CANCELLED` or `FORFEITED`); a create without one is rejected rather than saved as completed. Shift create and update requests accept optional `miles`. Shift responses include mileage cost, earnings per mile, linked expenses, net pay, and net hourly rate. The statistics and grouped report endpoints include mileage, cash expenses, deductions, and net earnings. These figures are planning estimates and are not tax advice.
 
 ## Driver expenses API
 

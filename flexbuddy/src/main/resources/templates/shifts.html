@@ -498,10 +498,12 @@
 
                     <label class="field field-wide">
                         <span th:text="#{import.status}">Status</span>
-                        <select id="importStatus" name="status">
-                            <option value="COMPLETED" th:text="#{import.completedWorkedAndPaid}">Completed · worked and paid</option>
-                            <option value="SCHEDULED" th:text="#{import.scheduledAnUpcomingBlock}">Scheduled · an upcoming block</option>
+                        <select id="importStatus" name="status" required aria-describedby="importStatusHint">
+                            <option value="" selected th:text="#{import.chooseOne}">Choose one</option>
+                            <option value="COMPLETED" th:text="#{import.completedIWorkedThisBlock}">Completed · I worked this block</option>
+                            <option value="SCHEDULED" th:text="#{import.scheduledAcceptedNotWorkedYet}">Scheduled · accepted, not worked yet</option>
                         </select>
+                        <small class="field-hint" id="importStatusHint" aria-live="polite"></small>
                     </label>
 
                     <label class="field field-wide">
@@ -913,6 +915,7 @@
 <script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>
