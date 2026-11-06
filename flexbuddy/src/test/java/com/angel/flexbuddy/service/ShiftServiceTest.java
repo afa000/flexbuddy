@@ -636,6 +636,42 @@ class ShiftServiceTest {
         assertThat(shift.getStatus()).isEqualTo(status);
     }
 
+    private ShiftResponse created(String miles, ShiftStatus status, String basePay) {
+        when(userRepository.findByEmailIgnoreCase(OWNER_EMAIL)).thenReturn(Optional.of(owner));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        return shiftService.createShift(OWNER_EMAIL, new CreateShiftRequest("VEA7", LocalDate.of(2026, 9, 3),
+                LocalTime.of(9, 0), LocalTime.of(13, 0), new BigDecimal(basePay), BigDecimal.ZERO,
+                miles == null ? null : new BigDecimal(miles), status));
+    }
+
+    @Test
+    void aCompletedBlockWithoutMilesIsFlaggedAsMissingThemFromNet() {
+        assertThat(created(null, ShiftStatus.COMPLETED, "80.00").isNetMissingMiles()).isTrue();
+    }
+
+    @Test
+    void zeroMilesIsAnAnswerAndIsNotFlagged() {
+        assertThat(created("0", ShiftStatus.COMPLETED, "80.00").isNetMissingMiles()).isFalse();
+        assertThat(created("31.5", ShiftStatus.COMPLETED, "80.00").isNetMissingMiles()).isFalse();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ShiftStatus.class, names = "COMPLETED",
+            mode = org.junit.jupiter.params.provider.EnumSource.Mode.EXCLUDE)
+    void aBlockThatWasNotWorkedIsNeverFlagged(ShiftStatus status) {
+        String pay = status == ShiftStatus.SCHEDULED ? "80.00" : "0";
+        assertThat(created(null, status, pay).isNetMissingMiles()).isFalse();
+    }
+
+    @Test
+    void nothingIsFlaggedWithActualExpenses() {
+        when(settingsService.get(OWNER_EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                com.angel.flexbuddy.model.VehicleCostMethod.ACTUAL_EXPENSES,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
+
+        assertThat(created(null, ShiftStatus.COMPLETED, "80.00").isNetMissingMiles()).isFalse();
+    }
+
     private Shift scheduled(Long id) {
         Shift shift = new Shift(id, "VEA7", LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15),
                 new BigDecimal("84.00"), BigDecimal.ZERO, owner);

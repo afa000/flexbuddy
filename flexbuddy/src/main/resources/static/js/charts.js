@@ -171,6 +171,9 @@
         return value == null ? '—' : Number(value).toFixed(1);
     }
 
+    /** The breakdown columns that show estimated net: Net and Net / hr. */
+    const NET_COLUMNS = [8, 9];
+
     function renderTable(tbody, report, onDrill) {
         tbody.replaceChildren();
         const buckets = report?.buckets ?? [];
@@ -197,10 +200,18 @@
                 optional(bucket.averageStops), optional(bucket.averageMinutesPerStop),
                 bucket.returnsRate == null ? '—' : `${Number(bucket.returnsRate).toFixed(1)}%`
             ];
+            const missingMiles = Number(bucket.netMissingMiles) > 0;
             values.forEach((value, index) => {
                 const cell = document.createElement(index === 0 ? 'th' : 'td');
                 if (index === 0) cell.scope = 'row';
                 cell.textContent = value;
+                // Net and net per hour leave out the vehicle cost of blocks without miles.
+                if (missingMiles && NET_COLUMNS.includes(index)) {
+                    const flag = document.createElement('small');
+                    flag.className = 'missing-miles-flag';
+                    flag.textContent = t('js.home.missingMiles');
+                    cell.append(flag);
+                }
                 row.append(cell);
             });
             const drill = () => onDrill(bucket, report.groupBy);
@@ -240,7 +251,8 @@
             netBar.style.width = `${Math.max(0, Number(bucket.netHourlyRate || 0) / max * 100)}%`;
             netTrack.append(netBar);
             const netValue = document.createElement('small');
-            netValue.textContent = t('js.charts.estNet', fullMoney(bucket.netHourlyRate));
+            netValue.textContent = t(Number(bucket.netMissingMiles) > 0 ? 'js.charts.estNetMissing' : 'js.charts.estNet',
+                fullMoney(bucket.netHourlyRate));
             row.append(label, grossTrack, grossValue, netTrack, netValue);
             list.append(row);
         });

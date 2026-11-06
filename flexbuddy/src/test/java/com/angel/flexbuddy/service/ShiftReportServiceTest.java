@@ -204,6 +204,36 @@ class ShiftReportServiceTest {
     }
 
     @Test
+    void earnings_flagsTheGroupsWhoseNetIsMissingMiles() {
+        Shift never = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift zero = shift("VEA7", LocalDate.of(2026, 9, 7), "100.00", "0.00", 240);
+        zero.setMiles(BigDecimal.ZERO);
+        Shift entered = shift("DCY1", LocalDate.of(2026, 9, 8), "100.00", "0.00", 240);
+        entered.setMiles(new BigDecimal("12.0"));
+        Shift scheduled = withStatus(shift("DCY1", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(never, zero, entered, scheduled));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).extracting(EarningsBucket::label, EarningsBucket::netMissingMiles)
+                .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple("VEA7", 1),
+                        org.assertj.core.groups.Tuple.tuple("DCY1", 0));
+    }
+
+    @Test
+    void earnings_flagsNothingWithActualExpenses() {
+        when(settingsService.get(EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                com.angel.flexbuddy.model.VehicleCostMethod.ACTUAL_EXPENSES,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
+        when(shiftService.findFiltered(EMAIL, ALL))
+                .thenReturn(List.of(shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240)));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).extracting(EarningsBucket::netMissingMiles).containsExactly(0);
+    }
+
+    @Test
     void statistics_countCancellationsAndForfeitsInTheRangeAndThisMonth() {
         Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 8, 7), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
         Shift forfeited = withStatus(shift("VEA7", LocalDate.of(2026, 8, 9), "0.00", "0.00", 240), ShiftStatus.FORFEITED);

@@ -1057,8 +1057,9 @@ async function loadStatistics(query, signal) {
         elements.tipsShareBar.style.width = `${tipShare}%`;
         elements.tipsShare.textContent = t('js.app.percentFromTips', tipShare.toFixed(1));
         elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
-        elements.netHourly.textContent = t('js.app.netHourlyEst', formatMoney(statistics.netHourlyRate));
         const missingMiles = window.flexbuddyHome?.netMissingMiles(statistics) ?? 0;
+        elements.netHourly.textContent = t(missingMiles ? 'js.app.netHourlyEstMissing' : 'js.app.netHourlyEst',
+            formatMoney(statistics.netHourlyRate));
         elements.netMargin.textContent = missingMiles
             ? tn(missingMiles, 'js.app.netMissingMiles')
             : t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
@@ -1201,12 +1202,16 @@ function renderShifts(shifts) {
             shift.details?.actualMinutes ?? shift.timeWorked) : '';
         const edited = shift.createdAt && shift.updatedAt
                 && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
+        // The server flags a block whose missing miles leave its vehicle cost out of estimated net.
+        const netLine = (shift.miles == null ? '' : `${t('js.common.miles', Number(shift.miles).toFixed(1))} · `)
+            + t('js.app.estNetLine', formatMoney(shift.netPay), formatMoney(shift.netHourlyRate))
+            + (shift.netMissingMiles ? ` · ${t('js.home.missingMiles')}` : '');
 
         row.innerHTML = `
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? `<small class="edited-tag">${escapeHtml(t('js.app.edited'))}</small>` : ''}${statusBadge}</strong><span>${escapeHtml(t('js.app.weekdayShift', weekday))}</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>${escapeHtml(t('js.app.scheduledTime'))}</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${escapeHtml((shift.miles == null ? '' : `${t('js.common.miles', Number(shift.miles).toFixed(1))} · `) + t('js.app.estNetLine', formatMoney(shift.netPay), formatMoney(shift.netHourlyRate)))}</span>${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span title="${escapeHtml(netLine)}">${escapeHtml(netLine)}</span>${shift.netMissingMiles ? `<button class="text-button add-miles-button" type="button">${escapeHtml(t('js.home.addMiles'))}</button>` : ''}${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -1216,6 +1221,14 @@ function renderShifts(shifts) {
         const editButton = row.querySelector('.edit-shift-button');
         editButton.setAttribute('aria-label', t('js.app.editShiftOn', shift.station, shift.date));
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
+        const addMilesButton = row.querySelector('.add-miles-button');
+        if (addMilesButton) {
+            addMilesButton.setAttribute('aria-label', t('js.app.addMilesTo', shift.station, formatDate(shift.date)));
+            addMilesButton.addEventListener('click', event => {
+                event.stopPropagation();
+                openEditModal(shift, addMilesButton, {focusMiles: true});
+            });
+        }
         elements.historyList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
             onEdit: () => openEditModal(shift, editButton),
             onDelete: () => deleteShiftFromList(shift),
@@ -1302,6 +1315,8 @@ function openEditModal(shift, trigger, options = {}) {
     if (options.focusPay) {
         elements.editBasePay.focus();
         elements.editBasePay.select();
+    } else if (options.focusMiles && !elements.editMiles.disabled) {
+        elements.editMiles.focus();
     } else {
         elements.editStation.focus();
     }
