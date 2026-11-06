@@ -492,6 +492,104 @@ class ShiftServiceTest {
         verify(shiftRepository).save(stored);
     }
 
+    private static final Instant SEEN = Instant.parse("2026-09-11T11:00:00Z");
+
+    /** A block saved as completed, with everything a worked block can hold. */
+    private Shift workedByMistake(Long id) {
+        Shift shift = shift(id, "VEA7", LocalDate.of(2026, 9, 20), "84.00", "12.00");
+        shift.setMiles(new BigDecimal("38.0"));
+        shift.setOdometerStart(new BigDecimal("1000.0"));
+        shift.setOdometerEnd(new BigDecimal("1038.0"));
+        shift.setActualStart(LocalTime.of(9, 5));
+        shift.setActualEnd(LocalTime.of(12, 41));
+        shift.setStops(30);
+        shift.setPackages(42);
+        shift.setReturns(1);
+        shift.setUpdatedAt(SEEN);
+        return shift;
+    }
+
+    @Test
+    void markNotWorked_movesACompletedBlockBackToScheduledAndClearsWhatOnlyAWorkedBlockHolds() {
+        Shift shift = workedByMistake(3L);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(shift));
+        when(shiftRepository.save(any(Shift.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ShiftResponse result = shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, KEY);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        assertThat(result.getEarnedPay()).isEqualByComparingTo("0.00");
+        assertThat(result.getNetPay()).isEqualByComparingTo("0.00");
+        assertThat(result.getBasePay()).isEqualByComparingTo("84.00");
+        assertThat(shift.getTips()).isEqualByComparingTo("0");
+        assertThat(shift.getMiles()).isNull();
+        assertThat(shift.getOdometerStart()).isNull();
+        assertThat(shift.getOdometerEnd()).isNull();
+        assertThat(shift.getActualStart()).isNull();
+        assertThat(shift.getActualEnd()).isNull();
+        assertThat(shift.getStops()).isNull();
+        assertThat(shift.getPackages()).isNull();
+        assertThat(shift.getReturns()).isNull();
+        assertThat(shift.getStation()).isEqualTo("VEA7");
+        assertThat(shift.getDate()).isEqualTo(LocalDate.of(2026, 9, 20));
+        assertThat(shift.getStatusChangedAt()).isEqualTo(Instant.parse("2026-09-11T12:00:00Z"));
+        assertThat(shift.getLastRequestId()).isEqualTo(KEY);
+        // Linked expenses are only read for the response, never changed.
+        verify(expenseService, org.mockito.Mockito.only()).findForShifts(eq(OWNER_EMAIL), any());
+    }
+
+    @Test
+    void markNotWorked_cannotReachAnotherDriversBlock() {
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, KEY))
+                .isInstanceOf(com.angel.flexbuddy.exception.ShiftNotFoundException.class);
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @Test
+    void markNotWorked_refusesABlockChangedSinceTheDriverSawIt() {
+        Shift shift = workedByMistake(3L);
+        shift.setUpdatedAt(Instant.parse("2026-09-11T11:30:00Z"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(shift));
+
+        assertThatThrownBy(() -> shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, KEY))
+                .isInstanceOfSatisfying(com.angel.flexbuddy.exception.ShiftConflictException.class,
+                        conflict -> assertThat(conflict.getCurrent().getStatus()).isEqualTo(ShiftStatus.COMPLETED));
+        verify(shiftRepository, never()).save(any());
+        assertThat(shift.getTips()).isEqualByComparingTo("12.00");
+        assertThat(shift.getLastRequestId()).isNull();
+    }
+
+    @Test
+    void markNotWorked_aRepeatReturnsTheBlockWithoutApplyingAnythingAgain() {
+        Shift alreadyMoved = scheduled(3L);
+        alreadyMoved.setLastRequestId(KEY);
+        alreadyMoved.setUpdatedAt(Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(alreadyMoved));
+
+        ShiftResponse result = shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, KEY);
+
+        assertThat(result.getStatus()).isEqualTo(ShiftStatus.SCHEDULED);
+        verify(shiftRepository, never()).save(any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = ShiftStatus.class, names = "COMPLETED",
+            mode = org.junit.jupiter.params.provider.EnumSource.Mode.EXCLUDE)
+    void markNotWorked_onlyMovesACompletedBlock(ShiftStatus status) {
+        Shift shift = shift(3L, "VEA7", LocalDate.of(2026, 9, 20), "84.00", "0");
+        shift.setStatus(status);
+        shift.setUpdatedAt(SEEN);
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(3L, OWNER_EMAIL)).thenReturn(Optional.of(shift));
+
+        assertThatThrownBy(() -> shiftService.markNotWorked(OWNER_EMAIL, 3L, SEEN, OTHER_KEY))
+                .isInstanceOf(InvalidShiftException.class)
+                .hasMessage("Only a completed block can be moved back to scheduled.");
+        verify(shiftRepository, never()).save(any());
+        assertThat(shift.getStatus()).isEqualTo(status);
+    }
+
     private Shift scheduled(Long id) {
         Shift shift = new Shift(id, "VEA7", LocalDate.of(2026, 9, 13), LocalTime.of(15, 15), LocalTime.of(19, 15),
                 new BigDecimal("84.00"), BigDecimal.ZERO, owner);

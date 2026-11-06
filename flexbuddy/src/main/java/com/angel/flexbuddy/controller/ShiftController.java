@@ -27,6 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.angel.flexbuddy.dto.BlockEvaluationRequest;
 import com.angel.flexbuddy.dto.BlockEvaluationResponse;
 import com.angel.flexbuddy.dto.CreateShiftRequest;
+import com.angel.flexbuddy.dto.NotWorkedRequest;
 import com.angel.flexbuddy.dto.EarningsReportResponse;
 import com.angel.flexbuddy.dto.GroupBy;
 import com.angel.flexbuddy.dto.OdometerReadingResponse;
@@ -156,6 +157,13 @@ public class ShiftController {
             @Valid @RequestBody ShiftStatusRequest request,
             @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
         return shiftService.changeStatus(principal.getName(), id, request, RequestIds.parse(key));
+    }
+
+    @PostMapping("/{id}/not-worked")
+    public ShiftResponse markNotWorked(Principal principal, @PathVariable Long id,
+            @Valid @RequestBody NotWorkedRequest request,
+            @RequestHeader(value = RequestIds.HEADER, required = false) String key) {
+        return shiftService.markNotWorked(principal.getName(), id, request.expectedUpdatedAt(), RequestIds.parse(key));
     }
 
     @DeleteMapping("/{id}")

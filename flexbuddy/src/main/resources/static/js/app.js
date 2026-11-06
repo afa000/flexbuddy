@@ -127,6 +127,11 @@ const elements = {
     deleteConfirm: document.querySelector('#deleteConfirm'),
     cancelDeleteButton: document.querySelector('#cancelDeleteButton'),
     confirmDeleteButton: document.querySelector('#confirmDeleteButton'),
+    notWorkedButton: document.querySelector('#notWorkedButton'),
+    notWorkedConfirm: document.querySelector('#notWorkedConfirm'),
+    notWorkedCleared: document.querySelector('#notWorkedCleared'),
+    cancelNotWorkedButton: document.querySelector('#cancelNotWorkedButton'),
+    confirmNotWorkedButton: document.querySelector('#confirmNotWorkedButton'),
     confirmModal: document.querySelector('#confirmModal'),
     confirmTitle: document.querySelector('#confirmTitle'),
     confirmMessage: document.querySelector('#confirmMessage'),
@@ -365,6 +370,9 @@ elements.duplicateShiftButton.addEventListener('click', () => {
 });
 elements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
 elements.confirmDeleteButton.addEventListener('click', deleteEditedShift);
+elements.notWorkedButton.addEventListener('click', showNotWorkedConfirmation);
+elements.cancelNotWorkedButton.addEventListener('click', hideNotWorkedConfirmation);
+elements.confirmNotWorkedButton.addEventListener('click', markEditedShiftNotWorked);
 elements.trashSection.addEventListener('toggle', () => {
     if (elements.trashSection.open) loadTrash();
 });
@@ -1273,6 +1281,8 @@ function openEditModal(shift, trigger, options = {}) {
         : t('js.app.updateValues');
     elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
     elements.duplicateShiftButton.classList.toggle('is-hidden', isNew);
+    elements.notWorkedButton.classList.toggle('is-hidden',
+        !window.flexbuddyNotWorked.canMarkNotWorked(editMode, editOriginalStatus));
     elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
     elements.editTimestamps.classList.toggle('is-hidden', isNew);
     if (!isNew) {
@@ -1283,6 +1293,7 @@ function openEditModal(shift, trigger, options = {}) {
     applyEditStatusRules(Boolean(options.status) && options.status !== editOriginalStatus);
     applyOfflineEditState();
     hideDeleteConfirmation();
+    hideNotWorkedConfirmation();
     hideMessage(elements.editError);
     elements.editModal.classList.remove('is-hidden');
     document.body.classList.add('modal-open');
@@ -1518,6 +1529,64 @@ async function saveEditedShift(event) {
     }
 }
 
+/** Asks before moving a block marked completed by mistake back to scheduled, naming every saved value it clears. */
+function showNotWorkedConfirmation() {
+    if (!editSnapshot) return;
+    const miles = new Intl.NumberFormat(appLocale(), {maximumFractionDigits: 1});
+    const items = window.flexbuddyNotWorked.clearedItems(editSnapshot,
+        {money: formatMoney, number: value => miles.format(Number(value))});
+    elements.notWorkedCleared.textContent = items.length
+        ? t('js.notWorked.clears', items.map(([key, ...args]) => t(key, ...args)).join(', '))
+        : t('js.notWorked.nothingElse');
+    hideMessage(elements.editError);
+    elements.editForm.querySelector('.form-actions').classList.add('is-hidden');
+    elements.notWorkedConfirm.classList.remove('is-hidden');
+    elements.cancelNotWorkedButton.focus();
+}
+
+function hideNotWorkedConfirmation() {
+    elements.editForm.querySelector('.form-actions').classList.remove('is-hidden');
+    elements.notWorkedConfirm.classList.add('is-hidden');
+}
+
+/**
+ * Moves the saved block back to scheduled. It names the version the dialog opened, so a block changed elsewhere is
+ * refused instead of corrected blind, and Undo puts every cleared value back.
+ */
+async function markEditedShiftNotWorked() {
+    const shiftId = editingShiftId;
+    const previous = editSnapshot;
+    if (shiftId === undefined || !previous) return;
+    hideMessage(elements.editError);
+    elements.confirmNotWorkedButton.disabled = true;
+    try {
+        const response = await apiFetch(`/shifts/${shiftId}/not-worked`, {
+            method: 'POST',
+            headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
+            body: JSON.stringify({expectedUpdatedAt: previous.updatedAt})
+        });
+        if (response.status === 409) {
+            hideNotWorkedConfirmation();
+            showMessage(elements.editError, t('js.notWorked.changedElsewhere'));
+            return;
+        }
+        if (!response.ok) throw new Error(await response.text() || t('js.notWorked.failed'));
+        closeEditModal();
+        showToast(t('js.notWorked.doneTitle'), t('js.notWorked.doneMessage', previous.station, formatDate(previous.date)), {
+            actionLabel: t('js.common.undo'),
+            duration: 8000,
+            onAction: () => undoEdit(shiftId, previous)
+        });
+        await loadStations();
+        await loadDashboard();
+    } catch (error) {
+        showMessage(elements.editError, error.message || t('js.notWorked.failed'));
+    } finally {
+        elements.confirmNotWorkedButton.disabled = false;
+        applyOfflineEditState();
+    }
+}
+
 function showDeleteConfirmation() {
     elements.editForm.querySelector('.form-actions').classList.add('is-hidden');
     elements.deleteConfirm.classList.remove('is-hidden');
@@ -1601,6 +1670,8 @@ async function undoEdit(id, previous) {
             basePay: previous.basePay,
             tips: previous.tips,
             miles: previous.miles,
+            // Puts the status back too, for an undo of a block moved back to scheduled.
+            status: previous.status,
             details: previous.details && previous.status !== 'SCHEDULED' ? {
                 actualStart: previous.status === 'COMPLETED' ? previous.details.actualStart : null,
                 actualEnd: previous.status === 'COMPLETED' ? previous.details.actualEnd : null,
@@ -1770,7 +1841,8 @@ function setSaving(saving) {
 /** Editing, deleting and duplicating a saved shift need a connection; adding one does not, because it can be queued. */
 function applyOfflineEditState() {
     const blocked = editMode === 'edit' && (window.flexbuddyPwa?.isOffline() ?? false);
-    [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton].forEach(button => {
+    [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton, elements.notWorkedButton,
+        elements.confirmNotWorkedButton].forEach(button => {
         button.disabled = blocked;
         button.title = blocked ? t('js.pwa.availableWhenOnline') : '';
     });
