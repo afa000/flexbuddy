@@ -2105,18 +2105,7 @@ async function loadStations() {
 
 function updateResultSummary(shifts) {
     const count = shifts.length;
-    let range = t('js.app.allDates');
-    if (filterState.from || filterState.to) {
-        range = `${filterState.from ? formatDate(filterState.from) : t('js.app.beginning')} – ${filterState.to ? formatDate(filterState.to) : t('js.app.today')}`;
-    } else if (count) {
-        const dates = shifts.map(shift => shift.date).sort();
-        range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
-    }
-    const station = filterState.station ? ` · ${filterState.station}` : '';
-    const expenseScope = filterState.station
-        ? t('js.app.expensesLinkedOnly')
-        : t('js.app.expensesByDate');
-    elements.resultsSummary.textContent = t('js.app.resultsSummary', tn(count, 'js.schedule.shifts'), range, station, expenseScope);
+    elements.resultsSummary.textContent = flexbuddyReports.scopeLine(filterState, shifts, formatDate);
     elements.activeFilterSummary.textContent = flexbuddyReports.summaryLine(shifts);
     elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
     elements.exportCsvButton.classList.toggle('is-disabled', count === 0);

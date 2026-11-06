@@ -60,5 +60,29 @@
         return shown ? `${blocks} · ${shown}${more}` : blocks;
     }
 
-    window.flexbuddyReports = {rangeLabel, reportParams, parseReportParams, summaryLine};
+    /**
+     * The line that says what the report covers: the period chosen, then the shifts found and their own dates, the
+     * station, which expenses count and what the export holds. The period comes first so a span of shift dates is
+     * never read as the period: All time counts every expense, whatever its date. Dates are YYYY-MM-DD strings that
+     * `formatDate` reads as written.
+     */
+    function scopeLine(filterState, shifts, formatDate) {
+        const {from, to, station} = filterState;
+        const span = (first, last) => first === last ? formatDate(first) : `${formatDate(first)} – ${formatDate(last)}`;
+        const period = from && to ? span(from, to)
+            : from ? t('js.reports.scopeFrom', formatDate(from))
+            : to ? t('js.reports.scopeUntil', formatDate(to))
+            : t('js.reports.scopeAllDates');
+        let found = t('js.reports.scopeNoShifts');
+        if (shifts.length) {
+            const dates = shifts.map(shift => shift.date).sort();
+            found = `${tn(shifts.length, 'js.schedule.shifts')}, ${span(dates[0], dates.at(-1))}`;
+        }
+        const expenses = station ? t('js.reports.scopeExpensesLinked')
+            : from || to ? t('js.reports.scopeExpensesInPeriod')
+            : t('js.reports.scopeExpensesAll');
+        return [period, found, station, expenses, t('js.reports.scopeExport')].filter(Boolean).join(' · ');
+    }
+
+    window.flexbuddyReports = {rangeLabel, reportParams, parseReportParams, summaryLine, scopeLine};
 })();
