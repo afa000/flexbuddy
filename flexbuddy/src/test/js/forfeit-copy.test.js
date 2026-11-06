@@ -21,13 +21,23 @@ test('the forfeit confirmations say FlexBuddy only records it and Amazon Flex is
         assert.match(english[key], /FlexBuddy/, key);
         assert.match(english[key], /Amazon Flex app/, key);
         assert.match(spanish(key), /FlexBuddy/, key);
-        assert.match(spanish(key), /app de Amazon Flex/, key);
+        assert.match(spanish(key), /aplicación de Amazon Flex/, key);
     }
+});
+
+test('the late confirmation also opens for a block that is already over, so its Amazon step is conditional', () => {
+    assert.match(englishMessages()['js.schedule.lateForfeitMessage'], /if the block is still on your Amazon Flex itinerary/);
+    assert.match(spanish('js.schedule.lateForfeitMessage'), /si el bloque sigue en su itinerario de Amazon Flex/);
 });
 
 test('the forfeit button records a status, like Mark cancelled', () => {
     const english = englishMessages();
     assert.strictEqual(english['js.schedule.forfeit'], 'Mark forfeited');
     assert.strictEqual(english['js.schedule.forfeitBlock'], 'Mark forfeited');
-    assert.strictEqual(spanish('js.schedule.forfeit'), 'Marcar como perdido');
+    assert.strictEqual(english['js.schedule.forfeitThisBlock'], 'Mark this block forfeited?');
+    assert.strictEqual(english['js.schedule.forfeitAnyway'], 'Record anyway');
+    for (const key of ['js.schedule.forfeit', 'js.schedule.forfeitBlock']) {
+        assert.strictEqual(spanish(key), 'Marcar como perdido', key);
+    }
+    assert.strictEqual(spanish('js.schedule.forfeitAnyway'), 'Registrar de todos modos');
 });
