@@ -6,10 +6,12 @@ const DATA_CACHE = 'flexbuddy-data';
 // Screenshots shared from another app wait here until the import screen reads them.
 const SHARE_CACHE = 'flexbuddy-share-inbox';
 const SHARE_MAX_AGE_MS = 10 * 60 * 1000;
+// The same limit as picking screenshots on the import screen (import-queue.js MAX_FILES).
+const SHARE_MAX_FILES = 10;
 
 const VERSIONED_ASSETS = [
     '/css/styles.css', '/js/errors.js', '/js/i18n.js', '/js/toast.js', '/js/charts.js', '/js/pwa.js', '/js/outbox.js', '/js/feedback.js', '/js/setup.js', '/js/reports.js', '/js/home.js', '/js/calendar.js',
-    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/payouts.js', '/js/standing.js', '/js/swipe.js', '/js/import-duplicates.js', '/js/import-queue.js', '/js/import-status.js', '/js/not-worked.js', '/js/expense-effect.js', '/js/quick-actions.js', '/js/app.js', '/js/account-sections.js', '/js/account.js', '/js/tax.js', '/js/password-toggle.js', '/js/two-factor.js'
+    '/js/schedule.js', '/js/evaluate.js', '/js/finish.js', '/js/payouts.js', '/js/standing.js', '/js/swipe.js', '/js/import-duplicates.js', '/js/import-queue.js', '/js/share-inbox.js', '/js/import-status.js', '/js/not-worked.js', '/js/expense-effect.js', '/js/quick-actions.js', '/js/app.js', '/js/account-sections.js', '/js/account.js', '/js/tax.js', '/js/password-toggle.js', '/js/two-factor.js'
 ].map(path => `${path}?v=${BUILD_ID}`);
 const STATIC_ASSETS = [
     '/manifest.webmanifest', '/offline.html', '/icons/icon-192.png', '/icons/icon-512.png',
@@ -71,24 +73,29 @@ self.addEventListener('fetch', event => {
     if (DATA_PATHS.some(pattern => pattern.test(path))) event.respondWith(networkFirstData(request));
 });
 
-/** Keeps the shared image on the device and opens the import screen, which reads and deletes it. */
+/**
+ * Keeps the shared images on the device and opens the import screen, which reads and deletes them (share-inbox.js).
+ * Android sends every image of a share as a "screenshot" field; up to ten are kept, each under /share-inbox/<id>/<n>.
+ */
 async function receiveSharedScreenshot(request) {
     const importUrl = shared => new URL(`/?screen=import&shared=${shared}`, self.location.origin).href;
     try {
         const form = await request.formData();
-        const file = form.getAll('screenshot').find(item => item instanceof File);
-        if (!file) return Response.redirect(importUrl('unavailable'), 303);
-        // Shares that were never read, such as one made while signed out, are dropped here too.
+        const files = form.getAll('screenshot').filter(item => item instanceof File);
+        if (!files.length) return Response.redirect(importUrl('unavailable'), 303);
+        if (files.length > SHARE_MAX_FILES) return Response.redirect(importUrl('too-many'), 303);
+        // Shares that were never read and are older than ten minutes are dropped here too.
         await removeStaleShares().catch(() => {});
         const id = crypto.randomUUID();
         const cache = await caches.open(SHARE_CACHE);
-        await cache.put(`/share-inbox/${id}`, new Response(file, {
+        const sharedAt = String(Date.now());
+        await Promise.all(files.map((file, index) => cache.put(`/share-inbox/${id}/${index}`, new Response(file, {
             headers: {
                 'Content-Type': file.type || 'application/octet-stream',
                 'X-File-Name': encodeURIComponent(file.name || 'shared-screenshot'),
-                'X-Shared-At': String(Date.now())
+                'X-Shared-At': sharedAt
             }
-        }));
+        }))));
         return Response.redirect(importUrl(id), 303);
     } catch (error) {
         return Response.redirect(importUrl('unavailable'), 303);

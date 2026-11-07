@@ -108,6 +108,16 @@ class PageControllerTest {
     }
 
     @Test
+    void theImportCardHasTheAndroidSharingTipHiddenUntilTheScriptShowsIt() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<small class=\"field-hint is-hidden\" id=\"shareTip\">On Android, you can also share screenshots to FlexBuddy from Photos.</small>",
+                "/js/share-inbox.js");
+    }
+
+    @Test
     void theImportCardTakesSeveralScreenshotsAndHasTheBatchList() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

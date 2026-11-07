@@ -432,6 +432,7 @@
                     <small class="field-hint" th:text="#{import.worksWith}">Works with a Schedule Details screenshot of a block you accepted, or an Earnings screenshot of a block you worked.</small>
                     <small class="field-hint" th:text="#{import.notOffersList}">An offers list with no block selected can't be imported.</small>
                     <small class="field-hint" th:text="#{import.upToTen}">You can choose up to 10 at once.</small>
+                    <small class="field-hint is-hidden" id="shareTip" th:text="#{import.shareFromPhotos}">On Android, you can also share screenshots to FlexBuddy from Photos.</small>
                 </div>
 
                 <section class="import-queue is-hidden" id="importQueue" th:aria-label="#{import.screenshotsInThisImport}">
@@ -947,6 +948,7 @@
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-queue.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/share-inbox.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/not-worked.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/expense-effect.js(v=${buildId})}" defer></script>
