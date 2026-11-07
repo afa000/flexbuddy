@@ -3039,8 +3039,9 @@ document.addEventListener('flexbuddy:cache-ready', () => {
     loadDashboard();
 });
 updateThemeToggle(document.documentElement.dataset.theme);
-// Sharing to FlexBuddy from Photos needs the Android app or an installed web app, so only Android hears about it.
-elements.shareTip.classList.toggle('is-hidden', !/Android/i.test(navigator.userAgent));
+// Sharing to FlexBuddy from Photos needs the Android app or the installed web app, so only they mention it.
+elements.shareTip.classList.toggle('is-hidden', !/Android/i.test(navigator.userAgent)
+    || !window.matchMedia('(display-mode: standalone)').matches);
 initializeFilters();
 openInitialScreen();
 greetNewDriver();

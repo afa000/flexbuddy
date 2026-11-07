@@ -75,15 +75,24 @@ test('a share older than ten minutes is deleted, not opened', async () => {
     assert.strictEqual(store.entries.size, 0);
 });
 
-test('after sign-in the newest waiting share opens, and only it', async () => {
+test('after sign-in the newest waiting share opens, and the older ones are dropped', async () => {
+    // Shared twice while signed out: usually the same screenshots again; the older one must not open later.
     const store = fakeCaches();
     await share(store.cache, A, ['earlier.png'], NOW - 5 * MINUTE);
     await share(store.cache, B, ['latest 1.png', 'latest 2.png'], NOW - MINUTE);
     const inbox = load(store);
 
     assert.deepStrictEqual([...(await inbox.takeNewest(NOW)).map(file => file.name)], ['latest 1.png', 'latest 2.png']);
-    assert.deepStrictEqual([...(await inbox.takeNewest(NOW)).map(file => file.name)], ['earlier.png']);
+    assert.strictEqual(store.entries.size, 0);
     assert.strictEqual((await inbox.takeNewest(NOW)).length, 0);
+});
+
+test('taking a share by its id drops any other share still waiting', async () => {
+    const store = fakeCaches();
+    await share(store.cache, A, ['signed out.png'], NOW - 3 * MINUTE);
+    await share(store.cache, B, ['now.png'], NOW);
+    assert.deepStrictEqual([...(await load(store).take(B, NOW)).map(file => file.name)], ['now.png']);
+    assert.strictEqual(store.entries.size, 0);
 });
 
 test('an id that is not a share id, or no Cache Storage at all, opens nothing', async () => {

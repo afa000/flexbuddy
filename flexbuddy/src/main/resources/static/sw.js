@@ -79,25 +79,32 @@ self.addEventListener('fetch', event => {
  */
 async function receiveSharedScreenshot(request) {
     const importUrl = shared => new URL(`/?screen=import&shared=${shared}`, self.location.origin).href;
+    const id = crypto.randomUUID();
+    let cache;
+    let files = [];
     try {
         const form = await request.formData();
-        const files = form.getAll('screenshot').filter(item => item instanceof File);
+        files = form.getAll('screenshot').filter(item => item instanceof File);
         if (!files.length) return Response.redirect(importUrl('unavailable'), 303);
         if (files.length > SHARE_MAX_FILES) return Response.redirect(importUrl('too-many'), 303);
         // Shares that were never read and are older than ten minutes are dropped here too.
         await removeStaleShares().catch(() => {});
-        const id = crypto.randomUUID();
-        const cache = await caches.open(SHARE_CACHE);
+        cache = await caches.open(SHARE_CACHE);
         const sharedAt = String(Date.now());
-        await Promise.all(files.map((file, index) => cache.put(`/share-inbox/${id}/${index}`, new Response(file, {
-            headers: {
-                'Content-Type': file.type || 'application/octet-stream',
-                'X-File-Name': encodeURIComponent(file.name || 'shared-screenshot'),
-                'X-Shared-At': sharedAt
-            }
-        }))));
+        // Every save is waited for, even after one fails, so the clean-up below never races a save still running.
+        const saved = await Promise.allSettled(files.map((file, index) => cache.put(`/share-inbox/${id}/${index}`,
+            new Response(file, {
+                headers: {
+                    'Content-Type': file.type || 'application/octet-stream',
+                    'X-File-Name': encodeURIComponent(file.name || 'shared-screenshot'),
+                    'X-Shared-At': sharedAt
+                }
+            }))));
+        if (saved.some(result => result.status === 'rejected')) throw new Error('A shared screenshot could not be kept.');
         return Response.redirect(importUrl(id), 303);
     } catch (error) {
+        // A part of a share must never open later as if it were the whole share.
+        if (cache) await Promise.all(files.map((file, index) => cache.delete(`/share-inbox/${id}/${index}`))).catch(() => {});
         return Response.redirect(importUrl('unavailable'), 303);
     }
 }

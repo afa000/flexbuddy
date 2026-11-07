@@ -39,8 +39,16 @@
         return [...shares.values()].sort((first, second) => second.sharedAt - first.sharedAt);
     }
 
-    /** Reads every file of a share, in the order it was shared, and deletes them so it never opens twice. */
-    async function readShare(cache, share) {
+    /**
+     * Reads every file of a share, in the order it was shared, and deletes them so it never opens twice. The other
+     * waiting shares are deleted too: they are usually the same screenshots shared again while the first one waited,
+     * and must not open on some later visit.
+     */
+    async function readShare(cache, share, waiting) {
+        for (const other of waiting) {
+            if (other === share) continue;
+            for (const {request} of other.entries) await cache.delete(request);
+        }
         const files = [];
         for (const {request, response} of share.entries.sort((first, second) => first.index - second.index)) {
             await cache.delete(request);
@@ -57,20 +65,21 @@
         const cache = await openInbox();
         if (!cache) return [];
         try {
-            const share = (await waitingShares(cache, now)).find(entry => entry.id === String(id).toLowerCase());
-            return share ? await readShare(cache, share) : [];
+            const waiting = await waitingShares(cache, now);
+            const share = waiting.find(entry => entry.id === String(id).toLowerCase());
+            return share ? await readShare(cache, share, waiting) : [];
         } catch {
             return [];
         }
     }
 
-    /** The newest waiting share, taken out of the inbox: one made while signed out, opened after sign-in. */
+    /** The newest waiting share, taken out of the inbox (one made while signed out, opened after sign-in). */
     async function takeNewest(now = Date.now()) {
         const cache = await openInbox();
         if (!cache) return [];
         try {
-            const [newest] = await waitingShares(cache, now);
-            return newest ? await readShare(cache, newest) : [];
+            const waiting = await waitingShares(cache, now);
+            return waiting.length ? await readShare(cache, waiting[0], waiting) : [];
         } catch {
             return [];
         }
