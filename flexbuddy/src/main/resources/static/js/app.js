@@ -45,6 +45,13 @@ const elements = {
     miles: document.querySelector('#miles'),
     saveButton: document.querySelector('#saveButton'),
     resetButton: document.querySelector('#resetButton'),
+    skipImportButton: document.querySelector('#skipImportButton'),
+    importQueue: document.querySelector('#importQueue'),
+    importQueueStatus: document.querySelector('#importQueueStatus'),
+    importQueueList: document.querySelector('#importQueueList'),
+    resumeQueueButton: document.querySelector('#resumeQueueButton'),
+    stopQueueButton: document.querySelector('#stopQueueButton'),
+    finishQueueButton: document.querySelector('#finishQueueButton'),
     saveError: document.querySelector('#saveError'),
     totalEarnings: document.querySelector('#totalEarnings'),
     totalShifts: document.querySelector('#totalShifts'),
@@ -218,6 +225,16 @@ let editOriginalStatus;
 let importCandidate;
 let importWarnings = [];
 let importDuplicateEdited = false;
+// The single screenshot under review gets its own request ids, so a repeated save is answered with the first one.
+let importRequestId;
+let importStatusRequestId;
+/**
+ * Several screenshots picked at once (import-queue.js): {items, current, paused, reading, abort}. `current` is the
+ * number of the file in the review form; `reading` is the file being read now, one at a time.
+ */
+let importBatch;
+/** True while an import save is on its way, so Skip, Stop or Review can't move the form out from under it. */
+let importSaveInFlight = false;
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 const previewFields = {
@@ -292,12 +309,25 @@ elements.homeLink.addEventListener('click', event => {
 });
 elements.dashboardNavButton.addEventListener('click', () => showDashboard());
 elements.dropZone.addEventListener('click', openFilePicker);
-elements.screenshotInput.addEventListener('change', event => {
-    const [file] = event.target.files;
-    if (file) processScreenshot(file);
+elements.screenshotInput.addEventListener('change', event => pickScreenshots([...event.target.files]));
+// In a batch, the card's remove button skips the file under review and Cancel stops the whole import.
+elements.removeFileButton.addEventListener('click', () => (importBatch ? skipBatchItem() : resetImport()));
+elements.cancelImportButton.addEventListener('click', () => (importBatch ? stopBatch() : resetImport()));
+elements.skipImportButton.addEventListener('click', skipBatchItem);
+elements.stopQueueButton.addEventListener('click', stopBatch);
+elements.resumeQueueButton.addEventListener('click', resumeBatch);
+elements.finishQueueButton.addEventListener('click', finishBatch);
+elements.importQueueList.addEventListener('click', handleQueueRowAction);
+// The batch check compares the form's current values, so it follows every edit of the block's station, day and times.
+[elements.station, elements.date, elements.startTime, elements.endTime].forEach(input =>
+    input.addEventListener('input', () => {
+        if (currentBatchItem()) applyImportStatusRules();
+    }));
+window.addEventListener('beforeunload', event => {
+    if (!importBatch || !window.flexbuddyImportQueue.hasUnsaved(importBatch.items)) return;
+    event.preventDefault();
+    event.returnValue = '';
 });
-elements.removeFileButton.addEventListener('click', resetImport);
-elements.cancelImportButton.addEventListener('click', resetImport);
 elements.chooseAgainButton.addEventListener('click', () => {
     resetImport();
     // iOS only opens the picker from inside the tap itself, so nothing may be awaited before this.
@@ -456,12 +486,33 @@ for (const eventName of ['dragleave', 'drop']) {
     });
 }
 
-elements.dropZone.addEventListener('drop', event => {
-    const [file] = event.dataTransfer.files;
-    if (file) processScreenshot(file);
-});
+elements.dropZone.addEventListener('drop', event => pickScreenshots([...event.dataTransfer.files]));
+
+/** One file keeps the single-screenshot flow; two to ten start a batch, reviewed one at a time. */
+function pickScreenshots(files) {
+    if (files.length === 0) return;
+    if (refuseNewPick()) {
+        elements.screenshotInput.value = '';
+        return;
+    }
+    // A finished batch is cleared first, so its list never sits beside another screenshot's review.
+    if (importBatch) resetImport();
+    if (files.length === 1) processScreenshot(files[0]);
+    else startBatch(files);
+}
+
+/**
+ * True, with a message, while an import still has files to read or review or a save is on its way: a new pick then
+ * would put another screenshot in the form that belongs to the file under review, or drop the batch mid-save.
+ */
+function refuseNewPick() {
+    const busy = importSaveInFlight || (importBatch && !window.flexbuddyImportQueue.isFinished(importBatch.items));
+    if (busy) showMessage(elements.uploadError, t('js.importQueue.finishFirst'));
+    return Boolean(busy);
+}
 
 function openFilePicker() {
+    if (refuseNewPick()) return;
     elements.screenshotInput.click();
 }
 
@@ -588,9 +639,6 @@ async function processScreenshot(file) {
     showSelectedFile(file);
     setProcessing(true);
 
-    const formData = new FormData();
-    formData.append('screenshot', file);
-
     const abort = new AbortController();
     importAbort = abort;
     let timedOut = false;
@@ -600,12 +648,7 @@ async function processScreenshot(file) {
     }, IMPORT_TIMEOUT_MS);
 
     try {
-        const response = await apiFetch('/shifts/import-preview', {
-            method: 'POST',
-            headers: csrfHeaders(),
-            body: formData,
-            signal: abort.signal
-        });
+        const response = await requestPreview(file, abort.signal);
 
         if (!response.ok) {
             throw new Error(await response.text() || t('js.app.screenshotNotProcessed'));
@@ -613,6 +656,8 @@ async function processScreenshot(file) {
 
         const preview = await response.json();
         if (importAbort !== abort) return;
+        importRequestId = crypto.randomUUID();
+        importStatusRequestId = crypto.randomUUID();
         populatePreview(preview);
     } catch (error) {
         // A cancel or a newer pick already reset the screen, and this answer must not touch it.
@@ -630,6 +675,13 @@ async function processScreenshot(file) {
             setProcessing(false);
         }
     }
+}
+
+/** Sends one screenshot to be read; nothing is saved. The server reads one screenshot at a time for everyone. */
+function requestPreview(file, signal) {
+    const formData = new FormData();
+    formData.append('screenshot', file);
+    return apiFetch('/shifts/import-preview', {method: 'POST', headers: csrfHeaders(), body: formData, signal});
 }
 
 function cancelImportRequest() {
@@ -699,8 +751,28 @@ function applyImportStatusRules() {
     elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
 }
 
+/**
+ * The server's notices for this screenshot, unless another file of this batch already saved the same block: the
+ * server read this file before that save, so the batch's own check replaces its answer.
+ */
 function importNotices() {
+    const item = currentBatchItem();
+    const inBatch = item && window.flexbuddyImportQueue.savedMatch(importFormBlock(), importBatch.items, item);
+    if (inBatch) {
+        return inBatch.kind === 'SCHEDULED_MATCH' ? {logged: undefined, schedule: inBatch} : {logged: inBatch, schedule: undefined};
+    }
     return window.flexbuddyImportDuplicates.choose(importCandidate, elements.importStatus.value, importDuplicateEdited);
+}
+
+/** The block as the review form holds it now. */
+function importFormBlock() {
+    return {
+        station: elements.station.value.trim(),
+        date: elements.date.value,
+        startTime: elements.startTime.value,
+        endTime: elements.endTime.value,
+        status: elements.importStatus.value
+    };
 }
 
 function renderImportNotices() {
@@ -738,28 +810,50 @@ async function openDuplicateShift() {
 async function completeScheduledShift() {
     hideMessage(elements.saveError);
     const shiftId = elements.scheduleMatchNotice.dataset.shiftId;
-    if (!shiftId || !elements.previewForm.reportValidity()) return;
+    // Add shift and Complete never both go out for one screenshot: that would count its pay twice.
+    if (!shiftId || importSaveInFlight || elements.completeScheduledButton.disabled
+        || !elements.previewForm.reportValidity()) return;
+    const batchItem = currentBatchItem();
+    const pay = {basePay: Number(elements.basePay.value), tips: Number(elements.tips.value)};
     elements.completeScheduledButton.disabled = true;
+    importSaveInFlight = true;
+    let answered = false;
     try {
         const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}/status`, {
             method: 'PATCH',
-            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            headers: retryHeaders(batchItem ? batchItem.statusRequestId : importStatusRequestId,
+                {'Content-Type': 'application/json'}),
             body: JSON.stringify({
                 status: 'COMPLETED',
-                basePay: Number(elements.basePay.value),
-                tips: Number(elements.tips.value),
+                ...pay,
                 miles: elements.miles.value === '' ? null : Number(elements.miles.value)
             })
         });
+        answered = true;
         if (!response.ok) throw new Error(await response.text() || t('js.app.scheduledNotCompleted'));
+        const completed = await response.json();
+        // A repeat is answered with the block as the first copy left it; a pay edited since then wasn't applied.
+        const replayed = Number(completed.basePay) !== pay.basePay || Number(completed.tips) !== pay.tips;
+        if (batchItem) {
+            window.flexbuddyImportQueue.noteCompleted(importBatch.items, completed.id);
+            recordBatchSave(batchItem, completed, 'completed', replayed);
+            return;
+        }
         resetImport();
-        showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
+        if (replayed) showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+        else showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
         await loadStations();
         await loadDashboard();
         showDashboard();
     } catch (error) {
+        if (batchItem && !answered) {
+            // It may have been completed: the row says so, and no other file offers to complete the block again.
+            batchItem.uncertain = true;
+            window.flexbuddyImportQueue.noteCompleted(importBatch.items, Number(shiftId));
+        }
         showMessage(elements.saveError, error.message || t('js.app.scheduledNotCompleted'));
     } finally {
+        importSaveInFlight = false;
         elements.completeScheduledButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
     }
 }
@@ -842,7 +936,8 @@ async function saveShift(event) {
     event.preventDefault();
     hideMessage(elements.saveError);
 
-    if (!elements.previewForm.reportValidity()) return;
+    // A second tap while a save is on its way does nothing; the request id covers a retry after it.
+    if (importSaveInFlight || elements.saveButton.disabled || !elements.previewForm.reportValidity()) return;
 
     const shift = {
         station: elements.station.value.trim(),
@@ -854,23 +949,52 @@ async function saveShift(event) {
         miles: elements.miles.value === '' ? null : Number(elements.miles.value),
         status: elements.importStatus.value
     };
+    const batchItem = currentBatchItem();
 
     setSaving(true);
+    importSaveInFlight = true;
 
+    let answered = false;
     try {
-        const response = await apiFetch('/shifts', {
+        const send = () => apiFetch('/shifts', {
             method: 'POST',
-            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            headers: retryHeaders(batchItem ? batchItem.requestId : importRequestId, {'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
+        let response = await send();
+        answered = true;
 
-        if (!response.ok) {
+        // A 409 DUPLICATE is a second copy of this same save racing the first, which landed. Sent once more with the
+        // same request id, it is answered with that first block.
+        let delivered = !response.ok && await isDuplicate(response);
+        if (delivered) {
+            const again = await send();
+            if (again.ok) {
+                response = again;
+                delivered = false;
+            }
+        }
+        if (!response.ok && !delivered) {
             const message = await response.text();
             throw new Error(message || t('js.app.saveFailedCheck'));
+        }
+        const saved = delivered ? undefined : await response.json();
+        const replayed = saved && !window.flexbuddyImportQueue.sameAsSent(shift, saved);
+
+        if (batchItem) {
+            recordBatchSave(batchItem, saved ?? shift, 'added', replayed);
+            return;
         }
 
         const scheduled = shift.status === 'SCHEDULED';
         resetImport();
+        if (replayed) {
+            showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+            await loadStations();
+            await loadDashboard();
+            showDashboard();
+            return;
+        }
         showToast(scheduled ? t('js.app.shiftScheduled') : t('js.app.shiftAdded'),
             scheduled ? t('js.app.shiftScheduledMessage') : t('js.app.shiftAddedMessage'));
         await loadStations();
@@ -878,8 +1002,11 @@ async function saveShift(event) {
         if (scheduled) showScheduleScreen();
         else showDashboard();
     } catch (error) {
+        // With no answer the save may still have landed; a later Skip or Stop says so instead of "Skipped".
+        if (batchItem && !answered) batchItem.uncertain = true;
         showMessage(elements.saveError, error.message || t('js.app.saveFailed'));
     } finally {
+        importSaveInFlight = false;
         setSaving(false);
     }
 }
@@ -1825,16 +1952,24 @@ function trapFocus(container, event) {
 
 function resetImport() {
     cancelImportRequest();
+    endBatch();
+    clearImportReview();
+    importRequestId = undefined;
+    importStatusRequestId = undefined;
+    elements.screenshotInput.value = '';
+    elements.dropZone.classList.remove('is-hidden');
+}
+
+/** Empties the file card and the review form, ready for another screenshot. */
+function clearImportReview() {
     setProcessing(false);
     if (selectedFileUrl) {
         URL.revokeObjectURL(selectedFileUrl);
         selectedFileUrl = undefined;
     }
-    elements.screenshotInput.value = '';
     elements.previewForm.reset();
     elements.fileCard.classList.add('is-hidden');
     elements.fileActions.classList.add('is-hidden');
-    elements.dropZone.classList.remove('is-hidden');
     elements.previewForm.classList.add('is-hidden');
     elements.emptyPreview.classList.remove('is-hidden');
     elements.ocrDetails.classList.add('is-hidden');
@@ -1859,6 +1994,295 @@ function resetImport() {
     elements.scheduleMatchNotice.classList.add('is-hidden');
     elements.duplicateNotice.classList.add('is-hidden');
     setSaving(false);
+}
+
+// ===== Several screenshots at once: import-queue.js decides what each row says and which file comes next =====
+
+/** The batch file in the review form, while it is still unsaved. */
+function currentBatchItem() {
+    if (!importBatch || importBatch.current === undefined) return undefined;
+    const item = importBatch.items.find(entry => entry.number === importBatch.current);
+    return item?.state === 'ready' ? item : undefined;
+}
+
+async function startBatch(files) {
+    const queue = window.flexbuddyImportQueue;
+    hideMessage(elements.uploadError);
+    if (files.length > queue.MAX_FILES) {
+        elements.screenshotInput.value = '';
+        showMessage(elements.uploadError, t('js.importQueue.tooMany'));
+        return;
+    }
+    resetImport();
+    elements.dropZone.classList.add('is-hidden');
+    // Files the server would refuse are never hashed or sent.
+    const signatures = await Promise.all(files.map(file => (queue.fileProblemKey(file) ? undefined : fileSignature(file))));
+    importBatch = {items: queue.createItems(files, signatures, () => crypto.randomUUID()).items, current: undefined, paused: false};
+    renderBatch();
+    readNextInBatch();
+}
+
+/** Identifies a file's bytes, so the same screenshot picked twice is read once. */
+async function fileSignature(file) {
+    try {
+        const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+        return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    } catch {
+        return `${file.name}|${file.size}|${file.lastModified}`;
+    }
+}
+
+/**
+ * Reads the next waiting file, then the one after, one at a time. A file the server can't read is marked and the next
+ * one is read; a busy server, the time limit or a lost connection pauses reading until the driver taps Continue
+ * reading. Reading never saves anything.
+ */
+async function readNextInBatch() {
+    const batch = importBatch;
+    const queue = window.flexbuddyImportQueue;
+    if (!batch || batch.reading || batch.paused) return;
+    const item = queue.nextToRead(batch.items);
+    if (!item) {
+        renderBatch();
+        return;
+    }
+    if (window.flexbuddyPwa?.isOffline()) {
+        batch.paused = true;
+        renderBatch();
+        return;
+    }
+    item.state = 'reading';
+    batch.reading = item;
+    const abort = new AbortController();
+    batch.abort = abort;
+    if (batch.current === undefined) showBatchIdle();
+    renderBatch();
+
+    let timedOut = false;
+    let status = 0;
+    const timer = setTimeout(() => {
+        timedOut = true;
+        abort.abort();
+    }, IMPORT_TIMEOUT_MS);
+    try {
+        const response = await requestPreview(item.file, abort.signal);
+        status = response.status;
+        if (!response.ok) throw new Error(await response.text() || t('js.app.screenshotNotProcessed'));
+        const preview = await response.json();
+        if (!preview.shifts?.[0]) {
+            status = 400;
+            throw new Error(t('js.app.noShiftDetails'));
+        }
+        // Stopped, or the whole import cleared, while this answer was on its way.
+        if (importBatch !== batch || item.state !== 'reading') return;
+        item.preview = preview;
+        item.state = 'ready';
+    } catch (error) {
+        if (importBatch !== batch || item.state !== 'reading') return;
+        const failure = queue.readFailure(timedOut ? 0 : status);
+        Object.assign(item, {
+            state: 'failed',
+            retry: failure.retry,
+            error: timedOut ? t('js.app.screenshotTimedOut') : error.message || t('js.app.screenshotNotProcessed')
+        });
+        if (failure.pause) batch.paused = true;
+    } finally {
+        clearTimeout(timer);
+        if (batch.reading === item) {
+            batch.reading = undefined;
+            batch.abort = undefined;
+        }
+    }
+    if (batch.current === undefined) openNextBatchReview(item.number - 1);
+    else renderBatch();
+    readNextInBatch();
+}
+
+/** Opens the next file read and not yet saved after file `after`, or shows the file being read while none is. */
+function openNextBatchReview(after = 0) {
+    const batch = importBatch;
+    const next = window.flexbuddyImportQueue.nextToReview(batch.items, after);
+    batch.current = next?.number;
+    if (next) showBatchReview(next);
+    else showBatchIdle();
+    renderBatch();
+}
+
+function showBatchReview(item) {
+    clearImportReview();
+    showSelectedFile(item.file);
+    elements.fileActions.classList.add('is-hidden');
+    populatePreview(item.preview);
+}
+
+function showBatchIdle() {
+    clearImportReview();
+    const reading = importBatch?.reading;
+    if (!reading) return;
+    showSelectedFile(reading.file);
+    elements.fileActions.classList.add('is-hidden');
+    setProcessing(true);
+}
+
+/** Marks a file saved with the block the server answered with, refreshes the totals, and opens the next file. */
+function recordBatchSave(item, block, kind, changed = false) {
+    item.state = 'saved';
+    item.uncertain = false;
+    item.saved = {
+        shiftId: block.id, status: block.status, station: block.station, date: block.date,
+        startTime: trimTime(block.startTime), endTime: trimTime(block.endTime), kind, changed
+    };
+    if (changed) showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+    loadStations().then(loadDashboard).catch(() => {});
+    openNextBatchReview(item.number);
+    scrollToReview();
+}
+
+/** On a phone the review form is below the list, so moving to the next file brings it into view. */
+function scrollToReview() {
+    if (!currentBatchItem() || !window.matchMedia('(max-width: 900px)').matches) return;
+    elements.previewForm.closest('.preview-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function skipBatchItem() {
+    const item = currentBatchItem();
+    if (!item || importSaveInFlight) return;
+    item.state = 'skipped';
+    openNextBatchReview(item.number);
+    scrollToReview();
+}
+
+function reviewBatchItem(item) {
+    if (importSaveInFlight || item.state !== 'ready') return;
+    importBatch.current = item.number;
+    showBatchReview(item);
+    renderBatch();
+    scrollToReview();
+}
+
+function retryBatchItem(item) {
+    if (item.state !== 'failed' || !item.retry) return;
+    Object.assign(item, {state: 'waiting', error: undefined, retry: undefined});
+    importBatch.paused = false;
+    renderBatch();
+    readNextInBatch();
+}
+
+function resumeBatch() {
+    if (!importBatch) return;
+    importBatch.paused = false;
+    renderBatch();
+    readNextInBatch();
+}
+
+/** Stops reading and reviewing; the blocks already saved stay saved and listed. */
+function stopBatch() {
+    const batch = importBatch;
+    if (!batch || importSaveInFlight) return;
+    window.flexbuddyImportQueue.stop(batch.items);
+    const abort = batch.abort;
+    Object.assign(batch, {reading: undefined, abort: undefined, current: undefined, paused: false});
+    abort?.abort();
+    clearImportReview();
+    renderBatch();
+}
+
+function finishBatch() {
+    resetImport();
+    showDashboard();
+}
+
+/** Forgets the batch; called by resetImport, so every way of starting over also ends a batch. */
+function endBatch() {
+    if (!importBatch) return;
+    const abort = importBatch.abort;
+    importBatch = undefined;
+    abort?.abort();
+    renderBatch();
+}
+
+function handleQueueRowAction(event) {
+    const button = event.target.closest('button[data-action]');
+    const item = button && importBatch?.items.find(entry => entry.number === Number(button.dataset.number));
+    if (!item) return;
+    if (button.dataset.action === 'review') reviewBatchItem(item);
+    else if (button.dataset.action === 'retry') retryBatchItem(item);
+    else if (button.dataset.action === 'open') openBatchShift(item.saved.shiftId, button);
+}
+
+async function openBatchShift(shiftId, trigger) {
+    hideMessage(elements.uploadError);
+    try {
+        const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}`);
+        if (!response.ok) throw new Error(await response.text() || t('js.app.requestFailed'));
+        openEditModal(await response.json(), trigger);
+    } catch (error) {
+        showMessage(elements.uploadError, error.message || t('js.app.requestFailed'));
+    }
+}
+
+const QUEUE_ACTION_TEXT = {review: 'js.importQueue.review', retry: 'js.importQueue.tryAgain', open: 'js.importQueue.open'};
+const QUEUE_ACTION_LABEL = {
+    review: 'js.importQueue.reviewLabel', retry: 'js.importQueue.tryAgainLabel', open: 'js.importQueue.openLabel'
+};
+
+function renderBatch() {
+    const batch = importBatch;
+    const queue = window.flexbuddyImportQueue;
+    elements.importQueue.classList.toggle('is-hidden', !batch);
+    elements.resetButton.classList.toggle('is-hidden', Boolean(batch));
+    elements.skipImportButton.classList.toggle('is-hidden', !batch);
+    if (!batch) {
+        elements.importQueueList.replaceChildren();
+        elements.importQueueStatus.textContent = '';
+        return;
+    }
+    const finished = queue.isFinished(batch.items);
+    elements.importQueueStatus.textContent = queue.headline(batch.items, batch.current, batch.paused);
+    elements.resumeQueueButton.classList.toggle('is-hidden', !batch.paused || !queue.nextToRead(batch.items));
+    elements.stopQueueButton.classList.toggle('is-hidden', finished);
+    elements.finishQueueButton.classList.toggle('is-hidden', !finished);
+    // Rows are rebuilt on every change, so a focused row button is found again in the new rows.
+    const focused = elements.importQueueList.contains(document.activeElement) ? document.activeElement.dataset : undefined;
+    elements.importQueueList.replaceChildren(...batch.items.map(item => queueRow(item, batch.current)));
+    if (focused) {
+        elements.importQueueList.querySelector(`button[data-action="${focused.action}"][data-number="${focused.number}"]`)
+            ?.focus();
+    }
+}
+
+function queueRow(item, current) {
+    const queue = window.flexbuddyImportQueue;
+    const row = document.createElement('li');
+    row.className = 'import-queue-row';
+    row.dataset.state = item.state;
+    if (item.state === 'ready' && item.number === current) {
+        row.classList.add('is-current');
+        row.setAttribute('aria-current', 'step');
+    }
+    const number = document.createElement('span');
+    number.className = 'import-queue-number';
+    number.textContent = item.number;
+    const file = document.createElement('div');
+    file.className = 'import-queue-file';
+    const name = document.createElement('strong');
+    name.textContent = item.name;
+    name.title = item.name;
+    const status = document.createElement('small');
+    status.textContent = queue.rowText(item, current, formatShortDay);
+    file.append(name, status);
+    row.append(number, file);
+    for (const action of queue.rowActions(item, current)) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'text-button';
+        button.dataset.action = action;
+        button.dataset.number = item.number;
+        button.textContent = t(QUEUE_ACTION_TEXT[action]);
+        button.setAttribute('aria-label', t(QUEUE_ACTION_LABEL[action], item.number));
+        row.append(button);
+    }
+    return row;
 }
 
 function setProcessing(processing) {

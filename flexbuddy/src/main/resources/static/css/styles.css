@@ -945,6 +945,30 @@ h1 {
 .file-actions .secondary-button { width: 100%; min-height: 44px; }
 .processing-row .text-button { margin-left: auto; color: var(--error); }
 
+/* Several screenshots at once: one compact row per file, so ten of them still leave Step 2 within reach on a phone. */
+#importScreen .preview-panel { scroll-margin-top: 100px; }
+.import-queue { margin: 12px 0; padding: 12px; background: var(--surface-deep); border: 1px solid var(--line); border-radius: 8px; }
+.import-queue-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.import-queue-heading strong { font-size: 14px; }
+.import-queue-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.import-queue-actions .text-button { min-height: 40px; }
+#stopQueueButton { color: var(--error); }
+.import-queue-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.import-queue-row { min-height: 44px; padding: 6px 0; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; border-top: 1px solid var(--line-soft); }
+.import-queue-row:first-child { border-top: 0; }
+.import-queue-number { color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; }
+.import-queue-file { min-width: 0; }
+.import-queue-file strong,
+.import-queue-file small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.import-queue-file strong { font-size: 13px; white-space: nowrap; }
+.import-queue-file small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.import-queue-row.is-current { margin: 0 -8px; padding: 6px 8px; background: var(--primary-soft); border-radius: 6px; }
+.import-queue-row.is-current .import-queue-file small,
+.import-queue-row[data-state="saved"] .import-queue-file small { color: var(--cyan); font-weight: 700; }
+.import-queue-row[data-state="failed"] .import-queue-file small,
+.import-queue-row[data-state="invalid"] .import-queue-file small { color: var(--error); }
+.import-queue-row .text-button { min-height: 40px; padding: 0 4px; }
+
 .spinner {
     width: 14px;
     height: 14px;
