@@ -491,11 +491,28 @@ elements.dropZone.addEventListener('drop', event => pickScreenshots([...event.da
 /** One file keeps the single-screenshot flow; two to ten start a batch, reviewed one at a time. */
 function pickScreenshots(files) {
     if (files.length === 0) return;
+    if (refuseNewPick()) {
+        elements.screenshotInput.value = '';
+        return;
+    }
+    // A finished batch is cleared first, so its list never sits beside another screenshot's review.
+    if (importBatch) resetImport();
     if (files.length === 1) processScreenshot(files[0]);
     else startBatch(files);
 }
 
+/**
+ * True, with a message, while an import still has files to read or review or a save is on its way: a new pick then
+ * would put another screenshot in the form that belongs to the file under review, or drop the batch mid-save.
+ */
+function refuseNewPick() {
+    const busy = importSaveInFlight || (importBatch && !window.flexbuddyImportQueue.isFinished(importBatch.items));
+    if (busy) showMessage(elements.uploadError, t('js.importQueue.finishFirst'));
+    return Boolean(busy);
+}
+
 function openFilePicker() {
+    if (refuseNewPick()) return;
     elements.screenshotInput.click();
 }
 
@@ -793,10 +810,14 @@ async function openDuplicateShift() {
 async function completeScheduledShift() {
     hideMessage(elements.saveError);
     const shiftId = elements.scheduleMatchNotice.dataset.shiftId;
-    if (!shiftId || elements.completeScheduledButton.disabled || !elements.previewForm.reportValidity()) return;
+    // Add shift and Complete never both go out for one screenshot: that would count its pay twice.
+    if (!shiftId || importSaveInFlight || elements.completeScheduledButton.disabled
+        || !elements.previewForm.reportValidity()) return;
     const batchItem = currentBatchItem();
+    const pay = {basePay: Number(elements.basePay.value), tips: Number(elements.tips.value)};
     elements.completeScheduledButton.disabled = true;
     importSaveInFlight = true;
+    let answered = false;
     try {
         const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}/status`, {
             method: 'PATCH',
@@ -804,24 +825,32 @@ async function completeScheduledShift() {
                 {'Content-Type': 'application/json'}),
             body: JSON.stringify({
                 status: 'COMPLETED',
-                basePay: Number(elements.basePay.value),
-                tips: Number(elements.tips.value),
+                ...pay,
                 miles: elements.miles.value === '' ? null : Number(elements.miles.value)
             })
         });
+        answered = true;
         if (!response.ok) throw new Error(await response.text() || t('js.app.scheduledNotCompleted'));
+        const completed = await response.json();
+        // A repeat is answered with the block as the first copy left it; a pay edited since then wasn't applied.
+        const replayed = Number(completed.basePay) !== pay.basePay || Number(completed.tips) !== pay.tips;
         if (batchItem) {
-            const completed = await response.json();
             window.flexbuddyImportQueue.noteCompleted(importBatch.items, completed.id);
-            recordBatchSave(batchItem, completed, 'completed');
+            recordBatchSave(batchItem, completed, 'completed', replayed);
             return;
         }
         resetImport();
-        showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
+        if (replayed) showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+        else showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
         await loadStations();
         await loadDashboard();
         showDashboard();
     } catch (error) {
+        if (batchItem && !answered) {
+            // It may have been completed: the row says so, and no other file offers to complete the block again.
+            batchItem.uncertain = true;
+            window.flexbuddyImportQueue.noteCompleted(importBatch.items, Number(shiftId));
+        }
         showMessage(elements.saveError, error.message || t('js.app.scheduledNotCompleted'));
     } finally {
         importSaveInFlight = false;
@@ -907,8 +936,8 @@ async function saveShift(event) {
     event.preventDefault();
     hideMessage(elements.saveError);
 
-    // A second tap while the first save is on its way does nothing; the request id covers a retry after it.
-    if (elements.saveButton.disabled || !elements.previewForm.reportValidity()) return;
+    // A second tap while a save is on its way does nothing; the request id covers a retry after it.
+    if (importSaveInFlight || elements.saveButton.disabled || !elements.previewForm.reportValidity()) return;
 
     const shift = {
         station: elements.station.value.trim(),
@@ -927,15 +956,24 @@ async function saveShift(event) {
 
     let answered = false;
     try {
-        const response = await apiFetch('/shifts', {
+        const send = () => apiFetch('/shifts', {
             method: 'POST',
             headers: retryHeaders(batchItem ? batchItem.requestId : importRequestId, {'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
+        let response = await send();
         answered = true;
 
-        // A 409 DUPLICATE is a second copy of this same save racing the first, which landed.
-        const delivered = !response.ok && await isDuplicate(response);
+        // A 409 DUPLICATE is a second copy of this same save racing the first, which landed. Sent once more with the
+        // same request id, it is answered with that first block.
+        let delivered = !response.ok && await isDuplicate(response);
+        if (delivered) {
+            const again = await send();
+            if (again.ok) {
+                response = again;
+                delivered = false;
+            }
+        }
         if (!response.ok && !delivered) {
             const message = await response.text();
             throw new Error(message || t('js.app.saveFailedCheck'));
@@ -2204,7 +2242,13 @@ function renderBatch() {
     elements.resumeQueueButton.classList.toggle('is-hidden', !batch.paused || !queue.nextToRead(batch.items));
     elements.stopQueueButton.classList.toggle('is-hidden', finished);
     elements.finishQueueButton.classList.toggle('is-hidden', !finished);
+    // Rows are rebuilt on every change, so a focused row button is found again in the new rows.
+    const focused = elements.importQueueList.contains(document.activeElement) ? document.activeElement.dataset : undefined;
     elements.importQueueList.replaceChildren(...batch.items.map(item => queueRow(item, batch.current)));
+    if (focused) {
+        elements.importQueueList.querySelector(`button[data-action="${focused.action}"][data-number="${focused.number}"]`)
+            ?.focus();
+    }
 }
 
 function queueRow(item, current) {

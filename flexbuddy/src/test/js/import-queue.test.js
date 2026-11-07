@@ -57,20 +57,12 @@ test('every file has its own request ids, fixed for the whole batch', () => {
     assert.strictEqual(new Set(all).size, 4);
 });
 
-test('a save interrupted and retried is one request: a server keyed by request id keeps one block', () => {
-    const [item] = batch([png('a.png'), png('b.png')]);
-    const server = new Map();
-    const create = (key, body) => {
-        if (!server.has(key)) server.set(key, {id: server.size + 1, ...body});
-        return server.get(key);
-    };
-    // The first answer is lost; the driver taps Add again, which sends the same item's id.
-    create(item.requestId, {basePay: 80});
-    const answer = create(item.requestId, {basePay: 95});
-    assert.strictEqual(server.size, 1);
-    assert.strictEqual(answer.basePay, 80);
-    assert.strictEqual(queue.sameAsSent({...vea7, status: 'COMPLETED', basePay: 95, tips: 0, miles: null},
-        {...vea7, status: 'COMPLETED', basePay: 80, tips: 0, miles: null}), false);
+test('a retried save answered with the first block, edited since, is told apart from what was sent', () => {
+    // The server side (one block per request id, answered with the first copy) is BatchImportSaveTest.
+    const sent = {...vea7, status: 'COMPLETED', basePay: 95, tips: 0, miles: null};
+    const first = {...vea7, status: 'COMPLETED', basePay: 80, tips: 0, miles: null};
+    assert.strictEqual(queue.sameAsSent(sent, first), false);
+    assert.strictEqual(queue.sameAsSent(sent, {...first, basePay: 95}), true);
 });
 
 test('the answer for a block holding what was sent counts as the same, server time format included', () => {
