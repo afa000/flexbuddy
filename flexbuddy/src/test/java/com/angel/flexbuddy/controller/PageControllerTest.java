@@ -108,6 +108,18 @@ class PageControllerTest {
     }
 
     @Test
+    void homeAndTheEditDialogOfferTheBlockChecklist() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"lastBlockCard\" hidden",
+                "id=\"lastBlockButton\" type=\"button\">Review this block</button>",
+                "id=\"reviewBlockButton\" type=\"button\">Review this block</button>",
+                "id=\"blockReviewModal\"", "<p class=\"step-label\">REVIEW THIS BLOCK</p>", "/js/block-review.js");
+    }
+
+    @Test
     void theImportCardHasTheAndroidSharingTipHiddenUntilTheScriptShowsIt() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

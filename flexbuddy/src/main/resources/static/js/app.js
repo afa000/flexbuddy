@@ -188,6 +188,7 @@ const elements = {
     editStatusHint: document.querySelector('#editStatusHint'),
     editBasePayLabel: document.querySelector('#editBasePayLabel'),
     linkedExpensesSection: document.querySelector('#linkedExpensesSection'),
+    reviewBlockButton: document.querySelector('#reviewBlockButton'),
     installBanner: document.querySelector('#installBanner'),
     installBannerText: document.querySelector('#installBannerText'),
     shareTip: document.querySelector('#shareTip'),
@@ -204,7 +205,10 @@ let editingShiftId;
 let editSnapshot;
 /** The account's vehicle cost method, once the Expenses page has loaded the settings. */
 let expenseCostMethod;
-/** The block an expense being edited is linked to, kept in the form when the Shift list doesn't hold it. */
+/**
+ * The block the expense in the form is linked to (one being edited, or a new toll started from Review this block), kept
+ * in the form when the Shift list doesn't hold it.
+ */
 let editingExpenseLink;
 /** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
 let notWorkedSending = false;
@@ -366,6 +370,7 @@ elements.filterSort.addEventListener('change', () => updateFilter('sort', elemen
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
 elements.heatmapMetric.addEventListener('change', loadHeatmap);
 elements.payoutCheckButton.addEventListener('click', event => window.flexbuddyPayouts.open(event.currentTarget));
+elements.reviewBlockButton.addEventListener('click', reviewEditedBlock);
 // The queue is on the phone, so its Pending tags and the offline state of the edit controls follow it.
 document.addEventListener('flexbuddy:outbox', refreshPendingTags);
 document.addEventListener('flexbuddy:online', () => {
@@ -1441,6 +1446,8 @@ function openEditModal(shift, trigger, options = {}) {
     elements.notWorkedButton.classList.toggle('is-hidden',
         !window.flexbuddyNotWorked.canMarkNotWorked(editMode, editOriginalStatus));
     elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
+    // Only a worked block has a checklist: a scheduled one counts for nothing until it is confirmed.
+    elements.reviewBlockButton.classList.toggle('is-hidden', isNew || editOriginalStatus !== 'COMPLETED');
     elements.editTimestamps.classList.toggle('is-hidden', isNew);
     if (!isNew) {
         loadLinkedExpenses(shift.id);
@@ -1565,6 +1572,44 @@ function saveEditLabel() {
     if (status === editOriginalStatus) return t('js.app.saveChanges');
     return {COMPLETED: t('js.app.markCompleted'), CANCELLED: t('js.app.markCancelled'), FORFEITED: t('js.app.markForfeited')}[status]
         || t('js.app.saveChanges');
+}
+
+/** Leaves the edit dialog for the block's checklist, unless that would drop changes the driver hasn't saved. */
+function reviewEditedBlock() {
+    if (editHasChanges()) {
+        showMessage(elements.editError, t('js.blockReview.saveFirst'));
+        return;
+    }
+    const id = editingShiftId;
+    const from = lastFocusedElement;
+    lastFocusedElement = undefined;
+    closeEditModal();
+    window.flexbuddyBlockReview.open(id, from);
+}
+
+/** True when any field of the edit dialog differs from the block as it was opened. */
+function editHasChanges() {
+    const shift = editSnapshot ?? {};
+    const details = shift.details ?? {};
+    const fields = [
+        [elements.editStation, shift.station], [elements.editDate, shift.date],
+        [elements.editStartTime, trimTime(shift.startTime)], [elements.editEndTime, trimTime(shift.endTime)],
+        [elements.editBasePay, shift.basePay], [elements.editTips, shift.tips ?? 0], [elements.editMiles, shift.miles],
+        [elements.editStatus, editOriginalStatus], [elements.editActualStart, trimTime(details.actualStart)],
+        [elements.editActualEnd, trimTime(details.actualEnd)], [elements.editOdometerStart, details.odometerStart],
+        [elements.editOdometerEnd, details.odometerEnd], [elements.editStops, details.stops],
+        [elements.editPackages, details.packages], [elements.editReturns, details.returns]
+    ];
+    return fields.some(([input, saved]) => !sameFieldValue(input.value, saved));
+}
+
+/** "12.50" and 12.5 are the same amount; dates, times and text compare as written. */
+function sameFieldValue(value, saved) {
+    const typed = String(value ?? '').trim();
+    const kept = saved == null ? '' : String(saved).trim();
+    if (typed === kept) return true;
+    return typed !== '' && kept !== '' && !Number.isNaN(Number(typed)) && !Number.isNaN(Number(kept))
+        && Number(typed) === Number(kept);
 }
 
 function closeEditModal() {
@@ -2778,6 +2823,23 @@ function applyOfflineExpenseState() {
     const blocked = editingExpenseId !== undefined && (window.flexbuddyPwa?.isOffline() ?? false);
     elements.saveExpenseButton.disabled = blocked;
     elements.saveExpenseButton.title = blocked ? t('js.pwa.availableWhenOnline') : '';
+}
+
+/**
+ * The Expenses form ready for a toll or parking on this block: its day, Toll, and the block already linked, kept as an
+ * option even when History's current results don't hold it.
+ */
+function startExpenseForBlock(shift) {
+    showExpensesScreen();
+    resetExpenseForm();
+    elements.expenseDate.value = shift.date;
+    elements.expenseCategory.value = 'TOLL';
+    editingExpenseLink = {id: shift.id, label: `${formatDate(shift.date)} · ${shift.station}`, status: shift.status ?? ''};
+    populateExpenseShifts(currentShifts);
+    elements.expenseShift.value = String(shift.id);
+    renderExpenseCategoryHint();
+    elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+    elements.expenseAmount.focus({preventScroll: true});
 }
 
 function resetExpenseForm() {

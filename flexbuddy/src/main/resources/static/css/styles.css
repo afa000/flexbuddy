@@ -947,6 +947,28 @@ h1 {
 
 /* Several screenshots at once: one compact row per file, so ten of them still leave Step 2 within reach on a phone. */
 #importScreen .preview-panel { scroll-margin-top: 100px; }
+
+/* Review this block: Home's card for the last block, and the checklist sheet. */
+.home-last-block { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.home-last-block[hidden] { display: none; }
+.last-block-text { display: grid; gap: 2px; min-width: 0; }
+.last-block-text strong { font-size: 16px; }
+.last-block-text small { color: var(--muted); font-size: 12px; }
+.review-block-button { margin-top: 6px; }
+.review-summary { margin: 0 0 10px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.review-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.review-row { padding: 12px; display: grid; gap: 10px; background: var(--surface-deep); border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; }
+.review-row[data-state="done"], .review-row[data-state="zero"] { border-left-color: var(--cyan); }
+.review-row[data-state="missing"], .review-row[data-state="attention"] { border-left-color: var(--warning-border); }
+.review-row[data-state="optional"], .review-row[data-state="waiting"] { border-left-color: var(--line); }
+.review-text { display: grid; gap: 3px; min-width: 0; }
+.review-text strong { font-size: 14px; }
+.review-text small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.review-state { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--cyan); font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.review-row[data-state="missing"] .review-state, .review-row[data-state="attention"] .review-state { background: var(--warning-surface); color: var(--warning); }
+.review-row[data-state="optional"] .review-state, .review-row[data-state="waiting"] .review-state { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.review-actions:empty { display: none; }
 .import-queue { margin: 12px 0; padding: 12px; background: var(--surface-deep); border: 1px solid var(--line); border-radius: 8px; }
 .import-queue-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .import-queue-heading strong { font-size: 14px; }

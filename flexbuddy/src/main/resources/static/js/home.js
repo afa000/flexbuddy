@@ -136,6 +136,7 @@
         }
 
         renderRecent(shifts.status === 'fulfilled' ? shifts.value : null);
+        window.flexbuddyBlockReview?.renderCard(shifts.status === 'fulfilled' ? shifts.value : []);
         // Adding a first block ticks its row in the setup card on the next refresh, with no page reload.
         if (shifts.status === 'fulfilled') window.flexbuddySetup?.update({hasBlocks: shifts.value.length > 0});
         renderAttention();
