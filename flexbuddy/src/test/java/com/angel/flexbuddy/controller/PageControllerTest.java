@@ -108,6 +108,18 @@ class PageControllerTest {
     }
 
     @Test
+    void theImportCardTakesSeveralScreenshotsAndHasTheBatchList() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<input id=\"screenshotInput\" type=\"file\" accept=\"image/png,image/jpeg\" multiple hidden>",
+                "You can choose up to 10 at once.",
+                "id=\"importQueue\" aria-label=\"Screenshots in this import\"",
+                ">Stop importing</button>", ">Skip this screenshot</button>", "/js/import-queue.js");
+    }
+
+    @Test
     void theImportCardSpeaksToTouchAndPointerAndSaysWhichScreensWork() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

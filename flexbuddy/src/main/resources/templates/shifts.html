@@ -418,7 +418,7 @@
                     </div>
                 </div>
 
-                <input id="screenshotInput" type="file" accept="image/png,image/jpeg" hidden>
+                <input id="screenshotInput" type="file" accept="image/png,image/jpeg" multiple hidden>
                 <button class="drop-zone" id="dropZone" type="button">
                     <span class="upload-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M12 15V5m0 0L8 9m4-4 4 4M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5"/></svg>
@@ -431,7 +431,20 @@
                 <div class="import-guidance">
                     <small class="field-hint" th:text="#{import.worksWith}">Works with a Schedule Details screenshot of a block you accepted, or an Earnings screenshot of a block you worked.</small>
                     <small class="field-hint" th:text="#{import.notOffersList}">An offers list with no block selected can't be imported.</small>
+                    <small class="field-hint" th:text="#{import.upToTen}">You can choose up to 10 at once.</small>
                 </div>
+
+                <section class="import-queue is-hidden" id="importQueue" th:aria-label="#{import.screenshotsInThisImport}">
+                    <div class="import-queue-heading">
+                        <strong id="importQueueStatus" aria-live="polite"></strong>
+                        <div class="import-queue-actions">
+                            <button class="text-button is-hidden" id="resumeQueueButton" type="button" data-online-only th:text="#{import.continueReading}">Continue reading</button>
+                            <button class="text-button" id="stopQueueButton" type="button" th:text="#{import.stopImporting}">Stop importing</button>
+                            <button class="primary-button compact-button is-hidden" id="finishQueueButton" type="button" th:text="#{import.done}">Done</button>
+                        </div>
+                    </div>
+                    <ol class="import-queue-list" id="importQueueList"></ol>
+                </section>
 
                 <div class="file-card is-hidden" id="fileCard">
                     <img id="imagePreview" th:alt="#{import.selectedShiftScreenshot}">
@@ -550,6 +563,7 @@
                     <div class="notice error-notice is-hidden field-wide" id="saveError" role="alert"></div>
                     <div class="form-actions field-wide">
                         <button class="secondary-button" id="resetButton" type="button" th:text="#{import.startOver}">Start over</button>
+                        <button class="secondary-button is-hidden" id="skipImportButton" type="button" th:text="#{import.skipThisScreenshot}">Skip this screenshot</button>
                         <button class="primary-button" id="saveButton" type="submit">
                             <span th:text="#{import.addShift}">Add shift</span>
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
@@ -932,6 +946,7 @@
 <script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-queue.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/not-worked.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/expense-effect.js(v=${buildId})}" defer></script>
