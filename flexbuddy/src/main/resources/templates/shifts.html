@@ -131,6 +131,15 @@
                 </div>
             </article>
 
+            <article class="home-card home-last-block" id="lastBlockCard" hidden aria-labelledby="lastBlockLabel">
+                <div class="last-block-text">
+                    <h2 class="home-label" id="lastBlockLabel" th:text="#{home.yourLastBlock}">Your last block</h2>
+                    <strong id="lastBlockTitle"></strong>
+                    <small id="lastBlockSummary"></small>
+                </div>
+                <button class="secondary-button compact-button" id="lastBlockButton" type="button" th:text="#{home.reviewThisBlock}">Review this block</button>
+            </article>
+
             <details class="panel evaluate-panel" id="evaluatePanel">
                 <summary class="evaluate-summary">
                     <span class="evaluate-title"><span class="step-label" th:text="#{home.beforeYouAccept}">BEFORE YOU ACCEPT</span><strong th:text="#{home.evaluateABlock}">Evaluate a block</strong></span>
@@ -732,7 +741,7 @@
                     <button class="text-button" id="sameAsScheduledButton" type="button" th:text="#{dialog.edit.sameAsScheduled}">Same as scheduled</button>
                 </details>
 
-                <section class="linked-expenses field-wide" id="linkedExpensesSection"><strong th:text="#{dialog.edit.linkedExpenses}">Linked expenses</strong><div id="linkedExpensesList"><small th:text="#{dialog.edit.loading}">Loading…</small></div></section>
+                <section class="linked-expenses field-wide" id="linkedExpensesSection"><strong th:text="#{dialog.edit.linkedExpenses}">Linked expenses</strong><div id="linkedExpensesList"><small th:text="#{dialog.edit.loading}">Loading…</small></div><button class="text-button review-block-button" id="reviewBlockButton" type="button" th:text="#{dialog.edit.reviewThisBlock}">Review this block</button></section>
 
                 <div class="notice error-notice is-hidden field-wide" id="editError" role="alert"></div>
                 <p class="shift-timestamps field-wide" id="editTimestamps"></p>
@@ -808,6 +817,24 @@
                 <button class="secondary-button" id="conflictKeepSaved" type="button" th:text="#{dialog.conflict.keepSavedVersion}">Keep saved version</button>
                 <button class="primary-button" id="conflictUseMine" type="button" th:text="#{dialog.conflict.useMyChange}">Use my change</button>
             </div>
+        </section>
+    </div>
+
+    <div class="modal-backdrop is-hidden" id="blockReviewModal">
+        <section class="edit-dialog review-dialog" role="dialog" aria-modal="true" aria-labelledby="blockReviewTitle" aria-describedby="blockReviewDescription">
+            <div class="edit-dialog-heading">
+                <div>
+                    <p class="step-label" th:text="#{dialog.review.label}">REVIEW THIS BLOCK</p>
+                    <h2 id="blockReviewTitle" th:text="#{dialog.review.title}">Review this block</h2>
+                    <p id="blockReviewDescription"></p>
+                </div>
+                <button class="icon-button dialog-close-button" id="closeBlockReviewButton" type="button" th:aria-label="#{dialog.edit.close}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
+                </button>
+            </div>
+            <p class="review-summary" id="blockReviewSummary" aria-live="polite"></p>
+            <ul class="review-list" id="blockReviewList"></ul>
+            <div class="notice error-notice is-hidden" id="blockReviewError" role="alert"></div>
         </section>
     </div>
 
@@ -943,6 +970,7 @@
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/block-review.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>

@@ -327,7 +327,7 @@
         return missing;
     }
 
-    /** Records that the block had no driving to log, which also stops the reminders for it. */
+    /** Records that the block had no driving to log, which also stops the reminders for it. True once it is saved. */
     async function noMiles(target, button) {
         button.disabled = true;
         try {
@@ -339,11 +339,13 @@
             if (!response.ok) throw new Error(await response.text() || t('js.finish.updateFailed'));
             showToast(t('js.finish.noMilesTitle'), t('js.finish.noMilesMessage', target.station, formatDate(target.date)));
             await loadDashboard();
+            return true;
         } catch (error) {
             showToast(t('js.common.notSaved'), error.message || t('js.finish.updateFailed'), {alert: true});
             button.disabled = false;
+            return false;
         }
     }
 
-    window.flexbuddyFinish = {open, openById, loadMissing, missingCount};
+    window.flexbuddyFinish = {open, openById, loadMissing, missingCount, noMiles};
 })();
