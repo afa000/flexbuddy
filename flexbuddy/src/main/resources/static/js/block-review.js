@@ -15,6 +15,7 @@
         times: 'js.blockReview.timesName', miles: 'js.blockReview.milesName', costs: 'js.blockReview.costsName',
         payout: 'js.blockReview.payoutName'
     };
+    const CHANGE_LABEL_KEYS = {times: 'js.blockReview.changeTimesLabel', miles: 'js.blockReview.changeMilesLabel'};
     const ACTION_KEYS = {
         addTimes: 'js.blockReview.addTimes', change: 'js.blockReview.change', addMiles: 'js.blockReview.addMiles',
         noMiles: 'js.blockReview.noMiles', costs: 'js.blockReview.addCost', payout: 'js.blockReview.checkPayout'
@@ -103,6 +104,9 @@
     let current;
     let data;
     let trigger;
+    // Each open and each card refresh gets a number, so an answer for an earlier one can never overwrite a later one.
+    let sheetVersion = 0;
+    let cardVersion = 0;
 
     function init() {
         if (el) return;
@@ -148,24 +152,32 @@
         return response.json();
     }
 
-    /** The block as saved, its linked expenses and the recent payouts; only the block itself is required. */
-    async function load(id) {
-        const [shift, expenses, periods] = await Promise.allSettled([
-            json(apiFetch(`/shifts/${encodeURIComponent(id)}`)),
+    /** A block's linked expenses and recent payouts, or null and no periods when they can't be loaded. */
+    async function extras(id, count) {
+        const [expenses, periods] = await Promise.allSettled([
             json(apiFetch(`/shifts/${encodeURIComponent(id)}/expenses`)),
-            json(apiFetch('/shifts/pay-periods?count=6'))
+            json(apiFetch(`/shifts/pay-periods?count=${count}`))
         ]);
-        if (shift.status !== 'fulfilled') throw new Error();
         return {
-            shift: shift.value,
             expenses: expenses.status === 'fulfilled' ? expenses.value : null,
             periods: periods.status === 'fulfilled' ? periods.value.periods : []
         };
     }
 
+    /** The block as saved, with its linked expenses and recent payouts; only the block itself is required. */
+    async function load(id) {
+        const [shift, more] = await Promise.all([json(apiFetch(`/shifts/${encodeURIComponent(id)}`)), extras(id, 6)]);
+        return {shift, ...more};
+    }
+
+    function sheetOpen() {
+        return Boolean(el) && !el.modal.classList.contains('is-hidden');
+    }
+
     /** Opens the checklist for the block with this id; only a worked block has one. */
     async function open(id, from) {
         init();
+        const version = ++sheetVersion;
         trigger = from;
         hideMessage(el.error);
         el.title.textContent = t('js.common.loading');
@@ -175,17 +187,22 @@
         el.modal.classList.remove('is-hidden');
         document.body.classList.add('modal-open');
         document.querySelector('#closeBlockReviewButton').focus();
+        let loaded;
         try {
-            const loaded = await load(id);
-            if (loaded.shift.status !== 'COMPLETED') throw new Error();
-            current = loaded.shift;
-            data = loaded;
-            render();
+            loaded = await load(id);
         } catch {
+            loaded = null;
+        }
+        if (version !== sheetVersion || !sheetOpen()) return;
+        if (!loaded || loaded.shift.status !== 'COMPLETED') {
             current = undefined;
             el.title.textContent = t('js.blockReview.title');
-            showMessage(el.error, t('js.blockReview.notFound'));
+            showMessage(el.error, t(loaded ? 'js.blockReview.notWorked' : 'js.blockReview.notFound'));
+            return;
         }
+        current = loaded.shift;
+        data = loaded;
+        render();
     }
 
     function render() {
@@ -219,7 +236,9 @@
                     ? 'primary-button compact-button' : 'secondary-button compact-button';
                 button.dataset.action = action;
                 button.textContent = t(ACTION_KEYS[action]);
-                if (action === 'noMiles') button.dataset.onlineOnly = '';
+                // "Change" appears on two rows, so its name says which.
+                if (action === 'change') button.setAttribute('aria-label', t(CHANGE_LABEL_KEYS[item.key]));
+                if (action === 'noMiles') button.disabled = window.flexbuddyPwa?.isOffline() ?? false;
                 actions.append(button);
             });
             row.append(text, actions);
@@ -232,11 +251,22 @@
         if (!shift) return;
         if (action === 'noMiles') {
             button.disabled = true;
-            if (await window.flexbuddyFinish.noMiles(shift, button)) {
-                data = await load(shift.id).catch(() => data);
-                current = data.shift;
-                render();
+            const version = sheetVersion;
+            if (!(await window.flexbuddyFinish.noMiles(shift, button))) return;
+            const reloaded = await load(shift.id).catch(() => null);
+            // Closed, or opened for another block, while the save was on its way.
+            if (version !== sheetVersion || !sheetOpen() || current !== shift) return;
+            if (reloaded) {
+                data = reloaded;
+                current = reloaded.shift;
+            } else {
+                current = {...shift, miles: 0};
+                data = {...data, shift: current};
             }
+            render();
+            // The pressed button went with the old rows; focus moves to the miles row's Change, inside the sheet.
+            (el.list.querySelector('[data-action="change"][aria-label="' + t(CHANGE_LABEL_KEYS.miles) + '"]')
+                ?? document.querySelector('#closeBlockReviewButton')).focus();
             return;
         }
         const from = trigger;
@@ -247,6 +277,7 @@
     }
 
     function close({restoreFocus = true} = {}) {
+        sheetVersion++;
         el.modal.classList.add('is-hidden');
         document.body.classList.remove('modal-open');
         current = undefined;
@@ -255,24 +286,26 @@
         trigger = undefined;
     }
 
-    /** Home's "Your last block" card: shown for the newest block worked today or yesterday, with what is left to check. */
+    /**
+     * Home's "Your last block" card: shown for the newest block worked today or yesterday, with what is left to check.
+     * The block comes from Home's own list, so only its expenses and the current payouts are fetched, and the summary
+     * is only rewritten when it changes.
+     */
     async function renderCard(shifts) {
         init();
+        const version = ++cardVersion;
         const today = toIsoDate(new Date());
         const block = lastBlock(shifts, window.flexbuddyCalendar.addDays(today, -1), today);
         el.card.hidden = !block;
         if (!block) return;
         const fmt = formats();
         el.cardTitle.textContent = `${block.station} · ${fmt.day(block.date)}`;
+        if (el.cardButton.dataset.shiftId !== String(block.id)) el.cardSummary.textContent = '';
         el.cardButton.dataset.shiftId = block.id;
-        el.cardSummary.textContent = '';
-        try {
-            const loaded = await load(block.id);
-            if (el.cardButton.dataset.shiftId !== String(block.id)) return;
-            el.cardSummary.textContent = summary(rows(loaded.shift, loaded, fmt));
-        } catch {
-            el.cardSummary.textContent = '';
-        }
+        const more = await extras(block.id, 3);
+        if (version !== cardVersion) return;
+        const text = summary(rows(block, more, fmt));
+        if (el.cardSummary.textContent !== text) el.cardSummary.textContent = text;
     }
 
     window.flexbuddyBlockReview = {rows, toCheck, summary, periodFor, lastBlock, open, renderCard};

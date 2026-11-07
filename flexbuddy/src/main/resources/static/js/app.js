@@ -1600,15 +1600,15 @@ function editHasChanges() {
         [elements.editOdometerEnd, details.odometerEnd], [elements.editStops, details.stops],
         [elements.editPackages, details.packages], [elements.editReturns, details.returns]
     ];
-    return fields.some(([input, saved]) => !sameFieldValue(input.value, saved));
+    return fields.some(([input, saved]) => !sameFieldValue(input.value, saved, input.type === 'number'));
 }
 
-/** "12.50" and 12.5 are the same amount; dates, times and text compare as written. */
-function sameFieldValue(value, saved) {
+/** In a number field "12.50" and 12.5 are the same amount; dates, times and text compare as written. */
+function sameFieldValue(value, saved, numeric) {
     const typed = String(value ?? '').trim();
     const kept = saved == null ? '' : String(saved).trim();
     if (typed === kept) return true;
-    return typed !== '' && kept !== '' && !Number.isNaN(Number(typed)) && !Number.isNaN(Number(kept))
+    return numeric && typed !== '' && kept !== '' && !Number.isNaN(Number(typed)) && !Number.isNaN(Number(kept))
         && Number(typed) === Number(kept);
 }
 
