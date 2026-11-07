@@ -163,6 +163,17 @@ class AccountControllerTest {
     }
 
     @Test
+    void loginPageCanSayASharedScreenshotIsWaiting() throws Exception {
+        // Hidden until share-inbox.js finds a share made while signed out; the image itself is never on this page.
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "id=\"sharedWaitingNotice\" role=\"status\">Sign in to review the screenshot you shared.</div>")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("class=\"notice success-notice is-hidden\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/js/share-inbox.js")));
+    }
+
+    @Test
     void loginPageOffersPersistentSignInForStandaloneMode() throws Exception {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())

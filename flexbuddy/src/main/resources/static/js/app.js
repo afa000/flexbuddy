@@ -190,6 +190,7 @@ const elements = {
     linkedExpensesSection: document.querySelector('#linkedExpensesSection'),
     installBanner: document.querySelector('#installBanner'),
     installBannerText: document.querySelector('#installBannerText'),
+    shareTip: document.querySelector('#shareTip'),
     installBannerButton: document.querySelector('#installBannerButton'),
     dismissInstallBanner: document.querySelector('#dismissInstallBanner')
 };
@@ -2914,10 +2915,8 @@ function openInitialScreen() {
     else showDashboard(false);
 }
 
-const SHARE_INBOX = 'flexbuddy-share-inbox';
 const SHARED_UNAVAILABLE = t('js.app.sharedUnavailable');
 
-/** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
 /** Right after the emailed code is accepted the address carries ?welcome; say so once and tidy the address. */
 function noteRecoveryCodeUse() {
     const params = new URLSearchParams(window.location.search);
@@ -2938,34 +2937,35 @@ function greetNewDriver() {
     showToast(t('js.app.emailConfirmed'), t('js.app.welcome'));
 }
 
+/**
+ * Opens the screenshots shared from another app, which the service worker left in the share inbox (share-inbox.js):
+ * one is reviewed as usual, two to ten start a batch. Without a share in the address, a share made while signed out
+ * and still waiting opens now, after the sign-in. Nothing is saved until the driver presses a save button.
+ */
 async function importSharedScreenshot() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('shared');
-    if (!id) return;
+    const inbox = window.flexbuddyShareInbox;
+    if (!id) {
+        const waiting = await inbox.takeNewest();
+        if (!waiting.length) return;
+        showImportScreen(false);
+        pickScreenshots(waiting);
+        showToast(t('js.app.sharedReadyTitle'), t('js.app.sharedReadyMessage'));
+        return;
+    }
     // Removed first so a reload or the back button never imports the same share twice.
     params.delete('shared');
     const query = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
 
-    const file = await takeSharedFile(id);
-    if (file) processScreenshot(file);
-    else showMessage(elements.uploadError, SHARED_UNAVAILABLE);
-}
-
-async function takeSharedFile(id) {
-    if (!/^[0-9a-f-]{36}$/i.test(id) || !('caches' in window)) return null;
-    try {
-        const cache = await caches.open(SHARE_INBOX);
-        const key = `/share-inbox/${id}`;
-        const response = await cache.match(key);
-        if (!response) return null;
-        await cache.delete(key);
-        const blob = await response.blob();
-        const name = decodeURIComponent(response.headers.get('X-File-Name') || 'shared-screenshot');
-        return new File([blob], name, {type: blob.type || response.headers.get('Content-Type') || ''});
-    } catch {
-        return null;
+    if (id === 'too-many') {
+        showMessage(elements.uploadError, t('js.app.sharedTooMany'));
+        return;
     }
+    const files = await inbox.take(id);
+    if (files.length) pickScreenshots(files);
+    else showMessage(elements.uploadError, SHARED_UNAVAILABLE);
 }
 
 /** Saves the browser's time zone when it differs, so "today", Upcoming, and reminders match the driver's clock. */
@@ -3039,6 +3039,9 @@ document.addEventListener('flexbuddy:cache-ready', () => {
     loadDashboard();
 });
 updateThemeToggle(document.documentElement.dataset.theme);
+// Sharing to FlexBuddy from Photos needs the Android app or the installed web app, so only they mention it.
+elements.shareTip.classList.toggle('is-hidden', !/Android/i.test(navigator.userAgent)
+    || !window.matchMedia('(display-mode: standalone)').matches);
 initializeFilters();
 openInitialScreen();
 greetNewDriver();

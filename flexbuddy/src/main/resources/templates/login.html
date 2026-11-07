@@ -59,6 +59,9 @@
         <div class="notice error-notice auth-notice" th:if="${param.expired}" th:text="#{login.yourSessionExpiredSignIn}">
             Your session expired. Sign in again.
         </div>
+        <div class="notice success-notice is-hidden" id="sharedWaitingNotice" role="status" th:text="#{login.sharedWaiting}">
+            Sign in to review the screenshot you shared.
+        </div>
         <div class="notice success-notice" th:if="${param.logout}" th:text="#{login.youHaveSignedOut}">
             You have signed out.
         </div>
@@ -109,6 +112,7 @@
 <script id="flexbuddyMessages" type="application/json" th:utext="${scriptMessages}">{}</script>
 <script th:src="@{/js/i18n.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/password-toggle.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/share-inbox.js(v=${buildId})}" defer></script>
 <script>
     (() => {
         const standalone = window.matchMedia('(display-mode: standalone)').matches
