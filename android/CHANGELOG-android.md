@@ -1,5 +1,31 @@
 # Android release history
 
+## Version code 5 — the driver experience changes, day 12 of the second closed test
+
+- No shell changes. `appVersionCode`, `appVersionName` and `appVersion` raised to 5 in `twa-manifest.json`
+  (`app/build.gradle` and `manifest-checksum.txt` follow). It brings the web changes live on Render since November 6
+  and 7, 2026 to testers as an update Play can see: an explicit worked/scheduled choice on import (FB-011), moving a
+  block back to scheduled (FB-012), missing-miles net labels (FB-013), what an expense does to net (FB-014), forfeit
+  wording (FB-015), report coverage lines (FB-016), deleted-block expenses (FB-017, FB-018), phone layout (FB-019,
+  FB-020), several screenshots at once (FB-021), sharing several screenshots and sharing before sign-in (FB-022) and
+  Review this block (FB-023).
+- Generated with `bubblewrap update --skipVersionUpgrade` on November 7, 2026. Afterwards the icons, splash images,
+  `store_icon.png`, `shortcuts.xml`, and the Java and XML files whose only change was whitespace were restored, as
+  for version 4.
+- Built unsigned with Bubblewrap on November 7, 2026. The APK reads `versionCode='5' versionName='5'`,
+  `minSdkVersion 24`, `targetSdkVersion 36`, package `com.angel.flexbuddy`, with the committed launcher shortcuts.
+- Release notes (English and Spanish): as written in `closed-test-round-2.md`.
+- Bundle signed interactively by the owner with the upload key on November 7, 2026; `jarsigner -verify` passed and the
+  certificate is the upload key (`A3:EC:82:…:FE:37`). Its contents match the unsigned build file for file. The APK
+  was not re-signed (its step didn't finish), so `app-release-signed.apk` on disk is still version 4's; Play only
+  takes the bundle.
+- Uploaded to Closed testing - Alpha on November 8, 2026 as `5 (driver experience)`, version 5 (5), API 24+, target
+  SDK 36; version 4 not carried over; supported devices unchanged (no device dropped). Release notes entered for
+  en-US, es-419 and es-US; rollout 100%. Submitted for review the same day (Publishing overview: "Changes in review",
+  quick checks running; managed publishing off). The upload and submission were done in the browser by Claude Code
+  with the owner's approval; the owner chose the file.
+- To do: record Google's approval date, and update the emulator's Play app to 5 (5) to check it opens full screen.
+
 ## Version code 4 — the October 30 web fixes, day 5 of the second closed test
 
 - No shell changes. `appVersionCode`, `appVersionName` and `appVersion` raised to 4 in `twa-manifest.json`
