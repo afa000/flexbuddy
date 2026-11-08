@@ -185,6 +185,26 @@ de 2026 y 76¢ desde julio). Informes e Inicio ahora indican cuándo la ganancia
 hay bloques sin millas.
 ```
 
+**Version 5, English.** The driver experience changes from the owner's November 5 emulator audit (FB-011 to FB-023),
+live on the web since November 6 and 7, 2026. No tester reports were logged, so the notes don't credit testers.
+430 characters.
+
+```text
+New in version 5: import up to 10 screenshots at once, or share them to FlexBuddy from Photos, even before you sign
+in. Every import asks whether you worked the block, and a block marked completed by mistake can go back to scheduled.
+Review this block checks a block's times, miles, tolls and payout in one place. Net per hour now says when miles are
+missing, expenses say how they change your net, and phones need less scrolling.
+```
+
+**Version 5, Spanish.** 465 characters.
+
+```text
+Novedades de la versión 5: importa hasta 10 capturas a la vez o compártelas con FlexBuddy desde Fotos, incluso antes
+de iniciar sesión. Cada importación pregunta si trabajaste el bloque, y un bloque marcado como completado por error
+puede volver a programado. Revisar este bloque revisa horas, millas, peajes y pago en un solo lugar. La ganancia neta
+por hora avisa si faltan millas, los gastos dicen cómo cambian tu neto y en el teléfono hay que desplazarse menos.
+```
+
 ## If something goes wrong
 
 | Problem | What to do |

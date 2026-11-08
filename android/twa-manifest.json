@@ -20,8 +20,8 @@
     "path": "upload-key.keystore",
     "alias": "flexbuddy-upload"
   },
-  "appVersionName": "4",
-  "appVersionCode": 4,
+  "appVersionName": "5",
+  "appVersionCode": 5,
   "shortcuts": [
     {
       "name": "Import a shift",
@@ -71,7 +71,7 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "4",
+  "appVersion": "5",
   "shareTarget": {
     "action": "https://flexbuddy.onrender.com/share-import",
     "method": "POST",
