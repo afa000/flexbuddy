@@ -1,7 +1,12 @@
 # FlexBuddy agent workflow
 
-How Claude Code, Antigravity and OpenCode with a local model work on FlexBuddy without losing context between them.
-The rules every agent follows are in [AGENTS.md](../AGENTS.md); this page covers setup and the day-to-day loop.
+How Claude Code, Codex, Antigravity and OpenCode with a local model work on FlexBuddy without losing context between
+them. The rules every agent follows are in [AGENTS.md](../AGENTS.md); this page covers setup and the day-to-day loop.
+
+Claude Code and Codex are interchangeable for the whole loop. Where this page says **Opus**, Codex uses **Sol**
+(`gpt-6.1-sol`); where it says **Sonnet**, Codex uses **Terra** (`gpt-6.1-terra`). Both read `AGENTS.md` and the
+skills in `.agents/skills/`, and both run the same guard. Claude Code starts a skill with `/implement-task FB-xxx`,
+Codex with `$implement-task FB-xxx`.
 
 The repository, not chat history, is the record: each task, its handoff notes and its checks live in files, so any tool
 can pick up where another stopped.
@@ -16,29 +21,38 @@ can pick up where another stopped.
    test on the pull request, and you can run it locally too ([setup](#local-postgresql-18-and-mailpit)).
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
    the pull request description.
-5. A fresh Claude Code session with Opus reviews the pull request with `/review-task FB-xxx`. You merge it yourself;
-   merging to `main` deploys to Render.
+5. A fresh Claude Code session with Opus (or Codex with Sol) reviews the pull request with `/review-task FB-xxx`. You
+   merge it yourself; merging to `main` deploys to Render.
 
 ### The native app's repository
 
 The native Kotlin app is built in its own repository, `flexbuddy-android` (not created yet), following
 [native-app-plan.md](native-app-plan.md). The loop is the same there. FB numbers are one sequence across both
 repositories, so check both for the next free one. A feature that needs the server becomes two tasks: the `/api/v1`
-endpoint here first, written into [api-v1.md](api-v1.md), then the app screen there.
+endpoint here first, written into [api-v1.md](api-v1.md), then the app screen there. Why it's split this way:
+[decision 1](decisions/0001-native-app-in-its-own-repository.md). Record later decisions of that size the same way,
+as the next numbered file in `docs/decisions/`.
 
-### Claude Code hooks
+### The guard: hooks in Claude Code and Codex
 
-[`.claude/settings.json`](../.claude/settings.json) runs [`.claude/hooks/guard.mjs`](../.claude/hooks/guard.mjs)
-before Claude Code's shell and file tools. It refuses:
+[`scripts/hooks/guard.mjs`](../scripts/hooks/guard.mjs) runs before an agent's shell and file tools:
+[`.claude/settings.json`](../.claude/settings.json) wires it into Claude Code and
+[`.codex/hooks.json`](../.codex/hooks.json) into Codex. It refuses:
 
 - `git push` to `main` (by name, `HEAD:main`, `--all`, `--mirror`, or a plain `git push` while on `main`) and
   `gh pr merge`. Pushing a feature or `ai/` branch still works, after you approve it in chat.
-- an edit to a migration that git already tracks. A new `V<n>__*.sql` is fine.
+- an edit to a migration that git already tracks, from Claude Code's file tools or a Codex patch. A new
+  `V<n>__*.sql` is fine.
+- in Claude Code, reading a whole message catalog (about 25K tokens each): it says to grep for the keys instead.
+
+Codex also has [`.codex/rules/flexbuddy.rules`](../.codex/rules/flexbuddy.rules), which forbids the same pushes and
+merges by command prefix, as a second layer. OpenCode and Antigravity have their own deny rules in `opencode.json` and
+`scripts/antigravity-cli-settings.json`.
 
 So pushing `main` and merging pull requests are always your steps. The hooks back up the rules in AGENTS.md; they
-don't replace them. A shell command can still change a file the file-tool check doesn't see, and Antigravity and
-OpenCode have their own permission files. Their tests: `node --test ".claude/hooks/*.test.mjs"` (not part of CI). A
-new Claude Code session picks up changes to the settings file.
+don't replace them: a shell command can still change a file the file-tool check doesn't see. The guard's tests:
+`node --test "scripts/hooks/*.test.mjs"` (not part of CI). A new Claude Code session picks up changes to the settings
+file; Codex asks you to approve new or changed hooks in `/hooks` before they run, and needs a restart for new rules.
 
 ## One-time setup
 
@@ -114,27 +128,58 @@ npm install -g opencode-ai
 ollama launch opencode --model gemma4:12b-32k
 ```
 
-OpenCode reads `AGENTS.md`, the skills in `.agents/skills/` and the permissions in [`opencode.json`](../opencode.json):
-it asks before every edit and shell command, lets read-only git commands through, and blocks `git push`,
-`git reset --hard` and `git clean`. Don't add paid model providers to it.
+OpenCode 2 reads `AGENTS.md`, the skills in `.agents/skills/` (and `.claude/skills/`, whose wrappers point to the same
+steps), [`.opencode/small-context.md`](../.opencode/small-context.md) through `instructions`, and the rules in
+[`opencode.json`](../opencode.json), written in the version 2 format: it asks before every edit and shell command,
+lets read-only git commands through, and blocks `git push`, `git reset --hard`, `git clean` and `gh pr merge`. The
+`headless` agent used by `run-agent.ps1` may also not open the message catalogs or touch a migration. Long sessions
+are summarised automatically (`compaction`), and build output isn't watched. Don't add paid model providers to it.
+`opencode debug agents` shows the rules each agent really gets; check it after changing the file.
 
-First test, before any real task:
+Optional, your call: OpenCode's free hosted models (such as GLM-5.3-Flash Free) are far stronger than Gemma, but need an
+OpenCode account, send the code to that provider, and are free only "for a limited time". They're not set up here.
 
-```text
-Inspect the FlexBuddy repository. Explain its architecture and identify where the Java controllers, services,
-repositories, Thymeleaf templates, JavaScript and tests live. Explain how to run validation. Do not edit files.
-```
+### Codex
+
+The Codex app (or the `codex` CLI, 0.159.0 or later for Terra) needs no project setup beyond what's committed:
+
+- It reads `AGENTS.md` and the skills in `.agents/skills/`; start one with `$implement-task FB-xxx`, `$prepare-review`
+  or `$review-task`.
+- Your own `~/.codex/config.toml` picks the model: `model = "gpt-6.1-sol"` (the Opus role). For a Terra session, run
+  `codex -m gpt-6.1-terra` or pick it with `/model`. There's deliberately no project `.codex/config.toml`, so the
+  repository never overrides your choice.
+- The project must be trusted in `~/.codex/config.toml` (it is), or Codex skips `.codex/hooks.json` and the rules.
+  The first time, open `/hooks` and approve the two guard hooks. Start Codex from the repository root: the hook commands
+  use paths relative to it.
+- `git push` of an `ai/` branch and `gh pr create` need network access outside Codex's sandbox; approve them when it
+  asks, as you would in Claude Code.
 
 ### Antigravity Pro
 
 Sign in with the Google account that has the Pro plan and set AI-credit overages to Never. Antigravity reads `AGENTS.md`
 from the workspace root ([rules docs](https://antigravity.google/docs/rules/)) and loads skills from
 `.agents/skills/<name>/SKILL.md` ([skills docs](https://antigravity.google/docs/skills/)), so it needs no extra setup.
+Run the smoke test under [Proving a tool works](#proving-a-tool-works) before giving it a real task.
 
 ### Claude Code
 
 `CLAUDE.md` imports `AGENTS.md`. Claude Code reviews from the local checkout with `gh`, and it is the tool for Android
 and emulator work because it already follows the emulator rules.
+
+## Proving a tool works
+
+Before a tool gets a real task, and again after updating it, give it this read-only prompt. It costs one short run.
+
+```text
+Read AGENTS.md and .ai/tasks/TEMPLATE.md. Without editing any file, answer: (1) which command runs both test suites,
+(2) where a new migration goes and what its next number is, (3) which three skills exist in .agents/skills and what
+each does, (4) whether you may push to main. Then run git status and report its output. Do not edit files.
+```
+
+It passes when every answer matches AGENTS.md, it ran `git status` itself, and `git status` shows nothing new
+afterwards. From Claude Code: `.\scripts\run-agent.ps1 -Agent local -TaskId <any existing id> -Prompt "<the prompt>"`
+(or `-Agent antigravity`); the log's "Refused tools" and "Handoff" sections show what it couldn't do. For the local
+model, also check `ollama ps` shows `32768` context during the run.
 
 ## Which tool for which task
 
@@ -162,10 +207,14 @@ when Claude's usage limits are tight; nothing depends on them.
 - **Android wrapper, emulator and Play Console work** stay with Claude Code; it follows the emulator and signing rules.
 - **The native Android app:** the same table, in its own repository. Claude handles anything touching sign-in, tokens,
   the outbox, earnings or background location, and reviews all of it.
-- **Inside Claude Code**, pick the model in the model picker:
-  - **Opus** for specs, design decisions, reviews, high-risk code and debugging;
-  - **Sonnet** to implement a well-specified task more cheaply;
+- **Inside Claude Code**, pick the model in the model picker (in Codex, `/model`):
+  - **Opus** (Codex: **Sol**) for specs, design decisions, reviews, high-risk code and debugging;
+  - **Sonnet** (Codex: **Terra**) to implement a well-specified task more cheaply;
   - **Haiku**, or the Explore subagent, for broad searches and reading logs.
+- **Reasoning effort:** high for specs, reviews and high-risk code; medium for routine implementation; low for docs and
+  one-line fixes. Claude Code: `/effort`. Codex: `model_reasoning_effort`, or the effort choice in `/model`.
+- **Claude Code or Codex:** either can run any task. Use whichever has usage left; keep one tool per task, and review
+  with a fresh session of either.
 
 Never let two agents edit the same working tree at once. Take turns, or give the second agent its own Git worktree.
 
@@ -180,13 +229,15 @@ local model. These habits keep tasks inside them:
    long session re-reads its whole history on every message.
 3. **Sonnet to build when usage is tight.** Opus plans and reviews; a well-specified task builds fine on Sonnet.
    Switch with the model picker.
-4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 84 KB) and other large files for the keys
-   you need. Use an Explore subagent for "where is X" questions.
+4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 94 KB, the Spanish one 103 KB) and
+   other large files for the keys you need; Claude Code's guard refuses a whole-catalog read. Use an Explore subagent
+   for "where is X" questions.
 5. **Read summaries.** `verify.ps1` writes `.ai/artifacts/<task-id>/summary.md`; open the full Maven log only when a
    check failed, and then only around the failure.
-6. **Review the diff, not the chat.** The reviewer reads the task, the review packet and `git diff`, nothing else.
+6. **Review the diff, not the chat.** The reviewer reads the review packet (which holds the task, the handoff and the
+   results) and `git diff`, nothing else.
 7. **Keep AGENTS.md short.** Every tool loads it on every turn. Rules go there; explanations go on this page.
-8. **Lower reasoning effort for routine work.** Small fixes don't need high effort.
+8. **Match the effort to the work.** See "Reasoning effort" above; routine work doesn't need high effort.
 
 ## A task from start to merge
 
@@ -281,9 +332,14 @@ Nobody is there to approve anything during these runs, so each agent gets fixed 
 
 Things to know:
 
-- **One refused command ends an Antigravity run** without an answer; the log's "Commands run" list ends with the one
-  it tried, marked "(outside the sandbox)" if it asked to leave it. Only a command that must leave the sandbox needs a
-  rule; add it to `scripts/antigravity-cli-settings.json` if it is safe.
+- **A refused command used to end an Antigravity run.** All four October runs (FB-008, FB-009) stopped that way after
+  about 40 searches and up to 7 minutes, with no answer. Antigravity 1.4.12's docs say a refused tool is now skipped
+  and the run carries on; the smoke test under [Proving a tool works](#proving-a-tool-works) confirms it on this PC.
+  The log now lists every refused tool under "Refused tools" and says whether a handoff report was written. Only a
+  command that must leave the sandbox needs a rule; add it to `scripts/antigravity-cli-settings.json` if it is safe.
+  Quoted `git grep` patterns with `<` or `|` in them are allowed.
+- **Tell it what the spec says.** `run-agent.ps1` now tells every agent that the task file lists the files to read
+  and the facts it needs, so it searches only for what's missing.
 - **Antigravity rules must be regexes.** On Windows the CLI checks each command wrapped in quotes, so plain rules such
   as `command(git status)` never match. The sandbox won't start with a relative path in a `write_file`/`read_file`
   rule, so the script writes a copy with absolute paths next to the run's log.

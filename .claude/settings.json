@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs\" release",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard.mjs\" release",
             "timeout": 10,
             "statusMessage": "Checking for a release to main"
           }
@@ -17,9 +17,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard.mjs\" migration",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard.mjs\" migration",
             "timeout": 10,
             "statusMessage": "Checking for a committed migration"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard.mjs\" catalog",
+            "timeout": 10,
+            "statusMessage": "Checking for a whole message catalog read"
           }
         ]
       }

@@ -10,8 +10,9 @@ Input: a task id such as `FB-001`, with an open pull request from `ai/<task-id>`
 Run this in a new session, not the one that wrote the code, so the review sees only what is in the
 repository.
 
-1. Read `AGENTS.md`, `.ai/tasks/<task-id>.md` and the pull request description (the review packet):
-   `gh pr view --json number,title,body,headRefOid` for the branch.
+1. Read the pull request description, which is the review packet: `gh pr view --json number,title,body,headRefOid`
+   for the branch. It already contains the task specification, the handoff report and the check results, so don't
+   read `.ai/tasks/<task-id>.md` separately unless the packet is missing or cut short. `AGENTS.md` is already loaded.
 2. Read the diff: `git fetch origin`, then `git diff origin/main...origin/ai/<task-id>`. Open a
    changed file in full only when the diff alone doesn't show enough, and other files only to check
    a specific concern.

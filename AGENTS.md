@@ -25,7 +25,7 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 - Design references for a task go in `.ai/design/<task-id>/`.
 - Repeatable procedures live in `.agents/skills/`: `implement-task` to build a task, `prepare-review` to get it ready for
   a pull request, and `review-task` to review that pull request in a fresh session. Claude Code reaches them as
-  `/implement-task`, `/prepare-review` and `/review-task`. If your tool does not load skills, read the `SKILL.md` and
+  `/implement-task`, `/prepare-review` and `/review-task`, Codex as `$implement-task` and so on. If your tool does not load skills, read the `SKILL.md` and
   follow it.
 - `.ai/implementations/<task-id>.md` is the handoff report between agents and `.ai/reviews/<task-id>.md` is the review
   packet. Both are local files, ignored by Git.
@@ -52,8 +52,8 @@ Render deploys every push to `main` once the GitHub checks pass. There is no sta
 - Work on a feature branch, not directly on `main`.
 - Never edit production data, Render settings or environment variables.
 - `FLEXBUDDY_TWO_FACTOR_KEY` must never be regenerated: it would lock out every driver who uses an authenticator app.
-- Claude Code's project hooks (`.claude/settings.json`) refuse a push to `main`, `gh pr merge` and an edit to a
-  committed migration. Don't work around them: the owner does those steps.
+- The agent guard (`scripts/hooks/guard.mjs`, run by Claude Code's and Codex's hooks) refuses a push to `main`,
+  `gh pr merge` and an edit to a committed migration. Don't work around it: the owner does those steps.
 
 ## Testing
 

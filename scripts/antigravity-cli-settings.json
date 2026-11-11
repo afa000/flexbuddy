@@ -4,6 +4,7 @@
   "permissions": {
     "allow": [
       "command(regex:^\"?git (status|diff|log|show|branch|grep)([^;&|<>$`]*)?\"?$)",
+      "command(regex:^\"?git grep(?: -[A-Za-z]+)* (?:\\\\?\"[^\"$`]*\\\\?\"|'[^'$`]*')(?: [^;&|<>$`\"']+)*\"?$)",
       "command(regex:^\"?(Get-ChildItem|Get-Content|Get-Item|Select-String|Test-Path|ls|dir|cat|type)( [^;&|<>$`]*)?\"?$)",
       "command(regex:^\"?node --test( [^;&|<>$`]*)?\"?$)",
       "command(regex:^\"?(\\.[\\\\/])?mvnw(\\.cmd)? -B -ntp (verify|test)( -Dtest=[A-Za-z0-9_*,#]+)?\"?$)",
@@ -11,6 +12,7 @@
     ],
     "deny": [
       "command(regex:^\"?git (push|commit|reset|clean|checkout|switch|rebase|merge)( .*)?$)",
+      "command(regex:^\"?gh pr merge( .*)?$)",
       "command(regex:^\"?git grep (.* )?(-[A-Za-z]*O|--op[A-Za-z-]*).*$)",
       "write_file(.git/)"
     ]

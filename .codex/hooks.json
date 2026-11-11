@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/guard.mjs release",
+            "commandWindows": "node scripts/hooks/guard.mjs release",
+            "timeout": 10,
+            "statusMessage": "Checking for a release to main"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/hooks/guard.mjs migration",
+            "commandWindows": "node scripts/hooks/guard.mjs migration",
+            "timeout": 10,
+            "statusMessage": "Checking for a committed migration"
+          }
+        ]
+      }
+    ]
+  }
+}

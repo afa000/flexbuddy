@@ -1,10 +1,13 @@
-// Tests for the FlexBuddy Claude Code guards. Run from the repository root: node --test ".claude/hooks/*.test.mjs"
+// Tests for the FlexBuddy agent guards. Run from the repository root: node --test "scripts/hooks/*.test.mjs"
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { isMigrationPath, migrationRefusal, releaseRefusal, splitCommands, targetsProtected } from './guard.mjs';
+import {
+    catalogRefusal, isCatalogPath, isMigrationPath, migrationRefusal, patchedPaths, releaseRefusal, splitCommands,
+    targetsProtected,
+} from './guard.mjs';
 
 const onBranch = (name) => () => name;
 const refused = (command, branch = 'ai/FB-027') => releaseRefusal(command, onBranch(branch)) !== null;
@@ -125,4 +128,59 @@ test('the script fails open on unreadable input', () => {
     assert.equal(run('release', 'not json').status, 0);
     assert.equal(run('migration', '').status, 0);
     assert.equal(run('unknown-mode', '{}').status, 0);
+});
+
+const patch = (...lines) => ['*** Begin Patch', ...lines, '*** End Patch'].join('\n');
+
+test('reads the files a Codex patch updates or deletes', () => {
+    assert.deepEqual(patchedPaths(patch(
+        '*** Update File: flexbuddy/src/main/resources/db/migration/V27__language.sql',
+        '@@',
+        '-old',
+        '+new',
+        '*** Add File: flexbuddy/src/main/resources/db/migration/V29__app_tokens.sql',
+        '+create table x();',
+        '*** Delete File: docs/old.md',
+    )), ['flexbuddy/src/main/resources/db/migration/V27__language.sql', 'docs/old.md']);
+    assert.deepEqual(patchedPaths(['apply_patch', patch('*** Update File: a.md')]), ['a.md']);
+    assert.deepEqual(patchedPaths(undefined), []);
+});
+
+test('a Codex patch is never read as shell commands', () => {
+    assert.equal(refused(patch('*** Update File: docs/a.md', '+git push origin main')), false);
+});
+
+test('refuses whole reads of a message catalog', () => {
+    const english = String.raw`C:\repo\flexbuddy\src\main\resources\i18n\messages.properties`;
+    const spanish = 'flexbuddy/src/main/resources/i18n/messages_es.properties';
+    assert.equal(isCatalogPath(english), true);
+    assert.equal(isCatalogPath(spanish), true);
+    assert.equal(isCatalogPath('flexbuddy/src/main/resources/application.properties'), false);
+    assert.notEqual(catalogRefusal({ file_path: english }), null);
+    assert.notEqual(catalogRefusal({ file_path: spanish, offset: 10, limit: 2000 }), null);
+    assert.equal(catalogRefusal({ file_path: spanish, offset: 400, limit: 60 }), null);
+    assert.equal(catalogRefusal({ file_path: spanish, limit: 200 }), null);
+    assert.equal(catalogRefusal({ file_path: 'AGENTS.md' }), null);
+    assert.equal(catalogRefusal(undefined), null);
+});
+
+test('the script refuses a Codex patch to a tracked migration and allows a new one', () => {
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    const tracked = run('migration', JSON.stringify({
+        tool_name: 'apply_patch', cwd: root,
+        tool_input: { command: patch('*** Update File: flexbuddy/src/main/resources/db/migration/V27__language.sql') },
+    }));
+    assert.equal(tracked.status, 2);
+    const added = run('migration', JSON.stringify({
+        tool_name: 'apply_patch', cwd: root,
+        tool_input: { command: patch('*** Add File: flexbuddy/src/main/resources/db/migration/V99__new.sql', '+x') },
+    }));
+    assert.equal(added.status, 0);
+});
+
+test('the script refuses a whole catalog read', () => {
+    const result = run('catalog', JSON.stringify({ tool_name: 'Read',
+        tool_input: { file_path: 'flexbuddy/src/main/resources/i18n/messages.properties' } }));
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /Grep for the keys/);
 });

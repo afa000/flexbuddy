@@ -46,6 +46,10 @@ if (-not $Prompt) {
     $Prompt = "Use the implement-task skill for $TaskId. The task is in .ai/tasks/$TaskId.md and you are on its " +
         "branch. $checks Write .ai/implementations/$TaskId.md before you stop. Do not commit or push."
 }
+# Antigravity's October runs spent most of their time searching for facts the spec already gave, and a refused command
+# is now skipped rather than fatal, so say both up front.
+$Prompt += " The task file already lists the files to read and the facts you need: read those first and search only " +
+    "for what it doesn't say. If a command is refused, don't retry it; note it in the handoff report and carry on."
 if ($Agent -eq 'antigravity') {
     # The terminal sandbox can read this working tree but not write to it, and has no network. Tests write build
     # output, so they have to leave the sandbox, which the allow rules approve.
@@ -83,6 +87,8 @@ Write-Host "Running $Agent on $TaskId in $root (log: .ai/artifacts/$TaskId/agent
 $out = "$log.out"
 $err = "$log.err"
 $timer = [Diagnostics.Stopwatch]::StartNew()
+$handoff = Join-Path $root ".ai\implementations\$TaskId.md"
+$handoffBefore = if (Test-Path $handoff) { (Get-Item $handoff).LastWriteTimeUtc } else { $null }
 $process = Start-Process -FilePath $exe -ArgumentList $arguments -WorkingDirectory $root -NoNewWindow -PassThru `
     -RedirectStandardOutput $out -RedirectStandardError $err
 $context = $null
@@ -109,8 +115,8 @@ if ($Agent -eq 'antigravity') {
     try { $result = $output | ConvertFrom-Json } catch { }
     if ($result) {
         $output = "Status: $($result.status)`n`n$($result.response)"
-        # In unattended mode one refused command ends the whole run, so record which commands it ran. The
-        # conversation id finds this run's transcript even when another run is going at the same time.
+        # Record which commands it ran, so a refused or wasted command is easy to find. The conversation id finds
+        # this run's transcript even when another run is going at the same time.
         $transcript = Join-Path $env:USERPROFILE `
             ".gemini\antigravity-cli\brain\$($result.conversation_id)\.system_generated\logs\transcript.jsonl"
         if (Test-Path $transcript) {
@@ -127,6 +133,17 @@ if ($Agent -eq 'antigravity') {
         Write-Warning "Antigravity stopped at a command its rules don't allow; it is the last one listed in the log."
     }
 }
+# Every tool the agent was refused, from either CLI's notices on stderr (Antigravity soft-denies and carries on).
+$refused = (($toolLog -split "`r?`n") | Where-Object { $_ -match '(?i)\b(soft-)?denied\b|cannot prompt for|not allowed' } |
+    ForEach-Object { "- " + $_.Trim() }) -join "`n"
+$handoffAfter = if (Test-Path $handoff) { (Get-Item $handoff).LastWriteTimeUtc } else { $null }
+$handoffNote = if (-not $handoffAfter) { "No handoff report was written." }
+    elseif ($handoffAfter -ne $handoffBefore) { "Handoff report written: .ai/implementations/$TaskId.md" }
+    else { "The handoff report was not updated during this run." }
+if (-not ("$output".Trim())) {
+    Write-Warning "The agent produced no answer. Check the refused tools and the tool log in the run's log file."
+}
+if ($handoffAfter -eq $handoffBefore) { Write-Warning $handoffNote }
 @"
 # $Agent on $TaskId, $stamp
 
@@ -141,6 +158,14 @@ $Prompt
 ## Output
 
 $output
+
+## Handoff
+
+$handoffNote
+
+## Refused tools
+
+$(if ($refused) { $refused } else { "(none reported)" })
 
 ## Tool log
 

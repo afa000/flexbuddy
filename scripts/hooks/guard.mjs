@@ -1,6 +1,9 @@
-// Claude Code PreToolUse guards for FlexBuddy (FB-027). They back up two AGENTS.md rules mechanically:
+// PreToolUse guards for FlexBuddy (FB-027), shared by Claude Code (.claude/settings.json) and Codex (.codex/hooks.json).
+// They back up AGENTS.md rules mechanically:
 //   node guard.mjs release    - refuses a git push to main, git push --all/--mirror and gh pr merge (they deploy)
-//   node guard.mjs migration  - refuses an edit to a Flyway migration that git already tracks (it has run in production)
+//   node guard.mjs migration  - refuses an edit to a Flyway migration that git already tracks (it has run in
+//                               production), from Claude Code's file tools or a Codex apply_patch
+//   node guard.mjs catalog    - refuses reading a whole message catalog; grep it for the keys instead
 // A refusal exits with code 2 and a one-line reason on stderr. Anything unreadable exits 0, so a broken hook never
 // blocks ordinary work. Nothing here prints the command or file contents beyond the refused part.
 
@@ -50,6 +53,8 @@ export function targetsProtected(refspec, currentBranch) {
  * push would run; it is only asked for when the push names no refspec.
  */
 export function releaseRefusal(command, currentBranch) {
+    // A Codex patch is file content, not commands; a doc line that mentions git push must not trip the guard.
+    if (/^\*\*\* Begin Patch/m.test(String(command))) return null;
     for (const segment of splitCommands(command)) {
         const tokens = stripPrefix(tokenize(segment));
         if (tokens.length === 0) continue;
@@ -112,6 +117,27 @@ export function migrationRefusal(path, isTracked) {
     return 'This migration is already committed and has run in production. Never edit it; add the next V<n>__*.sql instead.';
 }
 
+/** The files a Codex apply_patch updates or deletes ("*** Update File: <path>", "*** Delete File: <path>"). */
+export function patchedPaths(patch) {
+    const text = Array.isArray(patch) ? patch.join('\n') : String(patch ?? '');
+    return [...text.matchAll(/^\*\*\* (?:Update|Delete) File: (.+?)\s*$/gm)].map((match) => match[1]);
+}
+
+const CATALOG_READ_LIMIT = 200;
+
+/** Whether a path is one of the message catalogs (i18n/messages*.properties). */
+export function isCatalogPath(path) {
+    return /(^|\/)i18n\/messages[^/]*\.properties$/i.test(String(path).replace(/\\/g, '/'));
+}
+
+/** Returns the reason a Read must be refused, or null: a catalog read needs a limit of CATALOG_READ_LIMIT or fewer. */
+export function catalogRefusal(toolInput) {
+    if (!toolInput || !isCatalogPath(toolInput.file_path ?? '')) return null;
+    const limit = Number(toolInput.limit);
+    if (Number.isFinite(limit) && limit > 0 && limit <= CATALOG_READ_LIMIT) return null;
+    return `The message catalogs are about 100 KB. Grep for the keys you need, or Read with a limit of ${CATALOG_READ_LIMIT} lines or fewer.`;
+}
+
 function gitCurrentBranch(cwd) {
     try {
         return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -144,10 +170,15 @@ function main(mode) {
     if (mode === 'release') {
         reason = releaseRefusal(toolInput.command ?? '', (gitDir) => gitCurrentBranch(gitDir ? resolve(cwd, gitDir) : cwd));
     } else if (mode === 'migration') {
-        reason = migrationRefusal(toolInput.file_path ?? toolInput.notebook_path, gitTracks);
+        const paths = input?.tool_name === 'apply_patch' || /^\*\*\* Begin Patch/m.test(String(toolInput.command ?? ''))
+            ? patchedPaths(toolInput.command ?? toolInput.patch).map((path) => resolve(cwd, path))
+            : [toolInput.file_path ?? toolInput.notebook_path];
+        reason = paths.map((path) => migrationRefusal(path, gitTracks)).find(Boolean) ?? null;
+    } else if (mode === 'catalog') {
+        reason = catalogRefusal(toolInput);
     }
     if (!reason) return 0;
-    process.stderr.write(`Refused by FlexBuddy's Claude Code hook: ${reason}\n`);
+    process.stderr.write(`Refused by FlexBuddy's agent guard (scripts/hooks/guard.mjs): ${reason}\n`);
     return 2;
 }
 
