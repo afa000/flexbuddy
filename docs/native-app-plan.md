@@ -61,6 +61,27 @@ Change any of these before the first app task is specified.
 | Offline | Room cache for reading, plus an outbox that replays writes with the existing `Idempotency-Key` header | The server already de-duplicates retried block and expense saves (`RequestIds`) |
 | Rarely used account features | Two-step setup, backup/restore, Google linking, sign-up and account deletion open the website in a Custom Tab at first | Keeps the riskiest flows in one place. Account deletion stays reachable from inside the app, as Play requires |
 
+## Free testing tools
+
+Checked November 11, 2026. Offers change, and Student Pack offers end when student verification lapses: confirm each at
+sign-up, and if one asks for a card or a paid plan, stop and ask the owner. None of these adds a dependency to either
+project.
+
+| Tool | Cost | What it's for | Used in |
+|---|---|---|---|
+| Docker Desktop, `postgres:18` image | Free for personal and education use | Run `PostgresMigrationTest` locally by setting `FLEXBUDDY_TEST_POSTGRES_URL`, `_USER` and `_PASSWORD`, instead of only in CI. Every migration (V29 first) is checked before its pull request | NA-01, NA-02 |
+| Mailpit (Docker image) | Free, open source | A local mail server with a web inbox. Point `FLEXBUDDY_MAIL_HOST` at it (port 1025) to see sign-up, two-step and reset emails in both languages as real messages. The app's SMTP settings assume Gmail (auth and STARTTLS on), so check it connects without a username before relying on it | NA-01, NA-02 |
+| JetBrains student licence (IntelliJ IDEA Ultimate) | Student Pack, renewed yearly | Its HTTP client runs `.http` request files against the local or test server. Commit them next to `docs/api-v1.md` as runnable examples (sign in, get account, add a block), with no tokens or passwords in the files | NA-02 onward |
+| Neon branches | Free with the test-server database | Keep a clean `seed` branch with made-up accounts; branch from it before a test session and delete the branch after | NA-11 |
+| LambdaTest Live | Student Pack, 1 year | Real iPhones and Safari for website changes; the owner has no iPhone, and iPhone-only bugs have shipped before. Made-up data only | Any website task |
+| GitHub Pro | Student Pack | 3,000 GitHub Actions minutes a month for private repositories instead of 2,000; Android builds use minutes quickly | NA-01 (app repository) |
+| Play Console pre-launch report | Included with the developer account | Real-device crawl of every test-track upload for crashes, layout and accessibility. Google's docs disagree on whether internal testing gets one; check in the console | NA-10 |
+| Firebase Test Lab, Spark plan | Free, no card: 15 runs a day, 10 virtual and 5 physical | Compose UI tests on phones the owner doesn't have, by hand or from the app repository's CI | NA-05 onward |
+| Android Device Streaming | 30 free minutes a month | Drive a real Pixel or Samsung from Android Studio for a quick look; too few minutes for daily use | NA-03 onward |
+
+Left out for now: Sentry (Student Pack) would need privacy policy and Data safety changes before it could go in a Play
+build, and Android vitals already reports production crashes; BrowserStack overlaps with Test Lab.
+
 ## Delivery order
 
 Sections are plan references (NA-xx), not task numbers. Promote one at a time into tasks from `TEMPLATE.md`, in the
@@ -105,6 +126,8 @@ its branch protection.
   tokens, the outbox or earnings is high.
 - **Claude Code hooks** in `.claude/settings.json`: refuse `git push` to `main` and any edit to an existing
   `V<n>__*.sql`, so those rules hold even if an instruction is missed.
+- **Local Postgres and Mailpit:** add both to the setup in `docs/agent-workflow.md` (see "Free testing tools"), and
+  have `verify.ps1` say in `summary.md` whether the PostgreSQL migration test ran or was skipped.
 - Delete the stale local `claude/*` branches and `handoff-tools/` once the owner confirms nothing in them is needed.
 
 **In the app repository:**
@@ -117,7 +140,8 @@ its branch protection.
   `http://10.0.2.2:8080`.
 - `.ai/tasks/TEMPLATE.md`, the three skills adapted for Gradle, and a `scripts/verify.ps1` that runs
   `.\gradlew.bat test lintDebug` and writes `summary.md`.
-- CI on pull requests and `main`: JDK 21, Gradle cache, unit tests, lint, required before merge.
+- CI on pull requests and `main`: JDK 21, Gradle cache, unit tests, lint, required before merge. Claim GitHub Pro
+  from the Student Pack first, for the extra Actions minutes.
 - Keystores, passwords and signed builds stay out of this repository too; the owner signs.
 
 ## NA-02 — API foundation: the switch and token sign-in (FB-005, refreshed)
@@ -215,6 +239,9 @@ environment variable, signs and uploads.
   is the rollback for the server; the website doesn't depend on it.
 - A parity checklist: every everyday task in the TWA works natively, in both languages, at phone sizes, offline where
   the TWA worked offline.
+- Read the Play pre-launch report for every test-track upload. Play builds talk to production, so give its crawler
+  either no sign-in or a dedicated made-up account on production created for it, never a real driver's account, and
+  delete what it adds.
 - Internal testing track, then closed testing with the current testers, then production as a normal update:
   `versionCode` above the TWA's last, same package and upload key. Record each upload in the app repository's
   changelog, and the switch-over in `android/CHANGELOG-android.md` here.
@@ -265,6 +292,8 @@ production. It comes after NA-02, since before the switch exists there is nothin
   unmerged server task, deploy its branch by hand, then switch back to `main`.
 - Made-up accounts and figures only. No real driver data, no copies of the production database, and no real
   screenshots unless they're from the FB-003 sample set the owner already labeled.
+- Keep a Neon `seed` branch with the made-up accounts. For a test session, branch from it and point `DB_URL` at the
+  branch; delete the branch afterwards, so every session starts from the same data.
 - Expect slow screenshot reading on 0.1 CPU and the one-minute wake. The app has to show a clear "server waking up"
   or timeout message anyway; this is where that gets tested.
 - Play's internal and closed testing tracks (NA-10) use production with the API on, not this server: Play builds
