@@ -26,6 +26,15 @@ demos and every current driver, before, during and after the switch.
   every push and merge, high-risk work by Claude Code, earnings rules, per-user scoping, both languages, and
   backup/restore untouched.
 - **New dependencies need the owner's yes.** The list under "Decisions" is a proposal, not an approval.
+- **Offline first, server as the record.** Whatever can run on the phone does (reading, reminders, figures, exports),
+  so the app works with no signal and the server stays small as drivers join. The server stays the source of truth:
+  the phone syncs to it, and it re-checks every write. Earnings and import logic is never written twice; it moves into
+  the shared library (NA-12, NA-13), and the server's existing tests prove the website's results don't change.
+- **Accessible on every screen.** Each app task includes: TalkBack labels on every control, text that scales to 200%
+  without clipping, touch targets of at least 48 dp, meaning never shown by colour alone (such as missing miles),
+  light and dark themes, and both languages. Each screen is checked with Android's Accessibility Scanner, and the Play
+  pre-launch report's accessibility findings are read before release. The app stays usable on Android 8 phones with
+  little storage: a small download, and cached data and waiting screenshots that clean themselves up.
 
 ## Two repositories, one task sequence
 
@@ -59,6 +68,7 @@ Change any of these before the first app task is specified.
 | Text | `strings.xml` in English and Spanish; the API returns error codes, not sentences | Same two languages as the website |
 | Reminders | Local notifications scheduled by WorkManager from the driver's reminder settings | The website's Web Push (VAPID) can't reach a native app; Firebase Cloud Messaging is a new Google service and dependency, left for later |
 | Offline | Room cache for reading, plus an outbox that replays writes with the existing `Idempotency-Key` header | The server already de-duplicates retried block and expense saves (`RequestIds`) |
+| Sync | Every list endpoint takes `updatedSince` and returns changed and deleted records only, with an `ETag` so an unchanged answer is `304` with no body. Decided before NA-04 and written into `docs/api-v1.md` | Far less data on drivers' plans and less database work than reloading whole lists |
 | Rarely used account features | Two-step setup, backup/restore, Google linking, sign-up and account deletion open the website in a Custom Tab at first | Keeps the riskiest flows in one place. Account deletion stays reachable from inside the app, as Play requires |
 
 ## Free testing tools
@@ -93,7 +103,7 @@ session.
 | 0 | NA-00, NA-01 | The base-pay import bug fixed; the app repository and both repositories' rules ready |
 | 1 | NA-02, NA-11, NA-03 | A driver can sign in on the native app against a local server or the free test server (API still off in production) |
 | 2 | NA-04, NA-05, NA-06 | Home, Schedule and blocks: read, add, edit, complete, also offline |
-| 3 | NA-07, NA-12, NA-08, NA-09 | Expenses and payouts, screenshot import and sharing (also offline), reports, taxes, settings |
+| 3 | NA-07, NA-12, NA-13, NA-08, NA-09 | Expenses and payouts, screenshot import and sharing (also offline), figures and tools that work offline, reports, taxes, settings |
 | 4 | NA-10 | API turned on in production, parity check, internal and closed testing, then the Play update that replaces the TWA |
 
 ## NA-00 — Groundwork on the live app
@@ -185,6 +195,10 @@ the screen.
 - App: Home screen with this week's blocks, earnings, net with the missing-miles flags (FB-009, FB-013), goal progress.
   Scheduled blocks never count toward earnings, hours or net, same as the website.
 - App: Room cache so Home and Schedule open offline with the last data and say how old it is.
+- Server and app: the sync design from "Decisions" (`updatedSince`, deleted records, `ETag` and `304`) starts here,
+  so every later list endpoint follows it. Deleted records come back as deletions within the 30-day Recently deleted
+  window, so the phone drops them too.
+- At first Home shows the figures the server computed, cached. NA-13 moves the arithmetic to the phone.
 
 ## NA-05 — Blocks: add, edit, complete
 
@@ -336,6 +350,44 @@ least `MINIMUM_OVERLAP_MINUTES`) is small.
    duplicate check again; a clash answers `409` and the driver chooses, it never adds a second block.
 5. **Privacy.** The screenshot never leaves the phone when it is read offline, and is deleted after save or skip, and at
    sign-out. The Play Data safety form and privacy policy are checked against this before release.
+
+## NA-13 — Figures and tools that work offline
+
+Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
+Comes after NA-12, which creates the shared library.
+
+Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
+join, and it makes the app useful with no signal and on a small data plan. Checked November 11, 2026:
+`GoalProgressCalculator` (37 lines), `PayPeriodCalculator` (80), `IrsMileageRates` (57) and `MileageRates` (31) depend
+on nothing but a `@Component` annotation. `NetEarningsCalculator` (68) and `BlockEvaluator` (226) take the database
+entities `Shift` and `Expense`; `ShiftReportService` (429) and `TaxService` (258) also query the database.
+
+1. **Shared figures (server task).** Add to the shared library the calculators above, with `NetEarningsCalculator` and
+   `BlockEvaluator` changed to take plain inputs (a block's status, times, pay, tips and miles; an expense's category,
+   amount and date) instead of entities. The server maps its entities to those inputs and returns exactly the same
+   figures: the existing tests for each, plus the report and tax tests, pass unchanged. Scheduled blocks never count
+   toward earnings, hours or net, in the library as on the website.
+2. **Home and Reports offline (app task).** Compute this week's and each report's figures on the phone from the cached
+   blocks and expenses, with the shared calculators. Each screen says when the data was last synced. The tax year
+   summary keeps the server's figures, cached, because `TaxService` reads payments and settings the phone may not have
+   in full; say so on the screen.
+3. **Block evaluator offline (app task).** "Is this offer worth it?" runs on the phone with the shared `BlockEvaluator`
+   and the driver's cached costs, so it works when the driver is deciding with poor signal.
+4. **Exports offline (app task).** Build the blocks and expenses CSV on the phone with the shared writers
+   (`ShiftCsvWriter`, `ExpenseCsvWriter`, moved into the library) and hand it to Android's share sheet. The columns
+   and format match the website's download exactly; a test compares the two for the same data.
+5. **Add a block to the calendar (app task).** Use Android's calendar insert screen instead of downloading the
+   block's `.ics`. The private calendar feed (`/calendar/<token>.ics`) stays on the server, because Google Calendar
+   subscribes to it; the app never logs or shares its link.
+6. **Reminders on the phone (app task, with NA-09).** Block, missing-miles and tax due-date reminders are scheduled as
+   local notifications from cached data. The server's `ReminderJob`, `TaxReminderJob` and Web Push stay for the
+   website. To avoid two reminders for the same thing, the app tells the server, per device, that this phone handles
+   reminders, and the server skips Web Push for that driver while a phone has checked in within the last 7 days.
+   That flag is a small server change behind the API switch.
+
+**Stays on the server:** sign-in, two-step codes, password reset and all email; the calendar feed; backup and
+restore (older backup versions must stay restorable); the 30-day Recently deleted window; account deletion; and the
+duplicate and validation checks every synced write goes through.
 
 ## Later, not in this plan
 
