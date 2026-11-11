@@ -55,7 +55,7 @@ Change any of these before the first app task is specified.
 | Minimum Android | API 26 (Android 8.0) | Covers nearly all drivers' phones; the TWA's 24 gains little |
 | Stack | Kotlin, Compose, Navigation Compose, ViewModel, OkHttp + Retrofit + kotlinx.serialization, Room, WorkManager, DataStore. Manual dependency injection, no Hilt | Standard Jetpack set, few moving parts for a first native app |
 | Token storage | DataStore, encrypted with an Android Keystore key | `EncryptedSharedPreferences` is deprecated |
-| Screenshot reading | Server OCR through the API (the existing Tess4J path) | Keeps one parser and the FB-003 accuracy test set. On-device ML Kit can come later |
+| Screenshot reading | Server OCR through the API (the existing Tess4J path) at first; offline screenshots wait on the phone (NA-07). Reading on the phone comes in NA-12, with the server's own parser as a shared library | Keeps one parser and the FB-003 accuracy test set |
 | Text | `strings.xml` in English and Spanish; the API returns error codes, not sentences | Same two languages as the website |
 | Reminders | Local notifications scheduled by WorkManager from the driver's reminder settings | The website's Web Push (VAPID) can't reach a native app; Firebase Cloud Messaging is a new Google service and dependency, left for later |
 | Offline | Room cache for reading, plus an outbox that replays writes with the existing `Idempotency-Key` header | The server already de-duplicates retried block and expense saves (`RequestIds`) |
@@ -93,7 +93,7 @@ session.
 | 0 | NA-00, NA-01 | The base-pay import bug fixed; the app repository and both repositories' rules ready |
 | 1 | NA-02, NA-11, NA-03 | A driver can sign in on the native app against a local server or the free test server (API still off in production) |
 | 2 | NA-04, NA-05, NA-06 | Home, Schedule and blocks: read, add, edit, complete, also offline |
-| 3 | NA-07, NA-08, NA-09 | Expenses and payouts, screenshot import and sharing, reports, taxes, settings |
+| 3 | NA-07, NA-12, NA-08, NA-09 | Expenses and payouts, screenshot import and sharing (also offline), reports, taxes, settings |
 | 4 | NA-10 | API turned on in production, parity check, internal and closed testing, then the Play update that replaces the TWA |
 
 ## NA-00 — Groundwork on the live app
@@ -212,6 +212,10 @@ Risk: high (batch saves of earned blocks). Implementer: Claude Code.
   limits.
 - App: pick or share one or several screenshots (an Android share intent replaces the TWA's web share target), review
   each, explicit worked / not-yet-worked choice (FB-011), duplicate warnings (FB-008), save as a batch (FB-021).
+- App, **offline import (level 1)**: screenshots picked or shared with no connection are kept on the phone, in app
+  storage only, and listed as "waiting for a connection". Once the app is online they are read by the server and
+  reviewed one by one as usual. Nothing is saved without the driver's review, a waiting screenshot is deleted once it
+  is saved or skipped, and all of them are deleted at sign-out. Reading fully offline is NA-12.
 
 ## NA-08 — Reports, taxes and standing
 
@@ -298,6 +302,40 @@ production. It comes after NA-02, since before the switch exists there is nothin
   or timeout message anyway; this is where that gets tested.
 - Play's internal and closed testing tracks (NA-10) use production with the API on, not this server: Play builds
   carry the real package name and talk to the real site.
+
+## NA-12 — Reading screenshots fully offline
+
+Risk: high (earnings figures and batch saves, read with a new engine). Implementer: Claude Code. Repositories: both.
+Comes after NA-07; it can move to just after NA-10 if the owner would rather ship parity first.
+
+The phone reads the screenshot, the driver reviews and saves it with no connection, and the save syncs later. The
+website can't do this (its plan, `plan/on-device-ocr`, stopped because the parser would have to be copied into
+JavaScript and drift). The app can, because Kotlin on Android runs the server's Java: checked November 11, 2026,
+`ShiftScreenshotParser` (282 lines) and `ImportWarningRules` (114 lines) depend on nothing in Spring or the database
+except a `@Component` annotation. `ScheduledShiftMatcher` reads the database, but its rule (blocks overlapping by at
+least `MINIMUM_OVERLAP_MINUTES`) is small.
+
+1. **Shared library (server task, this repository).** Move the parser, its result types (`OcrLine`, `OcrResult`,
+   `ParseContext`, `ParsedField`, `ParsedShiftData`, `ConfidenceLevel`), `ImportWarningRules` and the overlap rule into
+   a plain-Java Maven module with no Spring dependency. The server wraps them as beans and behaves exactly as before:
+   `ShiftScreenshotParserTest`, `ImportWarningRulesTest`, `ScheduledShiftMatcherTest` and `OcrSampleAccuracyTest` pass
+   unchanged, and nothing a driver sees changes. Text the rules produce must stay message keys, so the app shows its
+   own `strings.xml` in both languages.
+2. **Publishing it (server task).** Publish the module as a versioned artifact the app repository can use, by default
+   GitHub Packages from this repository's CI. The owner approves the publishing setup; the app pins the version.
+3. **Go / no-go on the phone's reader (app task, before any app code ships).** Measure on the FB-003 labelled sample
+   set, as `plan/on-device-ocr` planned: the phone must give the same six fields (station, date, start, end, base pay,
+   tips) as the server on at least as many screenshots. Candidates, each a new dependency the owner approves:
+   - Tesseract on Android, the server's own engine and `eng.traineddata`, so its lines suit the parser best;
+   - Google ML Kit text recognition, faster and bundled, but its lines differ, so the parser may need tuning (which
+     then has to keep `OcrSampleAccuracyTest` passing on the server).
+   No go means no offline reading; level 1 from NA-07 stays.
+4. **Offline review and save (app task).** Read on the phone, run the shared parser and warning rules, check overlaps
+   against the blocks cached on the phone (NA-04), and show the same review with the explicit worked / not-yet-worked
+   choice (FB-011). Saving goes into the outbox (NA-05) with its `Idempotency-Key`. On sync the server runs its own
+   duplicate check again; a clash answers `409` and the driver chooses, it never adds a second block.
+5. **Privacy.** The screenshot never leaves the phone when it is read offline, and is deleted after save or skip, and at
+   sign-out. The Play Data safety form and privacy policy are checked against this before release.
 
 ## Later, not in this plan
 
