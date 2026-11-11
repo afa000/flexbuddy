@@ -10,15 +10,35 @@ can pick up where another stopped.
 
 1. Claude Code with Opus writes the task in `.ai/tasks/FB-xxx.md`, including its risk and who implements it, and
    pushes it on a new `ai/FB-xxx` branch.
-2. The implementer the task names works on that branch, one agent at a time: Claude Code with Sonnet, Antigravity, or
-   OpenCode with the local model ([which one](#which-tool-for-which-task)).
+2. The implementer the task names works on that branch, one agent at a time. Usually that is Claude Code with Opus
+   ([which one](#which-tool-for-which-task)).
 3. [`scripts/verify.ps1`](../scripts/verify.ps1) runs the Java and JavaScript suites; CI adds the PostgreSQL migration
-   test on the pull request.
+   test on the pull request, and you can run it locally too ([setup](#local-postgresql-18-and-mailpit)).
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
    the pull request description.
-5. A fresh Claude Code session with Opus reviews the pull request with the `review-task` skill
-   (`.agents/skills/review-task/SKILL.md`). Merging to `main`
-   deploys to Render.
+5. A fresh Claude Code session with Opus reviews the pull request with `/review-task FB-xxx`. You merge it yourself;
+   merging to `main` deploys to Render.
+
+### The native app's repository
+
+The native Kotlin app is built in its own repository, `flexbuddy-android` (not created yet), following
+[native-app-plan.md](native-app-plan.md). The loop is the same there. FB numbers are one sequence across both
+repositories, so check both for the next free one. A feature that needs the server becomes two tasks: the `/api/v1`
+endpoint here first, written into [api-v1.md](api-v1.md), then the app screen there.
+
+### Claude Code hooks
+
+[`.claude/settings.json`](../.claude/settings.json) runs [`.claude/hooks/guard.mjs`](../.claude/hooks/guard.mjs)
+before Claude Code's shell and file tools. It refuses:
+
+- `git push` to `main` (by name, `HEAD:main`, `--all`, `--mirror`, or a plain `git push` while on `main`) and
+  `gh pr merge`. Pushing a feature or `ai/` branch still works, after you approve it in chat.
+- an edit to a migration that git already tracks. A new `V<n>__*.sql` is fine.
+
+So pushing `main` and merging pull requests are always your steps. The hooks back up the rules in AGENTS.md; they
+don't replace them. A shell command can still change a file the file-tool check doesn't see, and Antigravity and
+OpenCode have their own permission files. Their tests: `node --test ".claude/hooks/*.test.mjs"` (not part of CI). A
+new Claude Code session picks up changes to the settings file.
 
 ## One-time setup
 
@@ -34,6 +54,35 @@ gh auth login --hostname github.com --git-protocol https --web
 ```
 
 Open a new terminal afterwards so `gh` is on the PATH.
+
+### Local PostgreSQL 18 and Mailpit
+
+Both run in Docker Desktop (free for personal and education use). Start Docker Desktop first.
+
+**PostgreSQL 18, for the migration test.** `PostgresMigrationTest` is skipped unless it has a database. It works in a
+schema with a random name and drops it afterwards, but give it its own container anyway, on port 5433 so it never
+meets a database the app uses:
+
+```powershell
+docker run -d --name flexbuddy-pg18 -e POSTGRES_PASSWORD=postgres -p 5433:5432 postgres:18
+$env:FLEXBUDDY_TEST_POSTGRES_URL = "jdbc:postgresql://localhost:5433/postgres"
+.\scripts\verify.ps1 -TaskId FB-xxx
+```
+
+The test's user and password default to `postgres`, the container's throwaway defaults, so only the URL is needed.
+`summary.md` says whether the test ran. Later, `docker start flexbuddy-pg18` brings the container back.
+
+**Mailpit, to see the app's emails.** A local mail server with a web inbox at http://localhost:8025:
+
+```powershell
+docker run -d --name mailpit -p 8025:8025 -p 1025:1025 axllent/mailpit
+$env:FLEXBUDDY_MAIL_HOST = "localhost"; $env:FLEXBUDDY_MAIL_PORT = "1025"
+cd flexbuddy; .\mvnw.cmd spring-boot:run
+```
+
+Sign-up, two-step and reset emails then arrive in the inbox as real messages, in either language. Not yet tried with
+the app: its mail settings are written for Gmail (sign-in and STARTTLS on). If it can't connect, use the
+`flexbuddy-links` launch configuration instead, which logs codes and links to the console.
 
 ### Ollama and the local models
 
@@ -89,30 +138,33 @@ and emulator work because it already follows the emulator rules.
 
 ## Which tool for which task
 
-Claude's usage limits are the scarce resource, so Claude plans and reviews everything and writes only the code where a
-mistake is expensive. Antigravity and the local model have their own quotas, so they take the volume.
+**What actually happens.** Since FB-011, every task has been handed to Claude Code with Opus, whatever its risk:
+specs, code, Android builds and reviews. That is the default now. The other tools stay set up as optional helpers for
+when Claude's usage limits are tight; nothing depends on them.
 
 **Every task, whoever implements it:**
 
 - **Plan:** Claude Code with **Opus**. The spec names the files to read, so the implementer doesn't explore.
-- **Review:** a fresh Claude Code session with **Opus** and the `review-task` skill, before merging.
+- **Review:** a fresh Claude Code session with **Opus** and `/review-task`, before merging.
 
 **Who implements, by the risk the spec gives it:**
 
-| Risk | What it covers | Implementer |
-|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data | Claude Code with **Sonnet** |
-| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | **Antigravity** (its Pro model) |
-| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
+| Risk | What it covers | Default | When usage is tight |
+|---|---|---|---|
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus** | Claude Code with **Sonnet**; never another tool |
+| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | Claude Code with **Opus** | Claude Code with **Sonnet**, or **Antigravity** (its Pro model) |
+| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Claude Code with **Opus** | **Sonnet**, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
 
-- **Escalate after two failed attempts:** local model → Antigravity → Claude Sonnet. Record the attempts in the handoff
+- **Name the implementer in the spec**, and when a task goes to someone else, say so in its `Implementer:` line with the
+  date, as FB-011 to FB-024 do.
+- **Escalate after two failed attempts:** local model → Antigravity → Claude. Record the attempts in the handoff
   report so the next tool doesn't repeat them.
 - **Android wrapper, emulator and Play Console work** stay with Claude Code; it follows the emulator and signing rules.
-- **The native Android app (Kotlin, later):** Antigravity or Gemini in Android Studio for screens, Claude for anything
-  touching sign-in, payments or background location, and Claude review for all of it.
+- **The native Android app:** the same table, in its own repository. Claude handles anything touching sign-in, tokens,
+  the outbox, earnings or background location, and reviews all of it.
 - **Inside Claude Code**, pick the model in the model picker:
-  - **Opus** for specs, design decisions, reviews and debugging a failure nobody else could fix;
-  - **Sonnet** for implementing;
+  - **Opus** for specs, design decisions, reviews, high-risk code and debugging;
+  - **Sonnet** to implement a well-specified task more cheaply;
   - **Haiku**, or the Explore subagent, for broad searches and reading logs.
 
 Never let two agents edit the same working tree at once. Take turns, or give the second agent its own Git worktree.
@@ -126,7 +178,8 @@ local model. These habits keep tasks inside them:
    implementer would otherwise go and find (class names, current behaviour, the next migration number).
 2. **One task per session.** Start a new Claude Code session, or `/clear`, for each task, and another for its review. A
    long session re-reads its whole history on every message.
-3. **Opus to plan and review, Sonnet to build.** Switch with the model picker.
+3. **Sonnet to build when usage is tight.** Opus plans and reviews; a well-specified task builds fine on Sonnet.
+   Switch with the model picker.
 4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 84 KB) and other large files for the keys
    you need. Use an Explore subagent for "where is X" questions.
 5. **Read summaries.** `verify.ps1` writes `.ai/artifacts/<task-id>/summary.md`; open the full Maven log only when a
@@ -144,7 +197,8 @@ You are the software architect for FlexBuddy.
 Read AGENTS.md and the code the feature touches.
 Feature request: [DESCRIBE FEATURE]
 
-Pick the next free FB-number: check .ai/tasks/ on main and the ai/FB-* branches on origin.
+Pick the next free FB-number: check .ai/tasks/ on main and the ai/FB-* branches on origin, in this
+repository and in flexbuddy-android once it exists.
 Create branch ai/<task-id> from main, write .ai/tasks/<task-id>.md from .ai/tasks/TEMPLATE.md,
 commit it and push the branch. Do not implement the feature.
 Set Risk and Implementer from the table in docs/agent-workflow.md, and list every file the
@@ -153,18 +207,19 @@ implementer needs under "Files to read". Keep the task small enough for one agen
 
 Pushing an `ai/` branch deploys nothing; Render only deploys `main`. The old `plan/<slug>` branches stay as history.
 
-**Implement.** Use the implementer the task names: from Claude Code, `run-agent.ps1` starts Antigravity or the local
-model ([below](#running-everything-from-one-claude-code-session)); for a Claude task, start a new session with Sonnet.
-To do it by hand, fetch the branch and ask the agent to use the `implement-task` skill:
+**Implement.** Use the implementer the task names. For a Claude task, start a new session (Opus by default, Sonnet to
+save usage), switch to the branch and run the skill:
 
 ```powershell
 git fetch origin
 git switch ai/FB-001
 ```
 
-> Use the implement-task skill for FB-001.
+> /implement-task FB-001
 
-If the tool doesn't load skills, say "Follow .agents/skills/implement-task/SKILL.md for FB-001."
+From Claude Code, `run-agent.ps1` starts Antigravity or the local model instead
+([below](#running-everything-from-one-claude-code-session)). In another tool, ask it to use the `implement-task`
+skill, or, if it doesn't load skills, say "Follow .agents/skills/implement-task/SKILL.md for FB-001."
 
 **Verify and open the pull request.** Commit first: the checks record the commit they tested, and the packet warns when
 that is no longer the latest one. Any untracked file counts as an uncommitted change: `verify.ps1` then reports "with
@@ -181,17 +236,18 @@ git push -u origin ai/FB-001
 gh pr create --base main --title "feat(scope): ..." --body-file .ai/reviews/FB-001.md
 ```
 
-Read the packet for secrets before it becomes the pull request description. The `prepare-review` skill does these steps
-and stops before pushing.
+Read the packet for secrets before it becomes the pull request description. `/prepare-review FB-001` does these
+steps and stops before pushing.
 
 **Review and merge.** Wait for the Java and JS checks. Then, in a new Claude Code session with Opus (not the one that
 wrote the code):
 
-> Follow .agents/skills/review-task/SKILL.md for FB-001.
+> /review-task FB-001
 
 The review reads only the task, the packet and the diff, and reports findings without changing code. Fixes go back to
-the implementer, or to Claude Sonnet for a high-risk task, and the review runs again on the new commit. Merging to
-`main` deploys to Render; GitHub refuses the merge until both checks pass.
+the implementer, or to Claude Code for a high-risk task, and the review runs again on the new commit. You merge the
+pull request yourself, in GitHub; Claude Code's hook refuses `gh pr merge`. Merging to `main` deploys to Render, and
+GitHub refuses the merge until both checks pass.
 
 ## Running everything from one Claude Code session
 

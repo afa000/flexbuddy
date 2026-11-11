@@ -2,7 +2,7 @@
 
 Status: Ready for implementation
 Risk: high | medium | low (see "Which tool for which task" in docs/agent-workflow.md)
-Implementer: Claude Code (Sonnet) | Antigravity | OpenCode + local model
+Implementer: Claude Code (Opus) | Claude Code (Sonnet) | Antigravity | OpenCode + local model
 Review: fresh Claude Code session (Opus), review-task skill
 
 ## Objective

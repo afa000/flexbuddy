@@ -15,6 +15,8 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 - `android/` is a Trusted Web Activity wrapper around the production site, built with Bubblewrap. It contains no app
   logic of its own.
 - `render.yaml` defines production on Render.
+- The native Kotlin app that will replace `android/` lives in its own repository, `flexbuddy-android`; app code never
+  goes here. The plan is [docs/native-app-plan.md](docs/native-app-plan.md).
 
 ## How work is organised
 
@@ -22,8 +24,9 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
   branch `ai/<task-id>`. The specification is committed on that branch before implementation starts.
 - Design references for a task go in `.ai/design/<task-id>/`.
 - Repeatable procedures live in `.agents/skills/`: `implement-task` to build a task, `prepare-review` to get it ready for
-  a pull request, and `review-task` to review that pull request in a fresh session. If your tool does not load skills,
-  read the `SKILL.md` and follow it.
+  a pull request, and `review-task` to review that pull request in a fresh session. Claude Code reaches them as
+  `/implement-task`, `/prepare-review` and `/review-task`. If your tool does not load skills, read the `SKILL.md` and
+  follow it.
 - `.ai/implementations/<task-id>.md` is the handoff report between agents and `.ai/reviews/<task-id>.md` is the review
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
@@ -49,6 +52,8 @@ Render deploys every push to `main` once the GitHub checks pass. There is no sta
 - Work on a feature branch, not directly on `main`.
 - Never edit production data, Render settings or environment variables.
 - `FLEXBUDDY_TWO_FACTOR_KEY` must never be regenerated: it would lock out every driver who uses an authenticator app.
+- Claude Code's project hooks (`.claude/settings.json`) refuse a push to `main`, `gh pr merge` and an edit to a
+  committed migration. Don't work around them: the owner does those steps.
 
 ## Testing
 
@@ -69,7 +74,8 @@ node --test "src/test/js/*.test.js"
 - Scripts are tested as they are loaded from disk, so keep logic in exported functions, not code that needs the page at
   load time.
 - The PostgreSQL migration test is skipped locally unless `FLEXBUDDY_TEST_POSTGRES_URL`, `_USER` and `_PASSWORD` are
-  set. CI runs it against Postgres 18 on every pull request. Say so if you did not run it.
+  set (setup in docs/agent-workflow.md). CI runs it against Postgres 18 on every pull request. Say so if you did not
+  run it.
 - User-facing text goes in both catalogs, English and Spanish, never hard-coded in a template or script. A new key goes
   in the same place in both files, in the same comment group. Spanish keeps the English `{0}` arguments and markup, and
   a message with arguments writes an apostrophe as `''`. `SpanishMessagesTest` checks all of this.
@@ -80,6 +86,8 @@ node --test "src/test/js/*.test.js"
 
 - Every query and endpoint is scoped to the signed-in user. Never return or change another user's data.
 - Keep existing authentication, authorization and rate-limit checks.
+- API work for the native app goes under `/api/v1/**` only, behind `FLEXBUDDY_API_ENABLED` (off in production until
+  the owner turns it on). Existing endpoints and pages don't change. Every API change updates `docs/api-v1.md`.
 - Database changes go in a new Flyway migration in `flexbuddy/src/main/resources/db/migration/` (next number after the
   newest `V<n>__*.sql`). Never edit a migration that already exists; it has run in production.
 - Preserve earnings rules: scheduled shifts never count toward earnings, hours or net figures until confirmed.
