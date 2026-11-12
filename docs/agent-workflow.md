@@ -5,7 +5,7 @@ them. The rules every agent follows are in [AGENTS.md](../AGENTS.md); this page 
 
 Claude Code and Codex are interchangeable for the whole loop. Where this page says **Opus**, Codex uses **Sol**
 (`gpt-6.1-sol`); where it says **Sonnet**, Codex uses **Terra** (`gpt-6.1-terra`). Both read `AGENTS.md` and the
-skills in `.agents/skills/`, and both run the same guard. Claude Code starts a skill with `/implement-task FB-xxx`,
+skills in `.agents/skills/`, and both have the same guard configured. Claude Code starts a skill with `/implement-task FB-xxx`,
 Codex with `$implement-task FB-xxx`.
 
 ### Starting a task in Codex
@@ -65,7 +65,9 @@ merges by command prefix, as a second layer. OpenCode and Antigravity have their
 So pushing `main` and merging pull requests are always your steps. The hooks back up the rules in AGENTS.md; they
 don't replace them: a shell command can still change a file the file-tool check doesn't see. The guard's tests:
 `node --test "scripts/hooks/*.test.mjs"` (not part of CI). A new Claude Code session picks up changes to the settings
-file; Codex asks you to approve new or changed hooks in `/hooks` before they run, and needs a restart for new rules.
+file. Review new or changed Codex hooks in Settings > Hooks in the desktop app, or `/hooks` in the CLI, before they
+run ([hook trust documentation](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)). An enabled entry alone
+does not prove that a tool call is intercepted: perform the live refusal check in the current session.
 
 ## One-time setup
 
@@ -167,7 +169,7 @@ The Codex app (or the `codex` CLI, 0.159.0 or later for Terra) needs no project 
   `codex -m gpt-6.1-terra` or pick it with `/model`. There's deliberately no project `.codex/config.toml`, so the
   repository never overrides your choice.
 - The project must be trusted in `~/.codex/config.toml` (it is), or Codex skips `.codex/hooks.json` and the rules.
-  The first time, open `/hooks` and approve the two guard hooks. They find the repository root with git, so they work
+  The first time, review the two guard hooks in Settings > Hooks (desktop) or `/hooks` (CLI). They find the repository root with git, so they work
   from any folder (`flexbuddy/` included) and in PowerShell, cmd or bash.
 - `git push` of an `ai/` branch and `gh pr create` need network access outside Codex's sandbox; approve them when it
   asks, as you would in Claude Code.
@@ -214,7 +216,7 @@ when Claude's usage limits are tight; nothing depends on them.
 
 | Risk | What it covers | Default | When usage is tight |
 |---|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus**, or Codex with **Sol** | Claude Code with **Sonnet** or Codex with **Terra**; never Antigravity or a local model |
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus**, or Codex with **Sol** | Switch between Opus and Sol, or wait for usage to reset; never Sonnet, Terra, Antigravity or a local model |
 | Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | Claude Code with **Opus** | Claude Code with **Sonnet**, or **Antigravity** (its Pro model) |
 | Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Claude Code with **Opus** | **Sonnet**, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
 
@@ -449,6 +451,12 @@ The [smoke test](#proving-a-tool-works) on November 11, 2026 (FB-027), with the 
 |---|---|---|
 | OpenCode + Gemma 4 12B, 32K | 70 s | **Partial pass.** Three of four answers right; for the next migration number it gave the rule, not `V29`, because it never looked in the migration folder. No refused tools, nothing changed |
 | Antigravity 1.4.12 | 60 s | **Pass.** All four right, including `V29`; three read-only commands; no refused tools, nothing changed. The first headless Antigravity run on this PC that returned an answer |
+
+Codex desktop live check later that day (FB-027): Settings > Hooks showed the current release and migration hooks
+enabled for this checkout, but `git push --dry-run origin HEAD:main` reached Git and failed on DNS rather than being
+refused by the hook. No changes were pushed. Hook execution in that session remains unresolved; do not treat the
+enabled indicators or passing launcher tests as proof of live enforcement. The bundled CLI's `execpolicy check`
+did load the repository rules and return `forbidden` for `git push origin main`.
 
 So the local model still needs the exact facts in the spec, as the "Writing tasks for the local model" list below
 says. Mailpit, under One-time setup, is still untried with the app's mail settings.

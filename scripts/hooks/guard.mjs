@@ -104,6 +104,14 @@ export function splitCommands(command) {
     let quote = null;
     for (let i = 0; i < text.length; i++) {
         const char = text[i];
+        // Bash backslash and PowerShell backtick continuations join one logical command, including CRLF input.
+        if (quote !== "'" && (char === '\\' || char === '`')) {
+            const newline = text.slice(i + 1).match(/^\r?\n/);
+            if (newline) {
+                i += newline[0].length;
+                continue;
+            }
+        }
         if (quote) {
             if (char === '\\' && quote === '"' && i + 1 < text.length) {
                 current += char + text[++i];

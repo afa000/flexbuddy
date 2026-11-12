@@ -95,6 +95,18 @@ test('splitCommands splits on chains and newlines', () => {
     assert.deepEqual(splitCommands('a && b || c; d | e\nf'), ['a', 'b', 'c', 'd', 'e', 'f']);
 });
 
+test('release checks join Bash and PowerShell continuation lines', () => {
+    for (const escape of ['\\', '`']) {
+        for (const newline of ['\n', '\r\n']) {
+            assert.equal(refused('git push origin ' + escape + newline + 'HEAD:main'), true);
+            assert.equal(refused('git pu' + escape + newline + 'sh origin main'), true);
+            assert.equal(refused('gh pr ' + escape + newline + 'merge 35'), true);
+            assert.equal(refused('git push origin ' + escape + newline + 'ai/FB-027'), false);
+            assert.equal(refused("echo 'notes" + escape + newline + "git push origin main'"), false);
+        }
+    }
+});
+
 test('recognises migration paths on Windows and POSIX', () => {
     assert.equal(isMigrationPath('C:\\repo\\flexbuddy\\src\\main\\resources\\db\\migration\\V27__language.sql'), true);
     assert.equal(isMigrationPath('flexbuddy/src/main/resources/db/migration/V1__init.sql'), true);
