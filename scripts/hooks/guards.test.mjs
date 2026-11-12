@@ -271,7 +271,23 @@ test('the Codex hook launcher finds the guard from a subfolder', async () => {
                     '*** Begin Patch\n*** Update File: src/main/resources/db/migration/V27__language.sql\n*** End Patch' } };
             const result = spawnSync(process.execPath, ['-e', code, mode],
                 { cwd: `${root}flexbuddy`, input: JSON.stringify(payload), encoding: 'utf8' });
-            assert.equal(result.status, 2, `${mode} from flexbuddy/: ${result.stderr}`);
+            assert.equal(result.status, 0, `${mode} from flexbuddy/: ${result.stderr}`);
+            const decision = JSON.parse(result.stdout).hookSpecificOutput;
+            assert.equal(decision.hookEventName, 'PreToolUse');
+            assert.equal(decision.permissionDecision, 'deny');
+            assert.match(decision.permissionDecisionReason, mode === 'release' ? /deploys production/ : /already committed/);
+            assert.equal(result.stderr, '');
+            const allowedPayload = mode === 'release'
+                ? { tool_name: 'Bash', tool_input: { command: 'git status' } }
+                : { tool_name: 'apply_patch', tool_input: { command:
+                    '*** Begin Patch\n*** Add File: db/migration/V99__new.sql\n+x\n*** End Patch' } };
+            for (const input of [JSON.stringify(allowedPayload), 'not json']) {
+                const allowed = spawnSync(process.execPath, ['-e', code, mode],
+                    { cwd: `${root}flexbuddy`, input, encoding: 'utf8' });
+                assert.equal(allowed.status, 0, allowed.stderr);
+                assert.equal(allowed.stdout, '');
+                assert.equal(allowed.stderr, '');
+            }
         }
     }
 });

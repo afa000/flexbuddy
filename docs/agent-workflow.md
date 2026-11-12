@@ -454,9 +454,17 @@ The [smoke test](#proving-a-tool-works) on November 11, 2026 (FB-027), with the 
 
 Codex desktop live check later that day (FB-027): Settings > Hooks showed the current release and migration hooks
 enabled for this checkout, but `git push --dry-run origin HEAD:main` reached Git and failed on DNS rather than being
-refused by the hook. No changes were pushed. Hook execution in that session remains unresolved; do not treat the
-enabled indicators or passing launcher tests as proof of live enforcement. The bundled CLI's `execpolicy check`
-did load the repository rules and return `forbidden` for `git push origin main`.
+refused by the hook. No changes were pushed. The bundled CLI's `execpolicy check` did load the repository rules and
+return `forbidden` for `git push origin main`.
+
+The live-hook investigation later that day confirmed both hooks were trusted and actually running. The guard detected
+the release command, but an exit-code-only refusal did not stop the tool in this desktop runtime
+(`codex-cli 0.167.0-alpha.4.1`). The Codex launcher now uses the documented
+[`PreToolUse` JSON denial](https://learn.chatgpt.com/docs/hooks#pretooluse), with exit 0; Claude Code's direct script
+still refuses with exit 2 and stderr. Verified live after the change: the release dry-run was blocked before Git,
+a patch to a Git-tracked dummy migration was blocked with its hash unchanged, and a new untracked dummy migration
+was allowed. Both fixtures live in an isolated Git repository under ignored `.ai/artifacts/FB-027/`; no real
+migration was edited. Enabled indicators and launcher tests alone still do not prove enforcement in another session.
 
 So the local model still needs the exact facts in the spec, as the "Writing tasks for the local model" list below
 says. Mailpit, under One-time setup, is still untried with the app's mail settings.

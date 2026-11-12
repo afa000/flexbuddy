@@ -4,8 +4,9 @@
 //   node guard.mjs migration  - refuses an edit to a Flyway migration that git already tracks (it has run in
 //                               production), from Claude Code's file tools or a Codex apply_patch
 //   node guard.mjs catalog    - refuses reading a whole message catalog; grep it for the keys instead
-// A refusal exits with code 2 and a one-line reason on stderr. Anything unreadable exits 0, so a broken hook never
-// blocks ordinary work. Nothing here prints the command or file contents beyond the refused part.
+// Direct CLI refusals exit 2 with a reason on stderr; Codex's runHook export returns a JSON deny with exit 0.
+// Anything unreadable exits 0, so a broken hook never blocks ordinary work.
+// Nothing here prints the command or file contents beyond the refused part.
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
@@ -292,15 +293,15 @@ function gitTracks(path) {
 }
 
 /**
- * Runs one guard on the hook payload from stdin and sets the exit code. Exported for the Codex launcher in
+ * Runs one guard with a structured PreToolUse decision. Exported for the Codex launcher in
  * .codex/hooks.json, which finds the repository root with git and imports this file, so the hook works from any folder
  * and in bash, cmd and PowerShell alike.
  */
 export function runHook(mode) {
-    process.exitCode = main(mode);
+    process.exitCode = main(mode, true);
 }
 
-function main(mode) {
+function main(mode, structured = false) {
     let input;
     try {
         // Windows PowerShell can pipe text with a UTF-8 byte-order mark, which JSON.parse rejects.
@@ -322,6 +323,17 @@ function main(mode) {
         reason = catalogRefusal(toolInput);
     }
     if (!reason) return 0;
+    if (structured) {
+        // Use an explicit Codex decision rather than depending on shell exit-code propagation.
+        process.stdout.write(JSON.stringify({
+            hookSpecificOutput: {
+                hookEventName: 'PreToolUse',
+                permissionDecision: 'deny',
+                permissionDecisionReason: reason,
+            },
+        }) + '\n');
+        return 0;
+    }
     process.stderr.write(`Refused by FlexBuddy's agent guard (scripts/hooks/guard.mjs): ${reason}\n`);
     return 2;
 }
