@@ -29,4 +29,4 @@ repository.
    fix. Say plainly when you found nothing, and list what you didn't check.
 
 Do not edit code, push, approve, merge or comment on the pull request unless the owner asks. Fixes go
-back to the implementer the task names, or to Claude Code for high-risk tasks.
+back to the implementer the task names, or to Claude Code or Codex for high-risk tasks.

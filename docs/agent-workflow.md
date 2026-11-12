@@ -8,6 +8,19 @@ Claude Code and Codex are interchangeable for the whole loop. Where this page sa
 skills in `.agents/skills/`, and both run the same guard. Claude Code starts a skill with `/implement-task FB-xxx`,
 Codex with `$implement-task FB-xxx`.
 
+### Starting a task in Codex
+
+1. **Plan** in a new Codex session on Sol: give the planning prompt under
+   [A task from start to merge](#a-task-from-start-to-merge). Codex writes `.ai/tasks/FB-xxx.md` on `ai/FB-xxx`.
+2. **Implement** in a new session: `git switch ai/FB-xxx`, then `$implement-task FB-xxx`. Use Sol for high-risk work,
+   Terra (`/model`) for routine work.
+3. **Prepare the pull request:** `$prepare-review FB-xxx` runs `verify.ps1` and builds the packet. Approve the push of
+   the `ai/` branch and `gh pr create` when Codex asks; the guard refuses anything aimed at `main`.
+4. **Review** in a fresh session, Codex or Claude Code: `$review-task FB-xxx`. Fixes go back to the implementer.
+5. **Merge** in GitHub yourself.
+
+Mixing tools is fine between steps, never within one: the repository files carry everything the next tool needs.
+
 The repository, not chat history, is the record: each task, its handoff notes and its checks live in files, so any tool
 can pick up where another stopped.
 
@@ -149,8 +162,8 @@ The Codex app (or the `codex` CLI, 0.159.0 or later for Terra) needs no project 
   `codex -m gpt-6.1-terra` or pick it with `/model`. There's deliberately no project `.codex/config.toml`, so the
   repository never overrides your choice.
 - The project must be trusted in `~/.codex/config.toml` (it is), or Codex skips `.codex/hooks.json` and the rules.
-  The first time, open `/hooks` and approve the two guard hooks. Start Codex from the repository root: the hook commands
-  use paths relative to it.
+  The first time, open `/hooks` and approve the two guard hooks. They find the repository root with git, so they work
+  from any folder (`flexbuddy/` included) and in PowerShell, cmd or bash.
 - `git push` of an `ai/` branch and `gh pr create` need network access outside Codex's sandbox; approve them when it
   asks, as you would in Claude Code.
 
@@ -196,7 +209,7 @@ when Claude's usage limits are tight; nothing depends on them.
 
 | Risk | What it covers | Default | When usage is tight |
 |---|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus** | Claude Code with **Sonnet**; never another tool |
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus**, or Codex with **Sol** | Claude Code with **Sonnet** or Codex with **Terra**; never Antigravity or a local model |
 | Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | Claude Code with **Opus** | Claude Code with **Sonnet**, or **Antigravity** (its Pro model) |
 | Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Claude Code with **Opus** | **Sonnet**, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
 
@@ -205,8 +218,8 @@ when Claude's usage limits are tight; nothing depends on them.
 - **Escalate after two failed attempts:** local model → Antigravity → Claude. Record the attempts in the handoff
   report so the next tool doesn't repeat them.
 - **Android wrapper, emulator and Play Console work** stay with Claude Code; it follows the emulator and signing rules.
-- **The native Android app:** the same table, in its own repository. Claude handles anything touching sign-in, tokens,
-  the outbox, earnings or background location, and reviews all of it.
+- **The native Android app:** the same table, in its own repository. Claude Code or Codex handles anything touching
+  sign-in, tokens, the outbox, earnings or background location, and reviews all of it.
 - **Inside Claude Code**, pick the model in the model picker (in Codex, `/model`):
   - **Opus** (Codex: **Sol**) for specs, design decisions, reviews, high-risk code and debugging;
   - **Sonnet** (Codex: **Terra**) to implement a well-specified task more cheaply;
@@ -296,8 +309,8 @@ wrote the code):
 > /review-task FB-001
 
 The review reads only the task, the packet and the diff, and reports findings without changing code. Fixes go back to
-the implementer, or to Claude Code for a high-risk task, and the review runs again on the new commit. You merge the
-pull request yourself, in GitHub; Claude Code's hook refuses `gh pr merge`. Merging to `main` deploys to Render, and
+the implementer, or to Claude Code or Codex for a high-risk task, and the review runs again on the new commit. You
+merge the pull request yourself, in GitHub; the guard refuses `gh pr merge` in both tools. Merging to `main` deploys to Render, and
 GitHub refuses the merge until both checks pass.
 
 ## Running everything from one Claude Code session
@@ -422,6 +435,16 @@ Then the same two jobs with Gemma 4 12B at 32K, also fully on the GPU:
 Gemma was faster and more accurate on both, so it is the local model to use, with Qwen as a fallback. One caveat:
 Gemma's FB-002 run started with the fix already committed and a shorter handoff report, a slightly easier start than
 Qwen had.
+
+The [smoke test](#proving-a-tool-works) on November 11, 2026 (FB-027), with the version 2 OpenCode config:
+
+| Tool | Time | Result |
+|---|---|---|
+| OpenCode + Gemma 4 12B, 32K | 70 s | **Partial pass.** Three of four answers right; for the next migration number it gave the rule, not `V29`, because it never looked in the migration folder. No refused tools, nothing changed |
+| Antigravity 1.4.12 | 60 s | **Pass.** All four right, including `V29`; three read-only commands; no refused tools, nothing changed. The first headless Antigravity run on this PC that returned an answer |
+
+So the local model still needs the exact facts in the spec, as the "Writing tasks for the local model" list below
+says. Mailpit, under One-time setup, is still untried with the app's mail settings.
 
 Treat the local model as a helper for narrow tasks with one example to copy: docs, CSS, small fixes, a test or two.
 Stop it after two failed attempts, check every test it writes fails without the change it guards, and don't take its

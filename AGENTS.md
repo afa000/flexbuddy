@@ -31,8 +31,8 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
 - Each task names its risk and its implementer. High-risk work (sign-in, payments, migrations, backup/restore,
-  earnings and tax figures, deleting data) is implemented by Claude Code. If you are not the named implementer and the
-  owner hasn't handed the task to you, stop and say so.
+  earnings and tax figures, deleting data) is implemented by Claude Code (Opus) or Codex (Sol), never by Antigravity or
+  a local model. If you are not the named implementer and the owner hasn't handed the task to you, stop and say so.
 - Read `verify.ps1`'s `summary.md`, not the full logs, unless a check failed.
 
 ## Before changing anything

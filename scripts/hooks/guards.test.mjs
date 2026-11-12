@@ -184,3 +184,68 @@ test('the script refuses a whole catalog read', () => {
     assert.equal(result.status, 2);
     assert.match(result.stderr, /Grep for the keys/);
 });
+
+test('refuses a push to main named through --repo', () => {
+    assert.equal(refused('git push --repo origin HEAD:main'), true);
+    assert.equal(refused('git push --repo=origin main'), true);
+    assert.equal(refused('git push --repo origin main'), true);
+    assert.equal(refused('git push --repo=origin --force ai/FB-027:main'), true);
+    assert.equal(refused('git push --repo origin ai/FB-027'), false);
+    assert.equal(refused('git push --repo=origin ai/FB-027'), false);
+});
+
+test('quoted text is never read as a command', () => {
+    for (const command of [
+        'echo "notes; git push origin main ; text"',
+        "echo 'a | git push origin main'",
+        'echo "first line\ngit push origin main"',
+        'git commit -m "docs: never git push origin main; ask the owner"',
+        'gh pr create --body "merge with gh pr merge later"',
+    ]) {
+        assert.equal(refused(command), false, command);
+    }
+});
+
+test('a real command after quoted text is still refused', () => {
+    assert.equal(refused('echo "done"; git push origin main'), true);
+    assert.equal(refused('echo "a << b"\ngit push origin main'), true);
+    assert.equal(refused('echo "$(git push origin main)"'), true);
+});
+
+test('heredoc and here-string bodies are text', () => {
+    const commit = "git commit -F - <<'EOF'\ndocs: say why\n\ngit push origin main is the owner's step\nEOF\ngit log -1";
+    assert.equal(refused(commit), false);
+    assert.equal(refused(commit + '\ngit push origin main'), true);
+    const hereString = "git commit -m @'\ngit push origin main\n'@";
+    assert.equal(refused(hereString), false);
+    assert.equal(refused('cat <<-END\n\tgit push origin main\n\tEND\ngit status'), false);
+});
+
+test('splitCommands keeps quoted separators inside one command', () => {
+    assert.deepEqual(splitCommands('echo "a; b" && git status'), ['echo "a; b"', 'git status']);
+    assert.deepEqual(splitCommands("echo 'x|y' | sort"), ["echo 'x|y'", 'sort']);
+});
+
+test('a payload with a UTF-8 byte-order mark is still read', () => {
+    const result = run('release', '﻿' + JSON.stringify({ tool_input: { command: 'git push origin main' } }));
+    assert.equal(result.status, 2);
+});
+
+test('the Codex hook launcher finds the guard from a subfolder', async () => {
+    const { readFileSync } = await import('node:fs');
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    const hooks = JSON.parse(readFileSync(new URL('../../.codex/hooks.json', import.meta.url), 'utf8'));
+    for (const group of hooks.hooks.PreToolUse) {
+        for (const hook of group.hooks) {
+            assert.equal(hook.command, hook.commandWindows, 'one command for every shell');
+            const [, code, mode] = hook.command.match(/^node -e "(.*)" (release|migration)$/);
+            const payload = mode === 'release'
+                ? { tool_name: 'Bash', cwd: '.', tool_input: { command: 'git push origin HEAD:main' } }
+                : { tool_name: 'apply_patch', cwd: `${root}flexbuddy`, tool_input: { command:
+                    '*** Begin Patch\n*** Update File: src/main/resources/db/migration/V27__language.sql\n*** End Patch' } };
+            const result = spawnSync(process.execPath, ['-e', code, mode],
+                { cwd: `${root}flexbuddy`, input: JSON.stringify(payload), encoding: 'utf8' });
+            assert.equal(result.status, 2, `${mode} from flexbuddy/: ${result.stderr}`);
+        }
+    }
+});

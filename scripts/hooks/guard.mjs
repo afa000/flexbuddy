@@ -14,12 +14,77 @@ import { fileURLToPath } from 'node:url';
 
 const PROTECTED_BRANCH = 'main';
 const PREFIX_TOKENS = new Set(['&', 'call', 'command', 'env', 'sudo', 'exec']);
-const PUSH_OPTIONS_WITH_VALUE = new Set(['-o', '--push-option', '--repo', '--receive-pack', '--exec']);
+const PUSH_OPTIONS_WITH_VALUE = new Set(['-o', '--push-option', '--receive-pack', '--exec']);
 const GIT_OPTIONS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace']);
 
-/** Splits a shell command into the commands chained by &&, ||, ;, | and newlines. */
+/** Drops heredoc bodies (<<EOF ... EOF) and PowerShell here-strings (@' ... '@): they are text, not commands. */
+export function stripHeredocs(command) {
+    const kept = [];
+    let until = null;
+    for (const line of String(command).split(/\r?\n/)) {
+        if (until) {
+            if (until.test(line)) until = null;
+            continue;
+        }
+        kept.push(line);
+        // Only a << outside quotes starts a heredoc; quoted text such as "a << b" must not hide the lines after it.
+        const unquoted = line.replace(/(?<!<<-?\s*)(["'])(?:(?!\1).)*\1/g, '""');
+        const heredoc = unquoted.match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/);
+        if (heredoc) {
+            until = new RegExp(`^\\s*${heredoc[2]}\\s*$`);
+        } else if (/@(['"])\s*$/.test(line)) {
+            until = new RegExp(`^${line.trim().slice(-1)}@`);
+        }
+    }
+    return kept.join('\n');
+}
+
+/**
+ * Splits a shell command into the commands chained by &&, ||, ;, | and newlines, outside quotes only, so quoted text
+ * that mentions a push is never read as one. Commands inside $( ) are returned as well, since the shell runs them.
+ */
 export function splitCommands(command) {
-    return String(command).split(/\|\||&&|[;|\r\n]/).map((part) => part.trim()).filter(Boolean);
+    const text = stripHeredocs(command);
+    const parts = [];
+    let current = '';
+    let quote = null;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (quote) {
+            if (char === '\\' && quote === '"' && i + 1 < text.length) {
+                current += char + text[++i];
+                continue;
+            }
+            if (char === quote) quote = null;
+            current += char;
+            continue;
+        }
+        if (char === '\\' && i + 1 < text.length && text[i + 1] !== '\n') {
+            current += char + text[++i];
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            current += char;
+            continue;
+        }
+        const pair = text.slice(i, i + 2);
+        if (pair === '&&' || pair === '||') {
+            parts.push(current);
+            current = '';
+            i++;
+            continue;
+        }
+        if (char === ';' || char === '|' || char === '\n' || char === '\r') {
+            parts.push(current);
+            current = '';
+            continue;
+        }
+        current += char;
+    }
+    parts.push(current);
+    const substitutions = [...text.matchAll(/\$\(([^()]*)\)/g)].flatMap((match) => splitCommands(match[1]));
+    return [...parts, ...substitutions].map((part) => part.trim()).filter(Boolean);
 }
 
 /** Splits one command into words, dropping the quotes around quoted words. */
@@ -79,19 +144,26 @@ export function releaseRefusal(command, currentBranch) {
         if (tokens[i] !== 'push') continue;
 
         const positional = [];
+        let repoOption = false;
         for (let j = i + 1; j < tokens.length; j++) {
             const word = tokens[j];
             if (word === '--all' || word === '--mirror') {
                 return `git push ${word} would push ${PROTECTED_BRANCH}, which deploys production. Push one feature branch, or ask the owner.`;
             }
-            if (PUSH_OPTIONS_WITH_VALUE.has(word)) {
+            if (word === '--repo') {
+                // --repo <remote> names the remote, so every positional argument after it is a refspec.
+                repoOption = true;
+                j++;
+            } else if (word.startsWith('--repo=')) {
+                repoOption = true;
+            } else if (PUSH_OPTIONS_WITH_VALUE.has(word)) {
                 j++;
             } else if (!word.startsWith('-')) {
                 positional.push(word);
             }
         }
 
-        const refspecs = positional.slice(1);
+        const refspecs = repoOption ? positional : positional.slice(1);
         const branch = () => currentBranch(gitDir);
         if (refspecs.length === 0) {
             if (branch() === PROTECTED_BRANCH) {
@@ -157,10 +229,20 @@ function gitTracks(path) {
     }
 }
 
+/**
+ * Runs one guard on the hook payload from stdin and sets the exit code. Exported for the Codex launcher in
+ * .codex/hooks.json, which finds the repository root with git and imports this file, so the hook works from any folder
+ * and in bash, cmd and PowerShell alike.
+ */
+export function runHook(mode) {
+    process.exitCode = main(mode);
+}
+
 function main(mode) {
     let input;
     try {
-        input = JSON.parse(readFileSync(0, 'utf8'));
+        // Windows PowerShell can pipe text with a UTF-8 byte-order mark, which JSON.parse rejects.
+        input = JSON.parse(readFileSync(0, 'utf8').replace(/^﻿/, ''));
     } catch {
         return 0;
     }

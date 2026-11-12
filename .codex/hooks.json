@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/guard.mjs release",
-            "commandWindows": "node scripts/hooks/guard.mjs release",
+            "command": "node -e \"import(require('url').pathToFileURL(require('child_process').execSync('git rev-parse --show-toplevel').toString().trim() + '/scripts/hooks/guard.mjs')).then((m) => m.runHook(process.argv[1]))\" release",
+            "commandWindows": "node -e \"import(require('url').pathToFileURL(require('child_process').execSync('git rev-parse --show-toplevel').toString().trim() + '/scripts/hooks/guard.mjs')).then((m) => m.runHook(process.argv[1]))\" release",
             "timeout": 10,
             "statusMessage": "Checking for a release to main"
           }
@@ -18,8 +18,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/guard.mjs migration",
-            "commandWindows": "node scripts/hooks/guard.mjs migration",
+            "command": "node -e \"import(require('url').pathToFileURL(require('child_process').execSync('git rev-parse --show-toplevel').toString().trim() + '/scripts/hooks/guard.mjs')).then((m) => m.runHook(process.argv[1]))\" migration",
+            "commandWindows": "node -e \"import(require('url').pathToFileURL(require('child_process').execSync('git rev-parse --show-toplevel').toString().trim() + '/scripts/hooks/guard.mjs')).then((m) => m.runHook(process.argv[1]))\" migration",
             "timeout": 10,
             "statusMessage": "Checking for a committed migration"
           }
