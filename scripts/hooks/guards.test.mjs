@@ -226,6 +226,20 @@ test('splitCommands keeps quoted separators inside one command', () => {
     assert.deepEqual(splitCommands("echo 'x|y' | sort"), ["echo 'x|y'", 'sort']);
 });
 
+test('literal and executable substitutions follow shell quoting', () => {
+    assert.equal(refused("echo '$(git push origin main)'"), false);
+    assert.equal(refused('echo "\\$(git push origin main)"'), false);
+    assert.equal(refused('echo "`$(git push origin main)"'), false);
+    assert.equal(refused('echo "$(echo "$(git push origin main)")"'), true);
+    assert.equal(refused("cat <<'EOF'\n$(git push origin main)\nEOF"), false);
+    assert.equal(refused('cat <<EOF\n$(git push origin main)\nEOF'), true);
+    assert.equal(refused('cat <<EOF\n$(\ngit push origin main\n)\nEOF'), true);
+    assert.equal(refused("cat <<EOF\n'$(git push origin main)'\nEOF"), true);
+    assert.equal(refused('cat <<EOF\ngit push origin main\nEOF'), false);
+    assert.equal(refused('Write-Output @"\n$(git push origin main)\n"@'), true);
+    assert.equal(refused("Write-Output @'\n$(git push origin main)\n'@"), false);
+});
+
 test('a payload with a UTF-8 byte-order mark is still read', () => {
     const result = run('release', '﻿' + JSON.stringify({ tool_input: { command: 'git push origin main' } }));
     assert.equal(result.status, 2);

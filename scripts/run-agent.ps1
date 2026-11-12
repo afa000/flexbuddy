@@ -109,11 +109,13 @@ $changes = (git -C $root status --short) -join "`n"
 # Both CLIs write UTF-8; Windows PowerShell would read it as the ANSI code page.
 $output = Get-Content $out -Raw -Encoding UTF8
 $toolLog = Get-Content $err -Raw -Encoding UTF8
+$answerEmpty = [string]::IsNullOrWhiteSpace([string]$output)
 $commands = ""
 if ($Agent -eq 'antigravity') {
     $result = $null
     try { $result = $output | ConvertFrom-Json } catch { }
     if ($result) {
+        $answerEmpty = [string]::IsNullOrWhiteSpace([string]$result.response)
         $output = "Status: $($result.status)`n`n$($result.response)"
         # Record which commands it ran, so a refused or wasted command is easy to find. The conversation id finds
         # this run's transcript even when another run is going at the same time.
@@ -140,7 +142,7 @@ $handoffAfter = if (Test-Path $handoff) { (Get-Item $handoff).LastWriteTimeUtc }
 $handoffNote = if (-not $handoffAfter) { "No handoff report was written." }
     elseif ($handoffAfter -ne $handoffBefore) { "Handoff report written: .ai/implementations/$TaskId.md" }
     else { "The handoff report was not updated during this run." }
-if (-not ("$output".Trim())) {
+if ($answerEmpty) {
     Write-Warning "The agent produced no answer. Check the refused tools and the tool log in the run's log file."
 }
 if ($handoffAfter -eq $handoffBefore) { Write-Warning $handoffNote }

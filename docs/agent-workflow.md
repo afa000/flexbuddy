@@ -104,12 +104,17 @@ The test's user and password default to `postgres`, the container's throwaway de
 ```powershell
 docker run -d --name mailpit -p 8025:8025 -p 1025:1025 axllent/mailpit
 $env:FLEXBUDDY_MAIL_HOST = "localhost"; $env:FLEXBUDDY_MAIL_PORT = "1025"
+$env:SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH = "false"
+$env:SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE = "false"
+$env:FLEXBUDDY_MAIL_USERNAME = ""; $env:FLEXBUDDY_MAIL_PASSWORD = ""
 cd flexbuddy; .\mvnw.cmd spring-boot:run
 ```
 
-Sign-up, two-step and reset emails then arrive in the inbox as real messages, in either language. Not yet tried with
-the app: its mail settings are written for Gmail (sign-in and STARTTLS on). If it can't connect, use the
-`flexbuddy-links` launch configuration instead, which logs codes and links to the console.
+These environment overrides turn off Gmail's SMTP sign-in and STARTTLS to match
+[Mailpit's default SMTP settings](https://mailpit.axllent.org/docs/configuration/smtp/). Sign-up,
+two-step and reset emails should then arrive in the inbox in either language. This setup has not been tested end to
+end here. Use a dedicated terminal and close it afterwards so the local overrides do not carry into other runs.
+The `flexbuddy-links` launch configuration is another local option; it logs codes and links to the console.
 
 ### Ollama and the local models
 
@@ -347,10 +352,12 @@ Things to know:
 
 - **A refused command used to end an Antigravity run.** All four October runs (FB-008, FB-009) stopped that way after
   about 40 searches and up to 7 minutes, with no answer. Antigravity 1.4.12's docs say a refused tool is now skipped
-  and the run carries on; the smoke test under [Proving a tool works](#proving-a-tool-works) confirms it on this PC.
+  and the run carries on. The smoke test under [Proving a tool works](#proving-a-tool-works) returned an answer on
+  this PC, but had no refused tools, so recovery from a refusal is still unverified.
   The log now lists every refused tool under "Refused tools" and says whether a handoff report was written. Only a
   command that must leave the sandbox needs a rule; add it to `scripts/antigravity-cli-settings.json` if it is safe.
-  Quoted `git grep` patterns with `<` or `|` in them are allowed.
+  Quoted `git grep` patterns with `<` or `|` in them are allowed. For PowerShell, use
+  `Select-String -Pattern '<html|body>' -Path docs/*.md` (quoted pattern, then plain paths).
 - **Tell it what the spec says.** `run-agent.ps1` now tells every agent that the task file lists the files to read
   and the facts it needs, so it searches only for what's missing.
 - **Antigravity rules must be regexes.** On Windows the CLI checks each command wrapped in quotes, so plain rules such

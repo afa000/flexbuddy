@@ -17,13 +17,63 @@ const PREFIX_TOKENS = new Set(['&', 'call', 'command', 'env', 'sudo', 'exec']);
 const PUSH_OPTIONS_WITH_VALUE = new Set(['-o', '--push-option', '--receive-pack', '--exec']);
 const GIT_OPTIONS_WITH_VALUE = new Set(['-C', '-c', '--git-dir', '--work-tree', '--namespace']);
 
-/** Drops heredoc bodies (<<EOF ... EOF) and PowerShell here-strings (@' ... '@): they are text, not commands. */
+/** Finds executable $(...) expressions, respecting quotes, escapes and nested parentheses. */
+function commandSubstitutions(text, body = false) {
+    const commands = [];
+    let quote = null;
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (quote !== "'" && (char === '\\' || char === '`')) {
+            i++;
+            continue;
+        }
+        if (!body && (char === '"' || char === "'")) {
+            if (!quote) quote = char;
+            else if (quote === char) quote = null;
+            continue;
+        }
+        if (quote === "'" || text.slice(i, i + 2) !== '$(') continue;
+        const start = i + 2;
+        let depth = 1;
+        let innerQuote = null;
+        let end = start;
+        for (; end < text.length; end++) {
+            const inner = text[end];
+            if (innerQuote !== "'" && (inner === '\\' || inner === '`')) {
+                end++;
+                continue;
+            }
+            if (inner === '"' || inner === "'") {
+                if (!innerQuote) innerQuote = inner;
+                else if (innerQuote === inner) innerQuote = null;
+            }
+            if (innerQuote) continue;
+            if (inner === '(') depth++;
+            if (inner === ')' && --depth === 0) break;
+        }
+        if (depth === 0) {
+            commands.push(text.slice(start, end));
+            i = end;
+        }
+    }
+    return commands;
+}
+
+/** Drops literal heredoc/here-string text, retaining commands in expanding bodies. */
 export function stripHeredocs(command) {
     const kept = [];
     let until = null;
+    let expanding = false;
+    let body = [];
     for (const line of String(command).split(/\r?\n/)) {
         if (until) {
-            if (until.test(line)) until = null;
+            if (until.test(line)) {
+                if (expanding) kept.push(...commandSubstitutions(body.join('\n'), true));
+                body = [];
+                until = null;
+            } else {
+                body.push(line);
+            }
             continue;
         }
         kept.push(line);
@@ -32,10 +82,14 @@ export function stripHeredocs(command) {
         const heredoc = unquoted.match(/<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/);
         if (heredoc) {
             until = new RegExp(`^\\s*${heredoc[2]}\\s*$`);
+            expanding = !heredoc[1];
         } else if (/@(['"])\s*$/.test(line)) {
             until = new RegExp(`^${line.trim().slice(-1)}@`);
+            expanding = line.trim().endsWith('"');
+            kept[kept.length - 1] = line.replace(/@(['"])\s*$/, '');
         }
     }
+    if (until && expanding) kept.push(...commandSubstitutions(body.join('\n'), true));
     return kept.join('\n');
 }
 
@@ -83,7 +137,7 @@ export function splitCommands(command) {
         current += char;
     }
     parts.push(current);
-    const substitutions = [...text.matchAll(/\$\(([^()]*)\)/g)].flatMap((match) => splitCommands(match[1]));
+    const substitutions = commandSubstitutions(text).flatMap((command) => splitCommands(command));
     return [...parts, ...substitutions].map((part) => part.trim()).filter(Boolean);
 }
 

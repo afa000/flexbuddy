@@ -6,6 +6,7 @@
       "command(regex:^\"?git (status|diff|log|show|branch|grep)([^;&|<>$`]*)?\"?$)",
       "command(regex:^\"?git grep(?: -[A-Za-z]+)* (?:\\\\?\"[^\"$`]*\\\\?\"|'[^'$`]*')(?: [^;&|<>$`\"']+)*\"?$)",
       "command(regex:^\"?(Get-ChildItem|Get-Content|Get-Item|Select-String|Test-Path|ls|dir|cat|type)( [^;&|<>$`]*)?\"?$)",
+      "command(regex:^\"?Select-String -Pattern (?:'[^'$`\\r\\n]*'|\"[^\"$`\\r\\n]*\") -Path [A-Za-z0-9_.*?/\\\\:-]+(?: [A-Za-z0-9_.*?/\\\\:-]+)*\"?$)",
       "command(regex:^\"?node --test( [^;&|<>$`]*)?\"?$)",
       "command(regex:^\"?(\\.[\\\\/])?mvnw(\\.cmd)? -B -ntp (verify|test)( -Dtest=[A-Za-z0-9_*,#]+)?\"?$)",
       "command(regex:^\"?(\\.[\\\\/])?scripts[\\\\/]verify\\.ps1 -TaskId [A-Za-z0-9_-]+\"?$)"
