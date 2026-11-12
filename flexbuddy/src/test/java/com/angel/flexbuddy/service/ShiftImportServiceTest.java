@@ -128,6 +128,44 @@ class ShiftImportServiceTest {
     }
 
     @Test
+    void createPreview_keepsBaseSeparateFromTheDisplayedTotalAndTips() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1)", 95, 0),
+                line("Sunday, 9/6", 95, 1),
+                line("04:00 - 07:30", 95, 2),
+                line("Total $90.50", 95, 3),
+                line("Base $72.00", 90, 4),
+                line("Tips $18.50", 85, 5))));
+        var screenshot = new MockMultipartFile("screenshot", "synthetic.png", "image/png", createPngBytes());
+
+        var candidate = shiftImportService.createPreview(EMAIL, screenshot).shifts().getFirst();
+
+        assertThat(candidate.basePay().value()).isEqualByComparingTo("72.00");
+        assertThat(candidate.tips().value()).isEqualByComparingTo("18.50");
+        assertThat(candidate.basePay().value().add(candidate.tips().value())).isEqualByComparingTo("90.50");
+        assertThat(candidate.basePay().lineIndex()).isEqualTo(4);
+        assertThat(candidate.warnings()).isEmpty();
+    }
+
+    @Test
+    void createPreview_warnsWhenOnlyTotalAndTipsCanBeRead() throws IOException {
+        when(textExtractor.extract(any(BufferedImage.class))).thenReturn(OcrResult.fromLines(java.util.List.of(
+                line("Windsor (DCY1)", 95, 0),
+                line("Sunday, 9/6", 95, 1),
+                line("04:00 - 07:30", 95, 2),
+                line("Total $90.50", 95, 3),
+                line("Tips $18.50", 95, 4))));
+        var screenshot = new MockMultipartFile("screenshot", "synthetic.png", "image/png", createPngBytes());
+
+        var candidate = shiftImportService.createPreview(EMAIL, screenshot).shifts().getFirst();
+
+        assertThat(candidate.basePay().value()).isNull();
+        assertThat(candidate.tips().value()).isEqualByComparingTo("18.50");
+        assertThat(candidate.warnings()).anyMatch(warning ->
+                warning.code().equals("MISSING_FIELD") && warning.field().equals("basePay"));
+    }
+
+    @Test
     void createPreview_throwsForUnsupportedContentType() {
         MockMultipartFile screenshot = new MockMultipartFile(
                 "screenshot",
