@@ -51,13 +51,14 @@ class ShiftReportServiceTest {
 
     @BeforeEach
     void setUp() {
+        ExpenseLinkStubs.readLinksFromEntities(expenseService);
         org.mockito.Mockito.lenient().when(userTime.now(EMAIL)).thenReturn(NOW);
         org.mockito.Mockito.lenient().when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
         org.mockito.Mockito.lenient().when(settingsService.get(EMAIL)).thenReturn(
                 new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                        new BigDecimal("0.70"), new BigDecimal("0.70"), 2025));
+                        new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
     }
 
     @Test
@@ -191,6 +192,49 @@ class ShiftReportServiceTest {
     }
 
     @Test
+    void statistics_passesTheCountOfWorkedBlocksWithoutMilesThrough() {
+        Shift never = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift entered = shift("VEA7", LocalDate.of(2026, 9, 7), "100.00", "0.00", 240);
+        entered.setMiles(new BigDecimal("12.0"));
+        Shift scheduled = withStatus(shift("VEA7", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(never, entered, scheduled));
+
+        ShiftStatisticsResponse result = reportService.statistics(EMAIL, ALL);
+
+        assertThat(result.getBlocksWithoutMiles()).isEqualTo(1);
+    }
+
+    @Test
+    void earnings_flagsTheGroupsWhoseNetIsMissingMiles() {
+        Shift never = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift zero = shift("VEA7", LocalDate.of(2026, 9, 7), "100.00", "0.00", 240);
+        zero.setMiles(BigDecimal.ZERO);
+        Shift entered = shift("DCY1", LocalDate.of(2026, 9, 8), "100.00", "0.00", 240);
+        entered.setMiles(new BigDecimal("12.0"));
+        Shift scheduled = withStatus(shift("DCY1", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(never, zero, entered, scheduled));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).extracting(EarningsBucket::label, EarningsBucket::netMissingMiles)
+                .containsExactlyInAnyOrder(org.assertj.core.groups.Tuple.tuple("VEA7", 1),
+                        org.assertj.core.groups.Tuple.tuple("DCY1", 0));
+    }
+
+    @Test
+    void earnings_flagsNothingWithActualExpenses() {
+        when(settingsService.get(EMAIL)).thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
+                com.angel.flexbuddy.model.VehicleCostMethod.ACTUAL_EXPENSES,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1)));
+        when(shiftService.findFiltered(EMAIL, ALL))
+                .thenReturn(List.of(shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240)));
+
+        EarningsReportResponse report = reportService.earnings(EMAIL, ALL, GroupBy.STATION);
+
+        assertThat(report.buckets()).extracting(EarningsBucket::netMissingMiles).containsExactly(0);
+    }
+
+    @Test
     void statistics_countCancellationsAndForfeitsInTheRangeAndThisMonth() {
         Shift cancelled = withStatus(shift("VEA7", LocalDate.of(2026, 8, 7), "18.00", "0.00", 240), ShiftStatus.CANCELLED);
         Shift forfeited = withStatus(shift("VEA7", LocalDate.of(2026, 8, 9), "0.00", "0.00", 240), ShiftStatus.FORFEITED);
@@ -231,6 +275,33 @@ class ShiftReportServiceTest {
         assertThat(result.getScheduledMinutes()).isEqualTo(420);
         assertThat(result.getExpectedPay()).isEqualByComparingTo("140.00");
         assertThat(result.getNeedsConfirmation()).isEqualTo(1);
+    }
+
+    private com.angel.flexbuddy.model.Expense toll(String amount, Shift linked) {
+        com.angel.flexbuddy.model.Expense expense = new com.angel.flexbuddy.model.Expense();
+        expense.setDate(LocalDate.of(2026, 9, 7));
+        expense.setCategory(com.angel.flexbuddy.model.ExpenseCategory.TOLL);
+        expense.setAmount(new BigDecimal(amount));
+        expense.setShift(linked);
+        return expense;
+    }
+
+    @Test
+    void anExpenseOnADeletedBlockCountsByDateWhileOneOnALiveScheduledBlockWaits() {
+        Shift worked = shift("VEA7", LocalDate.of(2026, 9, 6), "100.00", "0.00", 240);
+        Shift deleted = withStatus(shift("DCY1", LocalDate.of(2026, 9, 7), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        deleted.setId(2L);
+        deleted.setDeletedAt(java.time.Instant.parse("2026-09-08T12:00:00Z"));
+        Shift upcoming = withStatus(shift("DCY1", LocalDate.of(2026, 9, 20), "84.00", "0.00", 240), ShiftStatus.SCHEDULED);
+        upcoming.setId(3L);
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(worked));
+        when(expenseService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(toll("5.00", deleted), toll("7.00", upcoming)));
+
+        assertThat(reportService.statistics(EMAIL, ALL).getTotalExpenses()).isEqualByComparingTo("5.00");
+        // The deleted block's expense groups as unlinked, not under the deleted block's station.
+        assertThat(reportService.earnings(EMAIL, ALL, GroupBy.STATION).buckets())
+                .noneMatch(bucket -> "DCY1".equals(bucket.label()));
     }
 
     private Shift withStatus(Shift shift, ShiftStatus status) {
@@ -388,7 +459,7 @@ class ShiftReportServiceTest {
     private static com.angel.flexbuddy.dto.AccountSettingsResponse goalSettings(String weekly, String monthly,
             com.angel.flexbuddy.model.GoalBasis basis) {
         return new com.angel.flexbuddy.dto.AccountSettingsResponse(com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE,
-                new BigDecimal("0.70"), new BigDecimal("0.70"), 2025, "America/New_York", null, false, false, 45,
+                new BigDecimal("0.70"), new BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 45,
                 weekly == null ? null : new BigDecimal(weekly), monthly == null ? null : new BigDecimal(monthly), basis,
                 List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, null, null);
     }

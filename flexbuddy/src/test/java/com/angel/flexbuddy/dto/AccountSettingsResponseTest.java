@@ -15,7 +15,7 @@ class AccountSettingsResponseTest {
     @Test
     void theSeventeenArgumentConstructorShowsTheMissingMilesPromptsAsOn() {
         var settings = new AccountSettingsResponse(VehicleCostMethod.STANDARD_MILEAGE, new BigDecimal("0.700"),
-                new BigDecimal("0.700"), 2025, "America/Chicago", null, false, false, 45, null, null, GoalBasis.GROSS,
+                new BigDecimal("0.700"), java.time.LocalDate.of(2025, 1, 1), "America/Chicago", null, false, false, 45, null, null, GoalBasis.GROSS,
                 List.of(), 1, null, null, false);
 
         assertThat(settings.askMissingMiles()).isTrue();

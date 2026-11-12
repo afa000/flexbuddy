@@ -26,8 +26,10 @@
         <h1 th:text="#{taxSummary.heading(${'' + report.year})}">Tax year summary · 2026</h1>
         <p class="print-name" th:text="${report.displayName}">Driver</p>
         <p class="print-meta"><th:block th:text="#{taxSummary.generated}">Generated</th:block> <span th:text="${#temporals.format(report.generatedOn, 'MMM d, yyyy')}">Sep 29, 2026</span></p>
-        <p class="print-meta" th:if="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE'}"
+        <p class="print-meta" th:if="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE' and report.mileageRate != null}"
            th:text="#{taxSummary.vehicleCostsStandardMileageAt(${report.mileageRate.toPlainString()})}">Vehicle costs: Standard mileage</p>
+        <p class="print-meta" th:if="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE' and report.mileageRate == null}"
+           th:text="#{taxSummary.vehicleCostsStandardMileageIrs}">Vehicle costs: Standard mileage at the IRS rate for each block's date</p>
         <p class="print-meta" th:unless="${report.vehicleCostMethod.name() == 'STANDARD_MILEAGE'}" th:text="#{taxSummary.vehicleCostsActualExpenses}">Vehicle costs: Actual expenses</p>
     </header>
 
@@ -140,7 +142,7 @@
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.tips, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.gross, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="${row.miles.toPlainString()}">0.0</td>
-        <td class="num" th:text="'$' + ${row.mileageRate.toPlainString()}">$0.70</td>
+        <td class="num" th:text="${row.mileageRate != null} ? '$' + ${row.mileageRate.toPlainString()} : ''">$0.70</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.mileageCost, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.fuel, 1, 'COMMA', 2, 'POINT')}">$0.00</td>
         <td class="num" th:text="'$' + ${#numbers.formatDecimal(row.tolls, 1, 'COMMA', 2, 'POINT')}">$0.00</td>

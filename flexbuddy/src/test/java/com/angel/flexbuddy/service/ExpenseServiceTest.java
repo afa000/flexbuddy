@@ -60,6 +60,8 @@ class ExpenseServiceTest {
     void createLinksOnlyAnOwnedShiftAndNormalizesTheAmountAndNote() {
         when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(owner));
         when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(8L, EMAIL)).thenReturn(Optional.of(shift));
+        when(shiftRepository.findLinkedIncludingDeleted(EMAIL, java.util.Set.of(8L)))
+                .thenReturn(java.util.List.of(linkedRow(8L, "VEA7", "COMPLETED", false)));
         when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> {
             Expense expense = invocation.getArgument(0);
             expense.setId(20L);
@@ -167,5 +169,75 @@ class ExpenseServiceTest {
         org.mockito.ArgumentCaptor<Expense> saved = org.mockito.ArgumentCaptor.forClass(Expense.class);
         verify(expenseRepository).save(saved.capture());
         assertThat(saved.getValue().getCreateRequestId()).isEqualTo(KEY);
+    }
+
+    @Test
+    void anEditThatKeepsTheSameBlockKeepsTheLinkWithoutLookingTheBlockUp() {
+        Expense saved = linkedTo(8L);
+        saved.setId(20L);
+        when(expenseRepository.findByIdAndOwnerEmailIgnoreCase(20L, EMAIL)).thenReturn(Optional.of(saved));
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // The block is in Recently deleted, so a lookup would fail; the link must survive anyway.
+        service.update(EMAIL, 20L, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL,
+                new BigDecimal("5.00"), "new note", 8L));
+
+        assertThat(ExpenseService.linkedShiftId(saved)).isEqualTo(8L);
+        org.mockito.Mockito.verify(shiftRepository, org.mockito.Mockito.never()).findByIdAndOwnerEmailIgnoreCase(any(), any());
+    }
+
+    @Test
+    void anEditToAnotherBlockStillChecksItAndNoBlockUnlinks() {
+        Expense saved = linkedTo(8L);
+        saved.setId(20L);
+        when(expenseRepository.findByIdAndOwnerEmailIgnoreCase(20L, EMAIL)).thenReturn(Optional.of(saved));
+        when(shiftRepository.findByIdAndOwnerEmailIgnoreCase(9L, EMAIL)).thenReturn(Optional.empty());
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.update(EMAIL, 20L, new ExpenseRequest(
+                LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL, new BigDecimal("5.00"), null, 9L)))
+                .isInstanceOf(com.angel.flexbuddy.exception.ShiftNotFoundException.class);
+
+        when(expenseRepository.save(any(Expense.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        service.update(EMAIL, 20L, new ExpenseRequest(LocalDate.of(2026, 9, 12), ExpenseCategory.TOLL,
+                new BigDecimal("5.00"), null, null));
+        assertThat(saved.getShift()).isNull();
+    }
+
+    private Expense linkedTo(long shiftId) {
+        Expense expense = new Expense();
+        expense.setOwner(owner);
+        if (shiftId > 0) {
+            Shift link = new Shift();
+            link.setId(shiftId);
+            expense.setShift(link);
+        }
+        return expense;
+    }
+
+    @Test
+    void onlyAnExpenseOnALiveScheduledBlockWaitsAndOneOnADeletedBlockCountsByDate() {
+        Expense liveScheduled = linkedTo(1L), deletedScheduled = linkedTo(2L), completed = linkedTo(3L),
+                legacyNoStatus = linkedTo(4L), unlinked = linkedTo(0L);
+        when(shiftRepository.findLinkedIncludingDeleted(EMAIL, java.util.Set.of(1L, 2L, 3L, 4L))).thenReturn(java.util.List.of(
+                linkedRow(1L, "VEA7", "SCHEDULED", false), linkedRow(2L, "DCY1", "SCHEDULED", true),
+                linkedRow(3L, "VEA7", "COMPLETED", false), linkedRow(4L, "VEA6", null, false)));
+        java.util.List<Expense> all = java.util.List.of(liveScheduled, deletedScheduled, completed, legacyNoStatus, unlinked);
+
+        assertThat(service.countable(EMAIL, all)).containsExactly(deletedScheduled, completed, legacyNoStatus, unlinked);
+
+        var links = service.linkedShifts(EMAIL, all);
+        assertThat(ExpenseService.countedStation(deletedScheduled, links)).isNull();
+        assertThat(ExpenseService.countedStation(completed, links)).isEqualTo("VEA7");
+        assertThat(ExpenseService.countedStation(unlinked, links)).isNull();
+    }
+
+    private static com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow linkedRow(Long id, String station,
+            String status, boolean deleted) {
+        return new com.angel.flexbuddy.repository.ShiftRepository.LinkedShiftRow() {
+            public Long getId() { return id; }
+            public String getStation() { return station; }
+            public String getStatus() { return status; }
+            public Boolean getDeleted() { return deleted; }
+        };
     }
 }

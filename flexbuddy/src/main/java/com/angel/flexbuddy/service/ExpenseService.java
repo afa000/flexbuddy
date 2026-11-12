@@ -23,6 +23,7 @@ import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
 import com.angel.flexbuddy.model.Shift;
+import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.repository.AppUserRepository;
 import com.angel.flexbuddy.repository.ExpenseRepository;
 import com.angel.flexbuddy.repository.ShiftRepository;
@@ -46,7 +47,56 @@ public class ExpenseService {
 
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getExpenses(String email, ExpenseFilter filter) {
-        return findFiltered(email, filter).stream().map(this::toResponse).toList();
+        return toResponses(email, findFiltered(email, filter));
+    }
+
+    /** The block an expense is linked to, deleted or not. Status is never null; an old row without one was completed. */
+    public record LinkedShift(Long id, String station, ShiftStatus status, boolean deleted) {
+        /** An expense on a block that is still scheduled waits for it; one on a deleted block counts by its date. */
+        boolean waiting() { return !deleted && status == ShiftStatus.SCHEDULED; }
+    }
+
+    /**
+     * The blocks these expenses are linked to, by id, read in one query with deleted ones included. Expenses never
+     * follow their link past its id, because a deleted block can't be loaded through it.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<Long, LinkedShift> linkedShifts(String email, java.util.Collection<Expense> expenses) {
+        java.util.Set<Long> ids = expenses.stream().map(ExpenseService::linkedShiftId).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        if (ids.isEmpty()) return java.util.Map.of();
+        return shiftRepository.findLinkedIncludingDeleted(email, ids).stream()
+                .collect(java.util.stream.Collectors.toMap(ShiftRepository.LinkedShiftRow::getId, row -> new LinkedShift(
+                        row.getId(), row.getStation(),
+                        row.getStatus() == null ? ShiftStatus.COMPLETED : ShiftStatus.valueOf(row.getStatus()),
+                        Boolean.TRUE.equals(row.getDeleted()))));
+    }
+
+    /** The id of the block an expense is linked to, read without loading the block. */
+    public static Long linkedShiftId(Expense expense) {
+        return expense.getShift() == null ? null : expense.getShift().getId();
+    }
+
+    /** The linked block from a lookup, or null for an unlinked expense. */
+    public static LinkedShift linkOf(Expense expense, java.util.Map<Long, LinkedShift> links) {
+        Long id = linkedShiftId(expense);
+        return id == null ? null : links.get(id);
+    }
+
+    /** The expenses that count toward net: all but those on a block that is still scheduled. */
+    @Transactional(readOnly = true)
+    public List<Expense> countable(String email, List<Expense> expenses) {
+        java.util.Map<Long, LinkedShift> links = linkedShifts(email, expenses);
+        return expenses.stream().filter(expense -> {
+            LinkedShift link = linkOf(expense, links);
+            return link == null || !link.waiting();
+        }).toList();
+    }
+
+    /** The station an expense counts under: its block's, unless the block is deleted, when it counts as unlinked. */
+    public static String countedStation(Expense expense, java.util.Map<Long, LinkedShift> links) {
+        LinkedShift link = linkOf(expense, links);
+        return link == null || link.deleted() ? null : link.station();
     }
 
     @Transactional(readOnly = true)
@@ -68,8 +118,7 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<ExpenseResponse> getForShift(String email, Long shiftId) {
         ownedShift(email, shiftId);
-        return expenseRepository.findAllByShiftIdAndOwnerEmailIgnoreCaseOrderByDateDesc(shiftId, email)
-                .stream().map(this::toResponse).toList();
+        return toResponses(email, expenseRepository.findAllByShiftIdAndOwnerEmailIgnoreCaseOrderByDateDesc(shiftId, email));
     }
 
     @Transactional
@@ -85,7 +134,7 @@ public class ExpenseService {
     public ExpenseResponse create(String email, ExpenseRequest request, String requestId) {
         if (requestId != null) {
             Expense existing = expenseRepository.findByCreateRequestIdIncludingDeleted(email, requestId).orElse(null);
-            if (existing != null) return toResponse(existing);
+            if (existing != null) return toResponse(email, existing);
         }
         AppUser owner = userRepository.findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new IllegalStateException("Signed-in account could not be found."));
@@ -93,7 +142,7 @@ public class ExpenseService {
         expense.setCreateRequestId(requestId);
         expense.setOwner(owner);
         apply(expense, email, request);
-        return toResponse(expenseRepository.save(expense));
+        return toResponse(email, expenseRepository.save(expense));
     }
 
     @Transactional
@@ -101,7 +150,7 @@ public class ExpenseService {
         Expense expense = expenseRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
         apply(expense, email, request);
-        return toResponse(expenseRepository.save(expense));
+        return toResponse(email, expenseRepository.save(expense));
     }
 
     @Transactional
@@ -116,7 +165,7 @@ public class ExpenseService {
     @Transactional
     public ExpenseResponse restore(String email, Long id) {
         if (expenseRepository.restoreDeleted(email, id) == 0) throw new ExpenseNotFoundException(id);
-        return expenseRepository.findByIdAndOwnerEmailIgnoreCase(id, email).map(this::toResponse)
+        return expenseRepository.findByIdAndOwnerEmailIgnoreCase(id, email).map(expense -> toResponse(email, expense))
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
     }
 
@@ -126,7 +175,7 @@ public class ExpenseService {
     @Transactional
     public List<ExpenseResponse> getTrash(String email) {
         expenseRepository.purgeDeletedBefore(Instant.now(clock).minus(30, java.time.temporal.ChronoUnit.DAYS));
-        return expenseRepository.findTrash(email).stream().map(this::toResponse).toList();
+        return toResponses(email, expenseRepository.findTrash(email));
     }
 
     @Transactional
@@ -153,7 +202,13 @@ public class ExpenseService {
         expense.setCategory(request.category());
         expense.setAmount(money(request.amount()));
         expense.setNote(request.note() == null || request.note().isBlank() ? null : request.note().trim());
-        expense.setShift(request.shiftId() == null ? null : ownedShift(email, request.shiftId()));
+        Long requested = request.shiftId();
+        if (requested == null) {
+            expense.setShift(null);
+        } else if (!requested.equals(linkedShiftId(expense))) {
+            expense.setShift(ownedShift(email, requested));
+        }
+        // An unchanged link is kept as it is, even when its block is in Recently deleted and can't be looked up.
     }
 
     private Shift ownedShift(String email, Long id) {
@@ -161,11 +216,20 @@ public class ExpenseService {
                 .orElseThrow(() -> new ShiftNotFoundException(id));
     }
 
-    public ExpenseResponse toResponse(Expense expense) {
-        Shift shift = expense.getShift();
-        return new ExpenseResponse(expense.getId(), expense.getDate(), expense.getCategory(), expense.getAmount(),
-                expense.getNote(), shift == null ? null : shift.getId(), shift == null ? null : shift.getStation(),
-                expense.getCreatedAt(), expense.getUpdatedAt(), expense.getDeletedAt());
+    public ExpenseResponse toResponse(String email, Expense expense) {
+        return toResponses(email, List.of(expense)).getFirst();
+    }
+
+    /** Responses for a list of expenses, their linked blocks read in one query, deleted blocks included. */
+    public List<ExpenseResponse> toResponses(String email, List<Expense> expenses) {
+        java.util.Map<Long, LinkedShift> links = linkedShifts(email, expenses);
+        return expenses.stream().map(expense -> {
+            LinkedShift link = linkOf(expense, links);
+            return new ExpenseResponse(expense.getId(), expense.getDate(), expense.getCategory(), expense.getAmount(),
+                    expense.getNote(), linkedShiftId(expense), link == null ? null : link.station(),
+                    expense.getCreatedAt(), expense.getUpdatedAt(), expense.getDeletedAt(),
+                    link != null && link.deleted());
+        }).toList();
     }
 
     private BigDecimal money(BigDecimal value) {

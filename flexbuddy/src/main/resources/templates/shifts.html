@@ -94,7 +94,7 @@
                 </div>
                 <div class="home-figures">
                     <div><span th:text="#{home.last7Days}">Last 7 days</span><b id="rollingSevenDayTime">—</b><small id="lastSevenDetail"></small></div>
-                    <div><span th:text="#{home.estNetHr}">Est. net / hr</span><b id="weekNetHourly">—</b><small th:text="#{home.estimate}">estimate</small></div>
+                    <div><span th:text="#{home.estNetHr}">Est. net / hr</span><b id="weekNetHourly">—</b><small id="weekNetHourlyNote" th:text="#{home.estimate}">estimate</small></div>
                     <div><span th:text="#{home.setAside}">Set aside</span><b id="taxWeekAmount">—</b><small id="taxWeekDetail" th:text="#{home.taxEstimate}">tax estimate</small></div>
                 </div>
                 <p class="goal-month" id="goalMonth"></p>
@@ -129,6 +129,15 @@
                         <button class="text-button" id="dismissInstallBanner" type="button" th:text="#{home.notNow}">Not now</button>
                     </div>
                 </div>
+            </article>
+
+            <article class="home-card home-last-block" id="lastBlockCard" hidden aria-labelledby="lastBlockLabel">
+                <div class="last-block-text">
+                    <h2 class="home-label" id="lastBlockLabel" th:text="#{home.yourLastBlock}">Your last block</h2>
+                    <strong id="lastBlockTitle"></strong>
+                    <small id="lastBlockSummary"></small>
+                </div>
+                <button class="secondary-button compact-button" id="lastBlockButton" type="button" th:text="#{home.reviewThisBlock}">Review this block</button>
             </article>
 
             <details class="panel evaluate-panel" id="evaluatePanel">
@@ -418,14 +427,34 @@
                     </div>
                 </div>
 
-                <input id="screenshotInput" type="file" accept="image/png,image/jpeg" hidden>
+                <input id="screenshotInput" type="file" accept="image/png,image/jpeg" multiple hidden>
                 <button class="drop-zone" id="dropZone" type="button">
                     <span class="upload-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M12 15V5m0 0L8 9m4-4 4 4M5 14.5V18a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-3.5"/></svg>
                     </span>
-                    <strong th:text="#{import.dropYourScreenshotHere}">Drop your screenshot here</strong>
-                    <span th:text="#{import.orClickToBrowseYour}">or click to browse your files</span>
+                    <strong class="pointer-copy" th:text="#{import.dropYourScreenshotHere}">Drop your screenshot here</strong>
+                    <span class="pointer-copy" th:text="#{import.orClickToBrowseYour}">or click to browse your files</span>
+                    <strong class="touch-copy" th:text="#{import.chooseAScreenshot}">Choose a screenshot</strong>
+                    <span class="touch-copy" th:text="#{import.tapToPickFromPhotos}">Tap to pick one from your photos</span>
                 </button>
+                <div class="import-guidance">
+                    <small class="field-hint" th:text="#{import.worksWith}">Works with a Schedule Details screenshot of a block you accepted, or an Earnings screenshot of a block you worked.</small>
+                    <small class="field-hint" th:text="#{import.notOffersList}">An offers list with no block selected can't be imported.</small>
+                    <small class="field-hint" th:text="#{import.upToTen}">You can choose up to 10 at once.</small>
+                    <small class="field-hint is-hidden" id="shareTip" th:text="#{import.shareFromPhotos}">On Android, you can also share screenshots to FlexBuddy from Photos.</small>
+                </div>
+
+                <section class="import-queue is-hidden" id="importQueue" th:aria-label="#{import.screenshotsInThisImport}">
+                    <div class="import-queue-heading">
+                        <strong id="importQueueStatus" aria-live="polite"></strong>
+                        <div class="import-queue-actions">
+                            <button class="text-button is-hidden" id="resumeQueueButton" type="button" data-online-only th:text="#{import.continueReading}">Continue reading</button>
+                            <button class="text-button" id="stopQueueButton" type="button" th:text="#{import.stopImporting}">Stop importing</button>
+                            <button class="primary-button compact-button is-hidden" id="finishQueueButton" type="button" th:text="#{import.done}">Done</button>
+                        </div>
+                    </div>
+                    <ol class="import-queue-list" id="importQueueList"></ol>
+                </section>
 
                 <div class="file-card is-hidden" id="fileCard">
                     <img id="imagePreview" th:alt="#{import.selectedShiftScreenshot}">
@@ -491,12 +520,19 @@
                         <button class="secondary-button compact-button" id="completeScheduledButton" type="button" data-online-only th:text="#{import.completeThisScheduledShift}">Complete this scheduled shift</button>
                     </div>
 
+                    <div class="notice schedule-match-notice is-hidden field-wide" id="duplicateNotice" role="status">
+                        <span id="duplicateMessage"></span>
+                        <button class="secondary-button compact-button" id="openDuplicateButton" type="button" data-online-only th:text="#{import.openIt}">Open it</button>
+                    </div>
+
                     <label class="field field-wide">
                         <span th:text="#{import.status}">Status</span>
-                        <select id="importStatus" name="status">
-                            <option value="COMPLETED" th:text="#{import.completedWorkedAndPaid}">Completed · worked and paid</option>
-                            <option value="SCHEDULED" th:text="#{import.scheduledAnUpcomingBlock}">Scheduled · an upcoming block</option>
+                        <select id="importStatus" name="status" required aria-describedby="importStatusHint">
+                            <option value="" selected th:text="#{import.chooseOne}">Choose one</option>
+                            <option value="COMPLETED" th:text="#{import.completedIWorkedThisBlock}">Completed · I worked this block</option>
+                            <option value="SCHEDULED" th:text="#{import.scheduledAcceptedNotWorkedYet}">Scheduled · accepted, not worked yet</option>
                         </select>
+                        <small class="field-hint" id="importStatusHint" aria-live="polite"></small>
                     </label>
 
                     <label class="field field-wide">
@@ -537,6 +573,7 @@
                     <div class="notice error-notice is-hidden field-wide" id="saveError" role="alert"></div>
                     <div class="form-actions field-wide">
                         <button class="secondary-button" id="resetButton" type="button" th:text="#{import.startOver}">Start over</button>
+                        <button class="secondary-button is-hidden" id="skipImportButton" type="button" th:text="#{import.skipThisScreenshot}">Skip this screenshot</button>
                         <button class="primary-button" id="saveButton" type="submit">
                             <span th:text="#{import.addShift}">Add shift</span>
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
@@ -550,6 +587,7 @@
         <section class="expenses-screen is-hidden" id="expensesScreen" aria-labelledby="expenses-title">
             <div class="screen-title">
                 <h1 id="expenses-title" th:text="#{expenses.expenses}">Expenses</h1>
+                <button class="text-button expense-history-jump" id="expenseHistoryJump" type="button" th:text="#{expenses.goToHistory}">Go to expense history</button>
             </div>
             <section class="stats-grid expense-stats" th:aria-label="#{expenses.expenseTotals}">
                 <article class="stat-card stat-card-accent"><span th:text="#{expenses.filteredExpenses}">Filtered expenses</span><strong id="expenseSummaryTotal">$0.00</strong><small id="expenseSummaryCount" th:text="#{expenses.0Entries}">0 entries</small></article>
@@ -561,7 +599,7 @@
                     <div class="panel-heading"><div><h2 id="expenseFormTitle" th:text="#{expenses.logAnExpense}">Log an expense</h2></div></div>
                     <form class="preview-form" id="expenseForm" data-queueable>
                         <label class="field"><span th:text="#{expenses.date}">Date</span><input id="expenseDate" type="date" required></label>
-                        <label class="field"><span th:text="#{expenses.category}">Category</span><select id="expenseCategory" required><option value="FUEL" th:text="#{expenses.fuel}">Fuel</option><option value="TOLL" th:text="#{expenses.toll}">Toll</option><option value="PARKING" th:text="#{expenses.parking}">Parking</option><option value="MAINTENANCE" th:text="#{expenses.maintenance}">Maintenance</option><option value="OTHER" th:text="#{expenses.other}">Other</option></select></label>
+                        <label class="field"><span th:text="#{expenses.category}">Category</span><select id="expenseCategory" required><option value="FUEL" th:text="#{expenses.fuel}">Fuel</option><option value="TOLL" th:text="#{expenses.toll}">Toll</option><option value="PARKING" th:text="#{expenses.parking}">Parking</option><option value="MAINTENANCE" th:text="#{expenses.maintenance}">Maintenance</option><option value="OTHER" th:text="#{expenses.other}">Other</option></select><small class="field-hint" id="expenseCategoryHint" aria-live="polite"></small></label>
                         <label class="field money-field"><span th:text="#{expenses.amount}">Amount</span><span class="input-with-prefix"><b>$</b><input id="expenseAmount" type="number" min="0.01" step="0.01" inputmode="decimal" required></span></label>
                         <label class="field"><span th:utext="#{expenses.shiftOptional.html}">Shift <small>(optional)</small></span><select id="expenseShift"><option value="" th:text="#{expenses.noLinkedShift}">No linked shift</option></select><small class="field-hint" th:text="#{expenses.linkItToAShift}">Link it to a shift when the cost belongs to one block.</small></label>
                         <label class="field field-wide"><span th:utext="#{expenses.noteOptional.html}">Note <small>(optional)</small></span><input id="expenseNote" type="text" maxlength="255" th:placeholder="#{expenses.gasStationReceiptOrDetails}"></label>
@@ -570,8 +608,9 @@
                     </form>
                 </article>
                 <article class="panel expense-history-panel">
-                    <div class="panel-heading"><div><h2 th:text="#{expenses.expenseHistory}">Expense history</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download th:text="#{expenses.exportCsv}">Export CSV</a></div>
+                    <div class="panel-heading"><div><h2 id="expenseHistoryTitle" tabindex="-1" th:text="#{expenses.expenseHistory}">Expense history</h2></div><a class="text-button" id="exportExpensesButton" href="/expenses/export.csv" download th:text="#{expenses.exportCsv}">Export CSV</a></div>
                     <p class="expense-cost-note" th:utext="#{expenses.vehicleCostsUseStandardMileage.html}">Vehicle costs use <span id="expenseCostMethod">standard mileage</span> · <a class="text-link" href="/account#costs">Change</a></p>
+                    <p class="expense-cost-note" id="expenseFuelNote" hidden th:text="#{expenses.fuelCoveredByMileage}">Fuel and maintenance are covered by the mileage rate, so they don't lower your estimated net.</p>
                     <div class="filter-row expense-filters">
                         <label class="filter-field"><span th:text="#{expenses.from}">From</span><input id="expenseFrom" type="date"></label>
                         <label class="filter-field"><span th:text="#{expenses.to}">To</span><input id="expenseTo" type="date"></label>
@@ -702,13 +741,14 @@
                     <button class="text-button" id="sameAsScheduledButton" type="button" th:text="#{dialog.edit.sameAsScheduled}">Same as scheduled</button>
                 </details>
 
-                <section class="linked-expenses field-wide" id="linkedExpensesSection"><strong th:text="#{dialog.edit.linkedExpenses}">Linked expenses</strong><div id="linkedExpensesList"><small th:text="#{dialog.edit.loading}">Loading…</small></div></section>
+                <section class="linked-expenses field-wide" id="linkedExpensesSection"><strong th:text="#{dialog.edit.linkedExpenses}">Linked expenses</strong><div id="linkedExpensesList"><small th:text="#{dialog.edit.loading}">Loading…</small></div><button class="text-button review-block-button" id="reviewBlockButton" type="button" th:text="#{dialog.edit.reviewThisBlock}">Review this block</button></section>
 
                 <div class="notice error-notice is-hidden field-wide" id="editError" role="alert"></div>
                 <p class="shift-timestamps field-wide" id="editTimestamps"></p>
                 <div class="form-actions field-wide">
                     <button class="danger-text-button delete-shift-button" id="deleteShiftButton" type="button" th:text="#{dialog.edit.deleteShift}">Delete shift</button>
                     <button class="text-button" id="duplicateShiftButton" type="button" th:text="#{dialog.edit.duplicate}">Duplicate</button>
+                    <button class="text-button is-hidden" id="notWorkedButton" type="button" th:text="#{dialog.edit.notWorkedYet}">Not worked yet?</button>
                     <span class="action-spacer"></span>
                     <button class="secondary-button" id="cancelEditButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
                     <button class="primary-button" id="saveEditButton" type="submit">
@@ -720,6 +760,15 @@
                     <span><strong th:text="#{dialog.edit.deleteThisShift}">Delete this shift?</strong><small th:text="#{dialog.edit.youCanUndoForA}">You can undo for a few seconds or restore it later.</small></span>
                     <button class="secondary-button" id="cancelDeleteButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
                     <button class="danger-button" id="confirmDeleteButton" type="button" th:text="#{dialog.edit.delete}">Delete</button>
+                </div>
+                <div class="not-worked-confirm field-wide is-hidden" id="notWorkedConfirm" role="group" aria-labelledby="notWorkedTitle">
+                    <strong id="notWorkedTitle" th:text="#{dialog.edit.moveBackToScheduled}">Move this block back to Scheduled?</strong>
+                    <small th:text="#{dialog.edit.notWorkedExplain}">It stops counting toward earnings, hours and net. Linked expenses stay as they are, and unsaved changes here aren't saved.</small>
+                    <small id="notWorkedCleared"></small>
+                    <div class="not-worked-actions">
+                        <button class="secondary-button" id="cancelNotWorkedButton" type="button" th:text="#{dialog.edit.cancel}">Cancel</button>
+                        <button class="primary-button" id="confirmNotWorkedButton" type="button" th:text="#{dialog.edit.moveToScheduled}">Move to Scheduled</button>
+                    </div>
                 </div>
             </form>
         </section>
@@ -768,6 +817,24 @@
                 <button class="secondary-button" id="conflictKeepSaved" type="button" th:text="#{dialog.conflict.keepSavedVersion}">Keep saved version</button>
                 <button class="primary-button" id="conflictUseMine" type="button" th:text="#{dialog.conflict.useMyChange}">Use my change</button>
             </div>
+        </section>
+    </div>
+
+    <div class="modal-backdrop is-hidden" id="blockReviewModal">
+        <section class="edit-dialog review-dialog" role="dialog" aria-modal="true" aria-labelledby="blockReviewTitle" aria-describedby="blockReviewDescription">
+            <div class="edit-dialog-heading">
+                <div>
+                    <p class="step-label" th:text="#{dialog.review.label}">REVIEW THIS BLOCK</p>
+                    <h2 id="blockReviewTitle" th:text="#{dialog.review.title}">Review this block</h2>
+                    <p id="blockReviewDescription"></p>
+                </div>
+                <button class="icon-button dialog-close-button" id="closeBlockReviewButton" type="button" th:aria-label="#{dialog.edit.close}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10M17 7 7 17"/></svg>
+                </button>
+            </div>
+            <p class="review-summary" id="blockReviewSummary" aria-live="polite"></p>
+            <ul class="review-list" id="blockReviewList"></ul>
+            <div class="notice error-notice is-hidden" id="blockReviewError" role="alert"></div>
         </section>
     </div>
 
@@ -903,9 +970,16 @@
 <script th:src="@{/js/schedule.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/evaluate.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/finish.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/block-review.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/payouts.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/standing.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/swipe.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-duplicates.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-queue.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/share-inbox.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/import-status.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/not-worked.js(v=${buildId})}" defer></script>
+<script th:src="@{/js/expense-effect.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/quick-actions.js(v=${buildId})}" defer></script>
 <script th:src="@{/js/app.js(v=${buildId})}" defer></script>
 </body>

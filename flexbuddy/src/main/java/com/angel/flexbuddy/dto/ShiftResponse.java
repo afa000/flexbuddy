@@ -44,6 +44,11 @@ public class ShiftResponse {
     /** For a scheduled block, the last moment to forfeit it without it counting as late, in the driver's zone. */
     private java.time.LocalDateTime forfeitDeadline;
     private boolean lateForfeit;
+    /**
+     * True when estimated net leaves out this block's vehicle cost because it has no miles: a completed block with
+     * miles never entered, under standard mileage. Zero miles is an answer and doesn't count.
+     */
+    private boolean netMissingMiles;
 
     public ShiftResponse(Long id, String station, LocalDate date, LocalTime startTime, LocalTime endTime,
             BigDecimal basePay, BigDecimal tips, BigDecimal totalPay, int timeWorked, BigDecimal hourlyRate,
@@ -51,6 +56,6 @@ public class ShiftResponse {
         this(id, station, date, startTime, endTime, basePay, tips, totalPay, timeWorked, hourlyRate,
                 null, BigDecimal.ZERO.setScale(2), null, BigDecimal.ZERO.setScale(2), totalPay, hourlyRate,
                 createdAt, updatedAt, deletedAt, ShiftStatus.COMPLETED, null, totalPay,
-                BlockDetailsResponse.NONE, null, false);
+                BlockDetailsResponse.NONE, null, false, false);
     }
 }

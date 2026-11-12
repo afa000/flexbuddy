@@ -20,8 +20,8 @@
     "path": "upload-key.keystore",
     "alias": "flexbuddy-upload"
   },
-  "appVersionName": "2",
-  "appVersionCode": 2,
+  "appVersionName": "5",
+  "appVersionCode": 5,
   "shortcuts": [
     {
       "name": "Import a shift",
@@ -53,7 +53,7 @@
   "isChromeOSOnly": false,
   "isMetaQuest": false,
   "fullScopeUrl": "https://flexbuddy.onrender.com/",
-  "minSdkVersion": 21,
+  "minSdkVersion": 24,
   "orientation": "default",
   "fingerprints": [
     {
@@ -71,7 +71,7 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "2",
+  "appVersion": "5",
   "shareTarget": {
     "action": "https://flexbuddy.onrender.com/share-import",
     "method": "POST",

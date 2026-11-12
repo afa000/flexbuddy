@@ -34,7 +34,7 @@ class AccountSettingsServiceTest {
     @BeforeEach
     void setUp() {
         clock = new MutableClock(Instant.parse("2026-10-02T12:00:00Z"));
-        service = new AccountSettingsService(userRepository, new BigDecimal("0.700"), 2025, clock);
+        service = new AccountSettingsService(userRepository, clock);
         user = new AppUser("Angel", EMAIL, "hash");
         when(userRepository.findByEmailIgnoreCase(EMAIL)).thenReturn(Optional.of(user));
     }
@@ -51,12 +51,45 @@ class AccountSettingsServiceTest {
     }
 
     @Test
-    void getUsesTheConfiguredDefaultWhenTheUserHasNoCustomRate() {
+    void getUsesTodaysIrsRateWhenTheUserHasNoCustomRate() {
         var settings = service.get(EMAIL);
 
         assertThat(settings.vehicleCostMethod()).isEqualTo(VehicleCostMethod.STANDARD_MILEAGE);
-        assertThat(settings.mileageRate()).isEqualByComparingTo("0.700");
-        assertThat(settings.mileageRateYear()).isEqualTo(2025);
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.760");
+        assertThat(settings.defaultMileageRate()).isEqualByComparingTo("0.760");
+        assertThat(settings.defaultMileageRateSince()).isEqualTo(java.time.LocalDate.of(2026, 7, 1));
+        assertThat(settings.customMileageRate()).isFalse();
+    }
+
+    @Test
+    void anAccountWithItsOwnRateKeepsItAndStillReportsTodaysIrsRate() {
+        user.setMileageRate(new BigDecimal("0.650"));
+
+        var settings = service.get(EMAIL);
+
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.650");
+        assertThat(settings.defaultMileageRate()).isEqualByComparingTo("0.760");
+        assertThat(settings.customMileageRate()).isTrue();
+        assertThat(settings.mileageRates().rateOn(java.time.LocalDate.of(2026, 3, 10))).isEqualByComparingTo("0.650");
+    }
+
+    @Test
+    void theIrsRateFollowsTheDriversDateNotTheServers() {
+        user.setTimeZone("Pacific/Kiritimati");
+        var settings = new AccountSettingsService(userRepository, new MutableClock(Instant.parse("2026-06-30T12:00:00Z")))
+                .get(EMAIL);
+
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.760"); // already July 1 in Kiritimati
+        assertThat(settings.mileageRates().rateOn(java.time.LocalDate.of(2026, 6, 30))).isEqualByComparingTo("0.725");
+    }
+
+    @Test
+    void anInvalidStoredTimeZoneFallsBackToTheDefaultInsteadOfFailing() {
+        user.setTimeZone("Not/AZone");
+
+        var settings = service.get(EMAIL);
+
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.760");
     }
 
     @Test
@@ -72,7 +105,7 @@ class AccountSettingsServiceTest {
     }
 
     @Test
-    void aNullCustomRateResetsToTheConfiguredDefault() {
+    void aNullCustomRateResetsToTheIrsRate() {
         user.setMileageRate(new BigDecimal("0.500"));
         when(userRepository.save(user)).thenReturn(user);
 
@@ -80,7 +113,8 @@ class AccountSettingsServiceTest {
                 new AccountSettingsRequest(VehicleCostMethod.STANDARD_MILEAGE, null));
 
         assertThat(user.getMileageRate()).isNull();
-        assertThat(settings.mileageRate()).isEqualByComparingTo("0.700");
+        assertThat(settings.mileageRate()).isEqualByComparingTo("0.760");
+        assertThat(settings.customMileageRate()).isFalse();
     }
 
     @Test

@@ -85,10 +85,9 @@ public class ShiftImportService {
         ShiftStatus suggestedStatus = suggestStatus(parsedShift, now);
         parsedShift = warningRules.apply(parsedShift, ocrResult.meanConfidence(), context,
                 suggestedStatus == ShiftStatus.SCHEDULED);
-        List<DuplicateMatch> duplicates = suggestedStatus == ShiftStatus.COMPLETED
-                ? scheduledShiftMatcher.match(email, parsedShift.date().value(), parsedShift.startTime().value(),
-                        parsedShift.endTime().value(), parsedShift.station().value())
-                : List.of();
+        List<DuplicateMatch> duplicates = scheduledShiftMatcher.match(email, parsedShift.date().value(),
+                parsedShift.startTime().value(), parsedShift.endTime().value(), parsedShift.station().value(),
+                suggestedStatus);
         List<Integer> sourceLineRange = ocrResult.lines().isEmpty()
                 ? List.of()
                 : List.of(0, ocrResult.lines().size() - 1);

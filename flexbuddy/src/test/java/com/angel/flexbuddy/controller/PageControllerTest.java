@@ -65,6 +65,96 @@ class PageControllerTest {
     }
 
     @Test
+    void theImportReviewMakesTheDriverChooseWhetherTheBlockWasWorked() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Required, and the empty choice is the selected first option, so neither a new screenshot nor a form reset
+        // lands on Completed.
+        assertThat(page).containsPattern("<select id=\"importStatus\"[^>]*\\brequired\\b[^>]*>\\s*"
+                + "<option value=\"\" selected>Choose one</option>\\s*"
+                + "<option value=\"COMPLETED\">Completed · I worked this block</option>\\s*"
+                + "<option value=\"SCHEDULED\">Scheduled · accepted, not worked yet</option>");
+        assertThat(page).contains("id=\"importStatusHint\"", "/js/import-status.js?v=");
+        assertThat(page.indexOf("/js/import-status.js?v=")).isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
+    void theEditDialogOffersToMoveAWronglyCompletedBlockBackBehindAConfirmation() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // Hidden until the script sees a saved completed block; the confirmation is hidden until asked for.
+        assertThat(page).containsPattern("<button class=\"text-button is-hidden\" id=\"notWorkedButton\" type=\"button\">"
+                + "Not worked yet\\?</button>");
+        assertThat(page).containsPattern("<div class=\"not-worked-confirm field-wide is-hidden\" id=\"notWorkedConfirm\"");
+        assertThat(page).contains("Move this block back to Scheduled?", "id=\"notWorkedCleared\"",
+                "id=\"cancelNotWorkedButton\"", ">Move to Scheduled</button>", "/js/not-worked.js?v=");
+        assertThat(page.indexOf("/js/not-worked.js?v=")).isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
+    void theExpenseFormSaysWhatTheChosenCategoryDoesToNet() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        // The hint sits inside the Category label, so it is part of the select's name without aria-describedby.
+        assertThat(page).containsPattern("<select id=\"expenseCategory\" required>.*?</select>"
+                + "<small class=\"field-hint\" id=\"expenseCategoryHint\" aria-live=\"polite\"></small></label>");
+        assertThat(page.indexOf("/js/expense-effect.js?v=")).isPositive().isLessThan(page.indexOf("/js/app.js?v="));
+    }
+
+    @Test
+    void homeAndTheEditDialogOfferTheBlockChecklist() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("id=\"lastBlockCard\" hidden",
+                "id=\"lastBlockButton\" type=\"button\">Review this block</button>",
+                "id=\"reviewBlockButton\" type=\"button\">Review this block</button>",
+                "id=\"blockReviewModal\"", "<p class=\"step-label\">REVIEW THIS BLOCK</p>", "/js/block-review.js");
+    }
+
+    @Test
+    void theImportCardHasTheAndroidSharingTipHiddenUntilTheScriptShowsIt() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<small class=\"field-hint is-hidden\" id=\"shareTip\">On Android, you can also share screenshots to FlexBuddy from Photos.</small>",
+                "/js/share-inbox.js");
+    }
+
+    @Test
+    void theImportCardTakesSeveralScreenshotsAndHasTheBatchList() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<input id=\"screenshotInput\" type=\"file\" accept=\"image/png,image/jpeg\" multiple hidden>",
+                "You can choose up to 10 at once.",
+                "id=\"importQueue\" aria-label=\"Screenshots in this import\"",
+                ">Stop importing</button>", ">Skip this screenshot</button>", "/js/import-queue.js");
+    }
+
+    @Test
+    void theImportCardSpeaksToTouchAndPointerAndSaysWhichScreensWork() throws Exception {
+        String page = mockMvc.perform(get("/").with(user("angel@example.com")))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        assertThat(page).contains("<strong class=\"pointer-copy\">Drop your screenshot here</strong>",
+                "<strong class=\"touch-copy\">Choose a screenshot</strong>",
+                "<span class=\"touch-copy\">Tap to pick one from your photos</span>",
+                "Works with a Schedule Details screenshot of a block you accepted",
+                "An empty Offers screen has no block to import.");
+    }
+
+    @Test
     void shiftsPageRendersTheQuickActionMenu() throws Exception {
         String page = mockMvc.perform(get("/").with(user("angel@example.com")))
                 .andExpect(status().isOk())

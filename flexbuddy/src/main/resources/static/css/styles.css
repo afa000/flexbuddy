@@ -838,6 +838,16 @@ h1 {
     transition: border-color .16s ease, background .16s ease;
 }
 
+/* A touch screen has nothing to drop and nothing to click, so the card speaks of tapping and photos there. */
+.drop-zone .touch-copy { display: none; }
+@media (hover: none) and (pointer: coarse) {
+    .drop-zone .pointer-copy { display: none; }
+    .drop-zone .touch-copy { display: block; }
+}
+.import-guidance { margin-top: 10px; display: grid; gap: 4px; }
+/* Once a screenshot is chosen the card is gone, and so is the advice about which one to choose. */
+.drop-zone.is-hidden + .import-guidance { display: none; }
+
 .drop-zone:hover,
 .drop-zone.is-dragging {
     background: var(--drop-hover);
@@ -850,7 +860,7 @@ h1 {
     font-size: 16px;
 }
 
-.drop-zone > span:last-child {
+.drop-zone > span:not(.upload-icon) {
     font-size: 12px;
 }
 
@@ -934,6 +944,52 @@ h1 {
 .file-actions { margin-top: 10px; }
 .file-actions .secondary-button { width: 100%; min-height: 44px; }
 .processing-row .text-button { margin-left: auto; color: var(--error); }
+
+/* Several screenshots at once: one compact row per file, so ten of them still leave Step 2 within reach on a phone. */
+#importScreen .preview-panel { scroll-margin-top: 100px; }
+
+/* Review this block: Home's card for the last block, and the checklist sheet. */
+.home-last-block { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.home-last-block[hidden] { display: none; }
+.last-block-text { display: grid; gap: 2px; min-width: 0; }
+.last-block-text strong { font-size: 16px; }
+.last-block-text small { color: var(--muted); font-size: 12px; }
+.review-block-button { margin-top: 6px; }
+.review-summary { margin: 0 0 10px; color: var(--muted); font-size: 13px; font-weight: 700; }
+.review-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.review-row { padding: 12px; display: grid; gap: 10px; background: var(--surface-deep); border: 1px solid var(--line); border-left-width: 4px; border-radius: 8px; }
+.review-row[data-state="done"], .review-row[data-state="zero"] { border-left-color: var(--cyan); }
+.review-row[data-state="missing"], .review-row[data-state="attention"] { border-left-color: var(--warning-border); }
+.review-row[data-state="optional"], .review-row[data-state="waiting"] { border-left-color: var(--line); }
+.review-text { display: grid; gap: 3px; min-width: 0; }
+.review-text strong { font-size: 14px; }
+.review-text small { color: var(--muted); font-size: 12px; line-height: 1.45; }
+.review-state { margin-left: 6px; padding: 1px 7px; border-radius: 999px; background: var(--primary-soft); color: var(--cyan); font-size: 11px; font-weight: 700; vertical-align: 1px; }
+.review-row[data-state="missing"] .review-state, .review-row[data-state="attention"] .review-state { background: var(--warning-surface); color: var(--warning); }
+.review-row[data-state="optional"] .review-state, .review-row[data-state="waiting"] .review-state { background: transparent; color: var(--muted); border: 1px solid var(--line); }
+.review-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.review-actions:empty { display: none; }
+.import-queue { margin: 12px 0; padding: 12px; background: var(--surface-deep); border: 1px solid var(--line); border-radius: 8px; }
+.import-queue-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+.import-queue-heading strong { font-size: 14px; }
+.import-queue-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+.import-queue-actions .text-button { min-height: 40px; }
+#stopQueueButton { color: var(--error); }
+.import-queue-list { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.import-queue-row { min-height: 44px; padding: 6px 0; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: center; border-top: 1px solid var(--line-soft); }
+.import-queue-row:first-child { border-top: 0; }
+.import-queue-number { color: var(--muted); font-size: 12px; font-weight: 700; text-align: center; }
+.import-queue-file { min-width: 0; }
+.import-queue-file strong,
+.import-queue-file small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.import-queue-file strong { font-size: 13px; white-space: nowrap; }
+.import-queue-file small { color: var(--muted); font-size: 11px; line-height: 1.4; }
+.import-queue-row.is-current { margin: 0 -8px; padding: 6px 8px; background: var(--primary-soft); border-radius: 6px; }
+.import-queue-row.is-current .import-queue-file small,
+.import-queue-row[data-state="saved"] .import-queue-file small { color: var(--cyan); font-weight: 700; }
+.import-queue-row[data-state="failed"] .import-queue-file small,
+.import-queue-row[data-state="invalid"] .import-queue-file small { color: var(--error); }
+.import-queue-row .text-button { min-height: 40px; padding: 0 4px; }
 
 .spinner {
     width: 14px;
@@ -1345,6 +1401,9 @@ input[data-reveal]::-ms-reveal { display: none; }
     text-align: right;
 }
 
+.shift-pay .add-miles-button { min-height: 24px; padding: 4px 0; color: var(--warning); font-size: 11px; font-weight: 750; }
+.missing-miles-flag { display: block; color: var(--warning); font-size: 10px; font-weight: 700; white-space: nowrap; }
+
 .shift-pay strong {
     color: var(--text);
     font-size: 20px;
@@ -1442,6 +1501,9 @@ input[data-reveal]::-ms-reveal { display: none; }
 .delete-confirm { padding: 12px; display: flex; align-items: center; gap: 10px; background: var(--error-surface); border: 1px solid var(--error-border); border-radius: 6px; }
 .delete-confirm > span { margin-right: auto; display: grid; gap: 2px; }
 .delete-confirm small { color: var(--muted); }
+.not-worked-confirm { padding: 12px; display: grid; gap: 6px; background: var(--warning-surface); border: 1px solid var(--warning-border); border-radius: 6px; }
+.not-worked-confirm small { color: var(--muted); line-height: 1.45; }
+.not-worked-actions { margin-top: 4px; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
 .confirm-dialog { width: min(460px, 100%); padding: 26px; color: var(--text); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--toast-shadow); }
 .confirm-dialog h2 { margin: 0 0 8px; }
 .confirm-dialog p { margin: 0 0 20px; color: var(--muted); line-height: 1.5; }
@@ -1450,7 +1512,8 @@ input[data-reveal]::-ms-reveal { display: none; }
 .trash-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .trash-toolbar p, .trash-list > p { color: var(--muted); font-size: 12px; }
 .trash-row { padding: 12px 0; display: flex; align-items: center; justify-content: space-between; gap: 15px; border-top: 1px solid var(--line-soft); }
-.trash-row > div:first-child { display: grid; gap: 4px; }
+.trash-row > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.trash-row .trash-note { overflow: hidden; color: var(--muted); font-size: 11px; white-space: nowrap; text-overflow: ellipsis; }
 .trash-row span { color: var(--muted); font-size: 11px; }
 .trash-row > div:last-child { display: flex; align-items: center; gap: 15px; }
 
@@ -1888,9 +1951,22 @@ input[data-reveal]::-ms-reveal { display: none; }
 .settings-form { display: grid; gap: 14px; margin-top: 18px; }
 .settings-form .field { width: 100%; }
 
+.screen-title .expense-history-jump { display: none; }
+#expenseHistoryTitle:focus { outline: none; }
+#expenseHistoryTitle:focus-visible { outline: 2px solid var(--cyan); outline-offset: 4px; }
+
 @media (max-width: 900px) {
     .expense-layout { grid-template-columns: 1fr; }
     .expense-filters { grid-template-columns: 1fr 1fr; }
+    .screen-title .expense-history-jump { display: inline-flex; }
+    /* The upload card was 260px tall before the review form even started. */
+    #dropZone { min-height: 140px; padding: 18px; }
+    /* The sticky top bar would cover the heading the jump lands on. */
+    .expense-history-panel { scroll-margin-top: 100px; }
+    /* An empty "Next 14 days" panel repeats Next up; desktop keeps it to hold the two-column layout. */
+    .upcoming-panel.is-empty { display: none; }
+    /* While the on-screen keyboard is open the navigation steps aside, like the + (quick-actions.js). */
+    body.keyboard-open .mobile-nav { visibility: hidden; }
 }
 
 @media (max-width: 760px) {

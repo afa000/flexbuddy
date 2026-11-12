@@ -20,7 +20,7 @@ import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
 import com.angel.flexbuddy.repository.ShiftRepository;
 
-/** Finds the caller's scheduled blocks that an imported earnings screenshot most likely completes. */
+/** Finds the caller's logged blocks that an imported screenshot repeats, or scheduled ones it most likely completes. */
 @Component
 public class ScheduledShiftMatcher {
 
@@ -32,19 +32,37 @@ public class ScheduledShiftMatcher {
         this.shiftRepository = shiftRepository;
     }
 
+    /**
+     * Finds the caller's completed and scheduled blocks that overlap the imported one, starting the day before so a
+     * block that began late the previous evening is found. A scheduled block that a completed import most likely
+     * finishes is {@code SCHEDULED_MATCH}; any other block is {@code EXACT} or {@code LIKELY}.
+     */
     @Transactional(readOnly = true)
-    public List<DuplicateMatch> match(String email, LocalDate date, LocalTime start, LocalTime end, String station) {
+    public List<DuplicateMatch> match(String email, LocalDate date, LocalTime start, LocalTime end, String station,
+            ShiftStatus importStatus) {
         if (email == null || date == null || start == null || end == null) return List.of();
         LocalDateTime candidateStart = LocalDateTime.of(date, start);
         long minutes = ChronoUnit.MINUTES.between(start, end);
         LocalDateTime candidateEnd = candidateStart.plusMinutes(minutes < 0 ? minutes + 24 * 60 : minutes);
-        return shiftRepository.findByOwnerEmailIgnoreCaseAndStatusAndDateBetweenOrderByDateAscStartTimeAsc(
-                        email, ShiftStatus.SCHEDULED, date, date).stream()
+        Locale locale = LocaleContextHolder.getLocale();
+        return shiftRepository.findByOwnerEmailIgnoreCaseAndStatusInAndDateBetweenOrderByDateAscStartTimeAsc(
+                        email, List.of(ShiftStatus.COMPLETED, ShiftStatus.SCHEDULED), date.minusDays(1), date).stream()
                 .filter(shift -> stationMatches(station, shift.getStation()))
                 .filter(shift -> overlapMinutes(candidateStart, candidateEnd,
                         shift.getStartDateTime(), shift.getEndDateTime()) >= MINIMUM_OVERLAP_MINUTES)
-                .map(shift -> new DuplicateMatch(shift.getId(), DuplicateKind.SCHEDULED_MATCH,
-                        Messages.current("import.scheduledMatch", shift.getStation(), Messages.dayFormat(LocaleContextHolder.getLocale()).format(shift.getDate()))))
+                .map(shift -> {
+                    if (shift.getStatus() == ShiftStatus.SCHEDULED && importStatus == ShiftStatus.COMPLETED) {
+                        return new DuplicateMatch(shift.getId(), DuplicateKind.SCHEDULED_MATCH,
+                                Messages.current("import.scheduledMatch", shift.getStation(),
+                                        Messages.dayFormat(locale).format(shift.getDate())));
+                    }
+                    boolean exact = shift.getDate().equals(date) && shift.getStartTime().equals(start)
+                            && shift.getEndTime().equals(end);
+                    return new DuplicateMatch(shift.getId(), exact ? DuplicateKind.EXACT : DuplicateKind.LIKELY,
+                            Messages.current("import.alreadyLogged", shift.getStation(),
+                                    Messages.dayFormat(locale).format(shift.getDate()),
+                                    Messages.timeFormat(locale).format(shift.getStartTime())));
+                })
                 .toList();
     }
 

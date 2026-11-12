@@ -15,6 +15,73 @@ class ShiftScreenshotParserTest {
     private final ShiftScreenshotParser parser = new ShiftScreenshotParser();
 
     @Test
+    void parse_usesBaseLabelsInsteadOfTotalRegardlessOfOrderOrLayout() {
+        for (String text : java.util.List.of(
+                "Total $90.50\nBase $72.00\nTips $18.50",
+                "$90.50\nTips $18.50\nBase pay $72.00",
+                "TOTAL: $90.50 BASE: $72.00 TIPS: $18.50",
+                "Total\n$90.50\nBase\n$72.00\nTips\n$18.50",
+                "Total $90.50\nBase\n$72.00 Tips $18.50",
+                "Total $90.50\nPropinas\n$18.50 Base $72.00",
+                "Total $90.50\nPago base $72.00\nPropinas $18.50",
+                "Propinas $18.50\nImporte base $72.00\nTotal $90.50",
+                "Total $90.50\nGanancias base\n\n$72.00\nPropinas\n$18.50")) {
+            ParsedShiftData result = parser.parse(text, 2026);
+            assertThat(result.basePay().value()).as(text).isEqualByComparingTo("72.00");
+            assertThat(result.tips().value()).as(text).isEqualByComparingTo("18.50");
+        }
+    }
+
+    @Test
+    void parse_leavesBaseMissingRatherThanStealingTotalOrTips() {
+        for (String text : java.util.List.of(
+                "Total $90.50\nTips $18.50",
+                "Base unreadable\nTotal $90.50\nTips $18.50",
+                "Base\nTips $18.50\nTotal $90.50",
+                "Base Total $90.50 Tips $18.50")) {
+            ParsedShiftData result = parser.parse(text, 2026);
+            assertThat(result.basePay().value()).as(text).isNull();
+            assertThat(result.tips().value()).as(text).isEqualByComparingTo("18.50");
+            assertThat(result.warnings()).anyMatch(warning ->
+                    warning.code().equals("MISSING_FIELD") && warning.field().equals("basePay"));
+        }
+    }
+
+    @Test
+    void parse_skipsTipsWhenFallingBackToAnUnlabeledOfferAmount() {
+        for (String text : java.util.List.of(
+                "Tips $18.50\n$72.00", "Propinas\n$18.50\n$72.00", "$72.00 Tips $18.50")) {
+            ParsedShiftData result = parser.parse(text, 2026);
+            assertThat(result.basePay().value()).as(text).isEqualByComparingTo("72.00");
+            assertThat(result.tips().value()).as(text).isEqualByComparingTo("18.50");
+        }
+    }
+
+    @Test
+    void parse_keepsLabeledMoneySourceAndConservativeConfidence() {
+        var lines = java.util.List.of(
+                new OcrLine("Total $90.50", 99, 0, 0, 100, 20, 0),
+                new OcrLine("Base", 50, 0, 20, 100, 20, 1),
+                new OcrLine("$72.00", 95, 0, 40, 100, 20, 2),
+                new OcrLine("Tips", 95, 0, 60, 100, 20, 3),
+                new OcrLine("$18.50", 70, 0, 80, 100, 20, 4));
+        ParsedShiftData result = parser.parse(lines, 2026, new ParseContext(LocalDate.of(2026, 9, 7), null));
+        assertThat(result.basePay().lineIndex()).isEqualTo(2);
+        assertThat(result.basePay().confidence()).isEqualTo(50);
+        assertThat(result.basePay().level()).isEqualTo(ConfidenceLevel.LOW);
+        assertThat(result.tips().lineIndex()).isEqualTo(4);
+        assertThat(result.tips().confidence()).isEqualTo(70);
+        assertThat(result.tips().level()).isEqualTo(ConfidenceLevel.MEDIUM);
+    }
+
+    @Test
+    void parse_readsLabeledMoneyUsingExistingCurrencyFormats() {
+        ParsedShiftData result = parser.parse("Total 90,50 GBP\nBase 72,00 GBP\nTips 18,50 GBP", 2026);
+        assertThat(result.basePay().value()).isEqualByComparingTo("72.00");
+        assertThat(result.tips().value()).isEqualByComparingTo("18.50");
+    }
+
+    @Test
     void parse_extractsScheduleDetailsFields() {
         String rawText = """
                 North Haven CT (VEA7/BDL3) - Sub

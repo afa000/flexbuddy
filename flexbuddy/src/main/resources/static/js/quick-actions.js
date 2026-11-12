@@ -117,8 +117,11 @@
         return Boolean(field?.matches?.('input, select, textarea')) && !sheet.contains(field);
     };
     const keyboardOpen = () => window.visualViewport && window.innerHeight - window.visualViewport.height > 150;
-    const updateSuppressed = () => document.body.classList.toggle('fab-suppressed',
-        touch.matches && (typing() || Boolean(keyboardOpen())));
+    const updateSuppressed = () => {
+        document.body.classList.toggle('fab-suppressed', touch.matches && (typing() || Boolean(keyboardOpen())));
+        // The navigation only steps aside for the keyboard itself, so a select's picker or a mouse never hides it.
+        document.body.classList.toggle('keyboard-open', touch.matches && Boolean(keyboardOpen()));
+    };
     document.addEventListener('focusin', updateSuppressed);
     document.addEventListener('focusout', () => requestAnimationFrame(updateSuppressed));
     window.visualViewport?.addEventListener('resize', updateSuppressed);

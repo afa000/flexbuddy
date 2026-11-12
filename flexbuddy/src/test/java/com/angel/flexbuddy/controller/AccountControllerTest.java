@@ -163,6 +163,17 @@ class AccountControllerTest {
     }
 
     @Test
+    void loginPageCanSayASharedScreenshotIsWaiting() throws Exception {
+        // Hidden until share-inbox.js finds a share made while signed out; the image itself is never on this page.
+        mockMvc.perform(get("/login"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.containsString(
+                        "id=\"sharedWaitingNotice\" role=\"status\">Sign in to review the screenshot you shared.</div>")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("class=\"notice success-notice is-hidden\"")))
+                .andExpect(content().string(org.hamcrest.Matchers.containsString("/js/share-inbox.js")));
+    }
+
+    @Test
     void loginPageOffersPersistentSignInForStandaloneMode() throws Exception {
         mockMvc.perform(get("/login"))
                 .andExpect(status().isOk())
@@ -672,7 +683,7 @@ class AccountControllerTest {
         when(settingsService.updateTax(org.mockito.ArgumentMatchers.eq("angel@example.com"), request.capture()))
                 .thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, new java.math.BigDecimal("0.70"),
-                        new java.math.BigDecimal("0.70"), 2026, "America/New_York", null, false, false, 45, null, null,
+                        new java.math.BigDecimal("0.70"), java.time.LocalDate.of(2025, 1, 1), "America/New_York", null, false, false, 45, null, null,
                         com.angel.flexbuddy.model.GoalBasis.GROSS,
                         List.of(java.time.DayOfWeek.TUESDAY, java.time.DayOfWeek.FRIDAY), 1, new java.math.BigDecimal("25"),
                         null, true));
@@ -754,7 +765,7 @@ class AccountControllerTest {
         when(settingsService.updateReminders(any(), any()))
                 .thenReturn(new com.angel.flexbuddy.dto.AccountSettingsResponse(
                         com.angel.flexbuddy.model.VehicleCostMethod.STANDARD_MILEAGE, java.math.BigDecimal.ONE,
-                        java.math.BigDecimal.ONE, 2025));
+                        java.math.BigDecimal.ONE, java.time.LocalDate.of(2025, 1, 1)));
 
         mockMvc.perform(put("/account/reminders").with(user("angel@example.com")).with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)

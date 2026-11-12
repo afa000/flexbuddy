@@ -11,8 +11,12 @@ import java.util.Map;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.rememberme.CookieTheftException;
 import org.springframework.security.web.authentication.rememberme.PersistentRememberMeToken;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenBasedRememberMeServices;
 import org.springframework.security.web.authentication.rememberme.PersistentTokenRepository;
@@ -27,6 +31,10 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 public class RotationTolerantRememberMeServices extends PersistentTokenBasedRememberMeServices {
 
     static final Duration ROTATION_GRACE = Duration.ofMinutes(1);
+    /** Set on a request whose remember-me cookie was rejected as reused. */
+    static final String REJECTED_COOKIE_ATTRIBUTE = RotationTolerantRememberMeServices.class.getName() + ".REJECTED";
+
+    private static final Logger log = LoggerFactory.getLogger(RotationTolerantRememberMeServices.class);
 
     private final PersistentTokenRepository tokenRepository;
     private final Clock clock;
@@ -37,6 +45,21 @@ public class RotationTolerantRememberMeServices extends PersistentTokenBasedReme
         super(key, userDetailsService, tokenRepository);
         this.tokenRepository = tokenRepository;
         this.clock = clock;
+    }
+
+    /**
+     * Spring removes the account's remember-me tokens and clears the cookie before it reports a reused token. The
+     * request then carries on signed out, marked so the sign-in entry point can explain what happened.
+     */
+    @Override
+    public Authentication autoLogin(HttpServletRequest request, HttpServletResponse response) {
+        try {
+            return super.autoLogin(request, response);
+        } catch (CookieTheftException ex) {
+            log.warn("Rejected a reused remember-me cookie and removed the account's remember-me tokens");
+            request.setAttribute(REJECTED_COOKIE_ATTRIBUTE, Boolean.TRUE);
+            return null;
+        }
     }
 
     /** Synchronized so simultaneous requests rotate a series once instead of racing each other. */

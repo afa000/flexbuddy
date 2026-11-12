@@ -43,6 +43,9 @@ import org.springframework.security.test.context.support.WithAnonymousUser;
 import com.angel.flexbuddy.config.SecurityConfig;
 import com.angel.flexbuddy.dto.BlockEvaluationRequest;
 import com.angel.flexbuddy.dto.BlockEvaluationResponse;
+import com.angel.flexbuddy.dto.DuplicateKind;
+import com.angel.flexbuddy.dto.DuplicateMatch;
+import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.dto.ShiftImportPreviewResponse;
 import com.angel.flexbuddy.dto.ShiftCandidate;
 import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
@@ -411,6 +414,38 @@ class ShiftControllerTest {
     }
 
     @Test
+    void importPreviewReportsABlockThatIsAlreadyLoggedInTheDriversLanguage() throws Exception {
+        MockMultipartFile screenshot = new MockMultipartFile("screenshot", "shift.png", "image/png", new byte[] {1});
+        when(shiftImportService.createPreview(any(), any())).thenAnswer(invocation -> {
+            DuplicateMatch match = new DuplicateMatch(41L, DuplicateKind.EXACT,
+                    Messages.current("import.alreadyLogged", "VEA7", "Sun Sep 6", "3:15 PM"));
+            return new ShiftImportPreviewResponse("shift.png", "image/png", 1, "Found 1 shift.", "Schedule Details", 2026, 92,
+                    List.of(), List.of(new ShiftCandidate(0,
+                            ParsedField.defaulted("VEA7"),
+                            ParsedField.defaulted(LocalDate.of(2026, 9, 6)),
+                            ParsedField.defaulted(LocalTime.of(15, 15)),
+                            ParsedField.defaulted(LocalTime.of(19, 15)),
+                            ParsedField.defaulted(new BigDecimal("124.00")),
+                            ParsedField.defaulted(BigDecimal.ZERO),
+                            List.of(), List.of(match), List.of(0, 0))));
+        });
+
+        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot)
+                        .with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].kind").value("EXACT"))
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].shiftId").value(41))
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].message")
+                        .value("You already have a VEA7 block on Sun Sep 6 at 3:15 PM."));
+
+        mockMvc.perform(multipart("/shifts/import-preview").file(screenshot).locale(java.util.Locale.of("es"))
+                        .with(user("angel@example.com")).with(csrf()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.shifts[0].duplicates[0].message")
+                        .value("Ya tiene un bloque de VEA7 el Sun Sep 6 a las 3:15 PM."));
+    }
+
+    @Test
     void aFailedScreenshotReadStillAnswers500WithTheSameBodyAndNowLogsAnError() throws Exception {
         ch.qos.logback.classic.Logger logger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory
                 .getLogger("com.angel.flexbuddy.exception.GlobalExceptionHandler");
@@ -651,7 +686,23 @@ class ShiftControllerTest {
     }
 
     private static final String CREATE_JSON =
-            "{\"station\":\"VEA7\",\"date\":\"2026-09-12\",\"startTime\":\"09:00\",\"endTime\":\"13:00\",\"basePay\":80,\"tips\":10}";
+            "{\"station\":\"VEA7\",\"date\":\"2026-09-12\",\"startTime\":\"09:00\",\"endTime\":\"13:00\",\"basePay\":80,\"tips\":10,\"status\":\"COMPLETED\"}";
+
+    @Test
+    void aCreateWithNoStatusIsRejectedInTheDriversLanguage() throws Exception {
+        when(shiftService.createShift(eq("angel@example.com"), any(), any()))
+                .thenThrow(new InvalidShiftException("error.shift.statusRequired"));
+        String noStatus = CREATE_JSON.replace(",\"status\":\"COMPLETED\"", "");
+
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content(noStatus))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Choose whether the block is completed or scheduled."));
+        mockMvc.perform(post("/shifts").with(user("angel@example.com")).with(csrf()).locale(java.util.Locale.of("es"))
+                        .contentType(MediaType.APPLICATION_JSON).content(noStatus))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Elija si el bloque está completado o programado."));
+    }
 
     @Test
     void anIdempotencyKeyThatIsNotAUuidIsRejected() throws Exception {
@@ -705,6 +756,61 @@ class ShiftControllerTest {
                 .andExpect(jsonPath("$.code").value("CONFLICT"))
                 .andExpect(jsonPath("$.current.id").value(5))
                 .andExpect(jsonPath("$.current.updatedAt").exists());
+    }
+
+    @Test
+    void notWorkedPassesTheSeenVersionAndKeyToTheService() throws Exception {
+        ShiftResponse moved = new ShiftResponse();
+        moved.setId(5L);
+        moved.setStatus(com.angel.flexbuddy.model.ShiftStatus.SCHEDULED);
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any())).thenReturn(moved);
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .header("Idempotency-Key", "11111111-1111-4111-8111-111111111111")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SCHEDULED"));
+
+        verify(shiftService).markNotWorked("angel@example.com", 5L, java.time.Instant.parse("2026-09-10T00:00:00Z"),
+                "11111111-1111-4111-8111-111111111111");
+    }
+
+    @Test
+    void notWorkedNeedsTheVersionTheDriverSaw() throws Exception {
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON).content("{}"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(shiftService);
+    }
+
+    @Test
+    void notWorkedOnAChangedBlockIs409WithTheCurrentShift() throws Exception {
+        ShiftResponse current = new ShiftResponse();
+        current.setId(5L);
+        current.setUpdatedAt(java.time.Instant.parse("2026-09-11T12:00:00Z"));
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any()))
+                .thenThrow(new com.angel.flexbuddy.exception.ShiftConflictException(current));
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CONFLICT"))
+                .andExpect(jsonPath("$.current.id").value(5));
+    }
+
+    @Test
+    void notWorkedOnABlockThatIsNotCompletedIsRefusedInTheDriversLanguage() throws Exception {
+        when(shiftService.markNotWorked(eq("angel@example.com"), eq(5L), any(), any()))
+                .thenThrow(new InvalidShiftException("error.shift.onlyCompletedNotWorked"));
+
+        mockMvc.perform(post("/shifts/{id}/not-worked", 5L).with(user("angel@example.com")).with(csrf())
+                        .locale(java.util.Locale.of("es")).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"expectedUpdatedAt\":\"2026-09-10T00:00:00Z\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().string("Solo un bloque completado puede volver a programado."));
     }
 
     @Test

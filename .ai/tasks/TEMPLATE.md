@@ -1,10 +1,18 @@
 # Task: <task-id> - <title>
 
 Status: Ready for implementation
+Risk: high | medium | low (see "Which tool for which task" in docs/agent-workflow.md)
+Implementer: Claude Code (Opus) | Claude Code (Sonnet) | Antigravity | OpenCode + local model
+Review: fresh Claude Code session (Opus), review-task skill
 
 ## Objective
 
 What problem does this solve for drivers?
+
+## Files to read
+
+Every file the implementer needs, with the class, method or lines that matter. The implementer reads these and their
+tests, and searches before opening anything else. For the message catalogs, list the keys, not the files.
 
 ## Current behavior
 

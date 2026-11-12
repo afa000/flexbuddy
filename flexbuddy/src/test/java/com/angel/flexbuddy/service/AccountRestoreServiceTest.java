@@ -482,4 +482,19 @@ class AccountRestoreServiceTest {
         assertThat(owner.getLanguage()).isEqualTo("es".equals(language) ? "es" : "en");
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource(value = {"0.7,", "0.70,", "0.700,", "0.650,0.650", "0.705,0.705"})
+    void aRestoredRateOfSeventyCentsFollowsTheIrsRateAndAnyOtherRateIsKept(String stored, String expected) throws Exception {
+        owner.setMileageRate(new BigDecimal("0.500"));
+        AccountBackupFile file = new AccountBackupFile("flexbuddy-backup", 2, NOW, "2.0", backup.account(),
+                List.of(), List.of(), new BackupSettings("STANDARD_MILEAGE", stored), new BackupCounts(0, 0, 0, 0));
+        when(objectMapper.readValue(any(InputStream.class), eq(AccountBackupFile.class))).thenReturn(file);
+        MockHttpSession session = new MockHttpSession();
+        RestorePreviewResponse preview = service.preview(EMAIL, upload(), session);
+
+        service.restore(EMAIL, new RestoreRequest(preview.token(), RestoreMode.MERGE, false, false), session);
+
+        if (expected == null) assertThat(owner.getMileageRate()).isNull();
+        else assertThat(owner.getMileageRate()).isEqualByComparingTo(expected);
+    }
 }

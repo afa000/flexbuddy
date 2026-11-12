@@ -45,6 +45,13 @@ const elements = {
     miles: document.querySelector('#miles'),
     saveButton: document.querySelector('#saveButton'),
     resetButton: document.querySelector('#resetButton'),
+    skipImportButton: document.querySelector('#skipImportButton'),
+    importQueue: document.querySelector('#importQueue'),
+    importQueueStatus: document.querySelector('#importQueueStatus'),
+    importQueueList: document.querySelector('#importQueueList'),
+    resumeQueueButton: document.querySelector('#resumeQueueButton'),
+    stopQueueButton: document.querySelector('#stopQueueButton'),
+    finishQueueButton: document.querySelector('#finishQueueButton'),
     saveError: document.querySelector('#saveError'),
     totalEarnings: document.querySelector('#totalEarnings'),
     totalShifts: document.querySelector('#totalShifts'),
@@ -127,6 +134,11 @@ const elements = {
     deleteConfirm: document.querySelector('#deleteConfirm'),
     cancelDeleteButton: document.querySelector('#cancelDeleteButton'),
     confirmDeleteButton: document.querySelector('#confirmDeleteButton'),
+    notWorkedButton: document.querySelector('#notWorkedButton'),
+    notWorkedConfirm: document.querySelector('#notWorkedConfirm'),
+    notWorkedCleared: document.querySelector('#notWorkedCleared'),
+    cancelNotWorkedButton: document.querySelector('#cancelNotWorkedButton'),
+    confirmNotWorkedButton: document.querySelector('#confirmNotWorkedButton'),
     confirmModal: document.querySelector('#confirmModal'),
     confirmTitle: document.querySelector('#confirmTitle'),
     confirmMessage: document.querySelector('#confirmMessage'),
@@ -134,6 +146,7 @@ const elements = {
     acceptConfirmButton: document.querySelector('#acceptConfirmButton'),
     expenseForm: document.querySelector('#expenseForm'), expenseFormTitle: document.querySelector('#expenseFormTitle'),
     expenseDate: document.querySelector('#expenseDate'), expenseCategory: document.querySelector('#expenseCategory'),
+    expenseCategoryHint: document.querySelector('#expenseCategoryHint'),
     expenseAmount: document.querySelector('#expenseAmount'), expenseShift: document.querySelector('#expenseShift'),
     expenseNote: document.querySelector('#expenseNote'), expenseError: document.querySelector('#expenseError'),
     saveExpenseButton: document.querySelector('#saveExpenseButton'), cancelExpenseEdit: document.querySelector('#cancelExpenseEdit'),
@@ -142,7 +155,7 @@ const elements = {
     expenseList: document.querySelector('#expenseList'), expenseSummaryTotal: document.querySelector('#expenseSummaryTotal'),
     expenseSummaryCount: document.querySelector('#expenseSummaryCount'), expenseFuel: document.querySelector('#expenseFuel'),
     expenseRoad: document.querySelector('#expenseRoad'), exportExpensesButton: document.querySelector('#exportExpensesButton'),
-    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
+    expenseCostMethod: document.querySelector('#expenseCostMethod'), expenseFuelNote: document.querySelector('#expenseFuelNote'), expenseCategoryBreakdown: document.querySelector('#expenseCategoryBreakdown'),
     expenseTrashSection: document.querySelector('#expenseTrashSection'), expenseTrashList: document.querySelector('#expenseTrashList'),
     expenseTrashCount: document.querySelector('#expenseTrashCount'), emptyExpenseTrashButton: document.querySelector('#emptyExpenseTrashButton'),
     scheduleNavButton: document.querySelector('#scheduleNavButton'),
@@ -162,8 +175,12 @@ const elements = {
     goalLink: document.querySelector('#goalLink'),
     forfeitsDetail: document.querySelector('#forfeitsDetail'),
     importStatus: document.querySelector('#importStatus'),
+    importStatusHint: document.querySelector('#importStatusHint'),
     scheduleMatchNotice: document.querySelector('#scheduleMatchNotice'),
     scheduleMatchMessage: document.querySelector('#scheduleMatchMessage'),
+    duplicateNotice: document.querySelector('#duplicateNotice'),
+    duplicateMessage: document.querySelector('#duplicateMessage'),
+    openDuplicateButton: document.querySelector('#openDuplicateButton'),
     completeScheduledButton: document.querySelector('#completeScheduledButton'),
     editDialogTitle: document.querySelector('#editDialogTitle'),
     editDialogDescription: document.querySelector('#editDialogDescription'),
@@ -171,8 +188,10 @@ const elements = {
     editStatusHint: document.querySelector('#editStatusHint'),
     editBasePayLabel: document.querySelector('#editBasePayLabel'),
     linkedExpensesSection: document.querySelector('#linkedExpensesSection'),
+    reviewBlockButton: document.querySelector('#reviewBlockButton'),
     installBanner: document.querySelector('#installBanner'),
     installBannerText: document.querySelector('#installBannerText'),
+    shareTip: document.querySelector('#shareTip'),
     installBannerButton: document.querySelector('#installBannerButton'),
     dismissInstallBanner: document.querySelector('#dismissInstallBanner')
 };
@@ -184,6 +203,15 @@ let importTimer;
 const IMPORT_TIMEOUT_MS = 60000;
 let editingShiftId;
 let editSnapshot;
+/** The account's vehicle cost method, once the Expenses page has loaded the settings. */
+let expenseCostMethod;
+/**
+ * The block the expense in the form is linked to (one being edited, or a new toll started from Review this block), kept
+ * in the form when the Shift list doesn't hold it.
+ */
+let editingExpenseLink;
+/** True while a move back to scheduled is being sent, so going online again can't offer a second press. */
+let notWorkedSending = false;
 let pendingConfirmAction;
 let lastFocusedElement;
 let visibleShiftCount = 25;
@@ -201,6 +229,17 @@ let editMode = 'edit';
 let editOriginalStatus;
 let importCandidate;
 let importWarnings = [];
+let importDuplicateEdited = false;
+// The single screenshot under review gets its own request ids, so a repeated save is answered with the first one.
+let importRequestId;
+let importStatusRequestId;
+/**
+ * Several screenshots picked at once (import-queue.js): {items, current, paused, reading, abort}. `current` is the
+ * number of the file in the review form; `reading` is the file being read now, one at a time.
+ */
+let importBatch;
+/** True while an import save is on its way, so Skip, Stop or Review can't move the form out from under it. */
+let importSaveInFlight = false;
 const csrfToken = document.querySelector('meta[name="_csrf"]')?.content;
 const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.content;
 const previewFields = {
@@ -259,6 +298,13 @@ elements.reportsNavButton.addEventListener('click', () => showReportsScreen());
 elements.scheduleNavButton.addEventListener('click', showScheduleScreen);
 elements.importStatus.addEventListener('change', applyImportStatusRules);
 elements.completeScheduledButton.addEventListener('click', completeScheduledShift);
+elements.openDuplicateButton.addEventListener('click', openDuplicateShift);
+[elements.station, elements.date, elements.startTime, elements.endTime].forEach(input =>
+    input.addEventListener('input', () => {
+        if (importDuplicateEdited) return;
+        importDuplicateEdited = true;
+        applyImportStatusRules();
+    }));
 elements.editStatus.addEventListener('change', () => applyEditStatusRules(true));
 elements.expensesNavButton.addEventListener('click', showExpensesScreen);
 // The logo goes Home without a reload; its address still works for a middle-click or with scripts off.
@@ -268,12 +314,25 @@ elements.homeLink.addEventListener('click', event => {
 });
 elements.dashboardNavButton.addEventListener('click', () => showDashboard());
 elements.dropZone.addEventListener('click', openFilePicker);
-elements.screenshotInput.addEventListener('change', event => {
-    const [file] = event.target.files;
-    if (file) processScreenshot(file);
+elements.screenshotInput.addEventListener('change', event => pickScreenshots([...event.target.files]));
+// In a batch, the card's remove button skips the file under review and Cancel stops the whole import.
+elements.removeFileButton.addEventListener('click', () => (importBatch ? skipBatchItem() : resetImport()));
+elements.cancelImportButton.addEventListener('click', () => (importBatch ? stopBatch() : resetImport()));
+elements.skipImportButton.addEventListener('click', skipBatchItem);
+elements.stopQueueButton.addEventListener('click', stopBatch);
+elements.resumeQueueButton.addEventListener('click', resumeBatch);
+elements.finishQueueButton.addEventListener('click', finishBatch);
+elements.importQueueList.addEventListener('click', handleQueueRowAction);
+// The batch check compares the form's current values, so it follows every edit of the block's station, day and times.
+[elements.station, elements.date, elements.startTime, elements.endTime].forEach(input =>
+    input.addEventListener('input', () => {
+        if (currentBatchItem()) applyImportStatusRules();
+    }));
+window.addEventListener('beforeunload', event => {
+    if (!importBatch || !window.flexbuddyImportQueue.hasUnsaved(importBatch.items)) return;
+    event.preventDefault();
+    event.returnValue = '';
 });
-elements.removeFileButton.addEventListener('click', resetImport);
-elements.cancelImportButton.addEventListener('click', resetImport);
 elements.chooseAgainButton.addEventListener('click', () => {
     resetImport();
     // iOS only opens the picker from inside the tap itself, so nothing may be awaited before this.
@@ -311,6 +370,7 @@ elements.filterSort.addEventListener('change', () => updateFilter('sort', elemen
 elements.presetChips.forEach(chip => chip.addEventListener('click', () => applyPreset(chip.dataset.preset)));
 elements.heatmapMetric.addEventListener('change', loadHeatmap);
 elements.payoutCheckButton.addEventListener('click', event => window.flexbuddyPayouts.open(event.currentTarget));
+elements.reviewBlockButton.addEventListener('click', reviewEditedBlock);
 // The queue is on the phone, so its Pending tags and the offline state of the edit controls follow it.
 document.addEventListener('flexbuddy:outbox', refreshPendingTags);
 document.addEventListener('flexbuddy:online', () => {
@@ -353,6 +413,9 @@ elements.duplicateShiftButton.addEventListener('click', () => {
 });
 elements.cancelDeleteButton.addEventListener('click', hideDeleteConfirmation);
 elements.confirmDeleteButton.addEventListener('click', deleteEditedShift);
+elements.notWorkedButton.addEventListener('click', showNotWorkedConfirmation);
+elements.cancelNotWorkedButton.addEventListener('click', hideNotWorkedConfirmation);
+elements.confirmNotWorkedButton.addEventListener('click', markEditedShiftNotWorked);
 elements.trashSection.addEventListener('toggle', () => {
     if (elements.trashSection.open) loadTrash();
 });
@@ -362,6 +425,13 @@ elements.emptyTrashButton.addEventListener('click', () => openConfirm(
     emptyTrash
 ));
 elements.expenseForm.addEventListener('submit', saveExpense);
+elements.expenseCategory.addEventListener('change', renderExpenseCategoryHint);
+elements.expenseShift.addEventListener('change', renderExpenseCategoryHint);
+// On a phone the form comes first; this goes straight to the list and puts keyboard focus on its heading.
+document.querySelector('#expenseHistoryJump')?.addEventListener('click', () => {
+    document.querySelector('.expense-history-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+    document.querySelector('#expenseHistoryTitle').focus({preventScroll: true});
+});
 elements.cancelExpenseEdit.addEventListener('click', resetExpenseForm);
 elements.expenseDate.addEventListener('change', () => populateExpenseShifts(currentShifts));
 [elements.expenseFrom, elements.expenseTo, elements.expenseFilterCategory].forEach(input => input.addEventListener('change', loadExpenses));
@@ -422,12 +492,33 @@ for (const eventName of ['dragleave', 'drop']) {
     });
 }
 
-elements.dropZone.addEventListener('drop', event => {
-    const [file] = event.dataTransfer.files;
-    if (file) processScreenshot(file);
-});
+elements.dropZone.addEventListener('drop', event => pickScreenshots([...event.dataTransfer.files]));
+
+/** One file keeps the single-screenshot flow; two to ten start a batch, reviewed one at a time. */
+function pickScreenshots(files) {
+    if (files.length === 0) return;
+    if (refuseNewPick()) {
+        elements.screenshotInput.value = '';
+        return;
+    }
+    // A finished batch is cleared first, so its list never sits beside another screenshot's review.
+    if (importBatch) resetImport();
+    if (files.length === 1) processScreenshot(files[0]);
+    else startBatch(files);
+}
+
+/**
+ * True, with a message, while an import still has files to read or review or a save is on its way: a new pick then
+ * would put another screenshot in the form that belongs to the file under review, or drop the batch mid-save.
+ */
+function refuseNewPick() {
+    const busy = importSaveInFlight || (importBatch && !window.flexbuddyImportQueue.isFinished(importBatch.items));
+    if (busy) showMessage(elements.uploadError, t('js.importQueue.finishFirst'));
+    return Boolean(busy);
+}
 
 function openFilePicker() {
+    if (refuseNewPick()) return;
     elements.screenshotInput.click();
 }
 
@@ -554,9 +645,6 @@ async function processScreenshot(file) {
     showSelectedFile(file);
     setProcessing(true);
 
-    const formData = new FormData();
-    formData.append('screenshot', file);
-
     const abort = new AbortController();
     importAbort = abort;
     let timedOut = false;
@@ -566,12 +654,7 @@ async function processScreenshot(file) {
     }, IMPORT_TIMEOUT_MS);
 
     try {
-        const response = await apiFetch('/shifts/import-preview', {
-            method: 'POST',
-            headers: csrfHeaders(),
-            body: formData,
-            signal: abort.signal
-        });
+        const response = await requestPreview(file, abort.signal);
 
         if (!response.ok) {
             throw new Error(await response.text() || t('js.app.screenshotNotProcessed'));
@@ -579,6 +662,8 @@ async function processScreenshot(file) {
 
         const preview = await response.json();
         if (importAbort !== abort) return;
+        importRequestId = crypto.randomUUID();
+        importStatusRequestId = crypto.randomUUID();
         populatePreview(preview);
     } catch (error) {
         // A cancel or a newer pick already reset the screen, and this answer must not touch it.
@@ -596,6 +681,13 @@ async function processScreenshot(file) {
             setProcessing(false);
         }
     }
+}
+
+/** Sends one screenshot to be read; nothing is saved. The server reads one screenshot at a time for everyone. */
+function requestPreview(file, signal) {
+    const formData = new FormData();
+    formData.append('screenshot', file);
+    return apiFetch('/shifts/import-preview', {method: 'POST', headers: csrfHeaders(), body: formData, signal});
 }
 
 function cancelImportRequest() {
@@ -627,7 +719,10 @@ function populatePreview(preview) {
     setPreviewField('basePay', candidate.basePay);
     setPreviewField('tips', candidate.tips, value => value ?? 0);
     importCandidate = candidate;
-    elements.importStatus.value = candidate.suggestedStatus === 'SCHEDULED' ? 'SCHEDULED' : 'COMPLETED';
+    importDuplicateEdited = false;
+    // The driver says whether they worked the block; the screenshot's suggestion is only a hint.
+    elements.importStatus.value = window.flexbuddyImportStatus.INITIAL_STATUS;
+    elements.importStatusHint.textContent = t(window.flexbuddyImportStatus.hintKey(candidate));
     renderRawText(preview.lines, preview.rawText);
     renderReadQuality(preview.meanConfidence);
 
@@ -650,7 +745,8 @@ function applyImportStatusRules() {
         elements.tips.value = 0;
         elements.miles.value = '';
     }
-    elements.saveButton.querySelector('span').textContent = scheduled ? t('js.common.addScheduledShift') : t('js.common.addShift');
+    renderImportNotices();
+    elements.saveButton.querySelector('span').textContent = saveLabel();
     // A future date is expected for a scheduled block and suspicious for a completed one.
     const warnings = importWarnings.map(warning => warning.code !== 'FUTURE_DATE' ? warning : {
         ...warning,
@@ -659,43 +755,111 @@ function applyImportStatusRules() {
     });
     renderWarnings(warnings);
     elements.warningNotice.classList.toggle('is-hidden', warnings.length === 0);
-    renderScheduleMatch();
 }
 
-function renderScheduleMatch() {
-    const match = elements.importStatus.value === 'COMPLETED'
-        ? importCandidate?.duplicates?.find(duplicate => duplicate.kind === 'SCHEDULED_MATCH')
-        : undefined;
-    elements.scheduleMatchNotice.classList.toggle('is-hidden', !match);
-    elements.scheduleMatchNotice.dataset.shiftId = match ? match.shiftId : '';
-    elements.scheduleMatchMessage.textContent = match ? match.message : '';
+/**
+ * The server's notices for this screenshot, unless another file of this batch already saved the same block: the
+ * server read this file before that save, so the batch's own check replaces its answer.
+ */
+function importNotices() {
+    const item = currentBatchItem();
+    const inBatch = item && window.flexbuddyImportQueue.savedMatch(importFormBlock(), importBatch.items, item);
+    if (inBatch) {
+        return inBatch.kind === 'SCHEDULED_MATCH' ? {logged: undefined, schedule: inBatch} : {logged: inBatch, schedule: undefined};
+    }
+    return window.flexbuddyImportDuplicates.choose(importCandidate, elements.importStatus.value, importDuplicateEdited);
+}
+
+/** The block as the review form holds it now. */
+function importFormBlock() {
+    return {
+        station: elements.station.value.trim(),
+        date: elements.date.value,
+        startTime: elements.startTime.value,
+        endTime: elements.endTime.value,
+        status: elements.importStatus.value
+    };
+}
+
+function renderImportNotices() {
+    const {logged, schedule} = importNotices();
+    elements.duplicateNotice.classList.toggle('is-hidden', !logged);
+    elements.duplicateNotice.dataset.shiftId = logged ? logged.shiftId : '';
+    elements.duplicateMessage.textContent = logged ? logged.message : '';
+    elements.scheduleMatchNotice.classList.toggle('is-hidden', !schedule);
+    elements.scheduleMatchNotice.dataset.shiftId = schedule ? schedule.shiftId : '';
+    elements.scheduleMatchMessage.textContent = schedule ? schedule.message : '';
+}
+
+/** The save button's label: "Add anyway" while the duplicate notice shows, otherwise by status. */
+function saveLabel() {
+    if (importNotices().logged) return t('js.app.addAnyway');
+    return elements.importStatus.value === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
+}
+
+async function openDuplicateShift() {
+    hideMessage(elements.saveError);
+    const shiftId = elements.duplicateNotice.dataset.shiftId;
+    if (!shiftId) return;
+    elements.openDuplicateButton.disabled = true;
+    try {
+        const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}`);
+        if (!response.ok) throw new Error(await response.text() || t('js.app.requestFailed'));
+        openEditModal(await response.json(), elements.openDuplicateButton);
+    } catch (error) {
+        showMessage(elements.saveError, error.message || t('js.app.requestFailed'));
+    } finally {
+        elements.openDuplicateButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
+    }
 }
 
 async function completeScheduledShift() {
     hideMessage(elements.saveError);
     const shiftId = elements.scheduleMatchNotice.dataset.shiftId;
-    if (!shiftId || !elements.previewForm.reportValidity()) return;
+    // Add shift and Complete never both go out for one screenshot: that would count its pay twice.
+    if (!shiftId || importSaveInFlight || elements.completeScheduledButton.disabled
+        || !elements.previewForm.reportValidity()) return;
+    const batchItem = currentBatchItem();
+    const pay = {basePay: Number(elements.basePay.value), tips: Number(elements.tips.value)};
     elements.completeScheduledButton.disabled = true;
+    importSaveInFlight = true;
+    let answered = false;
     try {
         const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}/status`, {
             method: 'PATCH',
-            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            headers: retryHeaders(batchItem ? batchItem.statusRequestId : importStatusRequestId,
+                {'Content-Type': 'application/json'}),
             body: JSON.stringify({
                 status: 'COMPLETED',
-                basePay: Number(elements.basePay.value),
-                tips: Number(elements.tips.value),
+                ...pay,
                 miles: elements.miles.value === '' ? null : Number(elements.miles.value)
             })
         });
+        answered = true;
         if (!response.ok) throw new Error(await response.text() || t('js.app.scheduledNotCompleted'));
+        const completed = await response.json();
+        // A repeat is answered with the block as the first copy left it; a pay edited since then wasn't applied.
+        const replayed = Number(completed.basePay) !== pay.basePay || Number(completed.tips) !== pay.tips;
+        if (batchItem) {
+            window.flexbuddyImportQueue.noteCompleted(importBatch.items, completed.id);
+            recordBatchSave(batchItem, completed, 'completed', replayed);
+            return;
+        }
         resetImport();
-        showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
+        if (replayed) showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+        else showToast(t('js.app.scheduledCompletedTitle'), t('js.app.scheduledCompletedMessage'));
         await loadStations();
         await loadDashboard();
         showDashboard();
     } catch (error) {
+        if (batchItem && !answered) {
+            // It may have been completed: the row says so, and no other file offers to complete the block again.
+            batchItem.uncertain = true;
+            window.flexbuddyImportQueue.noteCompleted(importBatch.items, Number(shiftId));
+        }
         showMessage(elements.saveError, error.message || t('js.app.scheduledNotCompleted'));
     } finally {
+        importSaveInFlight = false;
         elements.completeScheduledButton.disabled = window.flexbuddyPwa?.isOffline() ?? false;
     }
 }
@@ -778,7 +942,8 @@ async function saveShift(event) {
     event.preventDefault();
     hideMessage(elements.saveError);
 
-    if (!elements.previewForm.reportValidity()) return;
+    // A second tap while a save is on its way does nothing; the request id covers a retry after it.
+    if (importSaveInFlight || elements.saveButton.disabled || !elements.previewForm.reportValidity()) return;
 
     const shift = {
         station: elements.station.value.trim(),
@@ -790,23 +955,52 @@ async function saveShift(event) {
         miles: elements.miles.value === '' ? null : Number(elements.miles.value),
         status: elements.importStatus.value
     };
+    const batchItem = currentBatchItem();
 
     setSaving(true);
+    importSaveInFlight = true;
 
+    let answered = false;
     try {
-        const response = await apiFetch('/shifts', {
+        const send = () => apiFetch('/shifts', {
             method: 'POST',
-            headers: csrfHeaders({'Content-Type': 'application/json'}),
+            headers: retryHeaders(batchItem ? batchItem.requestId : importRequestId, {'Content-Type': 'application/json'}),
             body: JSON.stringify(shift)
         });
+        let response = await send();
+        answered = true;
 
-        if (!response.ok) {
+        // A 409 DUPLICATE is a second copy of this same save racing the first, which landed. Sent once more with the
+        // same request id, it is answered with that first block.
+        let delivered = !response.ok && await isDuplicate(response);
+        if (delivered) {
+            const again = await send();
+            if (again.ok) {
+                response = again;
+                delivered = false;
+            }
+        }
+        if (!response.ok && !delivered) {
             const message = await response.text();
             throw new Error(message || t('js.app.saveFailedCheck'));
+        }
+        const saved = delivered ? undefined : await response.json();
+        const replayed = saved && !window.flexbuddyImportQueue.sameAsSent(shift, saved);
+
+        if (batchItem) {
+            recordBatchSave(batchItem, saved ?? shift, 'added', replayed);
+            return;
         }
 
         const scheduled = shift.status === 'SCHEDULED';
         resetImport();
+        if (replayed) {
+            showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+            await loadStations();
+            await loadDashboard();
+            showDashboard();
+            return;
+        }
         showToast(scheduled ? t('js.app.shiftScheduled') : t('js.app.shiftAdded'),
             scheduled ? t('js.app.shiftScheduledMessage') : t('js.app.shiftAddedMessage'));
         await loadStations();
@@ -814,8 +1008,11 @@ async function saveShift(event) {
         if (scheduled) showScheduleScreen();
         else showDashboard();
     } catch (error) {
+        // With no answer the save may still have landed; a later Skip or Stop says so instead of "Skipped".
+        if (batchItem && !answered) batchItem.uncertain = true;
         showMessage(elements.saveError, error.message || t('js.app.saveFailed'));
     } finally {
+        importSaveInFlight = false;
         setSaving(false);
     }
 }
@@ -1005,8 +1202,12 @@ async function loadStatistics(query, signal) {
         elements.tipsShareBar.style.width = `${tipShare}%`;
         elements.tipsShare.textContent = t('js.app.percentFromTips', tipShare.toFixed(1));
         elements.netEarnings.textContent = formatMoney(statistics.netEarnings);
-        elements.netHourly.textContent = t('js.app.netHourlyEst', formatMoney(statistics.netHourlyRate));
-        elements.netMargin.textContent = t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
+        const missingMiles = window.flexbuddyHome?.netMissingMiles(statistics) ?? 0;
+        elements.netHourly.textContent = t(missingMiles ? 'js.app.netHourlyEstMissing' : 'js.app.netHourlyEst',
+            formatMoney(statistics.netHourlyRate));
+        elements.netMargin.textContent = missingMiles
+            ? tn(missingMiles, 'js.app.netMissingMiles')
+            : t('js.app.afterDeductions', Number(statistics.netMargin || 0).toFixed(1));
         elements.expenseTotal.textContent = formatMoney(statistics.totalExpenses);
         elements.totalMiles.textContent = t('js.common.miles', Number(statistics.totalMiles || 0).toFixed(1));
         elements.mileageCost.textContent = t('js.app.mileageCost', formatMoney(statistics.mileageCost));
@@ -1146,12 +1347,16 @@ function renderShifts(shifts) {
             shift.details?.actualMinutes ?? shift.timeWorked) : '';
         const edited = shift.createdAt && shift.updatedAt
                 && new Date(shift.updatedAt) - new Date(shift.createdAt) > 60000;
+        // The server flags a block whose missing miles leave its vehicle cost out of estimated net.
+        const netLine = (shift.miles == null ? '' : `${t('js.common.miles', Number(shift.miles).toFixed(1))} · `)
+            + t('js.app.estNetLine', formatMoney(shift.netPay), formatMoney(shift.netHourlyRate))
+            + (shift.netMissingMiles ? ` · ${t('js.home.missingMiles')}` : '');
 
         row.innerHTML = `
             <div class="date-badge"><small>${escapeHtml(month)}</small><strong>${day}</strong></div>
             <div class="shift-main"><strong>${escapeHtml(shift.station)}${edited ? `<small class="edited-tag">${escapeHtml(t('js.app.edited'))}</small>` : ''}${statusBadge}</strong><span>${escapeHtml(t('js.app.weekdayShift', weekday))}</span></div>
             <div class="shift-time"><strong>${formatTime(shift.startTime)} – ${formatTime(shift.endTime)}</strong><span>${escapeHtml(t('js.app.scheduledTime'))}</span></div>
-            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span>${escapeHtml((shift.miles == null ? '' : `${t('js.common.miles', Number(shift.miles).toFixed(1))} · `) + t('js.app.estNetLine', formatMoney(shift.netPay), formatMoney(shift.netHourlyRate)))}</span>${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
+            <div class="shift-pay"><strong>${formatMoney(total)}</strong><span>${workSummary}</span><span class="net-line">${escapeHtml(netLine)}</span>${shift.netMissingMiles ? `<button class="text-button add-miles-button" type="button">${escapeHtml(t('js.home.addMiles'))}</button>` : ''}${route ? `<span>${escapeHtml(route)}</span>` : ''}</div>
             <button class="edit-shift-button" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 4.2-1 10.9-10.9a2.1 2.1 0 0 0-3-3L5.2 16 4 20Zm10.5-13.5 3 3"/></svg>
             </button>
@@ -1161,6 +1366,16 @@ function renderShifts(shifts) {
         const editButton = row.querySelector('.edit-shift-button');
         editButton.setAttribute('aria-label', t('js.app.editShiftOn', shift.station, shift.date));
         editButton.addEventListener('click', () => openEditModal(shift, editButton));
+        // The line can be cut off on a narrow phone, so its full text is also its tooltip.
+        row.querySelector('.net-line').title = netLine;
+        const addMilesButton = row.querySelector('.add-miles-button');
+        if (addMilesButton) {
+            addMilesButton.setAttribute('aria-label', t('js.app.addMilesTo', shift.station, formatDate(shift.date)));
+            addMilesButton.addEventListener('click', event => {
+                event.stopPropagation();
+                openEditModal(shift, addMilesButton, {focusMiles: true});
+            });
+        }
         elements.historyList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
             onEdit: () => openEditModal(shift, editButton),
             onDelete: () => deleteShiftFromList(shift),
@@ -1228,7 +1443,11 @@ function openEditModal(shift, trigger, options = {}) {
         : t('js.app.updateValues');
     elements.deleteShiftButton.classList.toggle('is-hidden', isNew);
     elements.duplicateShiftButton.classList.toggle('is-hidden', isNew);
+    elements.notWorkedButton.classList.toggle('is-hidden',
+        !window.flexbuddyNotWorked.canMarkNotWorked(editMode, editOriginalStatus));
     elements.linkedExpensesSection.classList.toggle('is-hidden', isNew);
+    // Only a worked block has a checklist: a scheduled one counts for nothing until it is confirmed.
+    elements.reviewBlockButton.classList.toggle('is-hidden', isNew || editOriginalStatus !== 'COMPLETED');
     elements.editTimestamps.classList.toggle('is-hidden', isNew);
     if (!isNew) {
         loadLinkedExpenses(shift.id);
@@ -1238,12 +1457,15 @@ function openEditModal(shift, trigger, options = {}) {
     applyEditStatusRules(Boolean(options.status) && options.status !== editOriginalStatus);
     applyOfflineEditState();
     hideDeleteConfirmation();
+    hideNotWorkedConfirmation();
     hideMessage(elements.editError);
     elements.editModal.classList.remove('is-hidden');
     document.body.classList.add('modal-open');
     if (options.focusPay) {
         elements.editBasePay.focus();
         elements.editBasePay.select();
+    } else if (options.focusMiles && !elements.editMiles.disabled) {
+        elements.editMiles.focus();
     } else {
         elements.editStation.focus();
     }
@@ -1350,6 +1572,44 @@ function saveEditLabel() {
     if (status === editOriginalStatus) return t('js.app.saveChanges');
     return {COMPLETED: t('js.app.markCompleted'), CANCELLED: t('js.app.markCancelled'), FORFEITED: t('js.app.markForfeited')}[status]
         || t('js.app.saveChanges');
+}
+
+/** Leaves the edit dialog for the block's checklist, unless that would drop changes the driver hasn't saved. */
+function reviewEditedBlock() {
+    if (editHasChanges()) {
+        showMessage(elements.editError, t('js.blockReview.saveFirst'));
+        return;
+    }
+    const id = editingShiftId;
+    const from = lastFocusedElement;
+    lastFocusedElement = undefined;
+    closeEditModal();
+    window.flexbuddyBlockReview.open(id, from);
+}
+
+/** True when any field of the edit dialog differs from the block as it was opened. */
+function editHasChanges() {
+    const shift = editSnapshot ?? {};
+    const details = shift.details ?? {};
+    const fields = [
+        [elements.editStation, shift.station], [elements.editDate, shift.date],
+        [elements.editStartTime, trimTime(shift.startTime)], [elements.editEndTime, trimTime(shift.endTime)],
+        [elements.editBasePay, shift.basePay], [elements.editTips, shift.tips ?? 0], [elements.editMiles, shift.miles],
+        [elements.editStatus, editOriginalStatus], [elements.editActualStart, trimTime(details.actualStart)],
+        [elements.editActualEnd, trimTime(details.actualEnd)], [elements.editOdometerStart, details.odometerStart],
+        [elements.editOdometerEnd, details.odometerEnd], [elements.editStops, details.stops],
+        [elements.editPackages, details.packages], [elements.editReturns, details.returns]
+    ];
+    return fields.some(([input, saved]) => !sameFieldValue(input.value, saved, input.type === 'number'));
+}
+
+/** In a number field "12.50" and 12.5 are the same amount; dates, times and text compare as written. */
+function sameFieldValue(value, saved, numeric) {
+    const typed = String(value ?? '').trim();
+    const kept = saved == null ? '' : String(saved).trim();
+    if (typed === kept) return true;
+    return numeric && typed !== '' && kept !== '' && !Number.isNaN(Number(typed)) && !Number.isNaN(Number(kept))
+        && Number(typed) === Number(kept);
 }
 
 function closeEditModal() {
@@ -1473,6 +1733,66 @@ async function saveEditedShift(event) {
     }
 }
 
+/** Asks before moving a block marked completed by mistake back to scheduled, naming every saved value it clears. */
+function showNotWorkedConfirmation() {
+    if (!editSnapshot) return;
+    const miles = new Intl.NumberFormat(appLocale(), {maximumFractionDigits: 1});
+    const items = window.flexbuddyNotWorked.clearedItems(editSnapshot,
+        {money: formatMoney, number: value => miles.format(Number(value))});
+    elements.notWorkedCleared.textContent = items.length
+        ? t('js.notWorked.clears', items.map(([key, ...args]) => t(key, ...args)).join(', '))
+        : t('js.notWorked.nothingElse');
+    hideMessage(elements.editError);
+    elements.editForm.querySelector('.form-actions').classList.add('is-hidden');
+    elements.notWorkedConfirm.classList.remove('is-hidden');
+    elements.cancelNotWorkedButton.focus();
+}
+
+function hideNotWorkedConfirmation() {
+    elements.editForm.querySelector('.form-actions').classList.remove('is-hidden');
+    elements.notWorkedConfirm.classList.add('is-hidden');
+}
+
+/**
+ * Moves the saved block back to scheduled. It names the version the dialog opened, so a block changed elsewhere is
+ * refused instead of corrected blind, and Undo puts every cleared value back.
+ */
+async function markEditedShiftNotWorked() {
+    const shiftId = editingShiftId;
+    const previous = editSnapshot;
+    if (shiftId === undefined || !previous) return;
+    hideMessage(elements.editError);
+    notWorkedSending = true;
+    elements.confirmNotWorkedButton.disabled = true;
+    try {
+        const response = await apiFetch(`/shifts/${shiftId}/not-worked`, {
+            method: 'POST',
+            headers: retryHeaders(crypto.randomUUID(), {'Content-Type': 'application/json'}),
+            body: JSON.stringify({expectedUpdatedAt: previous.updatedAt})
+        });
+        if (response.status === 409) {
+            hideNotWorkedConfirmation();
+            showMessage(elements.editError, t('js.notWorked.changedElsewhere'));
+            return;
+        }
+        if (!response.ok) throw new Error(await response.text() || t('js.notWorked.failed'));
+        closeEditModal();
+        showToast(t('js.notWorked.doneTitle'), t('js.notWorked.doneMessage', previous.station, formatDate(previous.date)), {
+            actionLabel: t('js.common.undo'),
+            duration: 8000,
+            onAction: () => undoEdit(shiftId, previous)
+        });
+        await loadStations();
+        await loadDashboard();
+    } catch (error) {
+        showMessage(elements.editError, error.message || t('js.notWorked.failed'));
+    } finally {
+        notWorkedSending = false;
+        elements.confirmNotWorkedButton.disabled = false;
+        applyOfflineEditState();
+    }
+}
+
 function showDeleteConfirmation() {
     elements.editForm.querySelector('.form-actions').classList.add('is-hidden');
     elements.deleteConfirm.classList.remove('is-hidden');
@@ -1556,6 +1876,8 @@ async function undoEdit(id, previous) {
             basePay: previous.basePay,
             tips: previous.tips,
             miles: previous.miles,
+            // Puts the status back too, for an undo of a block moved back to scheduled.
+            status: previous.status,
             details: previous.details && previous.status !== 'SCHEDULED' ? {
                 actualStart: previous.status === 'COMPLETED' ? previous.details.actualStart : null,
                 actualEnd: previous.status === 'COMPLETED' ? previous.details.actualEnd : null,
@@ -1676,16 +1998,24 @@ function trapFocus(container, event) {
 
 function resetImport() {
     cancelImportRequest();
+    endBatch();
+    clearImportReview();
+    importRequestId = undefined;
+    importStatusRequestId = undefined;
+    elements.screenshotInput.value = '';
+    elements.dropZone.classList.remove('is-hidden');
+}
+
+/** Empties the file card and the review form, ready for another screenshot. */
+function clearImportReview() {
     setProcessing(false);
     if (selectedFileUrl) {
         URL.revokeObjectURL(selectedFileUrl);
         selectedFileUrl = undefined;
     }
-    elements.screenshotInput.value = '';
     elements.previewForm.reset();
     elements.fileCard.classList.add('is-hidden');
     elements.fileActions.classList.add('is-hidden');
-    elements.dropZone.classList.remove('is-hidden');
     elements.previewForm.classList.add('is-hidden');
     elements.emptyPreview.classList.remove('is-hidden');
     elements.ocrDetails.classList.add('is-hidden');
@@ -1702,11 +2032,303 @@ function resetImport() {
     hideMessage(elements.saveError);
     importCandidate = undefined;
     importWarnings = [];
-    elements.importStatus.value = 'COMPLETED';
+    elements.importStatus.value = window.flexbuddyImportStatus.INITIAL_STATUS;
+    elements.importStatusHint.textContent = '';
     elements.tips.disabled = false;
     elements.miles.disabled = false;
+    importDuplicateEdited = false;
     elements.scheduleMatchNotice.classList.add('is-hidden');
+    elements.duplicateNotice.classList.add('is-hidden');
     setSaving(false);
+}
+
+// ===== Several screenshots at once: import-queue.js decides what each row says and which file comes next =====
+
+/** The batch file in the review form, while it is still unsaved. */
+function currentBatchItem() {
+    if (!importBatch || importBatch.current === undefined) return undefined;
+    const item = importBatch.items.find(entry => entry.number === importBatch.current);
+    return item?.state === 'ready' ? item : undefined;
+}
+
+async function startBatch(files) {
+    const queue = window.flexbuddyImportQueue;
+    hideMessage(elements.uploadError);
+    if (files.length > queue.MAX_FILES) {
+        elements.screenshotInput.value = '';
+        showMessage(elements.uploadError, t('js.importQueue.tooMany'));
+        return;
+    }
+    resetImport();
+    elements.dropZone.classList.add('is-hidden');
+    // Files the server would refuse are never hashed or sent.
+    const signatures = await Promise.all(files.map(file => (queue.fileProblemKey(file) ? undefined : fileSignature(file))));
+    importBatch = {items: queue.createItems(files, signatures, () => crypto.randomUUID()).items, current: undefined, paused: false};
+    renderBatch();
+    readNextInBatch();
+}
+
+/** Identifies a file's bytes, so the same screenshot picked twice is read once. */
+async function fileSignature(file) {
+    try {
+        const digest = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+        return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+    } catch {
+        return `${file.name}|${file.size}|${file.lastModified}`;
+    }
+}
+
+/**
+ * Reads the next waiting file, then the one after, one at a time. A file the server can't read is marked and the next
+ * one is read; a busy server, the time limit or a lost connection pauses reading until the driver taps Continue
+ * reading. Reading never saves anything.
+ */
+async function readNextInBatch() {
+    const batch = importBatch;
+    const queue = window.flexbuddyImportQueue;
+    if (!batch || batch.reading || batch.paused) return;
+    const item = queue.nextToRead(batch.items);
+    if (!item) {
+        renderBatch();
+        return;
+    }
+    if (window.flexbuddyPwa?.isOffline()) {
+        batch.paused = true;
+        renderBatch();
+        return;
+    }
+    item.state = 'reading';
+    batch.reading = item;
+    const abort = new AbortController();
+    batch.abort = abort;
+    if (batch.current === undefined) showBatchIdle();
+    renderBatch();
+
+    let timedOut = false;
+    let status = 0;
+    const timer = setTimeout(() => {
+        timedOut = true;
+        abort.abort();
+    }, IMPORT_TIMEOUT_MS);
+    try {
+        const response = await requestPreview(item.file, abort.signal);
+        status = response.status;
+        if (!response.ok) throw new Error(await response.text() || t('js.app.screenshotNotProcessed'));
+        const preview = await response.json();
+        if (!preview.shifts?.[0]) {
+            status = 400;
+            throw new Error(t('js.app.noShiftDetails'));
+        }
+        // Stopped, or the whole import cleared, while this answer was on its way.
+        if (importBatch !== batch || item.state !== 'reading') return;
+        item.preview = preview;
+        item.state = 'ready';
+    } catch (error) {
+        if (importBatch !== batch || item.state !== 'reading') return;
+        const failure = queue.readFailure(timedOut ? 0 : status);
+        Object.assign(item, {
+            state: 'failed',
+            retry: failure.retry,
+            error: timedOut ? t('js.app.screenshotTimedOut') : error.message || t('js.app.screenshotNotProcessed')
+        });
+        if (failure.pause) batch.paused = true;
+    } finally {
+        clearTimeout(timer);
+        if (batch.reading === item) {
+            batch.reading = undefined;
+            batch.abort = undefined;
+        }
+    }
+    if (batch.current === undefined) openNextBatchReview(item.number - 1);
+    else renderBatch();
+    readNextInBatch();
+}
+
+/** Opens the next file read and not yet saved after file `after`, or shows the file being read while none is. */
+function openNextBatchReview(after = 0) {
+    const batch = importBatch;
+    const next = window.flexbuddyImportQueue.nextToReview(batch.items, after);
+    batch.current = next?.number;
+    if (next) showBatchReview(next);
+    else showBatchIdle();
+    renderBatch();
+}
+
+function showBatchReview(item) {
+    clearImportReview();
+    showSelectedFile(item.file);
+    elements.fileActions.classList.add('is-hidden');
+    populatePreview(item.preview);
+}
+
+function showBatchIdle() {
+    clearImportReview();
+    const reading = importBatch?.reading;
+    if (!reading) return;
+    showSelectedFile(reading.file);
+    elements.fileActions.classList.add('is-hidden');
+    setProcessing(true);
+}
+
+/** Marks a file saved with the block the server answered with, refreshes the totals, and opens the next file. */
+function recordBatchSave(item, block, kind, changed = false) {
+    item.state = 'saved';
+    item.uncertain = false;
+    item.saved = {
+        shiftId: block.id, status: block.status, station: block.station, date: block.date,
+        startTime: trimTime(block.startTime), endTime: trimTime(block.endTime), kind, changed
+    };
+    if (changed) showToast(t('js.importQueue.savedBeforeTitle'), t('js.importQueue.savedBeforeMessage'));
+    loadStations().then(loadDashboard).catch(() => {});
+    openNextBatchReview(item.number);
+    scrollToReview();
+}
+
+/** On a phone the review form is below the list, so moving to the next file brings it into view. */
+function scrollToReview() {
+    if (!currentBatchItem() || !window.matchMedia('(max-width: 900px)').matches) return;
+    elements.previewForm.closest('.preview-panel').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+function skipBatchItem() {
+    const item = currentBatchItem();
+    if (!item || importSaveInFlight) return;
+    item.state = 'skipped';
+    openNextBatchReview(item.number);
+    scrollToReview();
+}
+
+function reviewBatchItem(item) {
+    if (importSaveInFlight || item.state !== 'ready') return;
+    importBatch.current = item.number;
+    showBatchReview(item);
+    renderBatch();
+    scrollToReview();
+}
+
+function retryBatchItem(item) {
+    if (item.state !== 'failed' || !item.retry) return;
+    Object.assign(item, {state: 'waiting', error: undefined, retry: undefined});
+    importBatch.paused = false;
+    renderBatch();
+    readNextInBatch();
+}
+
+function resumeBatch() {
+    if (!importBatch) return;
+    importBatch.paused = false;
+    renderBatch();
+    readNextInBatch();
+}
+
+/** Stops reading and reviewing; the blocks already saved stay saved and listed. */
+function stopBatch() {
+    const batch = importBatch;
+    if (!batch || importSaveInFlight) return;
+    window.flexbuddyImportQueue.stop(batch.items);
+    const abort = batch.abort;
+    Object.assign(batch, {reading: undefined, abort: undefined, current: undefined, paused: false});
+    abort?.abort();
+    clearImportReview();
+    renderBatch();
+}
+
+function finishBatch() {
+    resetImport();
+    showDashboard();
+}
+
+/** Forgets the batch; called by resetImport, so every way of starting over also ends a batch. */
+function endBatch() {
+    if (!importBatch) return;
+    const abort = importBatch.abort;
+    importBatch = undefined;
+    abort?.abort();
+    renderBatch();
+}
+
+function handleQueueRowAction(event) {
+    const button = event.target.closest('button[data-action]');
+    const item = button && importBatch?.items.find(entry => entry.number === Number(button.dataset.number));
+    if (!item) return;
+    if (button.dataset.action === 'review') reviewBatchItem(item);
+    else if (button.dataset.action === 'retry') retryBatchItem(item);
+    else if (button.dataset.action === 'open') openBatchShift(item.saved.shiftId, button);
+}
+
+async function openBatchShift(shiftId, trigger) {
+    hideMessage(elements.uploadError);
+    try {
+        const response = await apiFetch(`/shifts/${encodeURIComponent(shiftId)}`);
+        if (!response.ok) throw new Error(await response.text() || t('js.app.requestFailed'));
+        openEditModal(await response.json(), trigger);
+    } catch (error) {
+        showMessage(elements.uploadError, error.message || t('js.app.requestFailed'));
+    }
+}
+
+const QUEUE_ACTION_TEXT = {review: 'js.importQueue.review', retry: 'js.importQueue.tryAgain', open: 'js.importQueue.open'};
+const QUEUE_ACTION_LABEL = {
+    review: 'js.importQueue.reviewLabel', retry: 'js.importQueue.tryAgainLabel', open: 'js.importQueue.openLabel'
+};
+
+function renderBatch() {
+    const batch = importBatch;
+    const queue = window.flexbuddyImportQueue;
+    elements.importQueue.classList.toggle('is-hidden', !batch);
+    elements.resetButton.classList.toggle('is-hidden', Boolean(batch));
+    elements.skipImportButton.classList.toggle('is-hidden', !batch);
+    if (!batch) {
+        elements.importQueueList.replaceChildren();
+        elements.importQueueStatus.textContent = '';
+        return;
+    }
+    const finished = queue.isFinished(batch.items);
+    elements.importQueueStatus.textContent = queue.headline(batch.items, batch.current, batch.paused);
+    elements.resumeQueueButton.classList.toggle('is-hidden', !batch.paused || !queue.nextToRead(batch.items));
+    elements.stopQueueButton.classList.toggle('is-hidden', finished);
+    elements.finishQueueButton.classList.toggle('is-hidden', !finished);
+    // Rows are rebuilt on every change, so a focused row button is found again in the new rows.
+    const focused = elements.importQueueList.contains(document.activeElement) ? document.activeElement.dataset : undefined;
+    elements.importQueueList.replaceChildren(...batch.items.map(item => queueRow(item, batch.current)));
+    if (focused) {
+        elements.importQueueList.querySelector(`button[data-action="${focused.action}"][data-number="${focused.number}"]`)
+            ?.focus();
+    }
+}
+
+function queueRow(item, current) {
+    const queue = window.flexbuddyImportQueue;
+    const row = document.createElement('li');
+    row.className = 'import-queue-row';
+    row.dataset.state = item.state;
+    if (item.state === 'ready' && item.number === current) {
+        row.classList.add('is-current');
+        row.setAttribute('aria-current', 'step');
+    }
+    const number = document.createElement('span');
+    number.className = 'import-queue-number';
+    number.textContent = item.number;
+    const file = document.createElement('div');
+    file.className = 'import-queue-file';
+    const name = document.createElement('strong');
+    name.textContent = item.name;
+    name.title = item.name;
+    const status = document.createElement('small');
+    status.textContent = queue.rowText(item, current, formatShortDay);
+    file.append(name, status);
+    row.append(number, file);
+    for (const action of queue.rowActions(item, current)) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'text-button';
+        button.dataset.action = action;
+        button.dataset.number = item.number;
+        button.textContent = t(QUEUE_ACTION_TEXT[action]);
+        button.setAttribute('aria-label', t(QUEUE_ACTION_LABEL[action], item.number));
+        row.append(button);
+    }
+    return row;
 }
 
 function setProcessing(processing) {
@@ -1716,16 +2338,18 @@ function setProcessing(processing) {
 function setSaving(saving) {
     elements.saveButton.disabled = saving;
     elements.saveButton.querySelector('span').textContent = saving ? t('js.app.addingShift')
-        : elements.importStatus.value === 'SCHEDULED' ? t('js.common.addScheduledShift') : t('js.common.addShift');
+        : saveLabel();
 }
 
 /** Editing, deleting and duplicating a saved shift need a connection; adding one does not, because it can be queued. */
 function applyOfflineEditState() {
     const blocked = editMode === 'edit' && (window.flexbuddyPwa?.isOffline() ?? false);
-    [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton].forEach(button => {
+    [elements.saveEditButton, elements.deleteShiftButton, elements.duplicateShiftButton, elements.notWorkedButton,
+        elements.confirmNotWorkedButton].forEach(button => {
         button.disabled = blocked;
         button.title = blocked ? t('js.pwa.availableWhenOnline') : '';
     });
+    if (notWorkedSending) elements.confirmNotWorkedButton.disabled = true;
 }
 
 function setEditSaving(saving) {
@@ -1958,18 +2582,7 @@ async function loadStations() {
 
 function updateResultSummary(shifts) {
     const count = shifts.length;
-    let range = t('js.app.allDates');
-    if (filterState.from || filterState.to) {
-        range = `${filterState.from ? formatDate(filterState.from) : t('js.app.beginning')} – ${filterState.to ? formatDate(filterState.to) : t('js.app.today')}`;
-    } else if (count) {
-        const dates = shifts.map(shift => shift.date).sort();
-        range = `${formatDate(dates[0])} – ${formatDate(dates.at(-1))}`;
-    }
-    const station = filterState.station ? ` · ${filterState.station}` : '';
-    const expenseScope = filterState.station
-        ? t('js.app.expensesLinkedOnly')
-        : t('js.app.expensesByDate');
-    elements.resultsSummary.textContent = t('js.app.resultsSummary', tn(count, 'js.schedule.shifts'), range, station, expenseScope);
+    elements.resultsSummary.textContent = flexbuddyReports.scopeLine(filterState, shifts, formatDate);
     elements.activeFilterSummary.textContent = flexbuddyReports.summaryLine(shifts);
     elements.exportCsvButton.href = `/shifts/export.csv?${buildQuery()}`;
     elements.exportCsvButton.classList.toggle('is-disabled', count === 0);
@@ -2061,9 +2674,32 @@ function populateExpenseShifts(shifts) {
         const option = document.createElement('option');
         option.value = shift.id;
         option.textContent = `${formatDate(shift.date)} · ${shift.station}`;
+        option.dataset.status = shift.status ?? '';
         elements.expenseShift.append(option);
     });
+    keepEditingExpenseLink();
     if ([...elements.expenseShift.options].some(option => option.value === selected)) elements.expenseShift.value = selected;
+    renderExpenseCategoryHint();
+}
+
+/**
+ * The Shift list only holds blocks from History's current results, never deleted ones. An expense being edited keeps
+ * its own link as an option, so saving it doesn't quietly unlink it.
+ */
+function keepEditingExpenseLink() {
+    const link = editingExpenseLink;
+    if (!link || [...elements.expenseShift.options].some(option => option.value === String(link.id))) return;
+    const option = document.createElement('option');
+    option.value = link.id;
+    option.textContent = link.label;
+    option.dataset.status = link.status;
+    option.dataset.keptLink = 'true';
+    elements.expenseShift.append(option);
+}
+
+/** Takes a kept link back out of the Shift list, so it is never offered for another expense. */
+function dropKeptExpenseLink() {
+    elements.expenseShift.querySelectorAll('option[data-kept-link]').forEach(option => option.remove());
 }
 
 const EXPENSE_CATEGORY_KEYS = {
@@ -2102,6 +2738,9 @@ async function loadExpenses() {
         const settings = await settingsResponse.json();
         elements.expenseCostMethod.textContent = settings.vehicleCostMethod === 'ACTUAL_EXPENSES'
             ? t('js.app.costActual') : t('js.app.costStandard', formatMoney(settings.mileageRate));
+        elements.expenseFuelNote.hidden = settings.vehicleCostMethod !== 'STANDARD_MILEAGE';
+        expenseCostMethod = settings.vehicleCostMethod;
+        renderExpenseCategoryHint();
     } catch (error) {
         elements.expenseList.innerHTML = `<p class="history-empty">${escapeHtml(error.message || t('js.app.expensesNotLoaded'))}</p>`;
     }
@@ -2129,6 +2768,12 @@ function renderExpenseSummary(summary) {
     }));
 }
 
+/** Where an expense belongs: its block's station, marked when that block is in Recently deleted. */
+function expenseStationLabel(expense) {
+    if (!expense.station) return '';
+    return expense.shiftDeleted ? t('js.app.stationDeletedBlock', expense.station) : expense.station;
+}
+
 function renderExpenses(expenses) {
     elements.expenseList.replaceChildren();
     if (!expenses.length) {
@@ -2138,7 +2783,7 @@ function renderExpenses(expenses) {
     expenses.forEach(expense => {
         const row = document.createElement('article');
         row.className = 'expense-row';
-        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(categoryName(expense.category).slice(0, 1).toUpperCase())}</div><div class="expense-main"><strong>${escapeHtml(categoryName(expense.category).toUpperCase())}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expense.station)}` : ''}</span><small>${escapeHtml(expense.note || t('js.app.noNote'))}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">${escapeHtml(t('js.common.edit'))}</button><button class="danger-text-button delete-expense" type="button">${escapeHtml(t('js.common.delete'))}</button></div>`;
+        row.innerHTML = `<div class="expense-category-icon">${escapeHtml(categoryName(expense.category).slice(0, 1).toUpperCase())}</div><div class="expense-main"><strong>${escapeHtml(categoryName(expense.category).toUpperCase())}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expenseStationLabel(expense))}` : ''}</span><small>${escapeHtml(expense.note || t('js.app.noNote'))}</small></div><strong class="expense-amount">${formatMoney(expense.amount)}</strong><div class="expense-row-actions"><button class="text-button edit-expense" type="button">${escapeHtml(t('js.common.edit'))}</button><button class="danger-text-button delete-expense" type="button">${escapeHtml(t('js.common.delete'))}</button></div>`;
         row.querySelector('.edit-expense').addEventListener('click', () => editExpense(expense));
         row.querySelector('.delete-expense').addEventListener('click', () => deleteExpense(expense));
         elements.expenseList.append(window.flexbuddySwipe ? window.flexbuddySwipe.wrap(row, {
@@ -2157,8 +2802,18 @@ function editExpense(expense) {
     elements.expenseDate.value = expense.date;
     elements.expenseCategory.value = expense.category;
     elements.expenseAmount.value = expense.amount;
+    dropKeptExpenseLink();
+    // A block History knows reads like the other options; a deleted one is named by its station.
+    const known = expense.shiftId == null ? undefined : currentShifts.find(shift => shift.id === expense.shiftId);
+    editingExpenseLink = expense.shiftId == null ? undefined : {
+        id: expense.shiftId,
+        label: known ? `${formatDate(known.date)} · ${known.station}` : expenseStationLabel(expense) || t('js.app.linkedShift'),
+        status: known?.status ?? ''
+    };
+    keepEditingExpenseLink();
     elements.expenseShift.value = expense.shiftId ?? '';
     elements.expenseNote.value = expense.note ?? '';
+    renderExpenseCategoryHint();
     elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
     applyOfflineExpenseState();
 }
@@ -2170,15 +2825,48 @@ function applyOfflineExpenseState() {
     elements.saveExpenseButton.title = blocked ? t('js.pwa.availableWhenOnline') : '';
 }
 
+/**
+ * The Expenses form ready for a toll or parking on this block: its day, Toll, and the block already linked, kept as an
+ * option even when History's current results don't hold it.
+ */
+function startExpenseForBlock(shift) {
+    showExpensesScreen();
+    resetExpenseForm();
+    elements.expenseDate.value = shift.date;
+    elements.expenseCategory.value = 'TOLL';
+    editingExpenseLink = {id: shift.id, label: `${formatDate(shift.date)} · ${shift.station}`, status: shift.status ?? ''};
+    populateExpenseShifts(currentShifts);
+    elements.expenseShift.value = String(shift.id);
+    renderExpenseCategoryHint();
+    elements.expenseForm.scrollIntoView({behavior: 'smooth', block: 'center'});
+    elements.expenseAmount.focus({preventScroll: true});
+}
+
 function resetExpenseForm() {
     editingExpenseId = undefined;
+    editingExpenseLink = undefined;
+    dropKeptExpenseLink();
     elements.expenseForm.reset();
     elements.expenseDate.value = toIsoDate(new Date());
     elements.expenseFormTitle.textContent = t('js.app.logExpense');
     elements.saveExpenseButton.textContent = t('js.app.addExpense');
     elements.cancelExpenseEdit.classList.add('is-hidden');
     hideMessage(elements.expenseError);
+    renderExpenseCategoryHint();
     applyOfflineExpenseState();
+}
+
+/** What the chosen category does to estimated net, or nothing while the cost method isn't known. */
+function expenseEffectText(category) {
+    const linkedToScheduled = elements.expenseShift.selectedOptions[0]?.dataset.status === 'SCHEDULED';
+    const key = window.flexbuddyExpenseEffect?.effectKey(category, expenseCostMethod, linkedToScheduled);
+    return key ? t(key) : '';
+}
+
+/** Rewrites the hint only when it changes, so a screen reader doesn't announce the same words again. */
+function renderExpenseCategoryHint() {
+    const text = expenseEffectText(elements.expenseCategory.value);
+    if (elements.expenseCategoryHint.textContent !== text) elements.expenseCategoryHint.textContent = text;
 }
 
 async function saveExpense(event) {
@@ -2189,6 +2877,7 @@ async function saveExpense(event) {
         amount: Number(elements.expenseAmount.value), note: elements.expenseNote.value.trim() || null,
         shiftId: elements.expenseShift.value ? Number(elements.expenseShift.value) : null};
     const id = editingExpenseId;
+    const effect = expenseEffectText(body.category) || t('js.expenseEffect.saved');
     elements.saveExpenseButton.disabled = true;
     try {
         let response;
@@ -2210,7 +2899,7 @@ async function saveExpense(event) {
         }
         if (!response.ok && !(await isDuplicate(response))) throw new Error(await response.text());
         resetExpenseForm();
-        showToast(id ? t('js.app.expenseUpdated') : t('js.app.expenseAdded'), t('js.account.netRecalculated'));
+        showToast(id ? t('js.app.expenseUpdated') : t('js.app.expenseAdded'), effect);
         await Promise.all([loadExpenses(), loadDashboard()]);
     } catch (error) { showMessage(elements.expenseError, error.message || t('js.app.expenseNotSaved')); }
     finally { elements.saveExpenseButton.disabled = false; applyOfflineExpenseState(); }
@@ -2235,7 +2924,10 @@ async function loadExpenseTrash() {
     if (!expenses.length) return elements.expenseTrashList.innerHTML = `<p>${escapeHtml(t('js.app.noExpenseTrash'))}</p>`;
     expenses.forEach(expense => {
         const row = document.createElement('article'); row.className = 'trash-row';
-        row.innerHTML = `<div><strong>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}</span></div><div><button class="text-button" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
+        // The note and station tell similar expenses apart; the note is text, cut to one line with its full text on hover.
+        row.innerHTML = `<div><strong>${escapeHtml(categoryName(expense.category).toUpperCase())} · ${formatMoney(expense.amount)}</strong><span>${formatDate(expense.date)}${expense.station ? ` · ${escapeHtml(expenseStationLabel(expense))}` : ''}</span>${expense.note ? `<small class="trash-note">${escapeHtml(expense.note)}</small>` : ''}</div><div><button class="text-button" type="button">${escapeHtml(t('js.common.restore'))}</button><button class="danger-text-button" type="button">${escapeHtml(t('js.common.deletePermanently'))}</button></div>`;
+        const note = row.querySelector('.trash-note');
+        if (note) note.title = expense.note;
         const [restore, remove] = row.querySelectorAll('button');
         restore.addEventListener('click', async () => { await apiFetch(`/expenses/${expense.id}/restore`, {method:'POST',headers:csrfHeaders()}); await loadExpenseTrash(); await loadExpenses(); await loadDashboard(); });
         remove.addEventListener('click', () => openConfirm(t('js.app.deleteExpensePermanentlyTitle'), t('js.app.deleteExpensePermanentlyMessage'), async () => { await apiFetch(`/expenses/trash/${expense.id}`, {method:'DELETE',headers:csrfHeaders()}); await loadExpenseTrash(); }));
@@ -2285,10 +2977,8 @@ function openInitialScreen() {
     else showDashboard(false);
 }
 
-const SHARE_INBOX = 'flexbuddy-share-inbox';
 const SHARED_UNAVAILABLE = t('js.app.sharedUnavailable');
 
-/** Runs the import on a screenshot shared from another app, which the service worker left in the share inbox. */
 /** Right after the emailed code is accepted the address carries ?welcome; say so once and tidy the address. */
 function noteRecoveryCodeUse() {
     const params = new URLSearchParams(window.location.search);
@@ -2309,34 +2999,35 @@ function greetNewDriver() {
     showToast(t('js.app.emailConfirmed'), t('js.app.welcome'));
 }
 
+/**
+ * Opens the screenshots shared from another app, which the service worker left in the share inbox (share-inbox.js):
+ * one is reviewed as usual, two to ten start a batch. Without a share in the address, a share made while signed out
+ * and still waiting opens now, after the sign-in. Nothing is saved until the driver presses a save button.
+ */
 async function importSharedScreenshot() {
     const params = new URLSearchParams(window.location.search);
     const id = params.get('shared');
-    if (!id) return;
+    const inbox = window.flexbuddyShareInbox;
+    if (!id) {
+        const waiting = await inbox.takeNewest();
+        if (!waiting.length) return;
+        showImportScreen(false);
+        pickScreenshots(waiting);
+        showToast(t('js.app.sharedReadyTitle'), t('js.app.sharedReadyMessage'));
+        return;
+    }
     // Removed first so a reload or the back button never imports the same share twice.
     params.delete('shared');
     const query = params.toString();
     window.history.replaceState({}, '', `${window.location.pathname}${query ? `?${query}` : ''}`);
 
-    const file = await takeSharedFile(id);
-    if (file) processScreenshot(file);
-    else showMessage(elements.uploadError, SHARED_UNAVAILABLE);
-}
-
-async function takeSharedFile(id) {
-    if (!/^[0-9a-f-]{36}$/i.test(id) || !('caches' in window)) return null;
-    try {
-        const cache = await caches.open(SHARE_INBOX);
-        const key = `/share-inbox/${id}`;
-        const response = await cache.match(key);
-        if (!response) return null;
-        await cache.delete(key);
-        const blob = await response.blob();
-        const name = decodeURIComponent(response.headers.get('X-File-Name') || 'shared-screenshot');
-        return new File([blob], name, {type: blob.type || response.headers.get('Content-Type') || ''});
-    } catch {
-        return null;
+    if (id === 'too-many') {
+        showMessage(elements.uploadError, t('js.app.sharedTooMany'));
+        return;
     }
+    const files = await inbox.take(id);
+    if (files.length) pickScreenshots(files);
+    else showMessage(elements.uploadError, SHARED_UNAVAILABLE);
 }
 
 /** Saves the browser's time zone when it differs, so "today", Upcoming, and reminders match the driver's clock. */
@@ -2410,6 +3101,9 @@ document.addEventListener('flexbuddy:cache-ready', () => {
     loadDashboard();
 });
 updateThemeToggle(document.documentElement.dataset.theme);
+// Sharing to FlexBuddy from Photos needs the Android app or the installed web app, so only they mention it.
+elements.shareTip.classList.toggle('is-hidden', !/Android/i.test(navigator.userAgent)
+    || !window.matchMedia('(display-mode: standalone)').matches);
 initializeFilters();
 openInitialScreen();
 greetNewDriver();

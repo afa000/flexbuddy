@@ -1,0 +1,28 @@
+# Codex command rules for FlexBuddy (FB-027). A second layer behind the hook in .codex/hooks.json, which runs
+# scripts/hooks/guard.mjs and also catches HEAD:main, --all, --mirror and a plain push while on main. These rules
+# match argument prefixes only. Check them with:
+#   codex execpolicy check --pretty --rules .codex/rules/flexbuddy.rules -- git push origin main
+
+prefix_rule(
+    pattern = ["git", "push", "origin", "main"],
+    decision = "forbidden",
+    justification = "Pushing main deploys production. Push the ai/ branch and let the owner merge the pull request.",
+    match = ["git push origin main"],
+    not_match = ["git push origin ai/FB-027", "git push -u origin docs/native-app-plan"],
+)
+
+prefix_rule(
+    pattern = ["git", "push", ["-f", "--force", "--force-with-lease"], "origin", "main"],
+    decision = "forbidden",
+    justification = "Force-pushing main rewrites production history. The owner does this, if ever.",
+    match = ["git push --force origin main", "git push -f origin main"],
+    not_match = ["git push --force origin ai/FB-027"],
+)
+
+prefix_rule(
+    pattern = ["gh", "pr", "merge"],
+    decision = "forbidden",
+    justification = "Merging a pull request deploys production. The owner merges it in GitHub.",
+    match = ["gh pr merge 34", "gh pr merge --squash"],
+    not_match = ["gh pr view 34", "gh pr create --base main"],
+)
