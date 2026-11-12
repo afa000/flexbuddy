@@ -27,7 +27,8 @@ import com.angel.flexbuddy.repository.AppUserRepository;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({EmailVerificationService.class, AccountService.class, JpaAuditingConfig.class, TimestampListener.class})
+@Import({EmailVerificationService.class, AccountService.class, AppCredentialRevoker.class,
+        JpaAuditingConfig.class, TimestampListener.class})
 class EmailVerificationServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-10-02T12:00:00Z");

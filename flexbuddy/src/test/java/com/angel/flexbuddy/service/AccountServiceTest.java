@@ -75,6 +75,9 @@ class AccountServiceTest {
     @Mock
     private com.angel.flexbuddy.repository.RecoveryCodeRepository recoveryCodeRepository;
 
+    @Mock
+    private AppCredentialRevoker appCredentials;
+
     @InjectMocks
     private AccountService accountService;
 

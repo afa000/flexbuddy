@@ -48,10 +48,13 @@ public class EmailCodeService {
     private final Clock clock;
     private final byte[] secret;
     private final SecureRandom random = new SecureRandom();
+    private final com.angel.flexbuddy.repository.AppUserRepository users;
 
     public EmailCodeService(EmailCodeRepository codeRepository, EmailCodeMailer mailer, AttemptLimiter limiter,
             SecurityLimitsProperties limits, Clock clock,
-            @Value("${flexbuddy.security.remember-me-key}") String secret) {
+            @Value("${flexbuddy.security.remember-me-key}") String secret,
+            com.angel.flexbuddy.repository.AppUserRepository users) {
+        this.users = users;
         this.codeRepository = codeRepository;
         this.mailer = mailer;
         this.limiter = limiter;
@@ -63,6 +66,7 @@ public class EmailCodeService {
     /** Emails a new code, unless this address or connection has asked for too many; nothing is sent then. */
     @Transactional
     public SendResult send(AppUser user, EmailCodePurpose purpose, String ip) {
+        users.lockById(user.getId()).orElseThrow();
         String email = AttemptLimiter.emailKey(user.getEmail());
         if (limiter.isLocked(AttemptLimiter.CODE_IP, ip) || limiter.isLocked(AttemptLimiter.CODE_EMAIL, email)) {
             return SendResult.LIMITED;
@@ -88,6 +92,7 @@ public class EmailCodeService {
     /** Checks what the driver typed against the latest code; a right code is used up, a wrong one counts a try. */
     @Transactional
     public CheckResult check(AppUser user, EmailCodePurpose purpose, String entered) {
+        users.lockById(user.getId()).orElseThrow();
         String digits = entered == null ? "" : entered.replaceAll("\\s", "");
         // Anything that is not six digits cannot be a code, so it is not worth a try.
         if (!digits.matches("\\d{6}")) {

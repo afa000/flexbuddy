@@ -26,9 +26,11 @@ public class SignInCompleter {
 
     private final UserDetailsService userDetailsService;
     private final PersistentTokenBasedRememberMeServices rememberMeServices;
+    private final AttemptLimiter limiter;
 
     public SignInCompleter(UserDetailsService userDetailsService,
-            PersistentTokenBasedRememberMeServices rememberMeServices) {
+            PersistentTokenBasedRememberMeServices rememberMeServices, AttemptLimiter limiter) {
+        this.limiter = limiter;
         this.userDetailsService = userDetailsService;
         this.rememberMeServices = rememberMeServices;
     }
@@ -45,6 +47,7 @@ public class SignInCompleter {
         if (remember) {
             rememberMeServices.loginSuccess(new RememberMeRequest(request), response, authentication);
         }
+        limiter.clear(AttemptLimiter.LOGIN_EMAIL, AttemptLimiter.emailKey(user.getEmail()));
     }
 
     /** Issues the remember-me token for a sign-in that did not come through the form, such as Google's callback. */
