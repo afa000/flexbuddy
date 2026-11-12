@@ -12,7 +12,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -67,8 +66,9 @@ public class ShiftScreenshotParser {
     private static final Pattern PAY_PATTERN = Pattern.compile(
             "(?:[$£€]|\\b(?:MXN|GBP|EUR)(?![A-Za-z]))\\s*([0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?)"
                     + "|\\b([0-9]+(?:[.,][0-9]{2})?)\\s*(?:MXN|GBP|EUR)\\b");
-    private static final Pattern TIPS_PATTERN = Pattern.compile(
-            "^\\s*(?:Tips|Propinas)\\s*:?\\s*\\$\\s*([0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern MONEY_LABEL_PATTERN = Pattern.compile(
+            "\\b(?:(?:pago|importe|ganancias)\\s+base|base(?:\\s+pay)?|(tips|propinas)|(total))\\b",
+            Pattern.CASE_INSENSITIVE);
     private static final Map<String, Month> MONTHS = Map.ofEntries(
             Map.entry("jan", Month.JANUARY), Map.entry("feb", Month.FEBRUARY),
             Map.entry("mar", Month.MARCH), Map.entry("apr", Month.APRIL),
@@ -110,19 +110,14 @@ public class ShiftScreenshotParser {
         ParsedField<String> station = parseStation(safeLines);
         ParsedField<LocalDate> date = parseDate(safeLines, year);
         ParsedField<LocalTime>[] times = parseTimes(safeLines);
-        ParsedField<BigDecimal> basePay = firstMatch(safeLines, PAY_PATTERN, matcher -> matcher.group(1) != null
-                ? new BigDecimal(matcher.group(1).replace(",", ""))
-                : new BigDecimal(matcher.group(2).replace(',', '.')));
-        ParsedField<BigDecimal> tips = firstMatch(safeLines, TIPS_PATTERN,
-                matcher -> new BigDecimal(matcher.group(1).replace(",", "")));
-        if (tips.value() == null) tips = ParsedField.defaulted(BigDecimal.ZERO);
+        ParsedMoney money = parseMoney(safeLines);
 
         if (date.value() != null && shouldUsePreviousYear(date.value(), context.today())) {
             date = date.withValue(date.value().minusYears(1));
             warnings.add(new ImportWarning("YEAR_ROLLOVER", WarningSeverity.INFO, "date",
                     Messages.current("import.warning.yearRollover")));
         }
-        return new ParsedShiftData(station, date, times[0], times[1], basePay, tips, warnings);
+        return new ParsedShiftData(station, date, times[0], times[1], money.basePay(), money.tips(), warnings);
     }
 
     /** True when the text contains a word that only Spanish uses. */
@@ -249,12 +244,67 @@ public class ShiftScreenshotParser {
         return Normalizer.normalize(text, Normalizer.Form.NFD).replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
     }
 
-    private <T> ParsedField<T> firstMatch(List<OcrLine> lines, Pattern pattern, Function<Matcher, T> mapper) {
-        for (OcrLine line : lines) {
-            Matcher matcher = pattern.matcher(line.text());
-            if (matcher.find()) return ParsedField.found(mapper.apply(matcher), line);
+    private record ParsedMoney(ParsedField<BigDecimal> basePay, ParsedField<BigDecimal> tips) {}
+
+    private ParsedMoney parseMoney(List<OcrLine> lines) {
+        ParsedField<BigDecimal> base = ParsedField.missing();
+        ParsedField<BigDecimal> tips = ParsedField.missing();
+        boolean breakdown = false;
+        boolean[] labeledValues = new boolean[lines.size()];
+        for (int index = 0; index < lines.size(); index++) {
+            OcrLine line = lines.get(index);
+            var labels = MONEY_LABEL_PATTERN.matcher(line.text()).results().toList();
+            for (int position = 0; position < labels.size(); position++) {
+                var label = labels.get(position);
+                boolean tipLabel = label.group(1) != null;
+                boolean totalLabel = label.group(2) != null;
+                if (!tipLabel) breakdown = true;
+                int end = position + 1 < labels.size() ? labels.get(position + 1).start() : line.text().length();
+                ParsedField<BigDecimal> amount = moneyOnLine(line.text().substring(label.end(), end), line);
+                // A wrapped amount can precede another label, but must never be taken from after that label.
+                if (amount.value() == null && position == labels.size() - 1) {
+                    int next = index + 1;
+                    while (next < lines.size() && lines.get(next).text().isBlank()) next++;
+                    if (next < lines.size()) {
+                        OcrLine nextLine = lines.get(next);
+                        Matcher nextLabel = MONEY_LABEL_PATTERN.matcher(nextLine.text());
+                        String prefix = (nextLabel.find()
+                                ? nextLine.text().substring(0, nextLabel.start()) : nextLine.text()).trim();
+                        if (PAY_PATTERN.matcher(prefix).matches()) {
+                            amount = moneyOnLine(prefix, nextLine);
+                            labeledValues[next] = true;
+                        }
+                    }
+                }
+                if (amount.value() != null) {
+                    amount = new ParsedField<>(amount.value(), Math.min(line.confidence(), amount.confidence()),
+                            amount.lineIndex(), null);
+                    if (tipLabel && tips.value() == null) tips = amount;
+                    else if (!tipLabel && !totalLabel && base.value() == null) base = amount;
+                }
+            }
         }
-        return ParsedField.missing();
+        // An offer without a breakdown still uses its first amount, excluding amounts already assigned to tips.
+        if (!breakdown) {
+            for (int index = 0; index < lines.size(); index++) {
+                if (labeledValues[index]) continue;
+                OcrLine line = lines.get(index);
+                Matcher label = MONEY_LABEL_PATTERN.matcher(line.text());
+                String text = label.find() ? line.text().substring(0, label.start()) : line.text();
+                base = moneyOnLine(text, line);
+                if (base.value() != null) break;
+            }
+        }
+        return new ParsedMoney(base, tips.value() == null ? ParsedField.defaulted(BigDecimal.ZERO) : tips);
+    }
+
+    private ParsedField<BigDecimal> moneyOnLine(String text, OcrLine line) {
+        Matcher matcher = PAY_PATTERN.matcher(text);
+        if (!matcher.find()) return ParsedField.missing();
+        BigDecimal amount = matcher.group(1) != null
+                ? new BigDecimal(matcher.group(1).replace(",", ""))
+                : new BigDecimal(matcher.group(2).replace(',', '.'));
+        return ParsedField.found(amount, line);
     }
 
     private boolean shouldUsePreviousYear(LocalDate parsedDate, LocalDate today) {
