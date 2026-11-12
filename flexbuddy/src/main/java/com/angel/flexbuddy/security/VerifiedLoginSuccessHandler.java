@@ -41,10 +41,12 @@ public class VerifiedLoginSuccessHandler implements AuthenticationSuccessHandler
     private final SignInCompleter signInCompleter;
     private final Clock clock;
     private final LocaleResolver localeResolver;
+    private final AttemptLimiter limiter;
 
     public VerifiedLoginSuccessHandler(AppUserRepository userRepository, EmailVerificationService verification,
             TwoFactorService twoFactor, PersistentTokenBasedRememberMeServices rememberMeServices,
-            SignInCompleter signInCompleter, Clock clock, LocaleResolver localeResolver) {
+            SignInCompleter signInCompleter, Clock clock, LocaleResolver localeResolver, AttemptLimiter limiter) {
+        this.limiter = limiter;
         this.userRepository = userRepository;
         this.verification = verification;
         this.twoFactor = twoFactor;
@@ -71,6 +73,7 @@ public class VerifiedLoginSuccessHandler implements AuthenticationSuccessHandler
         boolean remember = googleRemember
                 || EmailVerificationController.rememberRequested(request.getParameter("remember-me"));
         if (user == null || (user.isEmailVerified() && user.getTwoFactorMethod() == null)) {
+            limiter.clear(AttemptLimiter.LOGIN_EMAIL, AttemptLimiter.emailKey(authentication.getName()));
             if (googleRemember) {
                 signInCompleter.rememberDevice(request, response, authentication);
             }

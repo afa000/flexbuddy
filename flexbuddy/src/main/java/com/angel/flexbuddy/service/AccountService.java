@@ -38,6 +38,7 @@ public class AccountService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final EmailCodeRepository emailCodeRepository;
     private final RecoveryCodeRepository recoveryCodeRepository;
+    private final AppCredentialRevoker appCredentials;
 
     public AccountService(AppUserRepository userRepository, PasswordEncoder passwordEncoder,
             ExpenseRepository expenseRepository, ReminderLogRepository reminderLogRepository,
@@ -47,7 +48,8 @@ public class AccountService {
             com.angel.flexbuddy.repository.StandingEntryRepository standingEntryRepository,
             com.angel.flexbuddy.repository.TaxReminderLogRepository taxReminderLogRepository,
             PasswordResetTokenRepository passwordResetTokenRepository, EmailCodeRepository emailCodeRepository,
-            RecoveryCodeRepository recoveryCodeRepository) {
+            RecoveryCodeRepository recoveryCodeRepository, AppCredentialRevoker appCredentials) {
+        this.appCredentials = appCredentials;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.expenseRepository = expenseRepository;
@@ -119,6 +121,7 @@ public class AccountService {
     /** Removes everything an account owns, then the account, in the one order that satisfies every reference. */
     @Transactional
     void deleteAccountData(Long ownerId, String email) {
+        appCredentials.revoke(ownerId);
         expenseRepository.deleteAllByOwnerIdIncludingTrash(ownerId);
         taxPaymentRepository.deleteAllByOwnerId(ownerId);
         payoutDepositRepository.deleteAllByOwnerId(ownerId);

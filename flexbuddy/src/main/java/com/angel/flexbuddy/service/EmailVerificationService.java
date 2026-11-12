@@ -22,9 +22,11 @@ public class EmailVerificationService {
     private final AppUserRepository userRepository;
     private final AccountService accountService;
     private final Clock clock;
+    private final jakarta.persistence.EntityManager entityManager;
 
     public EmailVerificationService(EmailCodeService codes, AppUserRepository userRepository,
-            AccountService accountService, Clock clock) {
+            AccountService accountService, Clock clock, jakarta.persistence.EntityManager entityManager) {
+        this.entityManager = entityManager;
         this.codes = codes;
         this.userRepository = userRepository;
         this.accountService = accountService;
@@ -39,10 +41,11 @@ public class EmailVerificationService {
     /** Checks the code and, when it is right, marks the account verified. */
     @Transactional
     public EmailCodeService.CheckResult verify(Long userId, String code) {
-        AppUser user = userRepository.findById(userId).orElse(null);
+        AppUser user = userRepository.lockById(userId).orElse(null);
         if (user == null) {
             return EmailCodeService.CheckResult.EXPIRED;
         }
+        entityManager.refresh(user);
         EmailCodeService.CheckResult result = codes.check(user, EmailCodePurpose.VERIFY_EMAIL, code);
         if (result == EmailCodeService.CheckResult.OK) {
             user.setEmailVerified(true);

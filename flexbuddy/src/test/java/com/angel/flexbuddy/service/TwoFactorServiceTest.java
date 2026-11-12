@@ -205,6 +205,7 @@ class TwoFactorServiceTest {
         assertThat(angel.getTwoFactorMethod()).isEqualTo(TwoFactorMethod.APP);
 
         service.disable(angel, PASSWORD, Totp.code(key, step()));
+        angel = userRepository.findById(angel.getId()).orElseThrow();
 
         assertThat(angel.getTwoFactorMethod()).isNull();
         assertThat(angel.getTotpSecret()).isNull();
@@ -217,9 +218,11 @@ class TwoFactorServiceTest {
         List<String> recovery = new ArrayList<>();
         byte[] key = enableApp(recovery);
         angel.setPasswordSet(false);
+        angel = userRepository.saveAndFlush(angel);
         clock.advance(Duration.ofSeconds(60));
 
         service.disable(angel, null, Totp.code(key, step()));
+        angel = userRepository.findById(angel.getId()).orElseThrow();
 
         assertThat(angel.getTwoFactorMethod()).isNull();
     }
@@ -246,6 +249,7 @@ class TwoFactorServiceTest {
         String code = mailer.codes.get(0);
 
         List<String> recovery = service.confirmEmail(angel, code);
+        angel = userRepository.findById(angel.getId()).orElseThrow();
 
         assertThat(angel.getTwoFactorMethod()).isEqualTo(TwoFactorMethod.EMAIL);
         assertThat(angel.getTotpSecret()).isNull();

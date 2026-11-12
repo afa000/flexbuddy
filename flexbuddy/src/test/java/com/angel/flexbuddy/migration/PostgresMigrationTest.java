@@ -300,7 +300,8 @@ class PostgresMigrationTest {
             Metadata metadata = new MetadataSources(registry)
                     .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class,
                             PayoutDeposit.class, StandingEntry.class, TaxPayment.class, TaxReminderLog.class,
-                            PasswordResetToken.class, EmailCode.class, RecoveryCode.class)
+                            PasswordResetToken.class, EmailCode.class, RecoveryCode.class,
+                            com.angel.flexbuddy.model.AppToken.class, com.angel.flexbuddy.model.AppSignInChallenge.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }

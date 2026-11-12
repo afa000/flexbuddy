@@ -1,0 +1,29 @@
+# Local development only. Enable FLEXBUDDY_API_ENABLED and use a made-up local account.
+# Supply password, token and challenge privately in the HTTP client's environment.
+@baseUrl = http://localhost:8080
+
+### Password sign-in (never save the response or credential environment in Git)
+POST {{baseUrl}}/api/v1/auth/sign-in
+Content-Type: application/json
+
+{"email":"{{email}}","password":"{{password}}","deviceName":"Local test"}
+
+### Complete a verification/two-factor challenge
+POST {{baseUrl}}/api/v1/auth/code
+Content-Type: application/json
+
+{"challenge":"{{challenge}}","code":"{{code}}"}
+
+### Resend an email code
+POST {{baseUrl}}/api/v1/auth/code/resend
+Content-Type: application/json
+
+{"challenge":"{{challenge}}"}
+
+### Check the token's account
+GET {{baseUrl}}/api/v1/account
+Authorization: Bearer {{token}}
+
+### Sign out this device
+POST {{baseUrl}}/api/v1/auth/sign-out
+Authorization: Bearer {{token}}

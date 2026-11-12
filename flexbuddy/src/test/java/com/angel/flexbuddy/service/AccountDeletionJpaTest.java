@@ -41,7 +41,7 @@ import jakarta.persistence.EntityManager;
 
 @DataJpaTest
 @ActiveProfiles("test")
-@Import({AccountService.class, JpaAuditingConfig.class, TimestampListener.class})
+@Import({AccountService.class, AppCredentialRevoker.class, JpaAuditingConfig.class, TimestampListener.class})
 class AccountDeletionJpaTest {
 
     private static final Instant NOW = Instant.parse("2026-09-13T12:00:00Z");
@@ -151,6 +151,21 @@ class AccountDeletionJpaTest {
         recovery.setCodeHash("c".repeat(64));
         recovery.setCreatedAt(NOW);
         recoveryCodeRepository.save(recovery);
+        // Credential revocation remains active without enabling any API beans.
+        var token = new com.angel.flexbuddy.model.AppToken();
+        token.setOwner(owner);
+        token.setTokenHash("d".repeat(64));
+        token.setCreatedAt(NOW);
+        token.setLastUsedAt(NOW);
+        token.setExpiresAt(NOW.plusSeconds(1800));
+        entityManager.persist(token);
+        var challenge = new com.angel.flexbuddy.model.AppSignInChallenge();
+        challenge.setOwner(owner);
+        challenge.setChallengeHash("e".repeat(64));
+        challenge.setPurpose(com.angel.flexbuddy.model.AppSignInChallenge.Purpose.TWO_FACTOR);
+        challenge.setCreatedAt(NOW);
+        challenge.setExpiresAt(NOW.plusSeconds(600));
+        entityManager.persist(challenge);
         entityManager.flush();
         when(passwordEncoder.matches("correct-password", "stored-hash")).thenReturn(true);
 
@@ -167,6 +182,8 @@ class AccountDeletionJpaTest {
         assertThat(rowCount("password_reset_token")).isZero();
         assertThat(rowCount("email_code")).isZero();
         assertThat(rowCount("recovery_code")).isZero();
+        assertThat(rowCount("app_token")).isZero();
+        assertThat(rowCount("app_sign_in_challenge")).isZero();
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
     }
 

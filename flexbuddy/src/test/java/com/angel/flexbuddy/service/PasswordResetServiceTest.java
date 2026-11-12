@@ -63,6 +63,12 @@ class PasswordResetServiceTest {
     @Mock
     private PasswordResetMailer mailer;
 
+    @Mock
+    private AppCredentialRevoker appCredentials;
+
+    @Mock
+    private jakarta.persistence.EntityManager entityManager;
+
     private MutableClock clock;
     private PasswordResetService service;
     private AppUser angel;
@@ -76,9 +82,10 @@ class PasswordResetServiceTest {
                 new SecurityLimitsProperties.Reset(3, 10, Duration.ofHours(1), Duration.ofMinutes(30)),
                 new SecurityLimitsProperties.Codes(Duration.ofMinutes(15), 5, 5, 20, Duration.ofHours(1)));
         service = new PasswordResetService(tokenRepository, userRepository, passwordEncoder, persistentTokenRepository,
-                limiter, mailer, clock, limits, "https://flexbuddy.onrender.com");
+                limiter, mailer, clock, limits, "https://flexbuddy.onrender.com", appCredentials, entityManager);
         angel = new AppUser("Angel", "angel@example.com", "old-hash");
         angel.setId(42L);
+        lenient().when(userRepository.lockById(42L)).thenReturn(Optional.of(angel));
     }
 
     private String sha256(String token) throws Exception {
@@ -179,6 +186,7 @@ class PasswordResetServiceTest {
         assertThat(link.getUsedAt()).isEqualTo(NOW);
         verify(tokenRepository).retireUnused(42L, NOW);
         verify(persistentTokenRepository).removeUserTokens("angel@example.com");
+        verify(appCredentials).revoke(42L);
         verify(limiter).clear(AttemptLimiter.LOGIN_EMAIL, "angel@example.com");
     }
 

@@ -2,7 +2,6 @@ package com.angel.flexbuddy.security;
 
 import org.springframework.context.event.EventListener;
 import org.springframework.security.authentication.event.AuthenticationFailureBadCredentialsEvent;
-import org.springframework.security.authentication.event.InteractiveAuthenticationSuccessEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.WebAuthenticationDetails;
 import org.springframework.stereotype.Component;
@@ -29,9 +28,5 @@ public class LoginAttemptEvents {
         }
     }
 
-    /** A good sign-in clears that email's failures. The connection's count stays, so one good account cannot wipe a guessing run. */
-    @EventListener
-    public void onSuccess(InteractiveAuthenticationSuccessEvent event) {
-        limiter.clear(AttemptLimiter.LOGIN_EMAIL, AttemptLimiter.emailKey(event.getAuthentication().getName()));
-    }
+    // Password success may still require a code. Only the final sign-in handlers clear email failures.
 }

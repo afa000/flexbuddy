@@ -48,11 +48,15 @@ public class PasswordResetService {
     private final Duration linkValidFor;
     private final String publicUrl;
     private final SecureRandom random = new SecureRandom();
+    private final AppCredentialRevoker appCredentials;
+    private final jakarta.persistence.EntityManager entityManager;
 
     public PasswordResetService(PasswordResetTokenRepository tokenRepository, AppUserRepository userRepository,
             PasswordEncoder passwordEncoder, PersistentTokenRepository persistentTokenRepository,
             AttemptLimiter limiter, PasswordResetMailer mailer, Clock clock, SecurityLimitsProperties limits,
-            @Value("${flexbuddy.public-url}") String publicUrl) {
+            @Value("${flexbuddy.public-url}") String publicUrl, AppCredentialRevoker appCredentials, jakarta.persistence.EntityManager entityManager) {
+        this.entityManager = entityManager;
+        this.appCredentials = appCredentials;
         this.tokenRepository = tokenRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
@@ -82,7 +86,8 @@ public class PasswordResetService {
         if (found.isEmpty()) {
             return;
         }
-        AppUser user = found.get();
+        AppUser user = userRepository.lockById(found.get().getId()).orElse(null);
+        if (user == null) return;
         Instant now = clock.instant();
         tokenRepository.retireUnused(user.getId(), now);
 
@@ -115,7 +120,13 @@ public class PasswordResetService {
     public void resetPassword(String token, String newPassword) {
         PasswordResetToken link = findUsable(token).orElseThrow(InvalidResetTokenException::new);
         Instant now = clock.instant();
-        AppUser user = link.getOwner();
+        AppUser user = userRepository.lockById(link.getOwner().getId()).orElseThrow(InvalidResetTokenException::new);
+        entityManager.refresh(user);
+        entityManager.refresh(link);
+        if (link.getUsedAt() != null || !link.getExpiresAt().isAfter(clock.instant())) {
+            throw new InvalidResetTokenException();
+        }
+        appCredentials.revoke(user.getId());
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         // The link went to the address, so using it proves the driver owns it.
         user.setEmailVerified(true);

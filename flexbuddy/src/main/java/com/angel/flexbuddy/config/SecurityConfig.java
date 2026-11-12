@@ -107,7 +107,12 @@ public class SecurityConfig {
             ObjectProvider<ClientRegistrationRepository> googleRegistrations,
             ObjectProvider<GoogleAccountService> googleAccounts,
             ObjectProvider<GoogleRememberChoice> googleRememberChoice,
-            ObjectProvider<GoogleFailureHandler> googleFailureHandler) throws Exception {
+            ObjectProvider<GoogleFailureHandler> googleFailureHandler,
+            @Value("${flexbuddy.api.enabled:false}") boolean apiEnabled) throws Exception {
+        if (!apiEnabled) {
+            http.addFilterBefore(new com.angel.flexbuddy.security.DisabledApiFilter(),
+                    org.springframework.security.web.csrf.CsrfFilter.class);
+        }
         // The limiter is always there in the running app; slice tests that do not load it simply sign in without limits.
         AttemptLimiter limiter = limiterProvider.getIfAvailable();
         // Slice tests that do not load the handler send everyone home, as before.

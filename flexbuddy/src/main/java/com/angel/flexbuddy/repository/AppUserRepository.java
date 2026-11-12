@@ -11,6 +11,15 @@ import com.angel.flexbuddy.model.AppUser;
 
 public interface AppUserRepository extends JpaRepository<AppUser, Long> {
 
+    /** Serializes device credential issuance, second-step consumption and revocation. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUser u where u.id = :id")
+    Optional<AppUser> lockById(@Param("id") Long id);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from AppUser u where lower(u.email) = lower(:email)")
+    Optional<AppUser> lockByEmail(@Param("email") String email);
+
     Optional<AppUser> findByEmailIgnoreCase(String email);
 
     /** Accounts that asked for estimated-tax due-date reminders. */

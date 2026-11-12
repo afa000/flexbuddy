@@ -69,10 +69,12 @@ public class TwoFactorService {
     private final AttemptLimiter limiter;
     private final Clock clock;
     private final SecureRandom random = new SecureRandom();
+    private final jakarta.persistence.EntityManager entityManager;
 
     public TwoFactorService(AppUserRepository userRepository, RecoveryCodeRepository recoveryRepository,
             EmailCodeService emailCodes, TwoFactorSecretCipher cipher, PasswordEncoder passwordEncoder,
-            AttemptLimiter limiter, Clock clock) {
+            AttemptLimiter limiter, Clock clock, jakarta.persistence.EntityManager entityManager) {
+        this.entityManager = entityManager;
         this.userRepository = userRepository;
         this.recoveryRepository = recoveryRepository;
         this.emailCodes = emailCodes;
@@ -98,6 +100,7 @@ public class TwoFactorService {
     /** Turns the app method on once the driver types a code the app made from that secret. Returns the recovery codes. */
     @Transactional
     public List<String> confirmApp(AppUser user, String base32Secret, String code) {
+        user = lockAndRefresh(user);
         byte[] key;
         try {
             key = Totp.fromBase32(base32Secret);
@@ -123,6 +126,7 @@ public class TwoFactorService {
     /** Turns the email method on once the emailed code is entered. Returns the recovery codes. */
     @Transactional
     public List<String> confirmEmail(AppUser user, String code) {
+        user = lockAndRefresh(user);
         EmailCodeService.CheckResult result = emailCodes.check(user, EmailCodePurpose.SIGN_IN, clean(code));
         if (result != EmailCodeService.CheckResult.OK) {
             throw new InvalidTwoFactorCodeException(result == EmailCodeService.CheckResult.EXPIRED
@@ -141,6 +145,7 @@ public class TwoFactorService {
     /** Replaces every recovery code with ten new ones, returned once in plain text and stored only as hashes. */
     @Transactional
     public List<String> newRecoveryCodes(AppUser user) {
+        user = userRepository.lockById(user.getId()).orElseThrow();
         recoveryRepository.deleteAllByOwnerId(user.getId());
         Instant now = clock.instant();
         List<String> shown = new ArrayList<>();
@@ -173,6 +178,7 @@ public class TwoFactorService {
     /** Checks a typed code: a recovery code, or one from the driver's authenticator app or inbox. */
     @Transactional
     public Result verifySignIn(AppUser user, String entered) {
+        user = lockAndRefresh(user);
         String cleaned = clean(entered).toUpperCase(Locale.ROOT);
         if (cleaned.length() == RECOVERY_LENGTH) {
             Optional<RecoveryCode> match = recoveryRepository.findAllByOwnerIdAndUsedAtIsNull(user.getId()).stream()
@@ -221,6 +227,7 @@ public class TwoFactorService {
     /** Turns two-step off. It needs the password and a current code, so a stolen session cannot do it. */
     @Transactional
     public void disable(AppUser user, String password, String code) {
+        user = lockAndRefresh(user);
         // A driver who signed up with Google has no password to give, so a code alone is enough for them.
         if (user.isPasswordSet()
                 && !passwordEncoder.matches(password == null ? "" : password, user.getPasswordHash())) {
@@ -255,6 +262,13 @@ public class TwoFactorService {
     }
 
     // ---- Helpers ----------------------------------------------------------------------------------------------------
+
+    private AppUser lockAndRefresh(AppUser user) {
+        AppUser managed = userRepository.lockById(user.getId()).orElseThrow();
+        // Re-read replay state and password after waiting; callers may hold detached/stale accounts.
+        entityManager.refresh(managed);
+        return managed;
+    }
 
     private long nowStep() {
         return clock.instant().getEpochSecond() / Totp.STEP_SECONDS;
