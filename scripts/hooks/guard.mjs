@@ -1,11 +1,13 @@
-// PreToolUse guards for FlexBuddy (FB-027), shared by Claude Code (.claude/settings.json) and Codex (.codex/hooks.json).
-// They back up AGENTS.md rules mechanically:
-//   node guard.mjs release    - refuses a git push to main, git push --all/--mirror and gh pr merge (they deploy)
-//   node guard.mjs migration  - refuses an edit to a Flyway migration that git already tracks (it has run in
-//                               production), from Claude Code's file tools or a Codex apply_patch
-//   node guard.mjs catalog    - refuses reading a whole message catalog; grep it for the keys instead
-// Direct CLI refusals exit 2 with a reason on stderr; Codex's runHook export returns a JSON deny with exit 0.
-// Anything unreadable exits 0, so a broken hook never blocks ordinary work.
+// PreToolUse guards for FlexBuddy (FB-027, FB-030), shared by Claude Code (.claude/settings.json), Codex
+// (.codex/hooks.json) and Antigravity (.agents/hooks.json). They back up AGENTS.md rules mechanically:
+//   node guard.mjs release      - refuses a git push to main, git push --all/--mirror and gh pr merge (they deploy)
+//   node guard.mjs migration    - refuses an edit to a Flyway migration that git already tracks (it has run in
+//                                 production), from Claude Code's file tools or a Codex apply_patch
+//   node guard.mjs catalog      - refuses reading a whole message catalog; grep it for the keys instead
+//   node guard.mjs antigravity  - the release and migration checks for any Antigravity tool call
+// Direct CLI refusals exit 2 with a reason on stderr; Codex's runHook export returns a JSON deny with exit 0;
+// Antigravity gets {"decision":"deny",...} on stdout with exit 0 for a refusal, and no output otherwise.
+// Anything unreadable is allowed through, so a broken hook never blocks ordinary work.
 // Nothing here prints the command or file contents beyond the refused part.
 
 import { execFileSync } from 'node:child_process';
@@ -273,6 +275,43 @@ export function catalogRefusal(toolInput) {
     return `The message catalogs are about 100 KB. Grep for the keys you need, or Read with a limit of ${CATALOG_READ_LIMIT} lines or fewer.`;
 }
 
+/** Antigravity transcripts store each tool argument JSON-encoded ("\"git status\""); hooks may get either form. */
+export function antigravityArg(value) {
+    if (value == null) return '';
+    if (typeof value !== 'string') return String(value);
+    try {
+        const parsed = JSON.parse(value);
+        if (typeof parsed === 'string') return parsed;
+    } catch {
+        // A plain, unencoded string.
+    }
+    return value;
+}
+
+// Antigravity tools that only read never change a migration (read_file, view_file, list_directory, grep_search...).
+const ANTIGRAVITY_READ_TOOL = /^(read|view|list|find|grep|search|code_search|codesearch)/;
+
+/**
+ * Returns the reason an Antigravity tool call must be refused, or null. Any call with a CommandLine argument gets the
+ * release check; any call that isn't a read gets the migration check on each argument whose name ends in Path or File
+ * (write_file's Path, for example), resolved against cwd.
+ */
+export function antigravityRefusal(toolCall, cwd, currentBranch, isTracked) {
+    const name = String(toolCall?.name ?? '').toLowerCase();
+    const args = toolCall?.args && typeof toolCall.args === 'object' ? toolCall.args : {};
+    if (args.CommandLine != null) {
+        const reason = releaseRefusal(antigravityArg(args.CommandLine), currentBranch);
+        if (reason) return reason;
+    }
+    if (ANTIGRAVITY_READ_TOOL.test(name)) return null;
+    for (const [key, value] of Object.entries(args)) {
+        if (!/(path|file)$/i.test(key) || value == null) continue;
+        const reason = migrationRefusal(resolve(cwd, antigravityArg(value)), isTracked);
+        if (reason) return reason;
+    }
+    return null;
+}
+
 function gitCurrentBranch(cwd) {
     try {
         return execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -301,7 +340,33 @@ export function runHook(mode) {
     process.exitCode = main(mode, true);
 }
 
+/**
+ * The Antigravity hook in .agents/hooks.json. Antigravity runs it from .agents/. A refusal is a JSON deny decision on
+ * stdout; anything else prints nothing, which leaves the call to Antigravity's own permission rules. Never print {}:
+ * Antigravity 1.5.7 reads an empty decision as a deny (checked live, FB-030). Never answer "allow" either, which
+ * would skip those rules.
+ */
+function antigravityMain() {
+    let reason = null;
+    try {
+        const input = JSON.parse(readFileSync(0, 'utf8').replace(/^﻿/, ''));
+        const cwd = input?.cwd || input?.workspacePaths?.[0] || process.cwd();
+        const args = input?.toolCall?.args ?? {};
+        const commandCwd = args.Cwd ? resolve(cwd, antigravityArg(args.Cwd)) : cwd;
+        reason = antigravityRefusal(input?.toolCall, cwd,
+            (gitDir) => gitCurrentBranch(gitDir ? resolve(commandCwd, gitDir) : commandCwd), gitTracks);
+    } catch {
+        reason = null;
+    }
+    if (reason) {
+        process.stdout.write(JSON.stringify(
+            { decision: 'deny', reason: `Refused by FlexBuddy's agent guard (scripts/hooks/guard.mjs): ${reason}` }) + '\n');
+    }
+    return 0;
+}
+
 function main(mode, structured = false) {
+    if (mode === 'antigravity') return antigravityMain();
     let input;
     try {
         // Windows PowerShell can pipe text with a UTF-8 byte-order mark, which JSON.parse rejects.

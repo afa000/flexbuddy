@@ -1,0 +1,16 @@
+{
+  "flexbuddy-guard": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ../scripts/hooks/guard.mjs antigravity",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

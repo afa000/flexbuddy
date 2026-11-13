@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import {
-    catalogRefusal, isCatalogPath, isMigrationPath, migrationRefusal, patchedPaths, releaseRefusal, splitCommands,
+    antigravityArg, antigravityRefusal, catalogRefusal, isCatalogPath, isMigrationPath, migrationRefusal, patchedPaths, releaseRefusal, splitCommands,
     targetsProtected,
 } from './guard.mjs';
 
@@ -289,5 +289,69 @@ test('the Codex hook launcher finds the guard from a subfolder', async () => {
                 assert.equal(allowed.stderr, '');
             }
         }
+    }
+});
+
+test('Antigravity arguments are read whether JSON-encoded or plain', () => {
+    assert.equal(antigravityArg('"git status"'), 'git status');
+    assert.equal(antigravityArg('git status'), 'git status');
+    assert.equal(antigravityArg(JSON.stringify('C:\\repo\\a.sql')), 'C:\\repo\\a.sql');
+    assert.equal(antigravityArg(undefined), '');
+    assert.equal(antigravityArg(true), 'true');
+});
+
+test('Antigravity tool calls get the release and migration checks', () => {
+    const migration = 'flexbuddy/src/main/resources/db/migration/V27__language.sql';
+    const check = (name, args, tracked = true) =>
+        antigravityRefusal({ name, args }, '/repo', onBranch('ai/FB-030'), () => tracked) !== null;
+    assert.equal(check('run_command', { CommandLine: '"git push origin HEAD:main"' }), true);
+    assert.equal(check('run_command', { CommandLine: 'git status && gh pr merge 12' }), true);
+    assert.equal(check('run_command', { CommandLine: '"git push -u origin ai/FB-030"' }), false);
+    assert.equal(check('run_command', { CommandLine: '"git status"' }), false);
+    assert.equal(check('write_file', { Path: JSON.stringify(migration), Content: '"x"' }), true);
+    assert.equal(check('replace_file_content', { TargetFile: migration }), true);
+    assert.equal(check('write_file', { Path: migration }, false), false, 'a new migration is fine');
+    assert.equal(check('read_file', { Path: migration }), false, 'reading a migration is fine');
+    assert.equal(check('view_file', { AbsolutePath: migration }), false);
+    assert.equal(check('write_file', { Path: 'docs/agent-workflow.md' }), false);
+    assert.equal(check('write_file', { Content: '"git push origin main"' }), false, 'file content is not a command');
+    assert.equal(antigravityRefusal(undefined, '/repo', onBranch('main'), () => true), null);
+});
+
+test('the Antigravity hook in .agents/hooks.json denies with JSON and otherwise prints nothing', async () => {
+    const { readFileSync } = await import('node:fs');
+    const root = fileURLToPath(new URL('../..', import.meta.url));
+    const hooks = JSON.parse(readFileSync(new URL('../../.agents/hooks.json', import.meta.url), 'utf8'));
+    const [group] = hooks['flexbuddy-guard'].PreToolUse;
+    assert.equal(group.matcher, '*');
+    const [{ command }] = group.hooks;
+    // Antigravity runs hook commands from the folder that holds hooks.json, with cmd /c on Windows and sh -c elsewhere.
+    const hook = (input) => spawnSync(command, { cwd: `${root}.agents`, input, encoding: 'utf8', shell: true });
+    const call = (name, args) => JSON.stringify({ hookEventName: 'PreToolUse', cwd: root, toolCall: { id: 't1', name, args } });
+
+    for (const input of [
+        call('run_command', { CommandLine: '"git push --dry-run origin HEAD:main"' }),
+        call('run_command', { CommandLine: 'gh pr merge 12 --squash' }),
+        call('write_file', { Path: JSON.stringify(`${root}flexbuddy/src/main/resources/db/migration/V27__language.sql`) }),
+    ]) {
+        const result = hook(input);
+        assert.equal(result.status, 0, result.stderr);
+        const decision = JSON.parse(result.stdout);
+        assert.equal(decision.decision, 'deny', input);
+        assert.match(decision.reason, /agent guard/);
+        assert.equal(result.stderr, '');
+    }
+    for (const input of [
+        call('run_command', { CommandLine: '"git status"' }),
+        call('write_file', { Path: `${root}flexbuddy/src/main/resources/db/migration/V99__new.sql` }),
+        call('read_file', { Path: `${root}flexbuddy/src/main/resources/db/migration/V27__language.sql` }),
+        'not json',
+        '',
+    ]) {
+        const result = hook(input);
+        assert.equal(result.status, 0, result.stderr);
+        // No output leaves the call to Antigravity's own rules; {} would be read as a deny, "allow" would skip them.
+        assert.equal(result.stdout, '', `no opinion: ${input}`);
+        assert.equal(result.stderr, '');
     }
 });

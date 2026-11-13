@@ -3,12 +3,20 @@
 How Claude Code, Codex, Antigravity and OpenCode with a local model work on FlexBuddy without losing context between
 them. The rules every agent follows are in [AGENTS.md](../AGENTS.md); this page covers setup and the day-to-day loop.
 
-Claude Code and Codex are interchangeable for the whole loop. Where this page says **Opus**, Codex uses **Sol**
-(`gpt-6.1-sol`); where it says **Sonnet**, Codex uses **Terra** (`gpt-6.1-terra`). Both read `AGENTS.md` and the
-skills in `.agents/skills/`, and both have the same guard configured. Claude Code starts a skill with `/implement-task FB-xxx`,
-Codex with `$implement-task FB-xxx`.
+Claude Code, Codex and Antigravity are interchangeable for the whole loop. Each has a top model and a routine model,
+and the two tiers line up:
 
-### Starting a task in Codex
+| Tier | Claude Code | Codex | Antigravity |
+|---|---|---|---|
+| Top: specs, reviews, high-risk code, debugging | **Opus** | **Sol** (`gpt-6.1-sol`) | **Gemini 4 Argon** (`gemini-4-argon-high`) |
+| Routine: a well-specified task, more cheaply | **Sonnet** | **Terra** (`gpt-6.1-terra`) | **Gemini 4 Hydrogen** (`gemini-4-hydrogen-medium`) |
+
+Where this page says **Opus**, read "Opus, Sol or Argon"; where it says **Sonnet**, read "Sonnet, Terra or Hydrogen".
+All three read `AGENTS.md` and the skills in `.agents/skills/`, and all three have the same guard configured. Claude
+Code starts a skill with `/implement-task FB-xxx`, Codex with `$implement-task FB-xxx`; in Antigravity, ask for the
+`implement-task` skill by name ("Use the implement-task skill for FB-xxx").
+
+### Starting a task in Codex or Antigravity
 
 1. **Plan** in a new Codex session on Sol: give the planning prompt under
    [A task from start to merge](#a-task-from-start-to-merge). Codex writes `.ai/tasks/FB-xxx.md` on `ai/FB-xxx`.
@@ -19,6 +27,10 @@ Codex with `$implement-task FB-xxx`.
 4. **Review** in a fresh session, Codex or Claude Code: `$review-task FB-xxx`. Fixes go back to the implementer.
 5. **Merge** in GitHub yourself.
 
+Antigravity follows the same five steps: plan on Argon, implement on Argon for high-risk work or Hydrogen for routine
+work (pick it in the model picker, `/model` in `agy`, or `agy --model`), ask for each skill by name, and approve the
+`ai/` branch push and `gh pr create` when it asks.
+
 Mixing tools is fine between steps, never within one: the repository files carry everything the next tool needs.
 
 The repository, not chat history, is the record: each task, its handoff notes and its checks live in files, so any tool
@@ -26,48 +38,54 @@ can pick up where another stopped.
 
 ## The loop
 
-1. Claude Code with Opus writes the task in `.ai/tasks/FB-xxx.md`, including its risk and who implements it, and
-   pushes it on a new `ai/FB-xxx` branch.
-2. The implementer the task names works on that branch, one agent at a time. Usually that is Claude Code with Opus
+1. A top model (Claude Code with Opus, Codex with Sol or Antigravity with Argon) writes the task in
+   `.ai/tasks/FB-xxx.md`, including its risk and who implements it, and pushes it on a new `ai/FB-xxx` branch.
+2. The implementer the task names works on that branch, one agent at a time
    ([which one](#which-tool-for-which-task)).
 3. [`scripts/verify.ps1`](../scripts/verify.ps1) runs the Java and JavaScript suites; CI adds the PostgreSQL migration
    test on the pull request, and you can run it locally too ([setup](#local-postgresql-18-and-mailpit)).
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
    the pull request description.
-5. A fresh Claude Code session with Opus (or Codex with Sol) reviews the pull request with `/review-task FB-xxx`. You
+5. A fresh session on a top model (Opus, Sol or Argon) reviews the pull request with the `review-task` skill. You
    merge it yourself; merging to `main` deploys to Render.
 
 ### The native app's repository
 
-The native Kotlin app is built in its own repository, `flexbuddy-android` (not created yet), following
-[native-app-plan.md](native-app-plan.md). The loop is the same there. FB numbers are one sequence across both
-repositories, so check both for the next free one. A feature that needs the server becomes two tasks: the `/api/v1`
-endpoint here first, written into [api-v1.md](api-v1.md), then the app screen there. Why it's split this way:
+The native Kotlin app is built in its own repository, `flexbuddy-android`, following
+[native-app-plan.md](native-app-plan.md). The loop and the three tools are the same there, and an app-only feature is
+planned in that repository, with its own planning prompt in its `docs/agent-workflow.md`. FB numbers are one sequence
+across both repositories, so check both for the next free one. A feature that needs the server becomes two tasks: the
+`/api/v1` endpoint here first, written into [api-v1.md](api-v1.md), then the app screen there. Why it's split this way:
 [decision 1](decisions/0001-native-app-in-its-own-repository.md). Record later decisions of that size the same way,
 as the next numbered file in `docs/decisions/`.
 
-### The guard: hooks in Claude Code and Codex
+### The guard: hooks in Claude Code, Codex and Antigravity
 
 [`scripts/hooks/guard.mjs`](../scripts/hooks/guard.mjs) runs before an agent's shell and file tools:
-[`.claude/settings.json`](../.claude/settings.json) wires it into Claude Code and
-[`.codex/hooks.json`](../.codex/hooks.json) into Codex. It refuses:
+[`.claude/settings.json`](../.claude/settings.json) wires it into Claude Code,
+[`.codex/hooks.json`](../.codex/hooks.json) into Codex and [`.agents/hooks.json`](../.agents/hooks.json) into
+Antigravity. It refuses:
 
 - `git push` to `main` (by name, `HEAD:main`, `--all`, `--mirror`, or a plain `git push` while on `main`) and
   `gh pr merge`. Pushing a feature or `ai/` branch still works, after you approve it in chat.
-- an edit to a migration that git already tracks, from Claude Code's file tools or a Codex patch. A new
-  `V<n>__*.sql` is fine.
+- an edit to a migration that git already tracks, from Claude Code's file tools, a Codex patch or an Antigravity file
+  tool. A new `V<n>__*.sql` is fine.
 - in Claude Code, reading a whole message catalog (about 25K tokens each): it says to grep for the keys instead.
 
-Codex also has [`.codex/rules/flexbuddy.rules`](../.codex/rules/flexbuddy.rules), which forbids the same pushes and
-merges by command prefix, as a second layer. OpenCode and Antigravity have their own deny rules in `opencode.json` and
+Antigravity's hook runs on every tool call (`"matcher": "*"`). It answers `{"decision":"deny"}` to a refusal and
+prints nothing otherwise, so Antigravity's own permission rules still decide everything else. It must never print `{}`
+(Antigravity 1.5.7 reads an empty decision as a deny) or "allow" (which would skip those rules). Codex also has
+[`.codex/rules/flexbuddy.rules`](../.codex/rules/flexbuddy.rules), which forbids the same pushes and merges by command
+prefix, as a second layer. OpenCode has its own deny rules in `opencode.json`, and unattended Antigravity runs add
 `scripts/antigravity-cli-settings.json`.
 
 So pushing `main` and merging pull requests are always your steps. The hooks back up the rules in AGENTS.md; they
 don't replace them: a shell command can still change a file the file-tool check doesn't see. The guard's tests:
 `node --test "scripts/hooks/*.test.mjs"` (not part of CI). A new Claude Code session picks up changes to the settings
 file. Review new or changed Codex hooks in Settings > Hooks in the desktop app, or `/hooks` in the CLI, before they
-run ([hook trust documentation](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)). An enabled entry alone
-does not prove that a tool call is intercepted: perform the live refusal check in the current session.
+run ([hook trust documentation](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)). Antigravity loads
+`.agents/hooks.json` only in a trusted workspace; `/hooks` in `agy` lists it as `flexbuddy-guard`. An enabled entry
+alone does not prove that a tool call is intercepted: perform the live refusal check in the current session.
 
 ## One-time setup
 
@@ -178,13 +196,22 @@ The Codex app (or the `codex` CLI, 0.159.0 or later for Terra) needs no project 
 
 Sign in with the Google account that has the Pro plan and set AI-credit overages to Never. Antigravity reads `AGENTS.md`
 from the workspace root ([rules docs](https://antigravity.google/docs/rules/)) and loads skills from
-`.agents/skills/<name>/SKILL.md` ([skills docs](https://antigravity.google/docs/skills/)), so it needs no extra setup.
-Run the smoke test under [Proving a tool works](#proving-a-tool-works) before giving it a real task.
+`.agents/skills/<name>/SKILL.md` ([skills docs](https://antigravity.google/docs/skills/)) and the guard hook from
+`.agents/hooks.json`, so it needs no extra setup beyond trusting the folder. Run the smoke test under
+[Proving a tool works](#proving-a-tool-works) before giving it a real task.
+
+- **Models:** **Gemini 4 Argon** is the top model (the Opus/Sol role). In the CLI it comes in three efforts:
+  `gemini-4-argon-high` for specs, reviews and high-risk code, `-medium` and `-low` for lighter work. **Gemini 4
+  Hydrogen** is the routine model (the Sonnet/Terra role), in four efforts: `gemini-4-hydrogen-low`, `-medium`,
+  `-high` and `-xhigh`; `-medium` suits routine implementation. Pick either in the model picker, with `/model` in
+  `agy`, or with `agy --model <id>`; `agy models` lists what your sign-in offers (both, on November 12, 2026).
+- `git push` of an `ai/` branch and `gh pr create` ask for approval, as in Claude Code and Codex. Your own
+  `~/.gemini/antigravity-cli/settings.json` currently denies every `git push`, so either push from another tool or
+  approve a one-off exception.
 
 ### Claude Code
 
-`CLAUDE.md` imports `AGENTS.md`. Claude Code reviews from the local checkout with `gh`, and it is the tool for Android
-and emulator work because it already follows the emulator rules.
+`CLAUDE.md` imports `AGENTS.md`. Claude Code reviews from the local checkout with `gh`.
 
 ## Proving a tool works
 
@@ -203,38 +230,43 @@ model, also check `ollama ps` shows `32768` context during the run.
 
 ## Which tool for which task
 
-**What actually happens.** Since FB-011, every task has been handed to Claude Code with Opus, whatever its risk:
-specs, code, Android builds and reviews. That is the default now. The other tools stay set up as optional helpers for
-when Claude's usage limits are tight; nothing depends on them.
+**The three tools are equals.** Claude Code, Codex and Antigravity can each plan, implement and review any task, at
+the tier the table below asks for. Until November 2026 the owner handed nearly every task to Claude Code with Opus;
+that is a habit, not a rule. Use whichever tool has usage left. OpenCode with the local model stays an optional helper
+for narrow low-risk work; nothing depends on it.
 
 **Every task, whoever implements it:**
 
-- **Plan:** Claude Code with **Opus**. The spec names the files to read, so the implementer doesn't explore.
-- **Review:** a fresh Claude Code session with **Opus** and `/review-task`, before merging.
+- **Plan:** a top model, **Opus**, **Sol** or **Argon**. The spec names the files to read, so the implementer doesn't
+  explore.
+- **Review:** a fresh session on a top model with the `review-task` skill, before merging. It may be the same tool
+  that implemented the task, as long as it is a new session.
 
 **Who implements, by the risk the spec gives it:**
 
-| Risk | What it covers | Default | When usage is tight |
+| Risk | What it covers | Implementer | Never |
 |---|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Claude Code with **Opus**, or Codex with **Sol** | Switch between Opus and Sol, or wait for usage to reset; never Sonnet, Terra, Antigravity or a local model |
-| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | Claude Code with **Opus** | Claude Code with **Sonnet**, or **Antigravity** (its Pro model) |
-| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Claude Code with **Opus** | **Sonnet**, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) |
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | A top model: Claude Code with **Opus**, Codex with **Sol** or Antigravity with **Gemini 4 Argon** (high effort) | Sonnet, Terra, Hydrogen or a local model. When usage is tight, switch between the three top models or wait for usage to reset |
+| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | A top model, or a routine one: **Sonnet**, **Terra** or **Gemini 4 Hydrogen** | A local model |
+| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Any of the six, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) | |
 
-- **Name the implementer in the spec**, and when a task goes to someone else, say so in its `Implementer:` line with the
-  date, as FB-011 to FB-024 do.
-- **Escalate after two failed attempts:** local model → Antigravity → Claude. Record the attempts in the handoff
-  report so the next tool doesn't repeat them.
-- **Android wrapper, emulator and Play Console work** stay with Claude Code; it follows the emulator and signing rules.
-- **The native Android app:** the same table, in its own repository. Claude Code or Codex handles anything touching
-  sign-in, tokens, the outbox, earnings or background location, and reviews all of it.
-- **Inside Claude Code**, pick the model in the model picker (in Codex, `/model`):
-  - **Opus** (Codex: **Sol**) for specs, design decisions, reviews, high-risk code and debugging;
-  - **Sonnet** (Codex: **Terra**) to implement a well-specified task more cheaply;
+- **Name the implementer in the spec** by tool and model, for example `Antigravity (Gemini 4 Argon)`. When a task
+  goes to someone else, say so in its `Implementer:` line with the date, as FB-011 to FB-024 do.
+- **Escalate after two failed attempts:** local model → a routine model → a top model, or from one top model to
+  another. Record the attempts in the handoff report so the next tool doesn't repeat them.
+- **Android wrapper, emulator and Play Console work** go to any of the three on a top model; AGENTS.md's emulator and
+  signing rules apply to all of them, and signing and Play uploads stay yours.
+- **The native Android app:** the same table and the same three tools, in its own repository. A top model handles
+  anything touching sign-in, tokens, the outbox, earnings or background location, and reviews all of it.
+- **Picking the model:** Claude Code's model picker, Codex's `/model`, Antigravity's model picker (`/model` or
+  `--model` in `agy`):
+  - **Opus**, **Sol** or **Argon** for specs, design decisions, reviews, high-risk code and debugging;
+  - **Sonnet**, **Terra** or **Hydrogen** to implement a well-specified task more cheaply;
   - **Haiku**, or the Explore subagent, for broad searches and reading logs.
 - **Reasoning effort:** high for specs, reviews and high-risk code; medium for routine implementation; low for docs and
   one-line fixes. Claude Code: `/effort`. Codex: `model_reasoning_effort`, or the effort choice in `/model`.
-- **Claude Code or Codex:** either can run any task. Use whichever has usage left; keep one tool per task, and review
-  with a fresh session of either.
+  Antigravity: the model's effort (`gemini-4-argon-high`, `-medium`, `-low`) or `agy --effort`.
+- **Keep one tool per task**, and review with a fresh session of any of the three.
 
 Never let two agents edit the same working tree at once. Take turns, or give the second agent its own Git worktree.
 
@@ -245,10 +277,10 @@ local model. These habits keep tasks inside them:
 
 1. **The spec does the exploring.** It lists the files to read under "Files to read" and states the facts the
    implementer would otherwise go and find (class names, current behaviour, the next migration number).
-2. **One task per session.** Start a new Claude Code session, or `/clear`, for each task, and another for its review. A
-   long session re-reads its whole history on every message.
-3. **Sonnet to build when usage is tight.** Opus plans and reviews; a well-specified task builds fine on Sonnet.
-   Switch with the model picker.
+2. **One task per session.** Start a new session (in Claude Code, or `/clear`) for each task, and another for its
+   review. A long session re-reads its whole history on every message.
+3. **A routine model to build when usage is tight.** A top model plans and reviews; a well-specified task builds fine
+   on Sonnet, Terra or Hydrogen. Switch with the model picker.
 4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 94 KB, the Spanish one 103 KB) and
    other large files for the keys you need; Claude Code's guard refuses a whole-catalog read. Use an Explore subagent
    for "where is X" questions.
@@ -261,7 +293,8 @@ local model. These habits keep tasks inside them:
 
 ## A task from start to merge
 
-**Plan.** In a new Claude Code session with Opus, give this prompt:
+**Plan.** In a new session on a top model (Claude Code with Opus, Codex with Sol or Antigravity with Argon), give
+this prompt:
 
 ```text
 You are the software architect for FlexBuddy.
@@ -269,7 +302,7 @@ Read AGENTS.md and the code the feature touches.
 Feature request: [DESCRIBE FEATURE]
 
 Pick the next free FB-number: check .ai/tasks/ on main and the ai/FB-* branches on origin, in this
-repository and in flexbuddy-android once it exists.
+repository and in flexbuddy-android (git ls-remote --heads https://github.com/afa000/flexbuddy-android 'ai/FB-*').
 Create branch ai/<task-id> from main, write .ai/tasks/<task-id>.md from .ai/tasks/TEMPLATE.md,
 commit it and push the branch. Do not implement the feature.
 Set Risk and Implementer from the table in docs/agent-workflow.md, and list every file the
@@ -278,19 +311,20 @@ implementer needs under "Files to read". Keep the task small enough for one agen
 
 Pushing an `ai/` branch deploys nothing; Render only deploys `main`. The old `plan/<slug>` branches stay as history.
 
-**Implement.** Use the implementer the task names. For a Claude task, start a new session (Opus by default, Sonnet to
-save usage), switch to the branch and run the skill:
+**Implement.** Use the implementer the task names. Start a new session on the model it names (a top model for high
+risk; a routine one may save usage otherwise), switch to the branch and run the skill:
 
 ```powershell
 git fetch origin
 git switch ai/FB-001
 ```
 
-> /implement-task FB-001
+> /implement-task FB-001 (Claude Code), $implement-task FB-001 (Codex), "Use the implement-task skill for FB-001"
+> (Antigravity)
 
-From Claude Code, `run-agent.ps1` starts Antigravity or the local model instead
-([below](#running-everything-from-one-claude-code-session)). In another tool, ask it to use the `implement-task`
-skill, or, if it doesn't load skills, say "Follow .agents/skills/implement-task/SKILL.md for FB-001."
+From Claude Code, `run-agent.ps1` can also start an unattended Antigravity or local-model run
+([below](#running-everything-from-one-claude-code-session)). In a tool that doesn't load skills, say "Follow
+.agents/skills/implement-task/SKILL.md for FB-001."
 
 **Verify and open the pull request.** Commit first: the checks record the commit they tested, and the packet warns when
 that is no longer the latest one. Any untracked file counts as an uncommitted change: `verify.ps1` then reports "with
@@ -310,14 +344,14 @@ gh pr create --base main --title "feat(scope): ..." --body-file .ai/reviews/FB-0
 Read the packet for secrets before it becomes the pull request description. `/prepare-review FB-001` does these
 steps and stops before pushing.
 
-**Review and merge.** Wait for the Java and JS checks. Then, in a new Claude Code session with Opus (not the one that
-wrote the code):
+**Review and merge.** Wait for the Java and JS checks. Then, in a new session on a top model (Opus, Sol or Argon; not
+the session that wrote the code):
 
-> /review-task FB-001
+> /review-task FB-001 (or `$review-task`, or "Use the review-task skill for FB-001")
 
 The review reads only the task, the packet and the diff, and reports findings without changing code. Fixes go back to
-the implementer, or to Claude Code or Codex for a high-risk task, and the review runs again on the new commit. You
-merge the pull request yourself, in GitHub; the guard refuses `gh pr merge` in both tools. Merging to `main` deploys to Render, and
+the implementer, or to a top model for a high-risk task, and the review runs again on the new commit. You
+merge the pull request yourself, in GitHub; the guard refuses `gh pr merge` in all three tools. Merging to `main` deploys to Render, and
 GitHub refuses the merge until both checks pass.
 
 ## Running everything from one Claude Code session
@@ -329,7 +363,11 @@ edit (a separate Git worktree if you are working in the main one at the same tim
 ```powershell
 .\scripts\run-agent.ps1 -Agent local -TaskId FB-003
 .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Prompt "Only do step 1 of the task's handoff plan."
+.\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Model gemini-4-argon-high
 ```
+
+For Antigravity, `-Model` takes an id from `agy models` (Argon for high-risk work, Hydrogen for routine
+work); without it the run uses your own `agy` default, and the log records which.
 
 Without `-Prompt`, the agent implements the task with the `implement-task` skill and writes its handoff report. The
 run is timed and saved to `.ai/artifacts/<task-id>/agent-<agent>-<time>.log`, with the agent's answer, its tool log,
@@ -465,6 +503,13 @@ still refuses with exit 2 and stderr. Verified live after the change: the releas
 a patch to a Git-tracked dummy migration was blocked with its hash unchanged, and a new untracked dummy migration
 was allowed. Both fixtures live in an isolated Git repository under ignored `.ai/artifacts/FB-027/`; no real
 migration was edited. Enabled indicators and launcher tests alone still do not prove enforcement in another session.
+
+Antigravity's hook, live on November 12, 2026 (FB-030, CLI 1.5.7, `run-agent.ps1 -Model gemini-4-argon-low`, about
+70 s a run): `gh pr merge --help` and a `write_file` over a Git-tracked dummy migration were both "denied by pre-tool
+hook" with the guard's reason, the dummy's hash unchanged, and `node --version` then ran normally. The first version
+answered `{}` when it had no objection, and Antigravity denied those calls too, with an empty reason; a probe hook
+showed that no output, `ask` and `allow` all let a call through. So the guard prints nothing unless it refuses. The
+fixture lives in ignored `.ai/artifacts/FB-030/`.
 
 So the local model still needs the exact facts in the spec, as the "Writing tasks for the local model" list below
 says. Mailpit, under One-time setup, is still untried with the app's mail settings.
