@@ -15,6 +15,7 @@
     <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
 </head>
 <body class="print-page">
+<div th:replace="~{fragments/test-server :: banner}"></div>
 <main class="print-layout">
     <div class="print-header">
         <a class="secondary-button compact-button" href="/account#taxes" th:text="#{taxSummary.backToAccount}">Back to account</a>

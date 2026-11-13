@@ -275,16 +275,19 @@ task and the small server change; the owner creates the accounts and sets every 
 
 FlexBuddy has no staging environment. This gives it one, at no cost, so `.dev` builds on the emulator or the owner's
 phone can reach a real server with the API on, and risky server changes can be tried on a hosted copy before they reach
-production. It comes after NA-02, since before the switch exists there is nothing to turn on.
+production. It comes after NA-02, since before the switch exists there is nothing to turn on. The server change is
+FB-032; the owner's setup, reset and smoke-check procedure is [docs/test-server.md](test-server.md).
 
 **Hosting** (checked November 11, 2026; confirm both pricing pages at sign-up):
 
 - **Server:** a Render free web service in the owner's existing workspace, built from the same Dockerfile. It sleeps
   after 15 minutes without traffic and takes about a minute to wake, has 512 MB of memory and a disk that is wiped on
   every restart. Created in the dashboard, not in `render.yaml`, so the production Blueprint doesn't change.
-- **Database:** a Neon free Postgres database (about 0.5 GB, no card). Not Render's free database, which is deleted
-  after 30 days plus a 14-day grace period. Choose Postgres 18 if Neon offers it, otherwise 17, and say so in the task.
-- **If either asks for a card or a paid plan, stop** and ask the owner. The test server must cost nothing.
+- **Database:** a Neon free Postgres database (1 GB per project, 100 CU-hours a month and 10 branches on November 13,
+  2026; no card). Not Render's free database, which is deleted after 30 days plus a 14-day grace period. Choose Postgres 18 if Neon offers it, otherwise 17, and say so in the task.
+- **If either asks for a card or a paid plan, stop** and ask the owner. The test server must cost nothing. Free
+  compute alone doesn't prove that: free instance hours are shared across the workspace, and bandwidth or build
+  minutes over the free amount can be billed to the workspace's card (docs/test-server.md, step 1).
 
 **Settings** (set by the owner in the dashboard, never in the repository, a log or chat):
 
@@ -295,9 +298,10 @@ production. It comes after NA-02, since before the switch exists there is nothin
 - No `FLEXBUDDY_MAIL_*` and no Google sign-in settings. With no mail host the app logs instead of sending mail
   (`MailConfig`), and `FLEXBUDDY_MAIL_LOG_LINKS=true` puts sign-up and sign-in codes in the Render log, so test
   accounts can be verified without a mailbox.
-- `FLEXBUDDY_ALERT_TO` unset, so error alerts are logged rather than sent to the support inbox.
+- No mail host also means error alerts are logged, not sent. Leaving `FLEXBUDDY_ALERT_TO` unset alone would not do
+  that: it falls back to the support inbox.
 
-**The one server change** (its own server task, off by default, so production doesn't change):
+**The one server change** (FB-032, off by default, so production doesn't change):
 
 - A `flexbuddy.test-server` property (`FLEXBUDDY_TEST_SERVER`, default `false`). When true, every page shows a banner
   in both languages ("Test server: made-up data only. Use flexbuddy.onrender.com for your real blocks.") and every
@@ -308,8 +312,8 @@ production. It comes after NA-02, since before the switch exists there is nothin
 
 - Deploys follow `main` automatically, so the test server runs what production runs, with the API on. To try an
   unmerged server task, deploy its branch by hand, then switch back to `main`.
-- Made-up accounts and figures only. No real driver data, no copies of the production database, and no real
-  screenshots unless they're from the FB-003 sample set the owner already labeled.
+- Made-up accounts and figures only. No real driver data, copies of the production database or real driver screenshots.
+  Hosted OCR checks use synthetic screenshots containing only made-up data, including any samples selected from FB-003.
 - Keep a Neon `seed` branch with the made-up accounts. For a test session, branch from it and point `DB_URL` at the
   branch; delete the branch afterwards, so every session starts from the same data.
 - Expect slow screenshot reading on 0.1 CPU and the one-minute wake. The app has to show a clear "server waking up"

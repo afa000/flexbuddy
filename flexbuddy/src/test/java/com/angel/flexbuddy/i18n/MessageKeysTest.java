@@ -74,7 +74,7 @@ class MessageKeysTest {
 
     private static Map<String, String> templates() throws IOException {
         Map<String, String> templates = new TreeMap<>();
-        for (Resource template : new PathMatchingResourcePatternResolver().getResources("classpath:/templates/*.html")) {
+        for (Resource template : new PathMatchingResourcePatternResolver().getResources("classpath:/templates/**/*.html")) {
             templates.put(template.getFilename(), text(template));
         }
         return templates;
