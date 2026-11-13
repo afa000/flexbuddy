@@ -53,7 +53,7 @@ Neither resource is connected to production in any way. Never restore, copy or b
 
 **Database (Neon):** create a new Neon project on the Free plan, in the AWS region nearest Render's Ohio region (US East
 (Ohio), `aws-us-east-2`, if offered). Choose PostgreSQL 18 if it is offered; otherwise choose the newest version and
-record it here: `PostgreSQL version: ____`. The project's default branch is `main`; rename or create a branch called
+record it here: `PostgreSQL version: 18` (Neon project `flexbuddy-1`, AWS US East 1, Virginia; created November 13, 2026). The project's default branch is `main`; rename or create a branch called
 `seed` for the clean made-up data (step 6).
 
 **Web service (Render):** in the dashboard (not `render.yaml`, which stays production's alone), New, Web Service:
@@ -66,7 +66,7 @@ record it here: `PostgreSQL version: ____`. The project's default branch is `mai
 | Dockerfile path | `./flexbuddy/Dockerfile` |
 | Docker build context | `./flexbuddy` |
 | Instance type | Free |
-| Region | Ohio (same as production, near the database) |
+| Region | Ohio (same as production, near the database). Actual: Virginia (US East), next to the Neon project in AWS US East 1 |
 | Health check path | `/actuator/health` |
 | Auto-deploy | After CI checks pass (production's `checksPass`) |
 | Environment groups | none; do not link production's |
@@ -123,7 +123,7 @@ Names and placeholders only here:
 
   | Date | Commit | Branch | Neon branch | Notes |
   |---|---|---|---|---|
-  | | | | | |
+  | November 13, 2026 | `4453abf` | `main` | `seed` | First successful deploy of `flexbuddy-test`; `DB_URL` uses Neon's direct (not pooled) host |
 
 ## 6. Repeatable made-up data
 
@@ -155,10 +155,10 @@ After the first deploy, and after any settings change. Record results here; keep
 
 | Check | How | Result |
 |---|---|---|
-| HTTPS | open `https://<test-service>.onrender.com`; the browser shows a valid certificate | |
-| Health | `/actuator/health` returns `{"status":"UP"}` | |
-| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | |
-| Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | |
+| HTTPS | open `https://<test-service>.onrender.com`; the browser shows a valid certificate | Pass, November 13, 2026 (`https://flexbuddy-test.onrender.com`) |
+| Health | `/actuator/health` returns `{"status":"UP"}` | Pass, November 13, 2026 |
+| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | Partial, November 13, 2026: `/login` in English and Spanish show it; the other pages are not checked yet |
+| Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | Pass, November 13, 2026 (`/login`, `/css/styles.css` and the API's `401` all carry it; production's `/login` does not) |
 | Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | |
 | API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | |
 | Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | |
@@ -194,5 +194,5 @@ After the first deploy, and after any settings change. Record results here; keep
 
 ## Status
 
-Hosted setup: **pending**, owner-operated. Step 1 (cost check) done on November 13, 2026; steps 2 to 7 are not started.
+Hosted setup: **pending**, owner-operated. Steps 1 (cost check) and 2 (resources) done on November 13, 2026: Render service `flexbuddy-test` (Free, Virginia) and Neon project `flexbuddy-1` (Free, PostgreSQL 18, branch `seed`). Step 7 is partly checked; step 6 (seed baseline, made-up accounts) is not done.
 Until they are done and recorded above, the hosted test server is not ready.
