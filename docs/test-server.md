@@ -136,7 +136,11 @@ Names and placeholders only here:
 
   | Seed baseline commit | Newest Flyway version | Recorded on |
   |---|---|---|
-  | | | |
+  | `4453abf` | `v29` (29 migrations applied on first start) | November 13, 2026 |
+
+  Seed accounts (made-up): `driver1@example.test` (English; 3 completed, 1 cancelled and 1 scheduled block at
+  made-up stations `DXX1 Testville` and `DXX2 Sampletown`) and `driver2@example.test` (Spanish; 2 completed and 1
+  scheduled block at `DXX3 Ejemplo`). Their passwords are kept outside the repository by the owner.
 
 - **Session branch.** Before testing, create a Neon branch from `seed` (for example `session-2026-11-20`), point `DB_URL`
   at it and redeploy. Test, then point back and delete the branch.
@@ -157,13 +161,13 @@ After the first deploy, and after any settings change. Record results here; keep
 |---|---|---|
 | HTTPS | open `https://<test-service>.onrender.com`; the browser shows a valid certificate | Pass, November 13, 2026 (`https://flexbuddy-test.onrender.com`) |
 | Health | `/actuator/health` returns `{"status":"UP"}` | Pass, November 13, 2026 |
-| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | Partial, November 13, 2026: `/login` in English and Spanish show it; the other pages are not checked yet |
+| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | Pass, November 13, 2026: `/login` (English and Spanish), Home, Account, `/privacy`, `/terms`, the tax year summary and a 404 requested as HTML each show one banner; a 404 requested as JSON stays JSON |
 | Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | Pass, November 13, 2026 (`/login`, `/css/styles.css` and the API's `401` all carry it; production's `/login` does not) |
-| Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | |
-| API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | |
-| Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | |
-| Cold start | after 15+ minutes idle, time the first request until the page loads | |
-| Memory and screenshot reading | import a few synthetic screenshots containing only made-up data; note time per screenshot and the memory graph in Render's Metrics tab | |
+| Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | Pass, November 13, 2026 (both seed accounts; sign-out returns to `/login?logout`) |
+| API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | Pass, November 13, 2026: `signed_in` with an `fbt_` token, account returned, sign-out `204`, the revoked token then gets `401` |
+| Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | Partial, November 13, 2026: the service worker cached `/`, `/account` and `/offline.html`, each with one banner (checked in Chrome's cache storage). Not yet viewed with the browser actually offline |
+| Cold start | after 15+ minutes idle, time the first request until the page loads | November 13, 2026: 2 min 8 s from the first request to a loaded page (Spring start-up 105 s). While waking, Render answers `503` at once instead of holding the request, so a client must retry |
+| Memory and screenshot reading | import a few synthetic screenshots containing only made-up data; note time per screenshot and the memory graph in Render's Metrics tab | Memory: 330 to 345 MB of 512 MB after start-up and the checks above. Screenshot reading: **pending**, needs synthetic screenshots (the FB-003 samples are real drivers' screenshots and must not be used) |
 
 **Offline procedure (test origin only):**
 
@@ -194,5 +198,5 @@ After the first deploy, and after any settings change. Record results here; keep
 
 ## Status
 
-Hosted setup: **pending**, owner-operated. Steps 1 (cost check) and 2 (resources) done on November 13, 2026: Render service `flexbuddy-test` (Free, Virginia) and Neon project `flexbuddy-1` (Free, PostgreSQL 18, branch `seed`). Step 7 is partly checked; step 6 (seed baseline, made-up accounts) is not done.
+Hosted setup: **pending**, owner-operated. Steps 1 (cost check) and 2 (resources) done on November 13, 2026: Render service `flexbuddy-test` (Free, Virginia) and Neon project `flexbuddy-1` (Free, PostgreSQL 18, branch `seed`). Step 6 (seed baseline and two made-up accounts) done the same day. Step 7 passes except two open items: an offline view with the browser actually disconnected, and screenshot reading with synthetic screenshots. Test origin for NA-03: `https://flexbuddy-test.onrender.com`; cold start about 2 minutes, answered with `503` until ready.
 Until they are done and recorded above, the hosted test server is not ready.
