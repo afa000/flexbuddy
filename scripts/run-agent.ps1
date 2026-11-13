@@ -17,7 +17,7 @@ param(
 
     # An Ollama model for -Agent local (default gemma4:12b-32k), or an Antigravity model id from `agy models` for
     # -Agent antigravity, such as gemini-4-argon-high (default: your own agy default).
-    [ValidatePattern('^[A-Za-z0-9_.:-]*$')]
+    [ValidatePattern('^[A-Za-z0-9_./:-]*$')]
     [string]$Model,
 
     [int]$TimeoutMinutes = 30
