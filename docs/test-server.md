@@ -127,8 +127,8 @@ Names and placeholders only here:
 ## 6. Repeatable made-up data
 
 - Made-up accounts and figures only (for example `driver1@example.test`). No real driver data, screenshots of real
-  drivers, production backups or copies of the production database. The FB-003 OCR sample set the owner already labeled
-  is the only allowed source of real screenshots.
+  drivers, production backups or copies of the production database. Use synthetic screenshots with made-up data for
+  OCR checks, including when selecting samples from FB-003; labeling a real screenshot does not make it synthetic.
 - **Seed branch.** Deploy `main` against the Neon `seed` branch once, so Flyway creates the schema. Register the
   made-up accounts through the site, add their made-up blocks, then record the baseline: the `main` commit and the
   newest `flyway_schema_history` version. Do not use the `seed` branch for test sessions after that.
@@ -160,9 +160,22 @@ After the first deploy, and after any settings change. Record results here; keep
 | Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | |
 | Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | |
 | API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | |
-| Offline page | install or visit, go offline, open a page never visited: the offline page shows the banner | |
+| Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | |
 | Cold start | after 15+ minutes idle, time the first request until the page loads | |
-| Memory and screenshot reading | import a few FB-003 sample screenshots; note time per screenshot and the memory graph in Render's Metrics tab | |
+| Memory and screenshot reading | import a few synthetic screenshots containing only made-up data; note time per screenshot and the memory graph in Render's Metrics tab | |
+
+**Offline procedure (test origin only):**
+
+1. Sign in with a made-up account, visit `/` and `/account` online, and wait until the service worker controls the page.
+   In browser developer tools, confirm the current `flexbuddy-pages-*` cache contains both routes and the current
+   `flexbuddy-static-*` cache contains `/offline.html`.
+2. Switch the browser offline and navigate to `/` and `/account`. Each cached shell must show the test-server banner.
+3. While still offline, delete only the `/account` entry from the current `flexbuddy-pages-*` cache in developer tools.
+   Keep the static cache and its `/offline.html` entry. Navigate to `/account` again: the offline fallback must show the
+   banner and Retry button. Do not use an arbitrary unvisited route: the service worker handles page navigation only
+   for `/` and `/account`.
+4. Restore the connection and visit `/account` to cache its shell again. Repeat for the other language, confirming the
+   cached fallback's language before disconnecting; it retains the language it had when cached at worker installation.
 
 - Render Free currently sleeps after 15 minutes without traffic and takes about a minute to wake. Do not add keep-alive
   pings to stop it sleeping.

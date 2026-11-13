@@ -312,8 +312,8 @@ FB-032; the owner's setup, reset and smoke-check procedure is [docs/test-server.
 
 - Deploys follow `main` automatically, so the test server runs what production runs, with the API on. To try an
   unmerged server task, deploy its branch by hand, then switch back to `main`.
-- Made-up accounts and figures only. No real driver data, no copies of the production database, and no real
-  screenshots unless they're from the FB-003 sample set the owner already labeled.
+- Made-up accounts and figures only. No real driver data, copies of the production database or real driver screenshots.
+  Hosted OCR checks use synthetic screenshots containing only made-up data, including any samples selected from FB-003.
 - Keep a Neon `seed` branch with the made-up accounts. For a test session, branch from it and point `DB_URL` at the
   branch; delete the branch afterwards, so every session starts from the same data.
 - Expect slow screenshot reading on 0.1 CPU and the one-minute wake. The app has to show a clear "server waking up"
