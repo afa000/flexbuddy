@@ -31,9 +31,10 @@ The test server must cost nothing. Free compute alone does not prove that.
 
    | Item | Limit offered | Checked on |
    |---|---|---|
-   | Render free instance hours (shared by the whole workspace) | | |
-   | Render free bandwidth and build minutes | | |
-   | Neon Free storage / compute / branches | | |
+   | Render free instance hours (shared by the whole workspace) | 750 hours; 0 used | November 13, 2026 |
+   | Render free bandwidth and build minutes | 5 GB bandwidth, 36 MB used; 500 build minutes, 10 used | November 13, 2026 |
+   | Neon Free storage / compute / branches | 1 GB storage, 100 compute hours, 10 branches | November 13, 2026 |
+   | Spending limit | on | November 13, 2026 |
 
 2. In the Render dashboard, check the workspace's current use. Free instance hours are shared by every free service in
    the workspace. The production service is on the paid Starter plan, so it does not use them, but any other free
@@ -193,5 +194,5 @@ After the first deploy, and after any settings change. Record results here; keep
 
 ## Status
 
-Hosted setup: **pending**, owner-operated. Until steps 1 to 7 are done and recorded above, the hosted test server is not
-ready.
+Hosted setup: **pending**, owner-operated. Step 1 (cost check) done on November 13, 2026; steps 2 to 7 are not started.
+Until they are done and recorded above, the hosted test server is not ready.
