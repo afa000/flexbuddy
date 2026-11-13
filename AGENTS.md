@@ -31,9 +31,9 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
 - Each task names its risk and its implementer. Three tools are equals, each with a top model and a routine model:
-  Claude Code (Opus, Sonnet), Codex (Sol, Terra) and Antigravity (Gemini 4 Argon, Gemini 4 Carbon). High-risk work
+  Claude Code (Opus, Sonnet), Codex (Sol, Terra) and Antigravity (Gemini 4 Argon, Gemini 4 Hydrogen). High-risk work
   (sign-in, payments, migrations, backup/restore, earnings and tax figures, deleting data) is implemented by a top
-  model, Opus, Sol or Argon, never by Sonnet, Terra, Carbon or a local model. If you are not the named implementer and
+  model, Opus, Sol or Argon, never by Sonnet, Terra, Hydrogen or a local model. If you are not the named implementer and
   the owner hasn't handed the task to you, stop and say so.
 - Read `verify.ps1`'s `summary.md`, not the full logs, unless a check failed.
 

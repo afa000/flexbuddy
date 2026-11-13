@@ -2,7 +2,7 @@
 
 Status: Ready for implementation
 Risk: high | medium | low (see "Which tool for which task" in docs/agent-workflow.md)
-Implementer: Claude Code (Opus) | Codex (Sol) | Antigravity (Gemini 4 Argon) | Claude Code (Sonnet) | Codex (Terra) | Antigravity (Gemini 4 Carbon) | OpenCode + local model
+Implementer: Claude Code (Opus) | Codex (Sol) | Antigravity (Gemini 4 Argon) | Claude Code (Sonnet) | Codex (Terra) | Antigravity (Gemini 4 Hydrogen) | OpenCode + local model
 Review: fresh Claude Code (Opus), Codex (Sol) or Antigravity (Gemini 4 Argon) session, review-task skill
 
 ## Objective

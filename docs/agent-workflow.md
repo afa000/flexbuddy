@@ -9,9 +9,9 @@ and the two tiers line up:
 | Tier | Claude Code | Codex | Antigravity |
 |---|---|---|---|
 | Top: specs, reviews, high-risk code, debugging | **Opus** | **Sol** (`gpt-6.1-sol`) | **Gemini 4 Argon** (`gemini-4-argon-high`) |
-| Routine: a well-specified task, more cheaply | **Sonnet** | **Terra** (`gpt-6.1-terra`) | **Gemini 4 Carbon** |
+| Routine: a well-specified task, more cheaply | **Sonnet** | **Terra** (`gpt-6.1-terra`) | **Gemini 4 Hydrogen** (`gemini-4-hydrogen-medium`) |
 
-Where this page says **Opus**, read "Opus, Sol or Argon"; where it says **Sonnet**, read "Sonnet, Terra or Carbon".
+Where this page says **Opus**, read "Opus, Sol or Argon"; where it says **Sonnet**, read "Sonnet, Terra or Hydrogen".
 All three read `AGENTS.md` and the skills in `.agents/skills/`, and all three have the same guard configured. Claude
 Code starts a skill with `/implement-task FB-xxx`, Codex with `$implement-task FB-xxx`; in Antigravity, ask for the
 `implement-task` skill by name ("Use the implement-task skill for FB-xxx").
@@ -27,7 +27,7 @@ Code starts a skill with `/implement-task FB-xxx`, Codex with `$implement-task F
 4. **Review** in a fresh session, Codex or Claude Code: `$review-task FB-xxx`. Fixes go back to the implementer.
 5. **Merge** in GitHub yourself.
 
-Antigravity follows the same five steps: plan on Argon, implement on Argon for high-risk work or Carbon for routine
+Antigravity follows the same five steps: plan on Argon, implement on Argon for high-risk work or Hydrogen for routine
 work (pick it in the model picker, `/model` in `agy`, or `agy --model`), ask for each skill by name, and approve the
 `ai/` branch push and `gh pr create` when it asks.
 
@@ -202,11 +202,9 @@ from the workspace root ([rules docs](https://antigravity.google/docs/rules/)) a
 
 - **Models:** **Gemini 4 Argon** is the top model (the Opus/Sol role). In the CLI it comes in three efforts:
   `gemini-4-argon-high` for specs, reviews and high-risk code, `-medium` and `-low` for lighter work. **Gemini 4
-  Carbon** is the routine model (the Sonnet/Terra role). Pick either in the model picker, with `/model` in `agy`, or
-  with `agy --model <id>`; `agy models` lists what your sign-in offers.
-- **Carbon wasn't offered here yet.** On November 12, 2026, `agy models` (CLI 1.5.7, Pro sign-in) listed the three
-  Argon efforts but no Carbon; the CLI changelog adds Carbon for Application Default Credentials sign-in. Until it
-  shows up in your picker, give routine work to Sonnet or Terra, or to Argon at `-low`/`-medium` effort.
+  Hydrogen** is the routine model (the Sonnet/Terra role), in four efforts: `gemini-4-hydrogen-low`, `-medium`,
+  `-high` and `-xhigh`; `-medium` suits routine implementation. Pick either in the model picker, with `/model` in
+  `agy`, or with `agy --model <id>`; `agy models` lists what your sign-in offers (both, on November 12, 2026).
 - `git push` of an `ai/` branch and `gh pr create` ask for approval, as in Claude Code and Codex. Your own
   `~/.gemini/antigravity-cli/settings.json` currently denies every `git push`, so either push from another tool or
   approve a one-off exception.
@@ -248,8 +246,8 @@ for narrow low-risk work; nothing depends on it.
 
 | Risk | What it covers | Implementer | Never |
 |---|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | A top model: Claude Code with **Opus**, Codex with **Sol** or Antigravity with **Gemini 4 Argon** (high effort) | Sonnet, Terra, Carbon or a local model. When usage is tight, switch between the three top models or wait for usage to reset |
-| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | A top model, or a routine one: **Sonnet**, **Terra** or **Gemini 4 Carbon** | A local model |
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | A top model: Claude Code with **Opus**, Codex with **Sol** or Antigravity with **Gemini 4 Argon** (high effort) | Sonnet, Terra, Hydrogen or a local model. When usage is tight, switch between the three top models or wait for usage to reset |
+| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | A top model, or a routine one: **Sonnet**, **Terra** or **Gemini 4 Hydrogen** | A local model |
 | Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Any of the six, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) | |
 
 - **Name the implementer in the spec** by tool and model, for example `Antigravity (Gemini 4 Argon)`. When a task
@@ -263,7 +261,7 @@ for narrow low-risk work; nothing depends on it.
 - **Picking the model:** Claude Code's model picker, Codex's `/model`, Antigravity's model picker (`/model` or
   `--model` in `agy`):
   - **Opus**, **Sol** or **Argon** for specs, design decisions, reviews, high-risk code and debugging;
-  - **Sonnet**, **Terra** or **Carbon** to implement a well-specified task more cheaply;
+  - **Sonnet**, **Terra** or **Hydrogen** to implement a well-specified task more cheaply;
   - **Haiku**, or the Explore subagent, for broad searches and reading logs.
 - **Reasoning effort:** high for specs, reviews and high-risk code; medium for routine implementation; low for docs and
   one-line fixes. Claude Code: `/effort`. Codex: `model_reasoning_effort`, or the effort choice in `/model`.
@@ -282,7 +280,7 @@ local model. These habits keep tasks inside them:
 2. **One task per session.** Start a new session (in Claude Code, or `/clear`) for each task, and another for its
    review. A long session re-reads its whole history on every message.
 3. **A routine model to build when usage is tight.** A top model plans and reviews; a well-specified task builds fine
-   on Sonnet, Terra or Carbon. Switch with the model picker.
+   on Sonnet, Terra or Hydrogen. Switch with the model picker.
 4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 94 KB, the Spanish one 103 KB) and
    other large files for the keys you need; Claude Code's guard refuses a whole-catalog read. Use an Explore subagent
    for "where is X" questions.
@@ -368,8 +366,8 @@ edit (a separate Git worktree if you are working in the main one at the same tim
 .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Model gemini-4-argon-high
 ```
 
-For Antigravity, `-Model` takes an id from `agy models` (Argon for high-risk work, Carbon once your sign-in offers
-it); without it the run uses your own `agy` default, and the log records which.
+For Antigravity, `-Model` takes an id from `agy models` (Argon for high-risk work, Hydrogen for routine
+work); without it the run uses your own `agy` default, and the log records which.
 
 Without `-Prompt`, the agent implements the task with the `implement-task` skill and writes its handoff report. The
 run is timed and saved to `.ai/artifacts/<task-id>/agent-<agent>-<time>.log`, with the agent's answer, its tool log,
