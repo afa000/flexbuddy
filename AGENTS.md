@@ -25,14 +25,16 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 - Design references for a task go in `.ai/design/<task-id>/`.
 - Repeatable procedures live in `.agents/skills/`: `implement-task` to build a task, `prepare-review` to get it ready for
   a pull request, and `review-task` to review that pull request in a fresh session. Claude Code reaches them as
-  `/implement-task`, `/prepare-review` and `/review-task`, Codex as `$implement-task` and so on. If your tool does not load skills, read the `SKILL.md` and
-  follow it.
+  `/implement-task`, `/prepare-review` and `/review-task`, Codex as `$implement-task` and so on, and Antigravity loads
+  them from `.agents/skills/` by name. If your tool does not load skills, read the `SKILL.md` and follow it.
 - `.ai/implementations/<task-id>.md` is the handoff report between agents and `.ai/reviews/<task-id>.md` is the review
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
-- Each task names its risk and its implementer. High-risk work (sign-in, payments, migrations, backup/restore,
-  earnings and tax figures, deleting data) is implemented by Claude Code (Opus) or Codex (Sol), never by Antigravity or
-  a local model. If you are not the named implementer and the owner hasn't handed the task to you, stop and say so.
+- Each task names its risk and its implementer. Three tools are equals, each with a top model and a routine model:
+  Claude Code (Opus, Sonnet), Codex (Sol, Terra) and Antigravity (Gemini 4 Argon, Gemini 4 Carbon). High-risk work
+  (sign-in, payments, migrations, backup/restore, earnings and tax figures, deleting data) is implemented by a top
+  model, Opus, Sol or Argon, never by Sonnet, Terra, Carbon or a local model. If you are not the named implementer and
+  the owner hasn't handed the task to you, stop and say so.
 - Read `verify.ps1`'s `summary.md`, not the full logs, unless a check failed.
 
 ## Before changing anything
@@ -52,8 +54,8 @@ Render deploys every push to `main` once the GitHub checks pass. There is no sta
 - Work on a feature branch, not directly on `main`.
 - Never edit production data, Render settings or environment variables.
 - `FLEXBUDDY_TWO_FACTOR_KEY` must never be regenerated: it would lock out every driver who uses an authenticator app.
-- The agent guard (`scripts/hooks/guard.mjs`, run by Claude Code's and Codex's hooks) refuses a push to `main`,
-  `gh pr merge` and an edit to a committed migration. Don't work around it: the owner does those steps.
+- The agent guard (`scripts/hooks/guard.mjs`, run by Claude Code's, Codex's and Antigravity's hooks) refuses a push
+  to `main`, `gh pr merge` and an edit to a committed migration. Don't work around it: the owner does those steps.
 
 ## Testing
 

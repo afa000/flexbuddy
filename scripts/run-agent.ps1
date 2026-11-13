@@ -2,6 +2,7 @@
 # output to .ai/artifacts/<task-id>/. Run it from the working tree the agent should edit, on the task's branch:
 #   .\scripts\run-agent.ps1 -Agent local -TaskId FB-003
 #   .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Prompt "Only do step 1 of the task's handoff plan."
+#   .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Model gemini-4-argon-high
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('antigravity', 'local')]
@@ -14,10 +15,14 @@ param(
     # Replaces the default instruction, which is to implement the task with the implement-task skill.
     [string]$Prompt,
 
-    [string]$Model = 'gemma4:12b-32k',
+    # An Ollama model for -Agent local (default gemma4:12b-32k), or an Antigravity model id from `agy models` for
+    # -Agent antigravity, such as gemini-4-argon-high (default: your own agy default).
+    [ValidatePattern('^[A-Za-z0-9_.:-]*$')]
+    [string]$Model,
 
     [int]$TimeoutMinutes = 30
 )
+if ($Agent -eq 'local' -and -not $Model) { $Model = 'gemma4:12b-32k' }
 
 $ErrorActionPreference = "Stop"
 $root = (git rev-parse --show-toplevel).Trim() -replace '/', '\'
@@ -79,7 +84,9 @@ if ($Agent -eq 'local') {
     [IO.File]::WriteAllText($settings, $rules)
     $exe = Join-Path $env:USERPROFILE ".gemini\bin\agy.exe"
     $arguments = @("--settings", "`"$settings`"", "--mode", "accept-edits", "--print-timeout", "${TimeoutMinutes}m",
-        "--output-format", "json", "-p")
+        "--output-format", "json")
+    if ($Model) { $arguments += @("--model", $Model) }
+    $arguments += "-p"
 }
 $arguments += '"' + ($Prompt -replace '"', '\"') + '"'
 
@@ -151,7 +158,7 @@ if ($handoffAfter -eq $handoffBefore) { Write-Warning $handoffNote }
 
 Branch: $branch
 Elapsed: $elapsed s
-$(if ($Agent -eq 'local') { "Model: $Model, context while running: $(if ($context) { $context } else { 'not seen' })" })
+$(if ($Agent -eq 'local') { "Model: $Model, context while running: $(if ($context) { $context } else { 'not seen' })" } else { "Model: $(if ($Model) { $Model } else { 'agy default' })" })
 
 ## Prompt
 
