@@ -1,0 +1,9 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<!-- Every full page includes this right after <body>. It renders only on the test server (TestServerAdvice). -->
+<div class="test-server-banner" role="note" th:fragment="banner" th:if="${testServer}"
+     th:utext="#{testServer.banner.html}"><strong>Test server:</strong> made-up data only. Use
+    <a href="https://flexbuddy.onrender.com">flexbuddy.onrender.com</a> for your real blocks.</div>
+</body>
+</html>

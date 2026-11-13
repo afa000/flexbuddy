@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.toLanguageTag()}">
+<head>
+    <!-- Test server only (TestServerOfflineController); production serves static/offline.html. -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#075c76">
+    <meta name="robots" content="noindex">
+    <title th:text="#{testServer.offline.title}">Offline | FlexBuddy</title>
+    <script>
+        document.documentElement.dataset.theme =
+            localStorage.getItem('flexbuddy-theme') === 'light' ? 'light' : 'dark';
+    </script>
+    <style>
+        :root { color-scheme: dark; --page: #02080b; --surface: #202b31; --text: #f7f8f8; --muted: #aab4bb; --cyan: #08ace2; --ink: #073344; --line: #5c6870; --warning-surface: #3d321f; --warning-border: #77613a; }
+        html[data-theme="light"] { color-scheme: light; --page: #ffffff; --surface: #f1f2f5; --text: #202a3c; --muted: #68717c; --cyan: #0789ad; --ink: #ffffff; --line: #c3cbd1; --warning-surface: #fff5d9; --warning-border: #e1ca8b; }
+        * { box-sizing: border-box; }
+        body { min-height: 100vh; margin: 0; padding: 24px; display: grid; place-items: center; align-content: center; gap: 20px; color: var(--text); background: var(--page); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; }
+        main { width: min(420px, 100%); padding: 34px 28px; text-align: center; background: var(--surface); border: 1px solid var(--line); border-top: 7px solid var(--cyan); border-radius: 10px; }
+        .mark { width: 56px; height: 56px; margin: 0 auto 18px; display: grid; place-items: center; color: #073344; background: var(--cyan); border-radius: 50%; font-weight: 850; font-size: 20px; }
+        h1 { margin: 0 0 10px; font-size: 28px; font-weight: 650; }
+        p { margin: 0 0 24px; color: var(--muted); line-height: 1.55; }
+        button { min-height: 50px; padding: 0 26px; color: var(--ink); background: var(--cyan); border: 0; border-radius: 6px; font: inherit; font-weight: 700; cursor: pointer; }
+        .test-server-banner { width: min(420px, 100%); padding: 10px 16px; color: var(--text); background: var(--warning-surface); border: 2px solid var(--warning-border); border-radius: 10px; font-size: 14px; font-weight: 650; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
+        .test-server-banner a { color: inherit; font-weight: 800; text-decoration: underline; }
+    </style>
+</head>
+<body>
+<div th:replace="~{fragments/test-server :: banner}"></div>
+<main>
+    <div class="mark" aria-hidden="true">FB</div>
+    <h1 th:text="#{testServer.offline.heading}">You're offline</h1>
+    <p th:text="#{testServer.offline.body}">FlexBuddy needs a connection to open this page for the first time.</p>
+    <button type="button" onclick="window.location.reload()" th:text="#{testServer.offline.retry}">Retry</button>
+</main>
+</body>
+</html>

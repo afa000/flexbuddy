@@ -23,6 +23,7 @@
     <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
 </head>
 <body>
+<div th:replace="~{fragments/test-server :: banner}"></div>
 <div class="app-shell">
     <header class="topbar">
         <a class="round-header-button" href="/account" th:aria-label="#{twoFactor.backToAccount}">

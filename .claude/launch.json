@@ -20,6 +20,15 @@
       "port": 8080
     },
     {
+      "name": "flexbuddy-test-server",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": [
+        "/c",
+        "set FLEXBUDDY_TEST_SERVER=true&& set FLEXBUDDY_API_ENABLED=true&& set FLEXBUDDY_MAIL_LOG_LINKS=true&& set DB_URL=jdbc:postgresql://localhost:5432/flexbuddy?currentSchema=fb032_local&& cd flexbuddy && .\\mvnw.cmd -q spring-boot:run"
+      ],
+      "port": 8080
+    },
+    {
       "name": "flexbuddy-google",
       "runtimeExecutable": "cmd",
       "runtimeArgs": [

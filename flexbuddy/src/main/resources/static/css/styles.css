@@ -2063,6 +2063,10 @@ button.calendar-day:hover { border-color: var(--cyan); }
 .schedule-match-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; color: var(--text); background: var(--primary-soft); border: 1px solid var(--cyan); }
 .nav-badge { position: absolute; top: 5px; right: calc(50% - 24px); min-width: 17px; height: 17px; padding: 0 4px; display: grid; place-items: center; color: var(--primary-text); background: var(--warning); border-radius: 999px; font-size: 10px; font-weight: 800; line-height: 1; }
 
+/* Hosted test server only (fragments/test-server.html): in the page flow, so it never covers the header, the bottom
+   navigation or a form. The words say what it is; the color only repeats it. */
+.test-server-banner { padding: 10px max(18px, env(safe-area-inset-left)); color: var(--text); background: var(--warning-surface); border-bottom: 2px solid var(--warning-border); font-size: 14px; font-weight: 650; line-height: 1.45; text-align: center; overflow-wrap: anywhere; }
+.test-server-banner a { color: inherit; font-weight: 800; text-decoration: underline; }
 .offline-banner { padding: 9px 18px; color: var(--text); background: var(--warning-surface); border-bottom: 1px solid var(--warning-border); font-size: 13px; font-weight: 700; text-align: center; }
 .install-banner { max-width: 1160px; margin: 18px auto 0; padding: 15px 18px; display: flex; align-items: center; justify-content: space-between; gap: 18px; background: var(--primary-soft); border: 1px solid var(--cyan); border-radius: var(--radius); }
 .install-banner[hidden] { display: none; }
@@ -2497,6 +2501,7 @@ body.is-offline .action-sheet-offline { display: block; }
     .print-table th, .print-table td { border: 1px solid #999; padding: 3px 5px; color: #000; background: none; }
     .print-table thead th { color: #000; }
     .notice { border: 1px solid #000; background: none; color: #000; }
+    .test-server-banner { margin-bottom: 10pt; border: 1px solid #000; background: none; color: #000; }
     tr, .print-section { break-inside: avoid; }
     thead { display: table-header-group; }
     a { color: #000; text-decoration: none; }

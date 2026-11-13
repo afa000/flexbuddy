@@ -27,6 +27,7 @@
     <link rel="stylesheet" th:href="@{/css/styles.css(v=${buildId})}">
 </head>
 <body th:attr="data-recovery-left=${recoveryLeft}">
+<div th:replace="~{fragments/test-server :: banner}"></div>
 <div class="app-shell">
     <header class="topbar">
         <a class="brand-mark" href="/" id="homeLink" th:aria-label="#{header.flexbuddyGoToHome}">
