@@ -31,9 +31,10 @@ The test server must cost nothing. Free compute alone does not prove that.
 
    | Item | Limit offered | Checked on |
    |---|---|---|
-   | Render free instance hours (shared by the whole workspace) | | |
-   | Render free bandwidth and build minutes | | |
-   | Neon Free storage / compute / branches | | |
+   | Render free instance hours (shared by the whole workspace) | 750 hours; 0 used | November 13, 2026 |
+   | Render free bandwidth and build minutes | 5 GB bandwidth, 36 MB used; 500 build minutes, 10 used | November 13, 2026 |
+   | Neon Free storage / compute / branches | 1 GB storage, 100 compute hours, 10 branches | November 13, 2026 |
+   | Spending limit | on | November 13, 2026 |
 
 2. In the Render dashboard, check the workspace's current use. Free instance hours are shared by every free service in
    the workspace. The production service is on the paid Starter plan, so it does not use them, but any other free
@@ -52,7 +53,7 @@ Neither resource is connected to production in any way. Never restore, copy or b
 
 **Database (Neon):** create a new Neon project on the Free plan, in the AWS region nearest Render's Ohio region (US East
 (Ohio), `aws-us-east-2`, if offered). Choose PostgreSQL 18 if it is offered; otherwise choose the newest version and
-record it here: `PostgreSQL version: ____`. The project's default branch is `main`; rename or create a branch called
+record it here: `PostgreSQL version: 18` (Neon project `flexbuddy-1`, AWS US East 1, Virginia; created November 13, 2026). The project's default branch is `main`; rename or create a branch called
 `seed` for the clean made-up data (step 6).
 
 **Web service (Render):** in the dashboard (not `render.yaml`, which stays production's alone), New, Web Service:
@@ -65,7 +66,7 @@ record it here: `PostgreSQL version: ____`. The project's default branch is `mai
 | Dockerfile path | `./flexbuddy/Dockerfile` |
 | Docker build context | `./flexbuddy` |
 | Instance type | Free |
-| Region | Ohio (same as production, near the database) |
+| Region | Ohio (same as production, near the database). Actual: Virginia (US East), next to the Neon project in AWS US East 1 |
 | Health check path | `/actuator/health` |
 | Auto-deploy | After CI checks pass (production's `checksPass`) |
 | Environment groups | none; do not link production's |
@@ -122,7 +123,7 @@ Names and placeholders only here:
 
   | Date | Commit | Branch | Neon branch | Notes |
   |---|---|---|---|---|
-  | | | | | |
+  | November 13, 2026 | `4453abf` | `main` | `seed` | First successful deploy of `flexbuddy-test`; `DB_URL` uses Neon's direct (not pooled) host |
 
 ## 6. Repeatable made-up data
 
@@ -135,7 +136,11 @@ Names and placeholders only here:
 
   | Seed baseline commit | Newest Flyway version | Recorded on |
   |---|---|---|
-  | | | |
+  | `4453abf` | `v29` (29 migrations applied on first start) | November 13, 2026 |
+
+  Seed accounts (made-up): `driver1@example.test` (English; 3 completed, 1 cancelled and 1 scheduled block at
+  made-up stations `DXX1 Testville` and `DXX2 Sampletown`) and `driver2@example.test` (Spanish; 2 completed and 1
+  scheduled block at `DXX3 Ejemplo`). Their passwords are kept outside the repository by the owner.
 
 - **Session branch.** Before testing, create a Neon branch from `seed` (for example `session-2026-11-20`), point `DB_URL`
   at it and redeploy. Test, then point back and delete the branch.
@@ -154,15 +159,15 @@ After the first deploy, and after any settings change. Record results here; keep
 
 | Check | How | Result |
 |---|---|---|
-| HTTPS | open `https://<test-service>.onrender.com`; the browser shows a valid certificate | |
-| Health | `/actuator/health` returns `{"status":"UP"}` | |
-| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | |
-| Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | |
-| Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | |
-| API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | |
-| Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | |
-| Cold start | after 15+ minutes idle, time the first request until the page loads | |
-| Memory and screenshot reading | import a few synthetic screenshots containing only made-up data; note time per screenshot and the memory graph in Render's Metrics tab | |
+| HTTPS | open `https://<test-service>.onrender.com`; the browser shows a valid certificate | Pass, November 13, 2026 (`https://flexbuddy-test.onrender.com`) |
+| Health | `/actuator/health` returns `{"status":"UP"}` | Pass, November 13, 2026 |
+| Banner, both languages | `/login` and `/login?lang=es` show the banner; signed-in pages, `/privacy`, a 404 page and the tax print view show it too | Pass, November 13, 2026: `/login` (English and Spanish), Home, Account, `/privacy`, `/terms`, the tax year summary and a 404 requested as HTML each show one banner; a 404 requested as JSON stays JSON |
+| Noindex | `curl -sI https://<test-service>.onrender.com/login` shows `X-Robots-Tag: noindex`; so does `curl -sI .../css/styles.css` | Pass, November 13, 2026 (`/login`, `/css/styles.css` and the API's `401` all carry it; production's `/login` does not) |
+| Web sign-up and sign-in | register a made-up account; read its code in the Render log; sign in, sign out, sign in again | Pass, November 13, 2026 (both seed accounts; sign-out returns to `/login?logout`) |
+| API sign-in | `POST /api/v1/auth/sign-in` with the made-up account (`docs/api-v1.md`), then `GET /api/v1/account` with the token | Pass, November 13, 2026: `signed_in` with an `fbt_` token, account returned, sign-out `204`, the revoked token then gets `401` |
+| Cached shells and offline fallback | follow the offline procedure below; both cached shells and the fallback show the banner | Pass, November 13, 2026: signed in as the made-up driver1, `/` and `/account` were cached with the banner. Chrome was then restarted with every connection blocked (a direct request to the server failed), and both pages opened from the cache with one banner and the cached-page marker. With only the `/account` cache entry removed, `/account` showed the offline page with the banner and Retry. DevTools' network Offline setting is not enough for this check: it blocks the page but not the service worker; use Application, Service workers, **Offline**, or cut the whole browser off |
+| Cold start | after 15+ minutes idle, time the first request until the page loads | November 13, 2026: 2 min 8 s from the first request to a loaded page (Spring start-up 105 s). While waking, Render answers `503` at once instead of holding the request, so a client must retry |
+| Memory and screenshot reading | import a few synthetic screenshots containing only made-up data; note time per screenshot and the memory graph in Render's Metrics tab | Memory: 330 to 345 MB of 512 MB after start-up and the checks above. Screenshot reading, November 13, 2026, with three synthetic screenshots of made-up blocks (1170x2532 PNG): 8.1 s for the first import, then 4.9 s and 5.0 s. Memory stayed at 331 to 345 MB of 512 MB; nothing ran out of memory. An English offer read fully; an earnings summary read everything but the station (it shows none); a Spanish offer read everything but the date, because the synthetic image wrapped the date over two lines |
 
 **Offline procedure (test origin only):**
 
@@ -193,5 +198,5 @@ After the first deploy, and after any settings change. Record results here; keep
 
 ## Status
 
-Hosted setup: **pending**, owner-operated. Until steps 1 to 7 are done and recorded above, the hosted test server is not
-ready.
+Hosted setup: **done**, owner-operated. Steps 1 (cost check) and 2 (resources) done on November 13, 2026: Render service `flexbuddy-test` (Free, Virginia) and Neon project `flexbuddy-1` (Free, PostgreSQL 18, branch `seed`). Step 6 (seed baseline and two made-up accounts) done the same day. Steps 3 to 5 (variables, mail, first deploy) were done the same day. Step 7 passes in full, including the offline view, checked with the browser cut off. Test origin for NA-03: `https://flexbuddy-test.onrender.com`; cold start about 2 minutes, answered with `503` until ready.
+The hosted test server is ready for NA-03.
