@@ -15,6 +15,13 @@ import org.springframework.data.jpa.repository.Modifying;
 
 public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
+    /** Lock the owned row, including trash, while an API write checks its version and changes it. */
+    @Query(value = """
+            select * from shift where id = :id
+            and owner_id = (select id from app_users where lower(email) = lower(:email)) for update
+            """, nativeQuery = true)
+    Optional<Shift> lockIncludingDeleted(@Param("email") String email, @Param("id") Long id);
+
     List<Shift> findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(String email);
 
     long countByOwnerEmailIgnoreCase(String email);

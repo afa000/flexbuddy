@@ -5,7 +5,8 @@ server task that adds or changes an `/api/v1` endpoint updates this page in the 
 against what this page says. The plan is [native-app-plan.md](native-app-plan.md).
 
 Status: FB-005 implements password sign-in, code challenges, device sign-out and the account summary. FB-033 adds
-read-only blocks and Home, with change-only sync. The API remains disabled by default.
+read-only blocks and Home, with change-only sync. NA-05 adds block writes for the native outbox. The API remains
+disabled by default.
 
 ## Availability
 
@@ -34,6 +35,11 @@ read-only blocks and Home, with change-only sync. The API remains disabled by de
   - `429`: locked or rate-limited: `{"error": "locked", "retryAfterMinutes": n}`
 - **Retried writes.** Every create or change sends an `Idempotency-Key` header with a new UUID per action. A retry with
   the same key never adds a second record. This is the header the website's offline outbox already uses.
+  NA-05 block writes require it, including delete and restore. UUIDs are case-insensitive. Keys belong to the account,
+  across its devices and API block-write endpoints. Reusing a key with a different action, id or bound request body
+  returns `409` `idempotency_conflict`. JSON whitespace and property order do not matter; retain the original values
+  when retrying. Failed actions do not consume a key. Successful acknowledgements persist across subsequent changes,
+  deletion, permanent deletion and backup restores, until account deletion; simultaneous retries apply only once.
 - **Dates and times** are ISO 8601. Dates are the driver's local date (`2026-11-11`), times are local with no offset
   (`18:30`), and instants are UTC with `Z`. The driver's time zone comes from `GET /api/v1/account`.
 - **Money** is a string with two decimals (`"72.00"`), never a floating-point number.
@@ -64,6 +70,11 @@ Added by FB-033. Every list endpoint follows this; `GET /api/v1/shifts` is the f
   answer is `304` with no body. Answers carry `Cache-Control: private, no-cache`. An unchanged account gives the same
   cursor and body, so a phone that polls gets `304`s.
 - No paging yet: a full answer holds every record.
+- **After a write:** an acknowledgement is `{"id":41}`, not a block snapshot or sync cursor. Keep the previous sync
+  cursor and fetch changes with `GET /api/v1/shifts?updatedSince=<cursor>` (or a full sync if none). A delayed retry
+  acknowledges the original successful action without applying it again, even if the block has since changed or been
+  deleted; the acknowledgement does not promise the block still exists. Do not put an acknowledgement into the block
+  cache or advance a cursor from a write response. Delete appears in `deleted`; restore appears in `shifts`.
 
 ## Endpoints
 
@@ -192,6 +203,111 @@ Added by FB-033. Token required: yes.
 
 200 with one block in the same shape. 404 `{"error":"not_found"}` for an id that doesn't exist, belongs to another
 account or is in Recently deleted. 400 `invalid` for an id that isn't a number. `ETag`/`304` as in Sync.
+
+### Block-write validation and conflicts
+
+Added by NA-05. Every write below requires a bearer token and a UUID `Idempotency-Key`. JSON bodies use the same
+lower-case status codes, ISO dates/local times and string decimals as reads. Every change to an existing block also
+requires `expectedUpdatedAt`, copied from the block the driver reviewed; DELETE carries it as a query parameter.
+Keep the exact request and key in the outbox until acknowledged. Resolve a conflict with the current block and
+submit the revised action with a fresh key.
+
+- `400 {"error":"invalid","fields":{"station":"invalid"}}`: missing/invalid fields, with property paths from
+  the website's validation (`details.stops`, for example). Missing versions use `"expectedUpdatedAt":"required"`;
+  missing, blank or malformed keys use `"Idempotency-Key":"invalid"`.
+- `400 {"error":"invalid","reason":"error.shift.scheduledNoTips"}`: a website business rule refused the action.
+  `reason` is a stable website message key, never a translated sentence. Malformed JSON, dates, times, statuses or
+  ids return `400 {"error":"invalid"}`. Submitted values are never echoed in validation errors.
+- `409 {"error":"conflict","current":{...}}`: `expectedUpdatedAt` differs from the stored version at microsecond
+  precision. `current` has the GET block shape. No changes are saved. A successful retry is acknowledged before
+  checking this version, so the original action cannot conflict with itself or overwrite a later website change.
+- `409 {"error":"idempotency_conflict"}`: this account already used the key for a different successful action.
+- `404 {"error":"not_found"}`: unknown id, another account's block, or a deleted block except on restore. A restore
+  also returns 404 for a live block or an expired deletion. A successful old retry remains acknowledged in these cases.
+- `401 {"error":"unauthorized"}`: missing, invalid, expired or revoked bearer token; website cookies do not count.
+
+Validation, status transitions, earnings and details calculations all use `ShiftService`, as the website does.
+Scheduled blocks never count toward earnings. Start, complete and not-worked are different actions: starting only
+records an actual start time; completing makes the block count as earned; not-worked removes the worked details.
+
+### POST /api/v1/shifts
+
+Added by NA-05. Token required: yes.
+
+Request:
+
+```json
+{
+  "station": "DXX1", "date": "2026-11-13", "startTime": "10:30", "endTime": "13:30",
+  "basePay": "72.00", "tips": "0.00", "status": "scheduled",
+  "miles": null, "details": null
+}
+```
+
+Required: station (nonblank, at most 255 characters), date, startTime, endTime, nonnegative basePay and tips, and
+status. Completed and scheduled blocks need positive basePay. Scheduled blocks cannot have tips or miles; cancelled
+and forfeited blocks cannot have tips. Miles is optional, nonnegative, at most seven integer digits and one decimal.
+
+Optional `details` has `actualStart`, `actualEnd`, `odometerStart`, `odometerEnd`, `stops`, `packages`, `returns`.
+Odometers are nonnegative, at most eight integer digits and one decimal; the end cannot precede the start. Without
+explicit miles, both odometers fill in the miles from their difference. Route counts are integers from 0 to 9999;
+returns cannot exceed packages. Actual end needs actual start and a completed block. A scheduled block may have
+actualStart but no actualEnd, route counts or odometer readings. All website details rules apply.
+
+201 `{"id":41}` with `Location: /api/v1/shifts/41`, including a retry of the same successful create. Other responses
+are listed under Block-write validation and conflicts. No duplicate-detection heuristic is added: distinct keys can
+create distinct blocks with identical values, as on the website.
+
+### PUT /api/v1/shifts/{id}
+
+Added by NA-05. Token required: yes.
+
+Request: the create fields plus required `expectedUpdatedAt`, for example `"2026-11-13T15:20:00Z"`. Station, date,
+times, basePay and tips are required replacement values. Status is optional and keeps the saved status when absent.
+Absent/null miles clears miles. Absent/null details keeps saved details, subject to status rules; supplying details
+replaces every details field, so null/absent fields inside it clear saved values. 200 `{"id":41}`.
+
+Directly editing or changing a completed, cancelled or forfeited block to scheduled is refused by the website's
+rules. For a completed block mistakenly marked worked, use not-worked below.
+
+### PATCH /api/v1/shifts/{id}/status
+
+Added by NA-05. Token required: yes.
+
+Request: required `status` and `expectedUpdatedAt`; optional `basePay`, `tips`, `miles`, `details`.
+For example `{"status":"completed","tips":"8.50","expectedUpdatedAt":"2026-11-13T15:20:00Z"}`.
+200 `{"id":41}`.
+
+Completing keeps offered pay and saved tips unless supplied. Moving to cancelled/forfeited starts pay at zero unless
+supplied, and clears tips unless supplied (nonzero tips are invalid). Missing miles preserves the saved distance
+except for scheduled; omitted details preserves valid saved details. Existing website rules decide all transitions.
+There is no separate complete endpoint: this status operation completes a scheduled block.
+
+### POST /api/v1/shifts/{id}/start
+
+Added by NA-05. Token required: yes. Request: `{"expectedUpdatedAt":"2026-11-13T15:20:00Z"}`.
+200 `{"id":41}`. Records now, to the minute in the account's time zone, as actualStart and clears actualEnd. The block
+stays scheduled. Only allowed from 15 minutes before its start through its end, and only for scheduled blocks.
+
+### POST /api/v1/shifts/{id}/not-worked
+
+Added by NA-05. Token required: yes. Request: `{"expectedUpdatedAt":"2026-11-13T15:20:00Z"}`.
+200 `{"id":41}`. Only completed blocks qualify. Returns the block to scheduled, retaining offered base pay and linked
+expenses while clearing tips, miles, actual times, odometers, route counts and late-forfeit judgement (FB-012).
+
+### DELETE /api/v1/shifts/{id}
+
+Added by NA-05. Token required: yes. No body. Required query: `expectedUpdatedAt=<ISO instant>` (URL-encode it).
+204 with no body, including successful retries. Soft-deletes the block into Recently deleted; linked expenses keep
+the website's behavior. It appears in `deleted` on the next change-only sync.
+
+### POST /api/v1/shifts/{id}/restore
+
+Added by NA-05. Token required: yes. Request: `{"expectedUpdatedAt":"2026-11-13T15:20:00Z"}`.
+200 `{"id":41}`. Restores only this account's deleted block when deleted less than 30 days ago. At exactly 30 days,
+restoration is refused even if the daily purge has not run. Use the saved block's updatedAt: delete and restore move
+the sync change time without changing the website's updatedAt. The restored block arrives in `shifts` on sync.
+No permanent-delete, empty-trash or batch-restore API is added by NA-05.
 
 ### GET /api/v1/home
 
