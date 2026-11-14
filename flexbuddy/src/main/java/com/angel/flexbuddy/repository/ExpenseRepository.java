@@ -54,7 +54,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Modifying
     @Query(value = """
-            update expense set deleted_at=:deletedAt, delete_batch=:batch
+            update expense set deleted_at=:deletedAt, delete_batch=:batch, sync_changed_at=:deletedAt
             where id=:id and owner_id=(select id from app_users where lower(email)=lower(:email))
               and deleted_at is null
             """, nativeQuery = true)
@@ -63,7 +63,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Modifying
     @Query(value = """
-            update expense set deleted_at=:deletedAt, delete_batch=:batch
+            update expense set deleted_at=:deletedAt, delete_batch=:batch, sync_changed_at=:deletedAt
             where owner_id=(select id from app_users where lower(email)=lower(:email)) and deleted_at is null
             """, nativeQuery = true)
     int softDeleteAll(@Param("email") String email, @Param("deletedAt") Instant deletedAt,
@@ -71,19 +71,19 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Modifying
     @Query(value = """
-            update expense set deleted_at=null, delete_batch=null
+            update expense set deleted_at=null, delete_batch=null, sync_changed_at=:now
             where id=:id and owner_id=(select id from app_users where lower(email)=lower(:email))
               and deleted_at is not null
             """, nativeQuery = true)
-    int restoreDeleted(@Param("email") String email, @Param("id") Long id);
+    int restoreDeleted(@Param("email") String email, @Param("id") Long id, @Param("now") Instant now);
 
     @Modifying
     @Query(value = """
-            update expense set deleted_at=null, delete_batch=null
+            update expense set deleted_at=null, delete_batch=null, sync_changed_at=:now
             where owner_id=(select id from app_users where lower(email)=lower(:email))
               and delete_batch=:batch and deleted_at is not null
             """, nativeQuery = true)
-    int restoreBatch(@Param("email") String email, @Param("batch") String batch);
+    int restoreBatch(@Param("email") String email, @Param("batch") String batch, @Param("now") Instant now);
 
     @Modifying
     @Query(value = """
@@ -113,4 +113,34 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Modifying
     @Query(value = "delete from expense where owner_id = :ownerId", nativeQuery = true)
     int deleteAllByOwnerIdIncludingTrash(@Param("ownerId") Long ownerId);
+
+    /** Lock the owned row, including trash, while an API write checks its version and changes it (NA-06). */
+    @Query(value = """
+            select * from expense where id = :id
+            and owner_id = (select id from app_users where lower(email) = lower(:email)) for update
+            """, nativeQuery = true)
+    Optional<Expense> lockIncludingDeleted(@Param("email") String email, @Param("id") Long id);
+
+    /** Every expense of this account not in Recently deleted, in the API's order (NA-06). */
+    @Query(value = """
+            select e.* from expense e join app_users u on u.id = e.owner_id
+            where lower(u.email) = lower(:email) and e.deleted_at is null
+            order by e.date, e.id
+            """, nativeQuery = true)
+    List<Expense> findLiveForSync(@Param("email") String email);
+
+    /** Expenses of this account changed after the given time, deleted ones included (NA-06). */
+    @Query(value = """
+            select e.* from expense e join app_users u on u.id = e.owner_id
+            where lower(u.email) = lower(:email) and e.sync_changed_at > :since
+            order by e.date, e.id
+            """, nativeQuery = true)
+    List<Expense> findChangedSince(@Param("email") String email, @Param("since") Instant since);
+
+    /** The latest sync time among this account's expenses, deleted ones included; null without any. */
+    @Query(value = """
+            select max(e.sync_changed_at) from expense e join app_users u on u.id = e.owner_id
+            where lower(u.email) = lower(:email)
+            """, nativeQuery = true)
+    Instant latestSyncChange(@Param("email") String email);
 }

@@ -17,4 +17,12 @@ public interface PayoutDepositRepository extends JpaRepository<PayoutDeposit, Lo
     Optional<PayoutDeposit> findByOwnerEmailIgnoreCaseAndPayoutDate(String email, LocalDate payoutDate);
 
     long deleteAllByOwnerId(Long ownerId);
+
+    /** Lock the recorded payout, if any, while an API write checks its version and changes it (NA-06). */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("""
+            select d from PayoutDeposit d where lower(d.owner.email) = lower(:email) and d.payoutDate = :payoutDate
+            """)
+    Optional<PayoutDeposit> lockByOwnerAndDate(@org.springframework.data.repository.query.Param("email") String email,
+            @org.springframework.data.repository.query.Param("payoutDate") LocalDate payoutDate);
 }

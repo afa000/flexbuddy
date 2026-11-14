@@ -278,7 +278,7 @@ public class AccountRestoreService {
     public java.util.Map<String, Integer> undoReplace(String email, String batch) {
         int removedExpenses = expenseRepository.deleteBatch(email, insertedBatch(batch));
         int removed = shiftRepository.deleteBatch(email, insertedBatch(batch));
-        int restoredExpenses = expenseRepository.restoreBatch(email, batch);
+        int restoredExpenses = expenseRepository.restoreBatch(email, batch, Instant.now(clock));
         int restored = shiftRepository.restoreBatch(email, batch, Instant.now(clock));
         // The removed blocks leave nothing to report as deleted, so phones reload every block (FB-033).
         userRepository.markSyncReset(email, Instant.now(clock));

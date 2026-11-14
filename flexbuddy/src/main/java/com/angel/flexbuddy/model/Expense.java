@@ -28,7 +28,8 @@ import lombok.Setter;
 @Table(name = "expense", indexes = {
         @Index(name = "idx_expense_owner_date", columnList = "owner_id,date"),
         @Index(name = "idx_expense_owner_deleted", columnList = "owner_id,deleted_at"),
-        @Index(name = "idx_expense_shift", columnList = "shift_id")
+        @Index(name = "idx_expense_shift", columnList = "shift_id"),
+        @Index(name = "idx_expense_owner_sync", columnList = "owner_id,sync_changed_at")
 }, uniqueConstraints = @UniqueConstraint(name = "uk_expense_owner_create_request",
         columnNames = {"owner_id", "create_request_id"}))
 @EntityListeners(TimestampListener.class)
@@ -72,6 +73,10 @@ public class Expense implements Timestamped {
 
     @Column(length = 36)
     private String deleteBatch;
+
+    /** When a phone last needs this expense again (NA-06): every save, delete and restore. Set by TimestampListener. */
+    @Column(name = "sync_changed_at", nullable = false)
+    private Instant syncChangedAt;
 
     /** The Idempotency-Key the expense was created with, so a repeat of the same create finds it instead of adding another. */
     @Column(name = "create_request_id", length = 36, updatable = false)

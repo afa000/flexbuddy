@@ -131,6 +131,58 @@ class PostgresMigrationTest {
         }
     }
 
+    @Test
+    void v32BackfillsExpenseSyncTimesFromEditsAndDeletions() throws Exception {
+        String schema = "flexbuddy_migration_test_" + UUID.randomUUID().toString().replace("-", "");
+        Flyway throughV31 = flyway(schema, MigrationVersion.fromVersion("31"));
+        Flyway latest = flyway(schema, MigrationVersion.LATEST);
+
+        try {
+            throughV31.migrate();
+            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+                statement.execute("set search_path to " + schema);
+                statement.execute("""
+                        insert into app_users (created_at, display_name, email, password_hash)
+                        values (timestamp with time zone '2026-09-01 12:00:00+00', 'Expense sync', 'expense-sync@example.com', 'hash')
+                        """);
+                statement.execute("""
+                        insert into expense (owner_id, date, category, amount, created_at, updated_at, deleted_at)
+                        select id, date '2026-10-01', 'FUEL', 12.50,
+                               timestamp with time zone '2026-10-01 12:00:00+00',
+                               timestamp with time zone '2026-10-02 12:00:00+00', null
+                        from app_users where email = 'expense-sync@example.com'
+                        union all
+                        select id, date '2026-10-01', 'TOLL', 3.00,
+                               timestamp with time zone '2026-10-01 12:00:00+00',
+                               timestamp with time zone '2026-10-02 12:00:00+00',
+                               timestamp with time zone '2026-10-05 12:00:00+00'
+                        from app_users where email = 'expense-sync@example.com'
+                        """);
+            }
+
+            latest.migrate();
+
+            try (Connection connection = connection(); Statement statement = connection.createStatement();
+                    ResultSet result = statement.executeQuery("select category, sync_changed_at from " + schema
+                            + ".expense order by category")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("category")).isEqualTo("FUEL");
+                assertThat(result.getObject("sync_changed_at", java.time.OffsetDateTime.class).toInstant())
+                        .isEqualTo(java.time.Instant.parse("2026-10-02T12:00:00Z"));
+                assertThat(result.next()).isTrue();
+                assertThat(result.getString("category")).isEqualTo("TOLL");
+                assertThat(result.getObject("sync_changed_at", java.time.OffsetDateTime.class).toInstant())
+                        .isEqualTo(java.time.Instant.parse("2026-10-05T12:00:00Z"));
+                assertThat(result.next()).isFalse();
+            }
+        } finally {
+            latest.clean();
+            try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+                statement.execute("drop schema if exists " + schema + " cascade");
+            }
+        }
+    }
+
     private void assertDriverExpenseSchema(String schema) throws Exception {
         try (Connection connection = connection(); PreparedStatement statement = connection.prepareStatement("""
                 select count(*) from information_schema.columns
@@ -163,6 +215,19 @@ class PostgresMigrationTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate(
                     "insert into api_write_receipt (owner_id, request_key, request_hash, shift_id) "
                     + "values (" + owner + ", '00000000-0000-0000-0000-000000000001', '" + "b".repeat(64) + "', 999999)"))
+                    .isInstanceOf(java.sql.SQLException.class);
+            // NA-06: a receipt may point at an expense or a payout date instead, but always at exactly one target.
+            statement.executeUpdate("insert into api_write_receipt (owner_id, request_key, request_hash, expense_id) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000002', '" + "c".repeat(64) + "', 999999)");
+            statement.executeUpdate("insert into api_write_receipt (owner_id, request_key, request_hash, payout_date) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000003', '" + "d".repeat(64) + "', date '2026-11-13')");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate(
+                    "insert into api_write_receipt (owner_id, request_key, request_hash) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000004', '" + "e".repeat(64) + "')"))
+                    .isInstanceOf(java.sql.SQLException.class);
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate(
+                    "insert into api_write_receipt (owner_id, request_key, request_hash, shift_id, expense_id) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000005', '" + "f".repeat(64) + "', 1, 2)"))
                     .isInstanceOf(java.sql.SQLException.class);
             statement.executeUpdate("delete from app_users where id = " + owner);
             try (ResultSet result = statement.executeQuery("select count(*) from api_write_receipt where owner_id = " + owner)) {

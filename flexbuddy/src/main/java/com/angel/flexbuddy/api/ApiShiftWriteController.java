@@ -17,7 +17,7 @@ import com.angel.flexbuddy.exception.ShiftConflictException;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
 
 import static com.angel.flexbuddy.api.ApiShiftWriteService.Action.*;
-import com.angel.flexbuddy.api.ApiShiftWriteService.Acknowledgement;
+import com.angel.flexbuddy.api.ApiWriteReceipts.Acknowledgement;
 import com.angel.flexbuddy.api.ApiShiftWriteService.Version;
 
 @RestController
@@ -81,13 +81,13 @@ public class ApiShiftWriteController {
         return ResponseEntity.status(409).body(Map.of("error", "conflict", "current", ApiShift.of(exception.getCurrent())));
     }
 
-    @ExceptionHandler(ApiShiftWriteService.KeyConflict.class)
+    @ExceptionHandler(ApiWriteReceipts.KeyConflict.class)
     ResponseEntity<?> keyConflict() {
         return ResponseEntity.status(409).body(Map.of("error", "idempotency_conflict"));
     }
 
-    @ExceptionHandler(ApiShiftWriteService.InvalidWrite.class)
-    ResponseEntity<?> invalidFields(ApiShiftWriteService.InvalidWrite exception) {
+    @ExceptionHandler(ApiWriteReceipts.InvalidWrite.class)
+    ResponseEntity<?> invalidFields(ApiWriteReceipts.InvalidWrite exception) {
         return ResponseEntity.badRequest().body(Map.of("error", "invalid", "fields", exception.fields()));
     }
 

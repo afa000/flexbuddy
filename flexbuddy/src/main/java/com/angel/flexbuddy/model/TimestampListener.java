@@ -23,6 +23,7 @@ public class TimestampListener {
         if (entity.getUpdatedAt() == null) entity.setUpdatedAt(entity.getCreatedAt());
         // Always the time of the save, even for a block restored from a backup with older times of its own.
         if (entity instanceof Shift shift) shift.setSyncChangedAt(now);
+        if (entity instanceof Expense expense) expense.setSyncChangedAt(now);
     }
 
     @PreUpdate
@@ -30,5 +31,6 @@ public class TimestampListener {
         Instant now = Instant.now(clock);
         entity.setUpdatedAt(now);
         if (entity instanceof Shift shift) shift.setSyncChangedAt(now);
+        if (entity instanceof Expense expense) expense.setSyncChangedAt(now);
     }
 }
