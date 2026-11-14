@@ -136,10 +136,12 @@ two-step and reset emails should then arrive in the inbox in either language. Th
 end here. Use a dedicated terminal and close it afterwards so the local overrides do not carry into other runs.
 The `flexbuddy-links` launch configuration is another local option; it logs codes and links to the console.
 
-**Without Docker.** Docker Desktop isn't installed on the owner's computer at the moment. The migration test can use
-the local PostgreSQL 18 the app already runs on (port 5432) instead; it still works in its own random schema and drops
-it afterwards. Point it there with the dev database's user and its default password from `application.properties`
-(`DB_PASSWORD`'s fallback), read from the file so it is never typed into a log or chat:
+**When Docker Desktop isn't running.** Docker Desktop is installed but doesn't always run. If `docker ps` fails with
+"failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine", Docker Desktop isn't started: ask
+the owner to start it, then use the container above. If that can't wait, the migration test can use the local
+PostgreSQL 18 the app already runs on (port 5432); it still works in its own random schema and drops it afterwards.
+Point it there with the dev database's user and its default password from `application.properties` (`DB_PASSWORD`'s
+fallback), read from the file so it is never typed into a log or chat:
 
 ```powershell
 $line = Select-String -Path flexbuddy\src\main\resources\application.properties -Pattern 'spring.datasource.password=' | Select-Object -First 1
