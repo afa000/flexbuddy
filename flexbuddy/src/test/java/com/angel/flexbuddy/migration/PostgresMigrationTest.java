@@ -80,6 +80,7 @@ class PostgresMigrationTest {
             assertPersistentLoginSchema(schema);
             assertSyncBackfill(schema);
             assertHibernateMappingsMatch(schema);
+            assertApiWriteReceipts(schema);
         } finally {
             latest.clean();
             try (Connection connection = connection(); Statement statement = connection.createStatement()) {
@@ -141,6 +142,32 @@ class PostgresMigrationTest {
             try (ResultSet result = statement.executeQuery()) {
                 assertThat(result.next()).isTrue();
                 assertThat(result.getInt(1)).isEqualTo(14);
+            }
+        }
+    }
+
+    private void assertApiWriteReceipts(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            long owner;
+            try (ResultSet result = statement.executeQuery("""
+                    insert into app_users (created_at, display_name, email, password_hash)
+                    values (current_timestamp, 'Receipt Test', 'receipt@example.test', 'hash') returning id
+                    """)) {
+                assertThat(result.next()).isTrue();
+                owner = result.getLong(1);
+            }
+            // A receipt intentionally survives without its block, but not without its account.
+            statement.executeUpdate("insert into api_write_receipt (owner_id, request_key, request_hash, shift_id) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000001', '" + "a".repeat(64) + "', 999999)");
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> statement.executeUpdate(
+                    "insert into api_write_receipt (owner_id, request_key, request_hash, shift_id) "
+                    + "values (" + owner + ", '00000000-0000-0000-0000-000000000001', '" + "b".repeat(64) + "', 999999)"))
+                    .isInstanceOf(java.sql.SQLException.class);
+            statement.executeUpdate("delete from app_users where id = " + owner);
+            try (ResultSet result = statement.executeQuery("select count(*) from api_write_receipt where owner_id = " + owner)) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isZero();
             }
         }
     }
@@ -324,7 +351,8 @@ class PostgresMigrationTest {
                     .addAnnotatedClasses(AppUser.class, Shift.class, Expense.class, PushSubscription.class, ReminderLog.class,
                             PayoutDeposit.class, StandingEntry.class, TaxPayment.class, TaxReminderLog.class,
                             PasswordResetToken.class, EmailCode.class, RecoveryCode.class,
-                            com.angel.flexbuddy.model.AppToken.class, com.angel.flexbuddy.model.AppSignInChallenge.class)
+                            com.angel.flexbuddy.model.AppToken.class, com.angel.flexbuddy.model.AppSignInChallenge.class,
+                            com.angel.flexbuddy.model.ApiWriteReceipt.class)
                     .buildMetadata();
             ExecutionOptions options = new ExecutionOptions() {
                 @Override public Map<String, Object> getConfigurationValues() { return settings; }

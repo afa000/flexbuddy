@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -355,6 +358,261 @@ class ApiShiftIntegrationTest {
 
     private AppUser account(String name, String email) {
         return users.save(new AppUser(name, email, encoder.encode(PASSWORD)));
+    }
+
+    @Test
+    void apiWritesFollowTheCompleteLifecycleAndChangeOnlySync() throws Exception {
+        driver.setTimeZone("America/New_York");
+        users.save(driver);
+        save(driver, "OLD1", LocalDate.of(2026, 11, 9), "10", "0");
+        testClock.advance(Duration.ofMinutes(10));
+        String cursor = body(sync(token, null)).get("cursor").asText();
+        testClock.advance(Duration.ofMinutes(10));
+        String createKey = key();
+        MvcResult created = write(post("/api/v1/shifts"), createKey, block("scheduled", "72", "0", null), 201);
+        long id = body(created).get("id").asLong();
+        assertThat(created.getResponse().getHeader("Location")).isEqualTo("/api/v1/shifts/" + id);
+        assertThat(body(write(post("/api/v1/shifts"), createKey, block("scheduled", "72", "0", null), 201))
+                .get("id").asLong()).isEqualTo(id);
+        assertThat(shifts.countByOwnerEmailIgnoreCase(EMAIL)).isEqualTo(2);
+        var delta = body(sync(token, cursor));
+        assertThat(delta.get("full").asBoolean()).isFalse();
+        assertThat(ids(delta.get("shifts"))).contains(id);
+        assertThat(read(id).get("earnedPay").asText()).isEqualTo("0.00");
+
+        testClock.advance(Duration.ofMinutes(1));
+        String startKey = key();
+        String startBody = version(id);
+        write(post("/api/v1/shifts/" + id + "/start"), startKey, startBody, 200);
+        assertThat(read(id).get("details").get("actualStart").asText()).isEqualTo("10:21");
+        testClock.advance(Duration.ofMinutes(1));
+        String complete = "{\"status\":\"completed\",\"tips\":\"8.50\",\"expectedUpdatedAt\":\"" + updatedAt(id)
+                + "\",\"details\":{\"actualStart\":\"10:21\",\"actualEnd\":\"12:50\","
+                + "\"odometerStart\":\"100.0\",\"odometerEnd\":\"140.5\",\"stops\":20,\"packages\":25,\"returns\":1}}";
+        String completeKey = key();
+        write(patch("/api/v1/shifts/" + id + "/status"), completeKey, complete, 200);
+        write(post("/api/v1/shifts/" + id + "/start"), startKey, startBody, 200);
+        assertThat(read(id).get("details").get("actualEnd").asText()).isEqualTo("12:50");
+        assertThat(read(id).get("earnedPay").asText()).isEqualTo("80.50");
+        assertThat(read(id).get("miles").asText()).isEqualTo("40.5");
+        testClock.advance(Duration.ofMinutes(1));
+        write(post("/api/v1/shifts/" + id + "/not-worked"), key(), version(id), 200);
+        write(patch("/api/v1/shifts/" + id + "/status"), completeKey, complete, 200);
+        JsonNode scheduled = read(id);
+        assertThat(scheduled.get("status").asText()).isEqualTo("scheduled");
+        assertThat(scheduled.get("tips").asText()).isEqualTo("0.00");
+        assertThat(scheduled.get("miles").isNull()).isTrue();
+        assertThat(scheduled.get("details").get("actualStart").isNull()).isTrue();
+        assertThat(scheduled.get("details").get("odometerStart").isNull()).isTrue();
+        assertThat(scheduled.get("details").get("stops").isNull()).isTrue();
+
+        String seen = updatedAt(id).toString();
+        String deleteKey = key();
+        testClock.advance(Duration.ofMinutes(10));
+        write(delete("/api/v1/shifts/" + id).param("expectedUpdatedAt", seen), deleteKey, null, 204);
+        var deleted = body(sync(token, delta.get("cursor").asText()));
+        assertThat(ids(deleted.get("deleted"))).containsExactly(id);
+        testClock.advance(Duration.ofMinutes(10));
+        String restoreKey = key();
+        String restoreBody = "{\"expectedUpdatedAt\":\"" + seen + "\"}";
+        write(post("/api/v1/shifts/" + id + "/restore"), restoreKey, restoreBody, 200);
+        var restored = body(sync(token, deleted.get("cursor").asText()));
+        assertThat(ids(restored.get("shifts"))).containsExactly(id);
+        assertThat(restored.get("deleted")).isEmpty();
+        // Delayed delete retries acknowledge delivery without deleting the restored block again.
+        write(delete("/api/v1/shifts/" + id).param("expectedUpdatedAt", seen), deleteKey, null, 204);
+        assertThat(read(id).get("status").asText()).isEqualTo("scheduled");
+        write(post("/api/v1/shifts/" + id + "/restore"), restoreKey, restoreBody, 200);
+    }
+
+    @Test
+    void staleEditsConflictAndDelayedRetriesNeverOverwriteLaterChanges() throws Exception {
+        Shift block = save(driver, "DXX1", LocalDate.of(2026, 11, 10), "72", "0");
+        long id = block.getId();
+        String seen = updatedAt(id).toString();
+        String editKey = key();
+        String first = block("completed", "80", "1", seen);
+        testClock.advance(Duration.ofMinutes(1));
+        write(put("/api/v1/shifts/" + id), editKey, first, 200);
+        testClock.advance(Duration.ofMinutes(1));
+        write(put("/api/v1/shifts/" + id), key(), block("completed", "90", "2", updatedAt(id).toString()), 200);
+        String latest = updatedAt(id).toString();
+        write(put("/api/v1/shifts/" + id), editKey, first, 200);
+        assertThat(read(id).get("basePay").asText()).isEqualTo("90.00");
+        assertThat(updatedAt(id).toString()).isEqualTo(latest);
+        String failedKey = key();
+        var conflict = body(write(put("/api/v1/shifts/" + id), failedKey, first, 409));
+        assertThat(conflict.get("error").asText()).isEqualTo("conflict");
+        assertThat(conflict.get("current").get("basePay").asText()).isEqualTo("90.00");
+        assertThat(conflict.get("current").get("status").asText()).isEqualTo("completed");
+        // A failed action didn't reserve the key; the driver can resolve and submit it.
+        write(put("/api/v1/shifts/" + id), failedKey, block("completed", "95", "2", latest), 200);
+        assertThat(body(write(put("/api/v1/shifts/" + id), editKey,
+                block("completed", "100", "2", latest), 409)).get("error").asText()).isEqualTo("idempotency_conflict");
+    }
+
+    @Test
+    void mutationVersionsAndValidationUseStructuredErrorsAndDoNotWrite() throws Exception {
+        String payload = block("scheduled", "72", "0", null);
+        for (String invalidKey : List.of("", "bad", "a".repeat(100))) {
+            assertThat(body(write(post("/api/v1/shifts"), invalidKey, payload, 400)).get("error").asText())
+                    .isEqualTo("invalid");
+        }
+        mvc.perform(post("/api/v1/shifts").header("Authorization", "Bearer " + token)
+                .contentType("application/json").content(payload)).andExpect(status().isBadRequest());
+        for (String invalid : List.of("{}", "{", "null", block("unknown", "72", "0", null),
+                block("scheduled", "72", "5", null), block("completed", "-1", "0", null),
+                payload.replace("DXX1", " "), payload.replace("2026-11-13", "2026-99-99"),
+                payload.replace("\"tips\":\"0\"", "\"tips\":null"))) {
+            assertThat(body(write(post("/api/v1/shifts"), key(), invalid, 400)).get("error").asText())
+                    .isEqualTo("invalid");
+        }
+        assertThat(shifts.count()).isZero();
+        long id = body(write(post("/api/v1/shifts"), key(), payload, 201)).get("id").asLong();
+        write(put("/api/v1/shifts/" + id), key(), payload, 400);
+        write(post("/api/v1/shifts/" + id + "/start"), key(), "{}", 400);
+        write(post("/api/v1/shifts/" + id + "/not-worked"), key(), version(id), 400);
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"completed\",\"miles\":\"1.23\",\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 400);
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"completed\",\"details\":{\"stops\":-1},\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 400);
+        assertThat(read(id).get("status").asText()).isEqualTo("scheduled");
+    }
+
+    @Test
+    void allMutationsRequireBearerAndRefuseOtherAccountsAndUnknownIds() throws Exception {
+        Shift theirs = save(other, "DXX9", LocalDate.of(2026, 11, 13), "72", "0");
+        for (long id : new long[]{theirs.getId(), 999_999L}) {
+            var requests = List.of(put("/api/v1/shifts/" + id), patch("/api/v1/shifts/" + id + "/status"),
+                    post("/api/v1/shifts/" + id + "/start"), post("/api/v1/shifts/" + id + "/not-worked"),
+                    post("/api/v1/shifts/" + id + "/restore"),
+                    delete("/api/v1/shifts/" + id).param("expectedUpdatedAt", START.toString()));
+            for (var request : requests) {
+                mvc.perform(request.contentType("application/json").content(block("completed", "72", "0", START.toString())))
+                        .andExpect(status().isUnauthorized());
+                mvc.perform(request.with(user(EMAIL))).andExpect(status().isUnauthorized());
+                write(request, key(), block("completed", "72", "0", START.toString()), 404);
+            }
+        }
+        mvc.perform(post("/api/v1/shifts").contentType("application/json").content(block("completed", "72", "0", null)))
+                .andExpect(status().isUnauthorized());
+        assertThat(shifts.count()).isEqualTo(1);
+    }
+
+    @Test
+    void restoredAndDeletedAndPermanentlyRemovedBlocksDoNotGetRecreatedByRetries() throws Exception {
+        String createKey = key();
+        String input = block("completed", "72", "0", null);
+        long id = body(write(post("/api/v1/shifts"), createKey, input, 201)).get("id").asLong();
+        String seen = updatedAt(id).toString();
+        shiftService.deleteShift(EMAIL, id);
+        write(post("/api/v1/shifts"), createKey, input, 201);
+        assertThat(shifts.count()).isZero();
+        // Exactly 30 days is outside the restore window, even before the purge job has run.
+        testClock.advance(Duration.ofDays(30));
+        token = signIn(EMAIL);
+        write(post("/api/v1/shifts/" + id + "/restore"), key(), "{\"expectedUpdatedAt\":\"" + seen + "\"}", 404);
+        shiftService.permanentlyDelete(EMAIL, id);
+        write(post("/api/v1/shifts"), createKey, input, 201);
+        assertThat(shifts.count()).isZero();
+    }
+
+    @Test
+    void parallelCreatesAndKeysFromDifferentAccountsAreIndependent() throws Exception {
+        String createKey = key();
+        String payload = block("completed", "72", "0", null);
+        try (var executor = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var gate = new java.util.concurrent.CountDownLatch(1);
+            java.util.concurrent.Callable<Long> action = () -> {
+                gate.await();
+                return body(write(post("/api/v1/shifts"), createKey, payload, 201)).get("id").asLong();
+            };
+            var a = executor.submit(action);
+            var b = executor.submit(action);
+            gate.countDown();
+            assertThat(a.get(20, java.util.concurrent.TimeUnit.SECONDS)).isEqualTo(b.get(20, java.util.concurrent.TimeUnit.SECONDS));
+        }
+        assertThat(shifts.countByOwnerEmailIgnoreCase(EMAIL)).isEqualTo(1);
+        mvc.perform(post("/api/v1/shifts").header("Authorization", "Bearer " + otherToken)
+                .header("Idempotency-Key", createKey).contentType("application/json").content(payload))
+                .andExpect(status().isCreated());
+        assertThat(shifts.countByOwnerEmailIgnoreCase(OTHER)).isEqualTo(1);
+        // Keys belong to an action as well as a payload.
+        long id = shifts.findAllByOwnerEmailIgnoreCaseOrderByDateDescStartTimeDesc(EMAIL).getFirst().getId();
+        assertThat(body(write(post("/api/v1/shifts/" + id + "/not-worked"), createKey, version(id), 409))
+                .get("error").asText()).isEqualTo("idempotency_conflict");
+    }
+
+    private static String key() { return java.util.UUID.randomUUID().toString(); }
+
+    @Test
+    void websiteChangesConflictWithEveryPendingMutationAndBusinessFailuresRollBack() throws Exception {
+        Shift block = save(driver, "DXX1", LocalDate.of(2026, 11, 13), "72", "0");
+        long id = block.getId();
+        String old = updatedAt(id).toString();
+        testClock.advance(Duration.ofMinutes(1));
+        var websiteEdit = new com.angel.flexbuddy.dto.UpdateShiftRequest("WEB1", block.getDate(),
+                block.getStartTime(), block.getEndTime(), new BigDecimal("80"), BigDecimal.ZERO);
+        shiftService.updateShift(EMAIL, id, websiteEdit);
+        for (var request : List.of(put("/api/v1/shifts/" + id), patch("/api/v1/shifts/" + id + "/status"),
+                post("/api/v1/shifts/" + id + "/start"), post("/api/v1/shifts/" + id + "/not-worked"),
+                delete("/api/v1/shifts/" + id).param("expectedUpdatedAt", old))) {
+            var conflict = body(write(request, key(), block("completed", "90", "0", old), 409));
+            assertThat(conflict.get("error").asText()).isEqualTo("conflict");
+            assertThat(conflict.get("current").get("station").asText()).isEqualTo("WEB1");
+        }
+        String good = block("completed", "90", "0", updatedAt(id).toString());
+        String bad = good.substring(0, good.length() - 1) + ",\"details\":{\"packages\":1,\"returns\":2}}";
+        String actionKey = key();
+        write(put("/api/v1/shifts/" + id), actionKey, bad, 400);
+        assertThat(read(id).get("station").asText()).isEqualTo("WEB1");
+        assertThat(read(id).get("basePay").asText()).isEqualTo("80.00");
+        write(put("/api/v1/shifts/" + id), actionKey, good, 200);
+        assertThat(read(id).get("basePay").asText()).isEqualTo("90.00");
+    }
+
+    @Test
+    void apiStartAndRescheduleKeepWebsiteTimingAndStatusRules() throws Exception {
+        long id = body(write(post("/api/v1/shifts"), key(), block("scheduled", "72", "0", null), 201))
+                .get("id").asLong();
+        write(post("/api/v1/shifts/" + id + "/start"), key(), version(id), 400);
+        testClock.advance(Duration.ofMinutes(15));
+        write(post("/api/v1/shifts/" + id + "/start"), key(), version(id), 200);
+        testClock.advance(Duration.ofMinutes(1));
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"completed\",\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 200);
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"scheduled\",\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 400);
+        testClock.advance(Duration.ofMinutes(1));
+        write(post("/api/v1/shifts/" + id + "/not-worked"), key(), version(id), 200);
+        testClock.advance(Duration.ofHours(4));
+        write(post("/api/v1/shifts/" + id + "/start"), key(), version(id), 400);
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"forfeited\",\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 200);
+        assertThat(read(id).get("earnedPay").asText()).isEqualTo("0.00");
+        assertThat(read(id).get("lateForfeit").asBoolean()).isTrue();
+        write(patch("/api/v1/shifts/" + id + "/status"), key(),
+                "{\"status\":\"scheduled\",\"basePay\":\"72\",\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}", 400);
+    }
+
+    private static String block(String status, String base, String tips, String expected) {
+        return "{\"station\":\"DXX1\",\"date\":\"2026-11-13\",\"startTime\":\"10:30\",\"endTime\":\"13:30\","
+                + "\"basePay\":\"" + base + "\",\"tips\":\"" + tips + "\",\"status\":\"" + status + "\""
+                + (expected == null ? "" : ",\"expectedUpdatedAt\":\"" + expected + "\"") + "}";
+    }
+
+    private String version(long id) { return "{\"expectedUpdatedAt\":\"" + updatedAt(id) + "\"}"; }
+
+    private JsonNode read(long id) throws Exception {
+        return body(mvc.perform(get("/api/v1/shifts/" + id).header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn());
+    }
+
+    private MvcResult write(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request,
+            String key, String payload, int expectedStatus) throws Exception {
+        request.header("Authorization", "Bearer " + token).header("Idempotency-Key", key);
+        if (payload != null) request.contentType("application/json").content(payload);
+        return mvc.perform(request).andExpect(status().is(expectedStatus)).andReturn();
     }
 
     private String signIn(String email) throws Exception {
