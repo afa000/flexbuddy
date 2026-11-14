@@ -293,7 +293,7 @@ class AccountRestoreServiceTest {
     @Test
     void undoReplaceRemovesInsertedRowsThenRestoresTheOriginalBatch() {
         when(shiftRepository.deleteBatch(eq(EMAIL), any(String.class))).thenReturn(2);
-        when(shiftRepository.restoreBatch(EMAIL, "batch")).thenReturn(4);
+        when(shiftRepository.restoreBatch(eq(EMAIL), eq("batch"), any())).thenReturn(4);
 
         var result = service.undoReplace(EMAIL, "batch");
 

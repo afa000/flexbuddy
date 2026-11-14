@@ -335,7 +335,7 @@ public class ShiftService {
 
     @org.springframework.transaction.annotation.Transactional
     public ShiftResponse restoreShift(String email, Long id) {
-        int updated = shiftRepository.restoreDeleted(email, id);
+        int updated = shiftRepository.restoreDeleted(email, id, Instant.now(clock));
         if (updated == 0) throw new ShiftNotFoundException(id);
         return shiftRepository.findByIdAndOwnerEmailIgnoreCase(id, email)
                 .map(shift -> toResponse(shift, expenseService.findForShifts(email, List.of(shift)), settingsService.get(email)))
@@ -344,7 +344,7 @@ public class ShiftService {
 
     @org.springframework.transaction.annotation.Transactional
     public int restoreBatch(String email, String batch) {
-        return shiftRepository.restoreBatch(email, batch);
+        return shiftRepository.restoreBatch(email, batch, Instant.now(clock));
     }
 
     @org.springframework.transaction.annotation.Transactional
@@ -357,11 +357,15 @@ public class ShiftService {
     @org.springframework.transaction.annotation.Transactional
     public void permanentlyDelete(String email, Long id) {
         if (shiftRepository.permanentlyDelete(email, id) == 0) throw new ShiftNotFoundException(id);
+        // Nothing is left to report as deleted, so a phone that synced before this reloads every block.
+        userRepository.markSyncReset(email, Instant.now(clock));
     }
 
     @org.springframework.transaction.annotation.Transactional
     public int emptyTrash(String email) {
-        return shiftRepository.emptyTrash(email);
+        int removed = shiftRepository.emptyTrash(email);
+        if (removed > 0) userRepository.markSyncReset(email, Instant.now(clock));
+        return removed;
     }
 
     private void applyRequest(Shift shift, ShiftStatus status, String station, LocalDate date, LocalTime startTime,

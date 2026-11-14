@@ -213,6 +213,8 @@ public class AccountRestoreService {
             if (source.id() != null) restoredShiftLinks.put(source.id(), entity);
         }
         shiftRepository.saveAll(insert);
+        // Restored blocks can carry deleted states and replace others, so phones reload every block (FB-033).
+        userRepository.markSyncReset(email, Instant.now(clock));
         Set<String> existingExpenses = request.mode() == RestoreMode.MERGE
                 ? expenseKeys(expenseRepository.findAllIncludingDeleted(email)) : new HashSet<>();
         List<Expense> expenseInsert = new ArrayList<>();
@@ -277,7 +279,9 @@ public class AccountRestoreService {
         int removedExpenses = expenseRepository.deleteBatch(email, insertedBatch(batch));
         int removed = shiftRepository.deleteBatch(email, insertedBatch(batch));
         int restoredExpenses = expenseRepository.restoreBatch(email, batch);
-        int restored = shiftRepository.restoreBatch(email, batch);
+        int restored = shiftRepository.restoreBatch(email, batch, Instant.now(clock));
+        // The removed blocks leave nothing to report as deleted, so phones reload every block (FB-033).
+        userRepository.markSyncReset(email, Instant.now(clock));
         return java.util.Map.of("removed", removed, "restored", restored,
                 "expensesRemoved", removedExpenses, "expensesRestored", restoredExpenses);
     }

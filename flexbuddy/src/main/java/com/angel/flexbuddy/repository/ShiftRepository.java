@@ -138,7 +138,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = :deletedAt, delete_batch = :batch
+            update shift set deleted_at = :deletedAt, delete_batch = :batch, sync_changed_at = :deletedAt
             where owner_id = (select id from app_users where lower(email) = lower(:email))
               and deleted_at is null
             """, nativeQuery = true)
@@ -147,7 +147,7 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = :deletedAt, delete_batch = :batch
+            update shift set deleted_at = :deletedAt, delete_batch = :batch, sync_changed_at = :deletedAt
             where id = :id
               and owner_id = (select id from app_users where lower(email) = lower(:email))
               and deleted_at is null
@@ -157,20 +157,20 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = null, delete_batch = null
+            update shift set deleted_at = null, delete_batch = null, sync_changed_at = :now
             where id = :id
               and owner_id = (select id from app_users where lower(email) = lower(:email))
               and deleted_at is not null
             """, nativeQuery = true)
-    int restoreDeleted(@Param("email") String email, @Param("id") Long id);
+    int restoreDeleted(@Param("email") String email, @Param("id") Long id, @Param("now") java.time.Instant now);
 
     @Modifying
     @Query(value = """
-            update shift set deleted_at = null, delete_batch = null
+            update shift set deleted_at = null, delete_batch = null, sync_changed_at = :now
             where owner_id = (select id from app_users where lower(email) = lower(:email))
               and delete_batch = :batch and deleted_at is not null
             """, nativeQuery = true)
-    int restoreBatch(@Param("email") String email, @Param("batch") String batch);
+    int restoreBatch(@Param("email") String email, @Param("batch") String batch, @Param("now") java.time.Instant now);
 
     @Modifying
     @Query(value = """
@@ -208,4 +208,27 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     @Modifying
     @Query(value = "delete from shift where owner_id = :ownerId", nativeQuery = true)
     int deleteAllByOwnerIdIncludingTrash(@Param("ownerId") Long ownerId);
+
+    /** Every block of this account not in Recently deleted, in the API's order (FB-033). */
+    @Query(value = """
+            select s.* from shift s join app_users u on u.id = s.owner_id
+            where lower(u.email) = lower(:email) and s.deleted_at is null
+            order by s.date, s.start_time, s.id
+            """, nativeQuery = true)
+    List<Shift> findLiveForSync(@Param("email") String email);
+
+    /** Blocks of this account changed after the given time, deleted ones included (FB-033). */
+    @Query(value = """
+            select s.* from shift s join app_users u on u.id = s.owner_id
+            where lower(u.email) = lower(:email) and s.sync_changed_at > :since
+            order by s.date, s.start_time, s.id
+            """, nativeQuery = true)
+    List<Shift> findChangedSince(@Param("email") String email, @Param("since") java.time.Instant since);
+
+    /** The latest sync time among this account's blocks, deleted ones included; null without any. */
+    @Query(value = """
+            select max(s.sync_changed_at) from shift s join app_users u on u.id = s.owner_id
+            where lower(u.email) = lower(:email)
+            """, nativeQuery = true)
+    java.time.Instant latestSyncChange(@Param("email") String email);
 }

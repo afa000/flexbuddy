@@ -56,6 +56,13 @@ public class AppUser {
 
     private Instant lastBackupAt;
 
+    /**
+     * When this account's blocks were last removed for good or replaced, so a phone that synced earlier reloads them
+     * all (FB-033). Written only by AppUserRepository.markSyncReset, never by saving the entity.
+     */
+    @Column(insertable = false, updatable = false)
+    private Instant syncResetAt;
+
     /** False only for a new sign-up whose emailed code has not been entered yet. */
     @Column(nullable = false)
     private boolean emailVerified = true;

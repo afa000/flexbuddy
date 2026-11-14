@@ -4,8 +4,8 @@ The JSON API the native Android app (`flexbuddy-android`) uses. It is the contra
 server task that adds or changes an `/api/v1` endpoint updates this page in the same pull request, and app tasks build
 against what this page says. The plan is [native-app-plan.md](native-app-plan.md).
 
-Status: FB-005 implements password sign-in, code challenges, device sign-out and the account summary.
-The API remains disabled by default.
+Status: FB-005 implements password sign-in, code challenges, device sign-out and the account summary. FB-033 adds
+read-only blocks and Home, with change-only sync. The API remains disabled by default.
 
 ## Availability
 
@@ -39,6 +39,31 @@ The API remains disabled by default.
 - **Money** is a string with two decimals (`"72.00"`), never a floating-point number.
 - **Earnings rules hold.** Scheduled blocks never count toward earnings, hours or net, same as the website.
 - **One account per token.** No request body, path or query parameter can choose another account.
+- **Status codes in data:** lower case, for example a block's `status` is `scheduled`, `completed`, `cancelled` or
+  `forfeited`. Local times have no seconds (`18:30`). Decimals that aren't money (miles, a rate per mile, a percentage)
+  are strings as stored, for example `"41.5"`.
+
+## Sync
+
+Added by FB-033. Every list endpoint follows this; `GET /api/v1/shifts` is the first.
+
+- **First sync:** send no `updatedSince`. The answer has `"full": true` and every record. Replace the phone's copy.
+- **Later syncs:** send `updatedSince=<cursor>` with the `cursor` from the previous answer. The answer has
+  `"full": false`, the records changed since then, and `deleted`: the ids of records deleted since then. Upsert the
+  changed ones by id and remove the deleted ones. A record deleted and then restored comes back as changed.
+- **The cursor is opaque.** It is the time of the latest change on the account, encoded; store it as given. A cursor
+  this server didn't write answers `400` `invalid`. It never chooses an account or a record.
+- **Overlap.** Changes from the 5 minutes before the cursor are sent again, so a save that committed late isn't missed.
+  The same record can arrive twice; upserting by id makes that harmless. The records at the cursor itself are always
+  among them.
+- **Full again.** The answer is `"full": true` (replace everything) when the cursor is more than 29 days old (Recently
+  deleted records are purged after 30), or when the account's records were removed for good or replaced since then
+  (permanent delete, emptying Recently deleted, a backup restore or undoing one). After such a removal, answers stay
+  full until a later change moves the cursor more than 5 minutes past it.
+- **`ETag` and `304`.** Every read answer has a strong `ETag`. Send it back as `If-None-Match`; if nothing changed the
+  answer is `304` with no body. Answers carry `Cache-Control: private, no-cache`. An unchanged account gives the same
+  cursor and body, so a phone that polls gets `304`s.
+- No paging yet: a full answer holds every record.
 
 ## Endpoints
 
@@ -124,6 +149,81 @@ Added by FB-005. Token required: yes.
 This is also the account shape in a successful sign-in response. The token chooses the account.
 Missing, malformed, unknown, expired or revoked tokens return 401 `unauthorized`, without a redirect.
 Browser sessions and remember-me cookies cannot authenticate these endpoints.
+
+### GET /api/v1/shifts
+
+Added by FB-033. Token required: yes. Query: optional `updatedSince` (see Sync).
+
+200:
+
+```json
+{
+  "full": false,
+  "cursor": "djE6MTc2MzA0NjAwMDow",
+  "shifts": [
+    {
+      "id": 41, "station": "DXX1", "date": "2026-11-10", "startTime": "18:30", "endTime": "21:30",
+      "status": "completed", "statusChangedAt": null, "lateForfeit": false,
+      "basePay": "72.00", "tips": "18.50", "totalPay": "90.50", "earnedPay": "90.50",
+      "timeWorked": 180, "hourlyRate": "30.17", "miles": "41.5", "earningsPerMile": "2.18",
+      "details": {
+        "actualStart": "18:25", "actualEnd": "21:10", "actualMinutes": 165, "actualHourlyRate": "32.91",
+        "finishedEarlyMinutes": 20, "odometerStart": null, "odometerEnd": null,
+        "stops": 38, "packages": 52, "returns": 1, "minutesPerStop": "4.3", "returnsRate": "1.9"
+      },
+      "createdAt": "2026-11-10T23:40:12Z", "updatedAt": "2026-11-11T01:02:03Z"
+    }
+  ],
+  "deleted": [38, 40]
+}
+```
+
+- Blocks in Recently deleted are not in `shifts`; they appear in `deleted` on a later sync. Order: date, start time, id.
+- `timeWorked` and `actualMinutes` are minutes. `earnedPay` is what counts toward earnings (zero for scheduled and
+  forfeited blocks). Scheduled blocks never count toward earnings, hours or net.
+- A block carries only figures that depend on the block itself. Net, vehicle cost, linked expenses and the forfeit
+  deadline also depend on expenses and settings, which don't change the block, so a sync wouldn't refresh them; Home has
+  the net totals.
+- 400 `invalid`: an unreadable cursor. 401 `unauthorized`: as for every endpoint.
+
+### GET /api/v1/shifts/{id}
+
+Added by FB-033. Token required: yes.
+
+200 with one block in the same shape. 404 `{"error":"not_found"}` for an id that doesn't exist, belongs to another
+account or is in Recently deleted. 400 `invalid` for an id that isn't a number. `ETag`/`304` as in Sync.
+
+### GET /api/v1/home
+
+Added by FB-033. Token required: yes. No parameters: the server works out today from the account's time zone.
+
+200:
+
+```json
+{
+  "today": "2026-11-13",
+  "week": {"from": "2026-11-09", "to": "2026-11-15", "totalShifts": 2, "totalEarnings": "170.50", "...": "..."},
+  "lastSevenDays": {"from": "2026-11-07", "to": "2026-11-13", "...": "..."},
+  "goals": {"basis": "gross", "week": null, "month": {"goal": "2000.00", "earned": "640.50", "...": "..."}},
+  "missingMiles": [37, 41]
+}
+```
+
+- `week` is Monday to Sunday containing `today`; `lastSevenDays` ends on `today`. Both have the website's statistics
+  for those dates: `totalShifts`, `totalBasePay`, `totalTips`, `totalEarnings`, `averagePayPerShift`,
+  `totalTimeWorked`, `averageHourlyEarnings`, `averageHourlyBasePay`, `averageHourlyTips`, `averageBasePerShift`,
+  `averageTipsPerShift`, `tipsShareOfEarnings`, `averageShiftMinutes`, `totalMiles`, `mileageCost`, `totalExpenses`,
+  `totalDeductions`, `netEarnings`, `netHourlyRate`, `earningsPerMile`, `netMargin`, `expensesByCategory` (category
+  code to money), `vehicleCost`, `outOfPocket`, `netPerShift`, `vehicleCostMethod`, `mileageRate`,
+  `rollingSevenDayMinutes`, `scheduledShifts`, `scheduledMinutes`, `expectedPay`, `needsConfirmation`,
+  `cancelledShifts`, `forfeitedShifts`, `forfeitedThisMonth`, `timedShifts`, `clockedMinutes`, `clockedHourlyRate`,
+  `averageFinishedEarlyMinutes`, `lateForfeitedShifts`, `lateForfeitedThisMonth` and `blocksWithoutMiles`. Money is a
+  string; minutes and counts are numbers.
+- `goals` is the weekly and monthly goal progress on the driver's basis; a goal that isn't set is `null`. Each has
+  `goal`, `earned`, `planned`, `remaining`, `percent`, `onTrack`, `blocksToGo`, `averageBlockPay`,
+  `averageBlockMinutes`, `periodStart` and `periodEnd`.
+- `missingMiles` lists the ids of completed blocks from the last 7 days with no miles entered, newest first.
+- Scheduled blocks never count toward these figures. `ETag`/`304` as in Sync.
 
 Authentication endpoints do not use Idempotency-Key. A code is consumed once; after a lost sign-in response, restart
 sign-in. The general retried-write convention above applies to later data endpoints.
