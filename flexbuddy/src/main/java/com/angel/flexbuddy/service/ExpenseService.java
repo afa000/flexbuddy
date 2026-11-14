@@ -164,13 +164,15 @@ public class ExpenseService {
 
     @Transactional
     public ExpenseResponse restore(String email, Long id) {
-        if (expenseRepository.restoreDeleted(email, id) == 0) throw new ExpenseNotFoundException(id);
+        if (expenseRepository.restoreDeleted(email, id, Instant.now(clock)) == 0) throw new ExpenseNotFoundException(id);
         return expenseRepository.findByIdAndOwnerEmailIgnoreCase(id, email).map(expense -> toResponse(email, expense))
                 .orElseThrow(() -> new ExpenseNotFoundException(id));
     }
 
     @Transactional
-    public int restoreBatch(String email, String batch) { return expenseRepository.restoreBatch(email, batch); }
+    public int restoreBatch(String email, String batch) {
+        return expenseRepository.restoreBatch(email, batch, Instant.now(clock));
+    }
 
     @Transactional
     public List<ExpenseResponse> getTrash(String email) {
@@ -181,10 +183,16 @@ public class ExpenseService {
     @Transactional
     public void permanentlyDelete(String email, Long id) {
         if (expenseRepository.permanentlyDelete(email, id) == 0) throw new ExpenseNotFoundException(id);
+        // Nothing is left to report as deleted, so a phone that synced before this reloads everything (NA-06).
+        userRepository.markSyncReset(email, Instant.now(clock));
     }
 
     @Transactional
-    public int emptyTrash(String email) { return expenseRepository.emptyTrash(email); }
+    public int emptyTrash(String email) {
+        int removed = expenseRepository.emptyTrash(email);
+        if (removed > 0) userRepository.markSyncReset(email, Instant.now(clock));
+        return removed;
+    }
 
     @Transactional(readOnly = true)
     public ExpenseSummaryResponse summary(String email, ExpenseFilter filter) {

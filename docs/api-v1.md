@@ -35,8 +35,9 @@ disabled by default.
   - `429`: locked or rate-limited: `{"error": "locked", "retryAfterMinutes": n}`
 - **Retried writes.** Every create or change sends an `Idempotency-Key` header with a new UUID per action. A retry with
   the same key never adds a second record. This is the header the website's offline outbox already uses.
-  NA-05 block writes require it, including delete and restore. UUIDs are case-insensitive. Keys belong to the account,
-  across its devices and API block-write endpoints. Reusing a key with a different action, id or bound request body
+  NA-05 block writes and NA-06 expense and payout writes require it, including delete and restore. UUIDs are
+  case-insensitive. Keys belong to the account, across its devices and every API write endpoint: a key used for a block
+  can't be used again for an expense or a payout. Reusing a key with a different action, id or bound request body
   returns `409` `idempotency_conflict`. JSON whitespace and property order do not matter; retain the original values
   when retrying. Failed actions do not consume a key. Successful acknowledgements persist across subsequent changes,
   deletion, permanent deletion and backup restores, until account deletion; simultaneous retries apply only once.
@@ -51,7 +52,12 @@ disabled by default.
 
 ## Sync
 
-Added by FB-033. Every list endpoint follows this; `GET /api/v1/shifts` is the first.
+Added by FB-033. Every list endpoint follows this; `GET /api/v1/shifts` is the first, `GET /api/v1/expenses` (NA-06)
+the second. Each list has its own cursor; never send one list's cursor to another. A permanent removal or backup
+restore on the account makes both lists full.
+
+The one exception is `GET /api/v1/payouts`: its figures are worked out from blocks and settings when asked, so it has
+no `updatedSince` and every answer is the whole list. It still has an `ETag`, so an unchanged answer is `304`.
 
 - **First sync:** send no `updatedSince`. The answer has `"full": true` and every record. Replace the phone's copy.
 - **Later syncs:** send `updatedSince=<cursor>` with the `cursor` from the previous answer. The answer has
@@ -340,6 +346,124 @@ Added by FB-033. Token required: yes. No parameters: the server works out today 
   `averageBlockMinutes`, `periodStart` and `periodEnd`.
 - `missingMiles` lists the ids of completed blocks from the last 7 days with no miles entered, newest first.
 - Scheduled blocks never count toward these figures. `ETag`/`304` as in Sync.
+
+### GET /api/v1/expenses
+
+Added by NA-06. Token required: yes. Query: optional `updatedSince` (see Sync).
+
+200:
+
+```json
+{
+  "full": false,
+  "cursor": "djE6MTc2MzA0NjAwMDow",
+  "expenses": [
+    {
+      "id": 17, "date": "2026-11-12", "category": "fuel", "amount": "12.50", "note": "Fuel stop", "shiftId": 41,
+      "createdAt": "2026-11-12T23:40:12Z", "updatedAt": "2026-11-12T23:40:12Z"
+    }
+  ],
+  "deleted": [12]
+}
+```
+
+- Categories: `fuel`, `toll`, `parking`, `maintenance`, `other`. `shiftId` is null for an expense not linked to a block.
+- Expenses in Recently deleted are not in `expenses`; they appear in `deleted` on a later sync. A restored expense
+  comes back in `expenses`. Order: date, id.
+- **Which expenses count toward net.** An expense carries only what is stored on it. Whether it counts depends on its
+  block, and a block change doesn't send the expense again, so the phone decides from its block cache, with the
+  website's rule:
+  - not linked (`shiftId` null): counts, by its own date;
+  - linked to a block that is `scheduled`: does not count yet; it counts once the block is completed, cancelled or
+    forfeited;
+  - linked to a block that is in Recently deleted, or to an id the phone doesn't have (a block removed for good):
+    counts by its own date, as if not linked, and has no station.
+  Home and the website already apply this rule to their totals.
+- 400 `invalid`: an unreadable cursor. `ETag`/`304` as in Sync.
+
+### GET /api/v1/expenses/{id}
+
+Added by NA-06. Token required: yes. 200 with one expense in the same shape. 404 `not_found` for an id that doesn't
+exist, belongs to another account or is in Recently deleted. `ETag`/`304` as in Sync.
+
+### Expense writes
+
+Added by NA-06. Every write requires a bearer token and a UUID `Idempotency-Key`, and follows the rules under
+Block-write validation and conflicts: the same `400 invalid` with `fields`, `409 conflict` with `current` (here in
+the GET expense shape), `409 idempotency_conflict`, failed writes don't use up a key, and a successful retry is
+acknowledged before the version is checked. Validation and linking use the website's `ExpenseService`.
+
+- `POST /api/v1/expenses` with `{"date":"2026-11-12","category":"fuel","amount":"12.50","note":"Fuel stop",
+  "shiftId":41}`. Required: date, category, a positive amount with at most two decimals. Optional: note (at most 255
+  characters, trimmed; blank clears it) and shiftId. 201 `{"id":17}` with `Location: /api/v1/expenses/17`, also for a
+  retry, and also if a website create already used the same key.
+- `PUT /api/v1/expenses/{id}` with the same fields plus required `expectedUpdatedAt`. Every field is replaced; absent
+  `note` or `shiftId` clears it. Keeping the same `shiftId` keeps the link even if that block is now in Recently
+  deleted. 200 `{"id":17}`. If the expense's `shiftId` names a block the phone doesn't have (removed for good, so the
+  server has already cleared the link), send `shiftId` null; sending the old id answers `404` with `field: shiftId`.
+- `DELETE /api/v1/expenses/{id}?expectedUpdatedAt=<ISO instant>`: 204. Moves the expense to Recently deleted; it
+  appears in `deleted` on the next sync.
+- `POST /api/v1/expenses/{id}/restore` with `{"expectedUpdatedAt":"..."}`: 200 `{"id":17}`. Only within 30 days of
+  deletion; at exactly 30 days it is refused even before the purge runs. Use the expense's saved `updatedAt`: delete and
+  restore don't change it.
+- `404 {"error":"not_found"}`: unknown id, another account's expense, or a deleted one except on restore (a restore
+  also answers 404 for a live expense or an expired deletion).
+- `404 {"error":"not_found","field":"shiftId"}`: `shiftId` names a block that isn't this account's or is in Recently
+  deleted, and isn't the expense's current link.
+
+No permanent-delete, empty-trash or batch-restore API is added.
+
+### GET /api/v1/payouts
+
+Added by NA-06. Token required: yes. Query: optional `count`, how many pay periods to return, 1 to 26 (default 2).
+Always a full answer (see Sync); `ETag`/`304` as in Sync.
+
+200:
+
+```json
+{
+  "nextPayout": {
+    "payoutDate": "2026-11-17", "from": "2026-11-13", "to": "2026-11-16", "blocks": 1, "earned": "72.00",
+    "scheduledBlocks": 1, "scheduledPay": "80.00", "received": null, "difference": null, "note": null,
+    "status": "upcoming", "updatedAt": null
+  },
+  "periods": [
+    {
+      "payoutDate": "2026-11-13", "from": "2026-11-10", "to": "2026-11-12", "blocks": 2, "earned": "170.50",
+      "scheduledBlocks": 0, "scheduledPay": "0.00", "received": "170.50", "difference": "0.00", "note": "Bank",
+      "status": "matched", "updatedAt": "2026-11-13T16:02:00Z"
+    }
+  ]
+}
+```
+
+- The website's pay periods, newest first, from the account's payout days and lag. `status` is `upcoming`,
+  `unchecked`, `matched`, `short` or `over`. `received`, `difference` and `note` are null until a payout is recorded.
+- `updatedAt` is when the payout was last recorded, or null with nothing recorded. Send it back as `expectedUpdatedAt`.
+- Scheduled blocks never count toward `earned`; they show in `scheduledBlocks` and `scheduledPay`.
+- 400 `invalid`: `count` outside 1 to 26 or not a number.
+
+### PUT /api/v1/payouts/{payoutDate}
+
+Added by NA-06. Token required: yes, plus `Idempotency-Key`. Request:
+`{"amount":"170.50","note":"Bank","expectedUpdatedAt":"2026-11-13T16:02:00Z"}`. `expectedUpdatedAt` is the period's
+`updatedAt`; leave it out or null when nothing was recorded. Amount is 0 to 99999.99 (0 for a payout that never
+arrived); note is optional, at most 255 characters. Recording again replaces the amount and note.
+200 `{"payoutDate":"2026-11-13"}`, also for a retry.
+
+- `400 {"error":"invalid","reason":"error.payout.notYet"}`: the payout date is after today in the account's time zone.
+- `400 {"error":"invalid","reason":"error.payout.notPayoutDay"}`: the date isn't one of the account's payout days.
+- `400 invalid` with `fields`, a missing or bad key, or a date that can't be read.
+- `409 {"error":"conflict","current":{...}}`: the recorded payout changed since the phone saw it. `current` is
+  `{"payoutDate","amount","note","updatedAt"}`, or null when nothing is recorded any more. `409 {"error":"conflict"}`
+  without `current` if the website recorded the same payout at the same moment; reload and try again.
+- `409 idempotency_conflict`: the key was used for another write.
+
+### DELETE /api/v1/payouts/{payoutDate}
+
+Added by NA-06. Token required: yes, plus `Idempotency-Key`. Query: `expectedUpdatedAt=<ISO instant>` (absent when
+nothing was recorded). 204. Forgets what was recorded, so the payout shows as unchecked again; nothing recorded is not
+an error. The same `409` answers as above. A retried record after the removal is acknowledged and doesn't bring it back.
 
 Authentication endpoints do not use Idempotency-Key. A code is consumed once; after a lost sign-in response, restart
 sign-in. The general retried-write convention above applies to later data endpoints.

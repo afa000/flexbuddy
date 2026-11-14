@@ -59,7 +59,7 @@ class ExpenseRepositoryTest {
         entityManager.clear();
         assertThat(expenseRepository.findByIdAndOwnerEmailIgnoreCase(visible.getId(), "angel@example.com")).isEmpty();
         assertThat(expenseRepository.findTrash("angel@example.com")).hasSize(1);
-        assertThat(expenseRepository.restoreBatch("angel@example.com", "batch")).isEqualTo(1);
+        assertThat(expenseRepository.restoreBatch("angel@example.com", "batch", java.time.Instant.now())).isEqualTo(1);
     }
 
     private Shift shift(AppUser owner, String station) {
