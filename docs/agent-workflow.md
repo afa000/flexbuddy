@@ -136,6 +136,38 @@ two-step and reset emails should then arrive in the inbox in either language. Th
 end here. Use a dedicated terminal and close it afterwards so the local overrides do not carry into other runs.
 The `flexbuddy-links` launch configuration is another local option; it logs codes and links to the console.
 
+**When Docker Desktop isn't running.** Docker Desktop is installed but doesn't always run. If `docker ps` fails with
+"failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine", Docker Desktop isn't started: ask
+the owner to start it, then use the container above. If that can't wait, the migration test can use the local
+PostgreSQL 18 the app already runs on (port 5432); it still works in its own random schema and drops it afterwards.
+Point it there with the dev database's user and its default password from `application.properties` (`DB_PASSWORD`'s
+fallback), read from the file so it is never typed into a log or chat:
+
+```powershell
+$line = Select-String -Path flexbuddy\src\main\resources\application.properties -Pattern 'spring.datasource.password=' | Select-Object -First 1
+$env:FLEXBUDDY_TEST_POSTGRES_PASSWORD = ($line.Line -replace '.*\$\{DB_PASSWORD:', '') -replace '\}$', ''
+$env:FLEXBUDDY_TEST_POSTGRES_URL = "jdbc:postgresql://localhost:5432/flexbuddy"
+$env:FLEXBUDDY_TEST_POSTGRES_USER = "flexbuddy"
+.\scripts\verify.ps1 -TaskId FB-xxx
+```
+
+**Running the app for a manual check on a task branch.** Don't point it at the main local database: Flyway would apply
+the branch's new migration there, and `main` would then refuse to start locally because that migration isn't on
+`main`. Give the run a throwaway schema instead, and drop it when done:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U flexbuddy -d flexbuddy -c "create schema fbxxx_local"
+$env:DB_URL = "jdbc:postgresql://localhost:5432/flexbuddy?currentSchema=fbxxx_local"
+$env:FLEXBUDDY_API_ENABLED = "true"; $env:FLEXBUDDY_MAIL_LOG_LINKS = "true"
+cd flexbuddy; .\mvnw.cmd spring-boot:run
+# afterwards
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -h localhost -U flexbuddy -d flexbuddy -c "drop schema fbxxx_local cascade"
+```
+
+Register made-up accounts on it (`@example.test`); with `FLEXBUDDY_MAIL_LOG_LINKS` the sign-up code appears in the
+app's log. In Claude Code, a temporary `.claude/launch.json` entry with the same variables does this; restore the file
+afterwards.
+
 ### Ollama and the local models
 
 Ollama 0.40 came with the AMD AI Bundle on this PC; elsewhere, install it from https://ollama.com/download/windows.
@@ -456,6 +488,24 @@ Android build. A wrapper change (icons, share target, manifest settings) goes li
 
 `/.well-known/assetlinks.json` must keep both certificate fingerprints, and the package name and upload key never
 change. Store text and screenshots live in `android/store-listing.md` and `android/store-screenshots/`.
+
+### Checking the native app on the emulator
+
+For `flexbuddy-android` tasks (`.dev` debug builds against a local server):
+
+- **More than one device may be connected.** The owner's phone is often attached over wireless debugging, and
+  `gradlew installDebug` installs on every connected device. Install on the emulator only:
+  `adb -s emulator-5554 install -r app\build\outputs\apk\debug\app-debug.apk`, and pass `-s emulator-5554` to every
+  `adb` command. If something did land on the phone, say so; only the owner decides whether to remove it.
+- **The emulator's apps may not reach `10.0.2.2:8080`.** On the `Pixel_10_Pro` image (November 2026) the shell could
+  reach the computer there but apps could not. Forward the port over adb and build against `localhost`, which the debug
+  build allows:
+  `adb -s emulator-5554 reverse tcp:8080 tcp:8080`, then
+  `.\gradlew.bat assembleDebug -Pflexbuddy.devServerUrl=http://localhost:8080`. Remove it afterwards with
+  `adb -s emulator-5554 reverse --remove-all`.
+- **Offline checks:** with the port forward, airplane mode alone doesn't cut the app off, because adb carries the
+  traffic. Remove the forward as well, then restart the app.
+- Put back anything changed for a check (text size, dark mode, app language, airplane mode) when done.
 
 ## What to expect from the local model
 
