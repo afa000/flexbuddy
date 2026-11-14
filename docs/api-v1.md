@@ -399,7 +399,8 @@ acknowledged before the version is checked. Validation and linking use the websi
   retry, and also if a website create already used the same key.
 - `PUT /api/v1/expenses/{id}` with the same fields plus required `expectedUpdatedAt`. Every field is replaced; absent
   `note` or `shiftId` clears it. Keeping the same `shiftId` keeps the link even if that block is now in Recently
-  deleted. 200 `{"id":17}`.
+  deleted. 200 `{"id":17}`. If the expense's `shiftId` names a block the phone doesn't have (removed for good, so the
+  server has already cleared the link), send `shiftId` null; sending the old id answers `404` with `field: shiftId`.
 - `DELETE /api/v1/expenses/{id}?expectedUpdatedAt=<ISO instant>`: 204. Moves the expense to Recently deleted; it
   appears in `deleted` on the next sync.
 - `POST /api/v1/expenses/{id}/restore` with `{"expectedUpdatedAt":"..."}`: 200 `{"id":17}`. Only within 30 days of

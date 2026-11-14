@@ -41,7 +41,11 @@ public class ApiPayoutService {
         this.receipts = receipts;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * One snapshot for both reads, so a payout recorded on the website in between can't pair the old amount with the
+     * new version (which would let the phone's next edit overwrite an amount the driver never saw).
+     */
+    @Transactional(readOnly = true, isolation = org.springframework.transaction.annotation.Isolation.REPEATABLE_READ)
     public ApiPayouts payouts(String email, int count) {
         var periods = reports.payPeriods(email, count);
         Map<LocalDate, Instant> versions = new HashMap<>();
