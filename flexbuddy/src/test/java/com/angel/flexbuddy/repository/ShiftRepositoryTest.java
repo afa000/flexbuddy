@@ -87,7 +87,7 @@ class ShiftRepositoryTest {
     }
 
     @Test
-    void deleteAndRestoreLeaveTheUpdatedTimestampAlone() {
+    void deleteAndRestoreLeaveTheUpdatedTimestampAloneAndMoveTheSyncTime() {
         AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
         Instant original = Instant.parse("2026-01-02T03:04:05Z");
         Shift stored = shift(angel, "VEA7", LocalDate.of(2026, 9, 5));
@@ -95,20 +95,64 @@ class ShiftRepositoryTest {
         stored.setUpdatedAt(original);
         shiftRepository.saveAndFlush(stored);
         entityManager.clear();
+        // A save always takes the clock's time for sync, even with older times of its own (a restored backup row).
+        assertThat(stored(stored.getId()).getSyncChangedAt()).isEqualTo(NOW);
 
-        shiftRepository.softDelete("angel@example.com", stored.getId(), NOW, "batch-1");
+        Instant deleted = NOW.plusSeconds(60);
+        shiftRepository.softDelete("angel@example.com", stored.getId(), deleted, "batch-1");
         entityManager.clear();
-        assertThat(updatedAt("angel@example.com", stored.getId())).isEqualTo(original);
+        assertThat(stored(stored.getId()).getUpdatedAt()).isEqualTo(original);
+        assertThat(stored(stored.getId()).getSyncChangedAt()).isEqualTo(deleted);
 
-        shiftRepository.restoreDeleted("angel@example.com", stored.getId());
+        Instant restored = NOW.plusSeconds(120);
+        shiftRepository.restoreDeleted("angel@example.com", stored.getId(), restored);
         entityManager.clear();
-        assertThat(updatedAt("angel@example.com", stored.getId())).isEqualTo(original);
+        assertThat(stored(stored.getId()).getUpdatedAt()).isEqualTo(original);
+        assertThat(stored(stored.getId()).getSyncChangedAt()).isEqualTo(restored);
 
-        shiftRepository.softDeleteAll("angel@example.com", NOW, "batch-2");
+        Instant deletedAll = NOW.plusSeconds(180);
+        shiftRepository.softDeleteAll("angel@example.com", deletedAll, "batch-2");
         entityManager.clear();
-        shiftRepository.restoreBatch("angel@example.com", "batch-2");
+        assertThat(stored(stored.getId()).getSyncChangedAt()).isEqualTo(deletedAll);
+        Instant restoredAll = NOW.plusSeconds(240);
+        shiftRepository.restoreBatch("angel@example.com", "batch-2", restoredAll);
         entityManager.clear();
-        assertThat(updatedAt("angel@example.com", stored.getId())).isEqualTo(original);
+        assertThat(stored(stored.getId()).getUpdatedAt()).isEqualTo(original);
+        assertThat(stored(stored.getId()).getSyncChangedAt()).isEqualTo(restoredAll);
+    }
+
+    @Test
+    void syncQueriesIncludeDeletedChangesAndStayWithinTheAccount() {
+        AppUser angel = userRepository.save(new AppUser("Angel", "angel@example.com", "hash"));
+        AppUser other = userRepository.save(new AppUser("Other", "other@example.com", "hash"));
+        Shift live = shiftRepository.saveAndFlush(shift(angel, "VEA7", LocalDate.of(2026, 9, 5)));
+        Shift gone = shiftRepository.saveAndFlush(shift(angel, "BDL4", LocalDate.of(2026, 9, 4)));
+        shiftRepository.saveAndFlush(shift(other, "XYZ1", LocalDate.of(2026, 9, 3)));
+        Instant later = NOW.plusSeconds(600);
+        shiftRepository.softDelete("angel@example.com", gone.getId(), later, "batch");
+        entityManager.clear();
+
+        assertThat(shiftRepository.findLiveForSync("angel@example.com")).extracting(Shift::getId)
+                .containsExactly(live.getId());
+        assertThat(shiftRepository.findChangedSince("angel@example.com", NOW)).extracting(Shift::getId)
+                .containsExactly(gone.getId());
+        assertThat(shiftRepository.findChangedSince("angel@example.com", NOW.minusSeconds(1))).extracting(Shift::getId)
+                .containsExactly(gone.getId(), live.getId());
+        assertThat(shiftRepository.latestSyncChange("angel@example.com")).isEqualTo(later);
+        assertThat(shiftRepository.latestSyncChange("other@example.com")).isEqualTo(NOW);
+        assertThat(shiftRepository.latestSyncChange("nobody@example.com")).isNull();
+
+        assertThat(userRepository.findSyncResetAt("angel@example.com")).isNull();
+        userRepository.markSyncReset("angel@example.com", later);
+        assertThat(userRepository.findSyncResetAt("angel@example.com")).isEqualTo(later);
+        assertThat(userRepository.findSyncResetAt("other@example.com")).isNull();
+    }
+
+    private Shift stored(Long id) {
+        return shiftRepository.findAllIncludingDeleted("angel@example.com").stream()
+                .filter(shift -> shift.getId().equals(id))
+                .findFirst()
+                .orElseThrow();
     }
 
     @Test
@@ -138,14 +182,6 @@ class ShiftRepositoryTest {
 
         assertThat(shiftRepository.findAllIncludingDeleted("angel@example.com"))
                 .extracting(Shift::getStation).containsExactly("BDL4");
-    }
-
-    private Instant updatedAt(String email, Long id) {
-        return shiftRepository.findAllIncludingDeleted(email).stream()
-                .filter(shift -> shift.getId().equals(id))
-                .findFirst()
-                .orElseThrow()
-                .getUpdatedAt();
     }
 
     @Test

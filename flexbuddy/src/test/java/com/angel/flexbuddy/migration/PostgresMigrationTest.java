@@ -78,6 +78,7 @@ class PostgresMigrationTest {
             assertDriverExpenseSchema(schema);
             assertScheduleAndReminderSchema(schema);
             assertPersistentLoginSchema(schema);
+            assertSyncBackfill(schema);
             assertHibernateMappingsMatch(schema);
         } finally {
             latest.clean();
@@ -266,6 +267,28 @@ class PostgresMigrationTest {
                 assertThat(result.getObject("end_time", LocalTime.class)).isEqualTo(LocalTime.MIDNIGHT);
                 assertThat(result.getBigDecimal("base_pay")).isEqualByComparingTo(BigDecimal.ZERO);
                 assertThat(result.getBigDecimal("tips")).isEqualByComparingTo(BigDecimal.ZERO);
+            }
+        }
+    }
+
+    /** V30: existing blocks get a sync time (the later of their edit and delete times); no account starts reset. */
+    private void assertSyncBackfill(String schema) throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("set search_path to " + schema);
+            try (ResultSet result = statement.executeQuery("""
+                    select count(*) as total,
+                           count(*) filter (where sync_changed_at = greatest(updated_at, coalesce(deleted_at, updated_at)))
+                               as matching
+                    from shift
+                    """)) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt("total")).isPositive();
+                assertThat(result.getInt("matching")).isEqualTo(result.getInt("total"));
+            }
+            try (ResultSet result = statement.executeQuery(
+                    "select count(*) from app_users where sync_reset_at is not null")) {
+                assertThat(result.next()).isTrue();
+                assertThat(result.getInt(1)).isZero();
             }
         }
     }

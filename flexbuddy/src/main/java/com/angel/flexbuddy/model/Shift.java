@@ -30,7 +30,8 @@ import org.hibernate.annotations.SQLRestriction;
 @Entity
 @Table(name = "shift", indexes = {
         @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"),
-        @Index(name = "idx_shift_owner_status_date", columnList = "owner_id,status,date")
+        @Index(name = "idx_shift_owner_status_date", columnList = "owner_id,status,date"),
+        @Index(name = "idx_shift_owner_sync", columnList = "owner_id,sync_changed_at")
 }, uniqueConstraints = @UniqueConstraint(name = "uk_shift_owner_create_request",
         columnNames = {"owner_id", "create_request_id"}))
 @EntityListeners(TimestampListener.class)
@@ -115,6 +116,13 @@ public class Shift implements Timestamped {
 
     @Column(length = 36)
     private String deleteBatch;
+
+    /**
+     * When the block last changed in any way the native app must hear about, deleting and restoring included. Unlike
+     * updatedAt, which the website shows as "last edited", the delete and restore queries move it too.
+     */
+    @Column(nullable = false)
+    private Instant syncChangedAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "owner_id")

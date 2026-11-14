@@ -40,4 +40,15 @@ public interface AppUserRepository extends JpaRepository<AppUser, Long> {
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(value = "delete from app_users where id = :id", nativeQuery = true)
     int deleteAccountById(@Param("id") Long id);
+
+    /**
+     * Records that this account's blocks were removed for good or replaced, so phones that synced earlier reload them
+     * all (FB-033). Flushes first so it runs after the change it describes, in the same transaction.
+     */
+    @Modifying(flushAutomatically = true)
+    @Query(value = "update app_users set sync_reset_at = :at where lower(email) = lower(:email)", nativeQuery = true)
+    int markSyncReset(@Param("email") String email, @Param("at") java.time.Instant at);
+
+    @Query(value = "select sync_reset_at from app_users where lower(email) = lower(:email)", nativeQuery = true)
+    java.time.Instant findSyncResetAt(@Param("email") String email);
 }
