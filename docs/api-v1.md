@@ -5,8 +5,8 @@ server task that adds or changes an `/api/v1` endpoint updates this page in the 
 against what this page says. The plan is [native-app-plan.md](native-app-plan.md).
 
 Status: FB-005 implements password sign-in, code challenges, device sign-out and the account summary. FB-033 adds
-read-only blocks and Home, with change-only sync. NA-05 adds block writes for the native outbox. The API remains
-disabled by default.
+read-only blocks and Home, with change-only sync. NA-05 adds block writes for the native outbox, NA-06 expenses and
+payouts, NA-07 screenshot import. The API remains disabled by default.
 
 ## Availability
 
@@ -41,6 +41,8 @@ disabled by default.
   returns `409` `idempotency_conflict`. JSON whitespace and property order do not matter; retain the original values
   when retrying. Failed actions do not consume a key. Successful acknowledgements persist across subsequent changes,
   deletion, permanent deletion and backup restores, until account deletion; simultaneous retries apply only once.
+  A screenshot import uses one key for the screenshot's preview and its one save (see
+  `POST /api/v1/shifts/import-preview`).
 - **Dates and times** are ISO 8601. Dates are the driver's local date (`2026-11-11`), times are local with no offset
   (`18:30`), and instants are UTC with `Z`. The driver's time zone comes from `GET /api/v1/account`.
 - **Money** is a string with two decimals (`"72.00"`), never a floating-point number.
@@ -314,6 +316,89 @@ Added by NA-05. Token required: yes. Request: `{"expectedUpdatedAt":"2026-11-13T
 restoration is refused even if the daily purge has not run. Use the saved block's updatedAt: delete and restore move
 the sync change time without changing the website's updatedAt. The restored block arrives in `shifts` on sync.
 No permanent-delete, empty-trash or batch-restore API is added by NA-05.
+
+### POST /api/v1/shifts/import-preview
+
+Added by NA-07. Token required: yes, plus `Idempotency-Key`. Reads one block screenshot with the website's import
+(same parser, warnings, status suggestion and duplicate check) and returns what the website's review shows. It saves
+nothing and keeps nothing: no copy of the screenshot, its text or the values read is stored, cached or logged.
+
+Request: `multipart/form-data` with one file part, `screenshot`. PNG or JPEG, at most 5 MB (6 MB for the whole
+request), at most 12,000 px a side and 30 megapixels. One screenshot per request; send a batch one at a time.
+
+**The screenshot's key.** Create one UUID per screenshot when it is picked or shared, send it on its preview, and save
+that screenshot with the same key, whichever save the driver chooses:
+
+- add it as a block: `POST /api/v1/shifts`, with the status the driver chose (worked or not yet worked);
+- or, for a `scheduled_match`, complete that scheduled block: `PATCH /api/v1/shifts/{id}/status` to `completed`,
+  with that block's `expectedUpdatedAt`.
+
+Keys are shared across the account's writes, so once one of the two has landed the other answers
+`409 idempotency_conflict`, and a screenshot's pay can never be counted twice, even after an unanswered save. If a
+preview's key already saved a block, the answer is `409 already_saved` with that block's id and the image isn't read
+again: drop the waiting screenshot. A preview itself uses up no key. There is no server check for duplicates inside a
+batch: compare with the blocks this batch already saved, as the website does.
+
+200, with `Cache-Control: no-store`:
+
+```json
+{
+  "meanConfidence": 87,
+  "lines": [{"index": 0, "text": "Windsor (DCY1)"}, {"index": 1, "text": "Thursday, 11/12"}],
+  "rawText": null,
+  "shifts": [{
+    "station": {"value": "DCY1", "level": "high", "confidence": 95, "lineIndex": 0},
+    "date": {"value": "2026-11-12", "level": "high", "confidence": 93, "lineIndex": 1},
+    "startTime": {"value": "04:00", "level": "medium", "confidence": 72, "lineIndex": 2},
+    "endTime": {"value": "07:30", "level": "medium", "confidence": 72, "lineIndex": 2},
+    "basePay": {"value": "72.00", "level": "high", "confidence": 90, "lineIndex": 4},
+    "tips": {"value": "18.50", "level": "high", "confidence": 85, "lineIndex": 5},
+    "suggestedStatus": "completed",
+    "warnings": [{"code": "medium_confidence", "severity": "info", "field": "startTime"}],
+    "duplicates": [{"shiftId": 41, "kind": "scheduled_match"}]
+  }]
+}
+```
+
+- `meanConfidence` (0-100) is the website's read-quality bar.
+- `lines` are the text read, in order, as the website's "View extracted text" panel shows it. `rawText` is the
+  fallback text, sent only when `lines` is empty, otherwise null.
+- Each field has `value` (null when not read), `level` (`high`, `medium`, `low` or `missing`), `confidence`
+  (0-100, null when not read) and `lineIndex` (the line it came from, to highlight; null when there is none). The
+  website shows a badge on a field unless it is `high` and at least 90: "Missing", or "N% read".
+- `suggestedStatus` is `completed` or `scheduled` (a block that starts after now in the account's time zone). It is a
+  hint: the driver chooses.
+- `warnings` are codes, never sentences: `poor_image`, `tips_exceed_base`, `missing_field`, `low_confidence`,
+  `medium_confidence`, `future_date`, `old_date`, `overnight`, `long_shift`, `short_shift`, `pay_out_of_range`.
+  `severity` is `error`, `warning` or `info`; `field` names the field, or is null.
+- `duplicates` are this account's completed or scheduled blocks the screenshot overlaps by 30 minutes or more:
+  `exact` or `likely` (already logged), or `scheduled_match` (a scheduled block this completed screenshot most likely
+  finishes). Look the block up in the synced cache or with `GET /api/v1/shifts/{id}`.
+- `shifts` is an array to match the website; it always has one entry today.
+
+Not returned: the file name, type and size, line positions, per-line confidence and translated messages.
+
+The read text is screenshot content: keep the answer in memory for the review only, never in the outbox, a database or
+logs.
+
+Errors (every one with `Cache-Control: no-store`; none repeats the screenshot, its text or its file name):
+
+- `400 {"error":"invalid","reason":"error.import.<key>"}`: `noScreenshot`, `unsupportedType` (not PNG or JPEG),
+  `notReadableImage`, `couldNotRead`, `tooLargeSides`, `tooLargeMegapixels`.
+- `400 {"error":"invalid","fields":{"Idempotency-Key":"invalid"}}`: missing or malformed key.
+- `400 {"error":"invalid"}`: not a multipart request, or a malformed multipart body.
+- `409 {"error":"already_saved","id":41}`: this key already saved that block.
+- `409 {"error":"idempotency_conflict"}`: this key was used for an expense or payout write.
+- `413 {"error":"too_large"}`: over the 5 MB file or 6 MB request limit.
+- `429 {"error":"busy_account"}` with `Retry-After` (seconds): this account already has a preview being read. At most
+  one per account at a time, per server instance.
+- `503 {"error":"busy"}`: another screenshot (any account) is being read and this one waited 20 seconds.
+- `500 {"error":"read_failed"}`: the reader failed.
+- `401`, and `404` while the API is off.
+
+Reading is slow on the hosted server: one screenshot at a time across all drivers, and the first request after a quiet
+spell may wait for the server to wake. Send previews one at a time, allow at least a minute, and back off on `429` and
+`503`.
 
 ### GET /api/v1/home
 
