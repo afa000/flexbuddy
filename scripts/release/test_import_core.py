@@ -247,7 +247,9 @@ class ReleaseTests(unittest.TestCase):
     def test_upload_uses_a_neutral_project_and_environment_references_only(self):
         payload, _ = self.payload()
         settings, global_settings, control = release.write_maven_control(self.root)
-        command = release.deploy_command(payload, VERSION, settings, global_settings, control)
+        command = release.deploy_command(ROOT, payload, VERSION, settings, global_settings, control)
+        self.assertEqual(["sh", str(ROOT / "flexbuddy/mvnw")], command[:2])  # Pinned wrapper, not the runner's mvn.
+        self.assertTrue((ROOT / "flexbuddy/mvnw").is_file())
         self.assertIn(str(control), command)
         self.assertIn("org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file", command)
         self.assertIn("-DpomFile=" + str(payload / release.names(VERSION)[1]), command)
@@ -255,7 +257,8 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("${env.GH_PACKAGES_TOKEN}", settings.read_text(encoding="utf-8"))
         self.assertNotIn("<build>", control.read_text(encoding="utf-8"))
         with self.assertRaises(release.ReleaseError):
-            release.deploy_command(payload, VERSION, settings, global_settings, control, "https://example.test/upload")
+            release.deploy_command(ROOT, payload, VERSION, settings, global_settings, control,
+                                   "https://example.test/upload")
 
     def test_failed_preflight_never_invokes_maven(self):
         payload, _ = self.payload()
@@ -289,6 +292,70 @@ class ReleaseTests(unittest.TestCase):
                     release.publish(self.root, payload, VERSION, SHA, env)
                 self.assertEqual(1, run.call_count)
                 summary.assert_not_called()
+
+
+def blocks(lines, indent):
+    """Split YAML text into {key: lines} at one indentation level; enough for this workflow's plain layout."""
+    found, current = {}, None
+    for line in lines:
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        depth = len(line) - len(line.lstrip(" "))
+        if depth < indent:
+            current = None
+        elif depth == indent and stripped.endswith(":") or depth == indent and ": " in stripped:
+            current = stripped.split(":")[0]
+            found[current] = [stripped]
+        elif current:
+            found[current].append(stripped)
+    return found
+
+
+class WorkflowRulesTests(unittest.TestCase):
+    """The publishing rules live in YAML, so check the text: these lines would otherwise change without a failure."""
+
+    def setUp(self):
+        self.text = (ROOT / ".github/workflows/publish-import-core.yml").read_text(encoding="utf-8")
+        lines = self.text.splitlines()
+        self.top = blocks(lines, 0)
+        self.jobs = blocks(lines[lines.index("jobs:") + 1:], 2)
+
+    def test_only_a_manual_dispatch_from_main_can_start_it(self):
+        self.assertEqual(["on:", "workflow_dispatch:"], self.top["on"][:2])
+        self.assertFalse([line for line in self.top["on"][1:] if line.endswith(":") and line not in
+                          ("workflow_dispatch:", "inputs:", "version:")])
+        for trigger in ("push", "pull_request", "pull_request_target", "release", "schedule", "workflow_run"):
+            self.assertNotRegex(self.text, r"(?m)^\s+" + trigger + r":")
+        self.assertEqual({"validate", "publish"}, set(self.jobs))
+        for name, job in self.jobs.items():
+            with self.subTest(job=name):
+                self.assertIn("if: github.ref == 'refs/heads/main' && github.repository == 'afa000/flexbuddy'", job)
+
+    def test_write_permission_and_the_token_belong_only_to_the_publish_job(self):
+        self.assertEqual(["permissions:", "contents: read"], self.top["permissions"])
+        self.assertEqual(1, self.text.count("packages: write"))
+        self.assertIn("packages: write", self.jobs["publish"])
+        self.assertNotIn("permissions:", self.jobs["validate"])
+        self.assertEqual(1, self.text.count("secrets."))
+        self.assertIn("GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}", self.jobs["publish"])
+
+    def test_every_checkout_drops_its_credentials(self):
+        checkouts = self.text.count("uses: actions/checkout@")
+        self.assertEqual(3, checkouts)
+        self.assertEqual(checkouts, self.text.count("persist-credentials: false"))
+
+    def test_staging_runs_a_copy_taken_before_the_tagged_build(self):
+        validate = self.jobs["validate"]
+        copy = validate.index('cp scripts/release/import_core.py "$RUNNER_TEMP/release-tooling/import_core.py"')
+        tagged_checkout = validate.index("path: release-source")
+        check = validate.index(
+            'echo "$TOOLING_SHA256  $RUNNER_TEMP/release-tooling/import_core.py" | sha256sum --check --quiet')
+        stage = validate.index('python3 -I "$RUNNER_TEMP/release-tooling/import_core.py" stage')
+        self.assertLess(copy, tagged_checkout)
+        self.assertLess(check, stage)
+        self.assertNotIn("scripts/release/import_core.py stage", "\n".join(validate))
+        self.assertIn("run: python3 scripts/release/import_core.py publish", self.jobs["publish"])
 
 
 if __name__ == "__main__":

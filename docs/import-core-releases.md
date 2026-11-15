@@ -15,11 +15,13 @@ this package or need a package credential. Publishing does not prove Android com
   standalone library POM and point to a commit reachable from `origin/main`. Versions such as `latest`, snapshots,
   prereleases, paths or shell fragments are refused. The tag is resolved to an immutable commit SHA.
 - The first job has read permission only. It checks out that SHA, runs the library tests, inspects runtime
-  dependencies and packages only the main JAR and POM with a SHA-256 manifest.
+  dependencies and packages only the main JAR and POM with a SHA-256 manifest. Staging runs from a copy of the
+  dispatch commit's release script taken before the tagged build, and refuses the copy if its checksum changed.
 - The publishing job uses trusted tooling from the workflow's dispatch commit. It rechecks the tag/SHA, manifest,
   coordinates and file set. Only this job has `packages:write`; its ephemeral `GITHUB_TOKEN` is exposed only to the
   upload/verification step. No long-lived publishing PAT is needed.
-- Upload runs the pinned Maven Deploy Plugin's `deploy-file` goal from a temporary neutral project. The tagged POM
+- Upload runs the pinned Maven Deploy Plugin's `deploy-file` goal through the dispatch commit's Maven wrapper (the
+  same Maven version as every other project build) from a temporary neutral project. The tagged POM
   is supplied only as the uploaded `pomFile`; its Maven lifecycle, extensions and scripts do not execute with write
   permission. This uploads the same tested library POM/JAR, never the server or reactor.
 - All releases of this artifact are serialized, and an active upload is not cancelled by a newer dispatch.
@@ -116,6 +118,14 @@ errors must be resolved before deciding whether anything was published. If the c
 them against the original run's hashes before describing the release as usable. If the state is partial or differs,
 the owner decides the recovery; prefer a separately reviewed new version/tag. There is no automatic cleanup job.
 Cancellation after an upload starts has the same uncertainty. A later preflight refuses existing metadata/files.
+
+On the first release, a refusal before any upload may come from the preflight's assumptions about the registry,
+not from an existing version. It treats only HTTP 404 as "not published yet", and expects the package's
+`maven-metadata.xml` to have a plain `<metadata>` root with the library's group and artifact ids. Unit tests use
+synthetic responses, so GitHub's real answers are first seen on that run. If the run reports
+"Registry metadata check returned HTTP ..." or "Unexpected registry metadata", note the status it printed and check
+the package page before changing anything. Loosening the preflight is a separately reviewed change, never a retry
+with the checks turned off.
 
 ## Local validation and remaining work
 

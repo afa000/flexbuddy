@@ -35,6 +35,14 @@ jobs:
         env:
           RELEASE_VERSION: ${{ inputs.version }}
         run: python3 scripts/release/import_core.py resolve
+      # Keep the dispatch commit's staging tool out of reach of the tagged build. The digest is a step output,
+      # which the build cannot rewrite, so staging refuses a copy that changed while Maven ran.
+      - name: Keep a copy of the trusted release tooling
+        id: tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-tooling"
+          cp scripts/release/import_core.py "$RUNNER_TEMP/release-tooling/import_core.py"
+          echo "sha256=$(sha256sum scripts/release/import_core.py | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
           ref: ${{ steps.source.outputs.source-sha }}
@@ -54,7 +62,10 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.source.outputs.version }}
           RELEASE_SHA: ${{ steps.source.outputs.source-sha }}
-        run: python3 scripts/release/import_core.py stage
+          TOOLING_SHA256: ${{ steps.tooling.outputs.sha256 }}
+        run: |
+          echo "$TOOLING_SHA256  $RUNNER_TEMP/release-tooling/import_core.py" | sha256sum --check --quiet
+          python3 -I "$RUNNER_TEMP/release-tooling/import_core.py" stage
       - uses: actions/upload-artifact@v4
         with:
           name: import-core-release

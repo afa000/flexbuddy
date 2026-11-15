@@ -277,12 +277,15 @@ def write_maven_control(directory):
     return settings, global_settings, control
 
 
-def deploy_command(payload, release_version, settings, global_settings, control, destination=REGISTRY):
+def deploy_command(repo, payload, release_version, settings, global_settings, control, destination=REGISTRY):
     # destination is injectable only for local file-backed validation, never a workflow input.
     if destination != REGISTRY and not destination.startswith("file:///"):
         raise ReleaseError("Unapproved release destination.")
     jar, pom = names(release_version)
-    return ["mvn", "-B", "-ntp", "--settings", str(settings), "--global-settings", str(global_settings),
+    # repo is the dispatch commit's trusted checkout, so its wrapper pins Maven exactly as the project builds do.
+    # retryFailedDeploymentCount=1 is the plugin's single attempt in total: a failed upload is never retried.
+    return ["sh", str(repo / "flexbuddy/mvnw"), "-B", "-ntp", "--settings", str(settings),
+            "--global-settings", str(global_settings),
             "-f", str(control), "org.apache.maven.plugins:maven-deploy-plugin:3.1.4:deploy-file",
             "-DrepositoryId=" + SERVER_ID, "-Durl=" + destination, "-DgeneratePom=false",
             "-DretryFailedDeploymentCount=1", "-Dfile=" + str(payload / jar), "-DpomFile=" + str(payload / pom)]
@@ -299,10 +302,10 @@ def publish(repo, payload, release_version, sha, env):
     authorization = "Basic " + base64.b64encode((actor + ":" + token).encode()).decode()
     get = lambda url: fetch(url, authorization)
     preflight(release_version, get)
-    # No tagged POM lifecycle, wrapper or scripts execute in this privileged job.
+    # No tagged POM lifecycle, wrapper or scripts execute in this privileged job; the wrapper is the dispatch commit's.
     with tempfile.TemporaryDirectory(prefix="import-core-upload-", dir=env["RUNNER_TEMP"]) as temporary:
         settings, global_settings, control = write_maven_control(Path(temporary))
-        result = subprocess.run(deploy_command(payload, release_version, settings, global_settings, control))
+        result = subprocess.run(deploy_command(repo, payload, release_version, settings, global_settings, control))
         if result.returncode:
             raise ReleaseError("Upload failed; release state may be partial. Inspect it before any retry.")
     verify_remote(payload, manifest, get)
