@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 import javax.imageio.ImageIO;
@@ -54,6 +55,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockMultipartHttpServletRequestBuilder;
+import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import com.angel.flexbuddy.exception.ScreenshotBusyException;
 import com.angel.flexbuddy.exception.ScreenshotOcrException;
@@ -69,6 +72,7 @@ import com.angel.flexbuddy.repository.ShiftRepository;
 import com.angel.flexbuddy.security.MutableClock;
 import com.angel.flexbuddy.service.OcrLine;
 import com.angel.flexbuddy.service.OcrResult;
+import com.angel.flexbuddy.service.ScreenshotReadGate;
 import com.angel.flexbuddy.service.ScreenshotTextExtractor;
 
 import tools.jackson.databind.JsonNode;
@@ -119,6 +123,7 @@ class ApiImportIntegrationTest {
     @Autowired ApiWriteReceiptRepository receipts;
     @Autowired PasswordEncoder encoder;
     @Autowired MutableClock clock;
+    @Autowired ScreenshotReadGate gate;
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     private AppUser driver;
@@ -160,6 +165,12 @@ class ApiImportIntegrationTest {
 
     @Test
     void previewReturnsWhatTheWebsiteReviewShowsAndNothingElse() throws Exception {
+        // A scheduled block the screenshot matches and a logged one it repeats, so both answers list duplicates.
+        scheduled(driver);
+        Shift logged = scheduled(driver);
+        logged.setStatus(ShiftStatus.COMPLETED);
+        logged.setTips(new BigDecimal("18.50"));
+        shifts.saveAndFlush(logged);
         MvcResult result = preview(token, key(), png(), 200);
         assertThat(result.getResponse().getHeader("Cache-Control")).contains("no-store");
         JsonNode api = body(result);
@@ -213,6 +224,15 @@ class ApiImportIntegrationTest {
             assertThat(warning.get("code").asText()).isEqualTo(siteWarning.get("code").asText().toLowerCase());
             assertThat(warning.get("severity").asText()).isEqualTo(siteWarning.get("severity").asText().toLowerCase());
             assertThat(warning.get("field").asText()).isEqualTo(siteWarning.get("field").asText());
+        }
+        assertThat(shift.get("duplicates")).hasSize(2);
+        assertThat(shift.get("duplicates")).hasSize(siteShift.get("duplicates").size());
+        for (int i = 0; i < shift.get("duplicates").size(); i++) {
+            JsonNode duplicate = shift.get("duplicates").get(i);
+            JsonNode siteDuplicate = siteShift.get("duplicates").get(i);
+            assertThat(names(duplicate)).isEqualTo(Set.of("shiftId", "kind"));
+            assertThat(duplicate.get("shiftId").asLong()).isEqualTo(siteDuplicate.get("shiftId").asLong());
+            assertThat(duplicate.get("kind").asText()).isEqualTo(siteDuplicate.get("kind").asText().toLowerCase());
         }
         assertThat(result.getResponse().getContentAsString()).doesNotContain(FILE_NAME, "image/png", "message", "year",
                 "sourceLineRange", "\"x\"", "\"width\"");
@@ -269,6 +289,9 @@ class ApiImportIntegrationTest {
     @Test
     void busyAndFailedReadsAnswerCodesAndLogNoScreenshotContent(CapturedOutput output) throws Exception {
         preview(token, key(), png(), 200);
+        String saved = key();
+        write(post("/api/v1/shifts"), saved, block("completed"), 201);
+        preview(token, saved, png(), 409);
         doThrow(new ScreenshotBusyException("error.import.busy")).when(extractor).extract(any());
         assertThat(body(preview(token, key(), png(), 503)).get("error").asText()).isEqualTo("busy");
         doThrow(new ScreenshotOcrException(
@@ -276,6 +299,11 @@ class ApiImportIntegrationTest {
         MvcResult failed = preview(token, key(), png(), 500);
         assertThat(body(failed).get("error").asText()).isEqualTo("read_failed");
         assertThat(failed.getResponse().getHeader("Cache-Control")).contains("no-store");
+        // The controller's backstop for an upload over the limits that got past ApiUploadLimitFilter.
+        doThrow(new MaxUploadSizeExceededException(5 * 1024 * 1024)).when(extractor).extract(any());
+        MvcResult tooLarge = preview(token, key(), png(), 413);
+        assertThat(body(tooLarge).get("error").asText()).isEqualTo("too_large");
+        assertThat(tooLarge.getResponse().getHeader("Cache-Control")).contains("no-store");
         doReturn(OcrResult.fromLines(LINES)).when(extractor).extract(any());
         preview(token, key(), new MockMultipartFile("screenshot", FILE_NAME, "image/gif", pngBytes()), 400);
 
@@ -349,7 +377,11 @@ class ApiImportIntegrationTest {
         // The other account waits for the shared reader instead of being refused.
         CompletableFuture<MvcResult> otherPreview = CompletableFuture.supplyAsync(
                 () -> mvcPreview(otherToken, key(), png(), 200));
-        Thread.sleep(300);
+        // Proof it arrived while the first is held: it is queued on the shared one-at-a-time reader, not refused.
+        Semaphore reader = (Semaphore) ReflectionTestUtils.getField(gate, "permit");
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!reader.hasQueuedThreads() && System.nanoTime() < deadline) Thread.onSpinWait();
+        assertThat(reader.hasQueuedThreads()).isTrue();
         assertThat(otherPreview).isNotDone();
         release.countDown();
         assertThat(first.get(10, TimeUnit.SECONDS).getResponse().getStatus()).isEqualTo(200);

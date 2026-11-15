@@ -14,17 +14,19 @@ import jakarta.servlet.http.HttpServletResponse;
 /**
  * NA-07: the website's HiddenHttpMethodFilter reads request parameters, which makes the container parse a multipart
  * body before Spring MVC or Spring Security run, so an upload over the multipart limits fails inside the filter chain
- * and would reach the website's error page. For {@code /api/v1} multipart requests only, this filter parses the parts
+ * and would reach the website's error page. For {@code /api/v1} multipart POSTs only, this filter parses the parts
  * first and answers a failure as JSON: {@code 413 too_large} over the limits, {@code 400 invalid} for a malformed body.
- * Every other request passes straight through, so the website behaves as before. Registered by
- * {@link ApiUploadLimitConfig}.
+ * It runs before the token check, as the HiddenHttpMethodFilter already did, so an oversize upload without a token is
+ * answered 413, not 401; nothing is decoded either way. Every other request passes straight through, so the website
+ * behaves as before. Registered by {@link ApiUploadLimitConfig}.
  */
 final class ApiUploadLimitFilter extends OncePerRequestFilter {
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
         String path = request.getRequestURI().substring(request.getContextPath().length());
         String type = request.getContentType();
-        return !path.startsWith("/api/v1/") || type == null
+        // POST only: the HiddenHttpMethodFilter only reads parameters of a POST, and no other API method takes an upload.
+        return !"POST".equals(request.getMethod()) || !path.startsWith("/api/v1/") || type == null
                 || !type.toLowerCase(Locale.ROOT).startsWith("multipart/");
     }
 

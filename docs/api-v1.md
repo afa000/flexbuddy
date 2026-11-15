@@ -324,7 +324,10 @@ Added by NA-07. Token required: yes, plus `Idempotency-Key`. Reads one block scr
 nothing and keeps nothing: no copy of the screenshot, its text or the values read is stored, cached or logged.
 
 Request: `multipart/form-data` with one file part, `screenshot`. PNG or JPEG, at most 5 MB (6 MB for the whole
-request), at most 12,000 px a side and 30 megapixels. One screenshot per request; send a batch one at a time.
+request), at most 12,000 px a side and 30 megapixels. One screenshot per request; send a batch one at a time. Other
+parts are ignored. Check the type and the 5 MB size on the phone before sending, as the website does: the server
+answers an oversize upload with `413`, but on a large one a proxy or client may see the connection close first, so
+treat a dropped connection on an upload over 5 MB as `too_large` rather than retrying it.
 
 **The screenshot's key.** Create one UUID per screenshot when it is picked or shared, send it on its preview, and save
 that screenshot with the same key, whichever save the driver chooses:
@@ -335,8 +338,8 @@ that screenshot with the same key, whichever save the driver chooses:
 
 Keys are shared across the account's writes, so once one of the two has landed the other answers
 `409 idempotency_conflict`, and a screenshot's pay can never be counted twice, even after an unanswered save. If a
-preview's key already saved a block, the answer is `409 already_saved` with that block's id and the image isn't read
-again: drop the waiting screenshot. A preview itself uses up no key. There is no server check for duplicates inside a
+preview's key was already used by a successful block write (any block action, in practice this screenshot's save),
+the answer is `409 already_saved` with that block's id and the image isn't read again: drop the waiting screenshot. A preview itself uses up no key. There is no server check for duplicates inside a
 batch: compare with the blocks this batch already saved, as the website does.
 
 200, with `Cache-Control: no-store`:
@@ -376,7 +379,8 @@ batch: compare with the blocks this batch already saved, as the website does.
   finishes). Look the block up in the synced cache or with `GET /api/v1/shifts/{id}`.
 - `shifts` is an array to match the website; it always has one entry today.
 
-Not returned: the file name, type and size, line positions, per-line confidence and translated messages.
+Not returned: the file name, type and size, line positions, per-line confidence, the year the parser assumed,
+the source line range and translated messages.
 
 The read text is screenshot content: keep the answer in memory for the review only, never in the outbox, a database or
 logs.
@@ -387,9 +391,10 @@ Errors (every one with `Cache-Control: no-store`; none repeats the screenshot, i
   `notReadableImage`, `couldNotRead`, `tooLargeSides`, `tooLargeMegapixels`.
 - `400 {"error":"invalid","fields":{"Idempotency-Key":"invalid"}}`: missing or malformed key.
 - `400 {"error":"invalid"}`: not a multipart request, or a malformed multipart body.
-- `409 {"error":"already_saved","id":41}`: this key already saved that block.
+- `409 {"error":"already_saved","id":41}`: this key was already used by a successful write to that block.
 - `409 {"error":"idempotency_conflict"}`: this key was used for an expense or payout write.
-- `413 {"error":"too_large"}`: over the 5 MB file or 6 MB request limit.
+- `413 {"error":"too_large"}`: over the 5 MB file or 6 MB request limit. The limit is checked before the token, so
+  an oversize upload without a token also gets `413`, not `401`; nothing is decoded or read either way.
 - `429 {"error":"busy_account"}` with `Retry-After` (seconds): this account already has a preview being read. At most
   one per account at a time, per server instance.
 - `503 {"error":"busy"}`: another screenshot (any account) is being read and this one waited 20 seconds.

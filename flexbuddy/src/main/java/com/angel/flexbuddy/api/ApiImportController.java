@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
@@ -80,6 +81,10 @@ public class ApiImportController {
     ResponseEntity<?> invalidScreenshot(InvalidScreenshotException exception) {
         return answer(400, Map.of("error", "invalid", "reason", exception.messageKey()));
     }
+
+    /** A backstop: ApiUploadLimitFilter answers these before any controller runs. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<?> tooLarge() { return answer(413, Map.of("error", "too_large")); }
 
     @ExceptionHandler(MultipartException.class)
     ResponseEntity<?> invalidUpload() { return answer(400, Map.of("error", "invalid")); }

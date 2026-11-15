@@ -16,8 +16,11 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -37,9 +40,11 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {"flexbuddy.api.enabled=true", "flexbuddy.security.remember-me-key=api-test-key"})
 @ActiveProfiles("test")
+@ExtendWith(OutputCaptureExtension.class)
 class ApiImportUploadLimitTest {
     private static final String EMAIL = "upload-limit@example.test";
     private static final String PASSWORD = "upload-limit-password";
+    private static final String FILE_NAME = "made-up-private-upload-name.png";
 
     @LocalServerPort int port;
     @MockitoBean ScreenshotTextExtractor extractor;
@@ -73,11 +78,38 @@ class ApiImportUploadLimitTest {
     }
 
     @Test
+    void anUploadOverTheRequestLimitIsAlsoJson413(CapturedOutput output) throws Exception {
+        users.save(new AppUser("Upload Limit", EMAIL, encoder.encode(PASSWORD)));
+        String token = signIn();
+        // Over the 6 MB request limit: refused on its declared length. Behind a proxy or on another client the
+        // connection may close instead, which is why the app checks 5 MB before sending (docs/api-v1.md).
+        HttpResponse<String> response = upload(token, new byte[7 * 1024 * 1024]);
+        assertThat(response.statusCode()).isEqualTo(413);
+        assertThat(json.readTree(response.body()).get("error").asText()).isEqualTo("too_large");
+        assertThat(response.headers().firstValue("Cache-Control").orElse("")).contains("no-store");
+        verify(extractor, never()).extract(any());
+        assertThat(output.getAll()).doesNotContain(FILE_NAME);
+    }
+
+    @Test
     void theWebsitesOwnUploadPathIsLeftAsItWas() throws Exception {
         HttpResponse<String> response = upload("/shifts/import-preview", null, new byte[5 * 1024 * 1024 + 300 * 1024]);
-        // The website keeps its own answer (its error handling, not the API JSON).
+        // The website's own answer, as before NA-07: its error handling's 413, never the API's JSON.
+        assertThat(response.statusCode()).isEqualTo(413);
+        assertThat(response.headers().firstValue("Content-Type").orElse("")).doesNotStartWith("application/json");
         assertThat(response.body()).doesNotContain("too_large");
         verify(extractor, never()).extract(any());
+    }
+
+    @Test
+    void onlyPostUploadsAreParsedAheadOfTheTokenCheck() throws Exception {
+        // A PUT upload to an API path isn't parsed by the limit filter: it goes on to the token check.
+        String boundary = "madeUpBoundary";
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/shifts/import-preview"))
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[5 * 1024 * 1024 + 300 * 1024])).build();
+        assertThat(http.send(request, HttpResponse.BodyHandlers.ofString()).statusCode()).isEqualTo(401);
     }
 
     private HttpResponse<String> upload(String token, byte[] content) throws Exception {
@@ -87,7 +119,7 @@ class ApiImportUploadLimitTest {
     private HttpResponse<String> upload(String path, String token, byte[] content) throws Exception {
         String boundary = "madeUpBoundary" + UUID.randomUUID().toString().replace("-", "");
         ByteArrayOutputStream body = new ByteArrayOutputStream();
-        body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"screenshot\"; filename=\"made-up.png\""
+        body.write(("--" + boundary + "\r\nContent-Disposition: form-data; name=\"screenshot\"; filename=\"" + FILE_NAME + "\""
                 + "\r\nContent-Type: image/png\r\n\r\n").getBytes(StandardCharsets.UTF_8));
         body.write(content);
         body.write(("\r\n--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
