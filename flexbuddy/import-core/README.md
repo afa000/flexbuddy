@@ -1,8 +1,12 @@
 # Shared screenshot import rules
 
-`com.angel:flexbuddy-import-core:0.1.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
+`com.angel:flexbuddy-import-core:0.1.1` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules. It performs
-no OCR, translation, persistence, file access or network calls. It is not published yet.
+no OCR, translation, persistence, file access or network calls. Releases are listed in
+[docs/import-core-releases.md](../../docs/import-core-releases.md).
+
+The native Android app runs it from API 26 (Android 8). Don't use JDK methods Android lacks at that level unless D8
+backports them; `AndroidApiCompatibilityTest` refuses `Stream.toList()` and `Matcher.results()` (API 34).
 
 Pass the account's current local date explicitly in `ParseContext`; the library never reads the clock or the
 device's locale. `parse(lines, year, context)` parses fields and year-rollover warnings; apply `ImportWarningRules`

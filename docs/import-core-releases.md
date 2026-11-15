@@ -1,8 +1,17 @@
 # Publishing the shared import library
 
-The release setup publishes `com.angel:flexbuddy-import-core:0.1.0` to
-`https://maven.pkg.github.com/afa000/flexbuddy`. **The first publication has not happened.** It requires this setup
-to be reviewed and merged, followed by the owner's approval of the actual release. Setup approval does not publish.
+The release setup publishes `com.angel:flexbuddy-import-core` to `https://maven.pkg.github.com/afa000/flexbuddy`.
+Every release needs the owner's approval of that actual release; merging a version bump does not publish.
+
+## Releases
+
+- **0.1.0**, published November 15, 2026 from tag `import-core-v0.1.0` (commit 2057ab8). Not usable on Android 8
+  to 13: it calls `Stream.toList()` and `Matcher.results()`, which Android only has from API 34 and D8 does not
+  backport, so every import there throws `NoSuchMethodError`.
+- **0.1.1**, prepared in NA-12-api26, not yet tagged or published. Replaces those calls with API-26-safe code that
+  returns the same results (same elements, order and unmodifiable lists); no parsing, warning or matching rule
+  changes. `AndroidApiCompatibilityTest` now refuses both calls. The server's source-module dependency is bumped
+  with it. Release it with the steps below, using `0.1.1` and tag `import-core-v0.1.1` in place of `0.1.0`.
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.

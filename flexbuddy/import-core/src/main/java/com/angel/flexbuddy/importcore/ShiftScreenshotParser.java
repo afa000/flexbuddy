@@ -8,12 +8,15 @@ import java.time.LocalTime;
 import java.time.Month;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.MatchResult;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 
 
@@ -91,8 +94,9 @@ public class ShiftScreenshotParser {
             "programaci6n");
 
     public ParsedShiftData parse(String rawText, int year, ParseContext context) {
-        List<String> textLines = Arrays.stream((rawText == null ? "" : rawText).split("\\R"))
-                .map(String::trim).filter(line -> !line.isBlank()).toList();
+        // Collectors.toList() rather than Stream.toList(), which Android only has from API 34.
+        List<String> textLines = Collections.unmodifiableList(Arrays.stream((rawText == null ? "" : rawText)
+                .split("\\R")).map(String::trim).filter(line -> !line.isBlank()).collect(Collectors.toList()));
         List<OcrLine> lines = new ArrayList<>();
         for (int index = 0; index < textLines.size(); index++) {
             lines.add(new OcrLine(textLines.get(index), 100, 0, 0, 0, 0, index));
@@ -242,6 +246,16 @@ public class ShiftScreenshotParser {
 
     private record ParsedMoney(ParsedField<BigDecimal> basePay, ParsedField<BigDecimal> tips) {}
 
+    /**
+     * Same as {@code matcher.results().toList()}: every match in order, as unmodifiable snapshots. Android has
+     * neither Matcher.results() nor Stream.toList() below API 34, and D8 does not backport them.
+     */
+    private static List<MatchResult> matchResults(Matcher matcher) {
+        List<MatchResult> results = new ArrayList<>();
+        while (matcher.find()) results.add(matcher.toMatchResult());
+        return Collections.unmodifiableList(results);
+    }
+
     private ParsedMoney parseMoney(List<OcrLine> lines) {
         ParsedField<BigDecimal> base = ParsedField.missing();
         ParsedField<BigDecimal> tips = ParsedField.missing();
@@ -249,7 +263,7 @@ public class ShiftScreenshotParser {
         boolean[] labeledValues = new boolean[lines.size()];
         for (int index = 0; index < lines.size(); index++) {
             OcrLine line = lines.get(index);
-            var labels = MONEY_LABEL_PATTERN.matcher(line.text()).results().toList();
+            List<MatchResult> labels = matchResults(MONEY_LABEL_PATTERN.matcher(line.text()));
             for (int position = 0; position < labels.size(); position++) {
                 var label = labels.get(position);
                 boolean tipLabel = label.group(1) != null;
