@@ -33,10 +33,10 @@ existing opt-in OcrSampleAccuracyTest. Nothing in the shipped parser, earnings l
   ignored local artifacts. No production operations, dependencies, push or PR.
 
 ## Acceptance criteria
-- [ ] Six-field scoring and fully-labelled/all-six counts, with five-field compatibility.
-- [ ] Synthetic scoring tests pass.
-- [ ] Private tips labels reviewed and limitations recorded without disclosing values or source names.
-- [ ] verify.ps1 -TaskId NA-12-tips results/skips and baseline aggregates recorded in implementation note.
+- [x] Six-field scoring and fully-labelled/all-six counts, with five-field compatibility.
+- [x] Synthetic scoring tests pass.
+- [x] Private tips labels reviewed and limitations recorded without disclosing values or source names.
+- [x] verify.ps1 -TaskId NA-12-tips results/skips and baseline aggregates recorded in implementation note.
 
 ## Validation
 Run existing wrapper tests and scripts/verify.ps1; PostgreSQL migration test may remain explicitly skipped if no

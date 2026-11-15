@@ -30,14 +30,15 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
  * Measures how often the screenshot import reads each field right on a folder of real Flex screenshots. Those
  * screenshots belong to drivers, so they and their expected values stay outside the repository:
  * FLEXBUDDY_OCR_SAMPLES names the folder, and FLEXBUDDY_OCR_LABELS a CSV of
- * {@code file,station,date(MM-dd),start(HH:mm),end(HH:mm),pay}, where an empty value is not checked and a line
+ * {@code file,station,date(MM-dd),start(HH:mm),end(HH:mm),pay,tips}, where tips is optional for legacy CSVs.
+ * An empty value is not checked and a line
  * starting with # is a comment. The report goes to target/ocr-samples/.
  */
 @Tag("ocr-samples")
 @EnabledIfEnvironmentVariable(named = "FLEXBUDDY_OCR_SAMPLES", matches = ".+")
 class OcrSampleAccuracyTest {
 
-    private static final String[] FIELDS = {"station", "date", "start", "end", "pay"};
+    private static final String[] FIELDS = OcrSampleScoring.FIELDS;
     private static final DateTimeFormatter MONTH_DAY = DateTimeFormatter.ofPattern("MM-dd");
 
     private final ScreenshotPreprocessor preprocessor = new ScreenshotPreprocessor();
@@ -62,6 +63,9 @@ class OcrSampleAccuracyTest {
 
         int[] checked = new int[FIELDS.length];
         int[] correct = new int[FIELDS.length];
+        int processed = 0;
+        int fullyLabelled = 0;
+        int allSixCorrect = 0;
         List<String> report = new ArrayList<>();
         report.add("file,field,expected,actual,ok");
         ParseContext context = new ParseContext(LocalDate.of(2026, 10, 21), null);
@@ -69,6 +73,7 @@ class OcrSampleAccuracyTest {
             String name = image.getFileName().toString();
             String[] expected = labels.get(name);
             if (!labels.isEmpty() && expected == null) continue;
+            processed++;
 
             OcrResult ocr = extractor.extract(read(image));
             Files.writeString(output.resolve("text").resolve(name + ".txt"), ocr.text(), StandardCharsets.UTF_8);
@@ -78,17 +83,19 @@ class OcrSampleAccuracyTest {
                     parsed.date().value() == null ? null : parsed.date().value().format(MONTH_DAY),
                     Objects.toString(parsed.startTime().value(), null),
                     Objects.toString(parsed.endTime().value(), null),
-                    parsed.basePay().value() == null ? null : plain(parsed.basePay().value())
+                    parsed.basePay().value() == null ? null : plain(parsed.basePay().value()),
+                    parsed.tips().value() == null ? null : plain(parsed.tips().value())
             };
+            List<OcrSampleScoring.Match> matches = OcrSampleScoring.compare(expected, actual);
+            if (OcrSampleScoring.fullyLabelled(matches)) fullyLabelled++;
+            if (OcrSampleScoring.allSixCorrect(matches)) allSixCorrect++;
             for (int field = 0; field < FIELDS.length; field++) {
                 String want = expected == null || expected.length <= field + 1 ? "" : expected[field + 1];
-                if (want.isEmpty()) {
+                if (matches.get(field) == OcrSampleScoring.Match.UNLABELLED) {
                     report.add(String.join(",", name, FIELDS[field], "", Objects.toString(actual[field], ""), ""));
                     continue;
                 }
-                boolean ok = field == 4
-                        ? actual[field] != null && new BigDecimal(want).compareTo(new BigDecimal(actual[field])) == 0
-                        : want.equals(actual[field]);
+                boolean ok = matches.get(field) == OcrSampleScoring.Match.CORRECT;
                 checked[field]++;
                 if (ok) correct[field]++;
                 report.add(String.join(",", name, FIELDS[field], want, Objects.toString(actual[field], ""), ok ? "yes" : "NO"));
@@ -96,7 +103,7 @@ class OcrSampleAccuracyTest {
         }
         Files.write(output.resolve("report.csv"), report, StandardCharsets.UTF_8);
 
-        StringBuilder summary = new StringBuilder("OCR sample accuracy over " + images.size() + " images:");
+        StringBuilder summary = new StringBuilder("OCR sample accuracy over " + processed + " processed images:");
         int allChecked = 0;
         int allCorrect = 0;
         for (int field = 0; field < FIELDS.length; field++) {
@@ -105,6 +112,8 @@ class OcrSampleAccuracyTest {
             allCorrect += correct[field];
         }
         summary.append(String.format(Locale.ROOT, "%n  %-8s %3d / %3d", "all", allCorrect, allChecked));
+        summary.append(String.format(Locale.ROOT, "%n  %-8s %3d / %3d fully labelled screenshots",
+                "all-six", allSixCorrect, fullyLabelled));
         Files.writeString(output.resolve("summary.txt"), summary, StandardCharsets.UTF_8);
         System.out.println(summary);
     }
