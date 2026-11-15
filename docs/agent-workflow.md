@@ -91,6 +91,22 @@ alone does not prove that a tool call is intercepted: perform the live refusal c
 
 Windows PowerShell 5.1 is enough; the scripts don't need PowerShell 7.
 
+### Building the server and shared import library
+
+From `flexbuddy/`, use `.\mvnw.cmd -B -ntp -f reactor/pom.xml verify` to verify the shared import library and server
+together. `scripts/verify.ps1` runs this reactor plus the Node suite. CI builds both modules from source.
+
+Before the first direct `.\mvnw.cmd spring-boot:run`, or after changing shared import rules, install the library:
+
+```powershell
+cd flexbuddy
+.\mvnw.cmd -B -ntp -f reactor/pom.xml -pl :flexbuddy-import-core -am install
+.\mvnw.cmd spring-boot:run
+```
+
+The Docker build also builds the library from source; no published package or credentials are required. See
+[`import-core/README.md`](../flexbuddy/import-core/README.md) for the consumer contract and pending Android checks.
+
 ### GitHub CLI
 
 Opening pull requests uses `gh`:

@@ -26,9 +26,14 @@ RUN curl -fL --retry 3 https://github.com/tesseract-ocr/tesseract/archive/refs/t
 FROM maven:3.9-eclipse-temurin-21 AS build
 WORKDIR /workspace
 COPY pom.xml .
-RUN mvn -B -ntp dependency:go-offline
+COPY reactor/pom.xml reactor/pom.xml
+COPY import-core/pom.xml import-core/pom.xml
+COPY import-core/src import-core/src
+# Install the source-built library before resolving the application's dependencies.
+RUN mvn -B -ntp -f import-core/pom.xml -DskipTests install \
+    && mvn -B -ntp dependency:go-offline
 COPY src ./src
-RUN mvn -B -ntp -DskipTests package
+RUN mvn -B -ntp -f reactor/pom.xml -DskipTests package
 COPY docker/OcrNativeSmokeCheck.java /smoke/OcrNativeSmokeCheck.java
 RUN mkdir /smoke/app \
     && cd /smoke/app \

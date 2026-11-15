@@ -33,6 +33,7 @@ class MessageKeysTest {
 
     private static final String FILE = "i18n/messages.properties";
     private static final Path JAVA = Path.of("src", "main", "java");
+    private static final Path IMPORT_CORE_JAVA = Path.of("import-core", "src", "main", "java");
     private static final Path SCRIPTS = Path.of("src", "main", "resources", "static", "js");
     /** Scripts whose text is not for the driver: error reports for the operator, and the data lines of the feedback mail. */
     private static final Set<String> NOT_TRANSLATED = Set.of("errors.js", "feedback.js", "i18n.js");
@@ -82,10 +83,11 @@ class MessageKeysTest {
 
     private static Map<String, String> javaSources() throws IOException {
         Map<String, String> sources = new TreeMap<>();
-        try (Stream<Path> files = Files.walk(JAVA)) {
-            for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
-                sources.put(JAVA.relativize(file).toString().replace('\\', '/'),
-                        Files.readString(file, StandardCharsets.UTF_8));
+        for (Path root : List.of(JAVA, IMPORT_CORE_JAVA)) {
+            try (Stream<Path> files = Files.walk(root)) {
+                for (Path file : files.filter(path -> path.toString().endsWith(".java")).toList()) {
+                    sources.put(file.toString().replace('\\', '/'), Files.readString(file, StandardCharsets.UTF_8));
+                }
             }
         }
         return sources;

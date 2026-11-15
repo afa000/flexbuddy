@@ -2,19 +2,17 @@ package com.angel.flexbuddy.service;
 
 public record ParsedField<T>(T value, Integer confidence, Integer lineIndex, ConfidenceLevel level) {
     public ParsedField {
-        if (value == null) {
-            confidence = null;
-            lineIndex = null;
-            level = ConfidenceLevel.MISSING;
-        } else if (level == null) {
-            level = levelFor(confidence);
-        }
+        var shared = new com.angel.flexbuddy.importcore.ParsedField<>(value, confidence, lineIndex,
+                level == null ? null : com.angel.flexbuddy.importcore.ConfidenceLevel.valueOf(level.name()));
+        confidence = shared.confidence();
+        lineIndex = shared.lineIndex();
+        level = ConfidenceLevel.valueOf(shared.level().name());
     }
 
     public static <T> ParsedField<T> found(T value, OcrLine line) {
         return value == null
                 ? missing()
-                : new ParsedField<>(value, line.confidence(), line.index(), levelFor(line.confidence()));
+                : new ParsedField<>(value, line.confidence(), line.index(), null);
     }
 
     public static <T> ParsedField<T> defaulted(T value) {
@@ -29,9 +27,4 @@ public record ParsedField<T>(T value, Integer confidence, Integer lineIndex, Con
         return new ParsedField<>(replacement, confidence, lineIndex, level);
     }
 
-    private static ConfidenceLevel levelFor(Integer confidence) {
-        if (confidence == null || confidence >= 80) return ConfidenceLevel.HIGH;
-        if (confidence >= 60) return ConfidenceLevel.MEDIUM;
-        return ConfidenceLevel.LOW;
-    }
 }

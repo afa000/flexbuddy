@@ -25,7 +25,7 @@ function Invoke-Check([string]$Name, [string]$Command, [string]$Log) {
 
 Push-Location $app
 try {
-    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd -B -ntp verify" "maven.log"
+    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd -B -ntp -f reactor/pom.xml verify" "maven.log"
     $js = Invoke-Check "JavaScript tests" "node --test src/test/js/*.test.js" "javascript.log"
 }
 finally {
