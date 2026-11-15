@@ -106,6 +106,8 @@ cd flexbuddy
 
 The Docker build also builds the library from source; no published package or credentials are required. See
 [`import-core/README.md`](../flexbuddy/import-core/README.md) for the consumer contract and pending Android checks.
+Its [manual release procedure](import-core-releases.md) covers separately approved publication and authenticated
+readers. Release guard tests use Python 3's standard library and run in CI without package-write permissions.
 
 ### GitHub CLI
 

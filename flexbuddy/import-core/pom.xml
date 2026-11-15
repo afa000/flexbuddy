@@ -7,6 +7,12 @@
     <version>0.1.0</version>
     <name>FlexBuddy screenshot import core</name>
     <description>Shared screenshot parsing and matching rules, with no runtime dependencies.</description>
+    <distributionManagement>
+        <repository>
+            <id>github-import-core</id>
+            <url>https://maven.pkg.github.com/afa000/flexbuddy</url>
+        </repository>
+    </distributionManagement>
     <properties>
         <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -22,6 +28,11 @@
     </dependencies>
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-deploy-plugin</artifactId>
+                <version>3.1.4</version>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
