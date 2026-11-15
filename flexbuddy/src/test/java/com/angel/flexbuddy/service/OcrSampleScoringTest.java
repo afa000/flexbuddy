@@ -52,4 +52,15 @@ class OcrSampleScoringTest {
         assertEquals(OcrSampleScoring.Match.INCORRECT, OcrSampleScoring.compare(expected, values).getFirst());
         assertFalse(OcrSampleScoring.allSixCorrect(List.of(OcrSampleScoring.Match.CORRECT)));
     }
+
+    @Test void unreadableMoneyLabelsNameTheFieldButNeverTheValue() {
+        for (int column : List.of(5, 6)) {
+            var labels = expected.clone();
+            labels[column] = "$9.99 made-up";
+            var error = assertThrows(IllegalArgumentException.class, () -> OcrSampleScoring.compare(labels, actual));
+            assertTrue(error.getMessage().contains(OcrSampleScoring.FIELDS[column - 1]));
+            assertFalse(error.getMessage().contains("9.99"));
+            assertNull(error.getCause(), "the parse error would carry the label text");
+        }
+    }
 }

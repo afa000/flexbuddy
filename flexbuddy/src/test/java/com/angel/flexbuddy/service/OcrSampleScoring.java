@@ -21,12 +21,22 @@ final class OcrSampleScoring {
                 matches.add(Match.UNLABELLED);
                 continue;
             }
+            BigDecimal wantMoney = field >= 4 ? money(want, field) : null;
             boolean correct = actual[field] != null && (field >= 4
-                    ? new BigDecimal(want).compareTo(new BigDecimal(actual[field])) == 0
+                    ? wantMoney.compareTo(new BigDecimal(actual[field])) == 0
                     : want.equals(actual[field]));
             matches.add(correct ? Match.CORRECT : Match.INCORRECT);
         }
         return List.copyOf(matches);
+    }
+
+    /** Labels are private: an unreadable one is reported by field name only, never by its value. */
+    private static BigDecimal money(String label, int field) {
+        try {
+            return new BigDecimal(label);
+        } catch (NumberFormatException unreadable) {
+            throw new IllegalArgumentException("Unreadable " + FIELDS[field] + " label; use a plain number such as 18.50");
+        }
     }
 
     static boolean fullyLabelled(List<Match> matches) {
