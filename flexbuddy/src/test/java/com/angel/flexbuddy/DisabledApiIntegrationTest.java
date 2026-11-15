@@ -75,12 +75,16 @@ class DisabledApiIntegrationTest {
         assertThat(context.getBeansOfType(ApiExpenseService.class)).isEmpty();
         assertThat(context.getBeansOfType(ApiPayoutController.class)).isEmpty();
         assertThat(context.getBeansOfType(ApiPayoutService.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiImportController.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiImportService.class)).isEmpty();
+        assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiUploadLimitConfig.class)).isEmpty();
+        assertThat(context.containsBean("apiUploadLimitFilter")).isFalse();
         assertThat(context.containsBean("apiSecurityFilterChain")).isFalse();
         for (String path : new String[]{"/api/v1", "/api/v1/account", "/api/v1/auth/sign-in", "/api/v1/unknown",
                 "/api/v1/shifts", "/api/v1/shifts/1", "/api/v1/shifts/1/start", "/api/v1/shifts/1/status",
                 "/api/v1/shifts/1/not-worked", "/api/v1/shifts/1/restore", "/api/v1/home",
                 "/api/v1/expenses", "/api/v1/expenses/1", "/api/v1/expenses/1/restore", "/api/v1/payouts",
-                "/api/v1/payouts/2026-11-13"}) {
+                "/api/v1/payouts/2026-11-13", "/api/v1/shifts/import-preview"}) {
             mvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(header().doesNotExist("Location"));
             mvc.perform(post(path)).andExpect(status().isNotFound());
             mvc.perform(delete(path)).andExpect(status().isNotFound());
