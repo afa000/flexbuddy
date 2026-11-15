@@ -97,7 +97,7 @@ environment rather than a literal token:
 ```
 
 The consumer's Maven repository id must be `flexbuddy-packages`, its URL must be the registry URL above, and its
-dependency must pin `com.angel:flexbuddy-import-core:0.1.0`. This task does not modify anyone's existing settings.
+dependency must pin `com.angel:flexbuddy-import-core:0.1.1`. This task does not modify anyone's existing settings.
 
 For the later Android task, inside the existing `dependencyResolutionManagement.repositories` block:
 
@@ -112,7 +112,7 @@ maven {
 }
 ```
 
-Pin `implementation("com.angel:flexbuddy-import-core:0.1.0")` in the app module. In its CI, the owner supplies the
+Pin `implementation("com.angel:flexbuddy-import-core:0.1.1")` in the app module. In its CI, the owner supplies the
 two environment variables from repository secrets only to jobs that need authenticated dependency resolution.
 Do not supply them to untrusted fork jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
 Actual resolution remains untested until the owner approves/releases the first version and configures a reader.
