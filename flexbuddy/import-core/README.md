@@ -34,8 +34,9 @@ Before running the application directly, install the local library from source:
 The repository's `scripts/verify.ps1` and CI run the reactor. Docker builds the same library from source inside the
 existing `flexbuddy/` context, without package credentials. Its executable server JAR embeds the thin library.
 
-Publishing and Android integration are separate follow-ups. Before choosing a phone OCR dependency, benchmark the
-same labelled screenshots and frozen parser version against the server for all six fields, including tips. The
+The [manual publishing setup](../../docs/import-core-releases.md) keeps first publication owner-operated; no package
+has been published by this change. Android integration remains separate. Before choosing a phone OCR dependency,
+benchmark the same labelled screenshots and frozen parser version against the server for all six fields, including tips. The
 existing server sample test measures five fields and cannot alone establish that gate.
 
 Android compatibility must be checked with the consuming app's Java 21/D8 toolchain and minimum SDK 26. The existing

@@ -1,0 +1,105 @@
+name: Publish import core
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Stable POM version with an existing import-core-vVERSION tag'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+# Serialize all versions of this artifact; never interrupt an upload.
+concurrency:
+  group: publish-import-core
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.ref == 'refs/heads/main' && github.repository == 'afa000/flexbuddy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.source.outputs.version }}
+      source-sha: ${{ steps.source.outputs.source-sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve an approved source revision
+        id: source
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/release/import_core.py resolve
+      # Keep the dispatch commit's staging tool out of reach of the tagged build. The digest is a step output,
+      # which the build cannot rewrite, so staging refuses a copy that changed while Maven ran.
+      - name: Keep a copy of the trusted release tooling
+        id: tooling
+        run: |
+          mkdir -p "$RUNNER_TEMP/release-tooling"
+          cp scripts/release/import_core.py "$RUNNER_TEMP/release-tooling/import_core.py"
+          echo "sha256=$(sha256sum scripts/release/import_core.py | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.source.outputs.source-sha }}
+          path: release-source
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          overwrite-settings: false
+      - name: Test and package only the tagged library
+        working-directory: release-source/flexbuddy
+        run: >-
+          sh ./mvnw -B -ntp -f import-core/pom.xml clean verify
+          dependency:tree -Dscope=runtime -DoutputFile=target/release-dependencies.txt
+      - name: Stage the checked JAR and POM
+        env:
+          RELEASE_VERSION: ${{ steps.source.outputs.version }}
+          RELEASE_SHA: ${{ steps.source.outputs.source-sha }}
+          TOOLING_SHA256: ${{ steps.tooling.outputs.sha256 }}
+        run: |
+          echo "$TOOLING_SHA256  $RUNNER_TEMP/release-tooling/import_core.py" | sha256sum --check --quiet
+          python3 -I "$RUNNER_TEMP/release-tooling/import_core.py" stage
+      - uses: actions/upload-artifact@v4
+        with:
+          name: import-core-release
+          path: ${{ runner.temp }}/import-core-release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.repository == 'afa000/flexbuddy'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      # This is the dispatch commit's trusted release tooling, not executable code from the release artifact.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: import-core-release
+          path: ${{ runner.temp }}/import-core-release/
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          overwrite-settings: false
+      - name: Check, upload and verify the immutable version
+        env:
+          RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+          RELEASE_SHA: ${{ needs.validate.outputs.source-sha }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/release/import_core.py publish
