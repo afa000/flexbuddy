@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 
@@ -41,7 +42,8 @@ public class ImportWarningRules {
             warnings.add(warning("TIPS_EXCEED_BASE", WarningSeverity.WARNING, "tips",
                     "import.warning.tipsExceedBase"));
         }
-        return shift.withWarnings(warnings.stream().distinct().toList());
+        // Same as stream().distinct(): first occurrence kept, in order. Stream.toList() is missing below Android 14.
+        return shift.withWarnings(new ArrayList<>(new LinkedHashSet<>(warnings)));
     }
 
     private void checkField(String field, ParsedField<?> value, List<ImportWarning> warnings, String missingKey,

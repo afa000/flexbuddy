@@ -13,7 +13,7 @@ import import_core as release
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.1.0"
+VERSION = "0.1.1"  # The real library POM version; the tests read that POM.
 SHA = "a" * 40
 POM = (ROOT / release.POM_PATH).read_bytes()
 ENV = {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main",
@@ -62,12 +62,12 @@ class ReleaseTests(unittest.TestCase):
 
     def test_pom_checks_real_coordinates_and_standalone_runtime_dependency_contract(self):
         release.check_pom(POM, VERSION)
-        invalid = [POM.replace(b"<version>0.1.0</version>", b"<version>0.1.1</version>", 1),
+        invalid = [POM.replace(f"<version>{VERSION}</version>".encode(), b"<version>9.9.9</version>", 1),
                    POM.replace(b"<scope>test</scope>", b"<scope>runtime</scope>"),
                    POM.replace(b"<scope>test</scope>", b""),
                    POM.replace(b"</project>", b"<parent/></project>"),
                    POM.replace(b"</project>", b"<profiles/></project>"),
-                   POM.replace(b"</project>", b"<version>0.1.0</version></project>"),
+                   POM.replace(b"</project>", f"<version>{VERSION}</version></project>".encode()),
                    POM.replace(b"https://maven.pkg.github.com/afa000/flexbuddy", b"https://example.test/other"),
                    b'<!DOCTYPE project [<!ENTITY example "no">]><project/>']
         for index, data in enumerate(invalid):
@@ -95,13 +95,13 @@ class ReleaseTests(unittest.TestCase):
         run("update-ref", "refs/remotes/origin/main", sha)
         with self.assertRaises(release.ReleaseError):
             release.resolve_source(repo, VERSION)  # Missing tag.
-        run("tag", "-a", "import-core-v0.1.0", "-m", "synthetic test tag")
+        run("tag", "-a", "import-core-v" + VERSION, "-m", "synthetic test tag")
         self.assertEqual(sha, release.resolve_source(repo, VERSION)["source-sha"])
         run("checkout", "-b", "unmerged")
         (repo / "unmerged.txt").write_text("synthetic", encoding="utf-8")
         run("add", ".")
         run("commit", "-m", "unmerged fixture")
-        run("tag", "-f", "import-core-v0.1.0")
+        run("tag", "-f", "import-core-v" + VERSION)
         with self.assertRaises(release.ReleaseError):
             release.resolve_source(repo, VERSION)
 
@@ -170,7 +170,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_existing_metadata_or_either_partial_artifact_refuses_upload(self):
         metadata = (b"<metadata><groupId>com.angel</groupId><artifactId>flexbuddy-import-core</artifactId>"
-                    b"<versioning><versions><version>0.1.0</version></versions></versioning></metadata>")
+                    + f"<versioning><versions><version>{VERSION}</version></versions></versioning></metadata>".encode())
         for responses in ([(200, metadata)], [(404, b""), (200, b"jar")],
                           [(404, b""), (404, b""), (200, b"pom")]):
             with self.subTest(responses=responses), self.assertRaises(release.ReleaseError):

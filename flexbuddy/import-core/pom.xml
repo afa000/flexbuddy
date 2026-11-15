@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.angel</groupId>
     <artifactId>flexbuddy-import-core</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.1</version>
     <name>FlexBuddy screenshot import core</name>
     <description>Shared screenshot parsing and matching rules, with no runtime dependencies.</description>
     <distributionManagement>
