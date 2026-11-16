@@ -25,7 +25,10 @@ class ShiftScreenshotParserTest {
                 "Total $90.50\nPropinas\n$18.50 Base $72.00",
                 "Total $90.50\nPago base $72.00\nPropinas $18.50",
                 "Propinas $18.50\nImporte base $72.00\nTotal $90.50",
-                "Total $90.50\nGanancias base\n\n$72.00\nPropinas\n$18.50")) {
+                "Total $90.50\nGanancias base\n\n$72.00\nPropinas\n$18.50",
+                // The current Spanish Block details screen calls the tip line "Consejos".
+                "Base $72.00\nConsejos (i) $18.50\nImporte total $90.50",
+                "Importe total $90.50\nConsejos\n$18.50\nBase\n$72.00")) {
             ParsedShiftData result = parser.parse(text, 2026);
             assertThat(result.basePay().value()).as(text).isEqualByComparingTo("72.00");
             assertThat(result.tips().value()).as(text).isEqualByComparingTo("18.50");
@@ -150,6 +153,122 @@ class ShiftScreenshotParserTest {
         ParsedShiftData result = parser.parse(text + "\nInicio\n9:00\nTerminar en\n10:00", 2026);
 
         assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // The current Spanish Block details header: weekday, then month, then day.
+            "jue, oct 22|2026-10-22",
+            "sáb., nov 8|2026-11-08",
+            "SAB, NOV 8|2026-11-08",
+            "mié, ene 7|2026-01-07",
+            "martes, oct 21|2026-10-21",
+            // "mar" here is martes, not marzo.
+            "mar, oct 21|2026-10-21",
+            "dom., sept 6|2026-09-06"
+    })
+    void parse_readsSpanishWeekdayMonthDay(String text, LocalDate expected) {
+        ParsedShiftData result = parser.parse(text + "\nInicio\n9:00\nTerminar en\n10:00", 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @Test
+    void parse_readsTheSpanishBlockDetailsScreen() {
+        // Laid out like the Spanish app's Block details screen; every value is made up.
+        String rawText = """
+                Detalles del bloque
+                jue, oct 15, 6:30 p.m. - 8:30 p.m.
+                $60
+                Pago programado para el lun, oct 19
+                Ganancias
+                Base $41
+                Consejos (i) $19
+                Importe total $60
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 10, 15));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(18, 30));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(20, 30));
+        assertThat(result.basePay().value()).isEqualByComparingTo("41");
+        assertThat(result.tips().value()).isEqualByComparingTo("19");
+    }
+
+    @Test
+    void parse_takesAnEarningsListDateFromTheBlockWhoseTimesAreUsed() {
+        // The Earnings list puts "Payment sent" rows above the blocks, and OCR splits each row over two lines.
+        String rawText = """
+                Earnings
+                Payment sent                $71
+                Wed, Aug 19
+                Mon, Aug 17                 $33
+                4:45 PM - 6:15 PM           Base: $27
+                Paid                        Tips: $6
+                Mon, Aug 17                 $27
+                2:45 PM - 4:15 PM           Base: $27
+                Paid                        Tips: $0
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 8, 17));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(18, 15));
+        assertThat(result.basePay().value()).isEqualByComparingTo("27");
+        assertThat(result.tips().value()).isEqualByComparingTo("6");
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "Block details\\nFri, Dec 18, 12:30 pm - 2:30 pm\\n$97\\nPayment scheduled for Fri, Dec 25\\nBase $38|2026-12-18",
+            "BLOCK DETAILS\\nThu, Aug 13\\n9:15 PM - 10:15 PM\\nPayment sent Tue, Aug 18\\nBase $26.50|2026-08-13",
+            "Wednesday, 10/14\\nSpringfield (DXX9) - Whole Foods\\n7:45 AM - 9:45 AM\\n$30.00 - $60.00|2026-10-14",
+            // A payment date directly above the time range is not the block's date.
+            "Block details\\nFri, Dec 18\\n$97\\nPayment scheduled for Fri, Dec 25\\n12:30 pm - 2:30 pm\\nBase $38|2026-12-18",
+            "13 de octubre\\nPago programado para el lun, oct 19\\n16:30 - 21:00|2026-10-13",
+            // Spanish date patterns are not tried near the range on an English screen.
+            "Fri, Sep 4\\nUpdated 2 hours ago\\n17:30 - 20:30|2026-09-04",
+            "Fri, Sep 4\\n12 hours may vary\\n17:30 - 20:30|2026-09-04",
+            "Fri, Sep 4\\nMarket Oct 22\\n17:30 - 20:30|2026-09-04"
+    })
+    void parse_keepsTheHeaderDateWhenTheLinesNearTheRangeHoldAnotherDate(String rawText, LocalDate expected) {
+        ParsedShiftData result = parser.parse(rawText.replace("\\n", "\n"), 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // A day-first Spanish date with the range on the same OCR line: the hour is not the day.
+            "13 MARTES OCTUBRE 16:45 - 21:15|2026-10-13",
+            "5 MIERCOLES MARZO 9:00 - 10:00|2026-03-05",
+            "jue, oct 22, 7:45 p.m. - 9:45 p.m.|2026-10-22"
+    })
+    void parse_neverReadsTheStartHourAsTheDay(String line, LocalDate expected) {
+        ParsedShiftData result = parser.parse(line, 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @Test
+    void parse_takesASpanishEarningsListDateFromTheBlockWhoseTimesAreUsed() {
+        // Short weekday names and no word the parser uses to recognise a Spanish screen; values are made up.
+        String rawText = """
+                Ganancias
+                Pago enviado                $71
+                mie, ago 19
+                lun, ago 17                 $33
+                4:45 p.m. - 6:15 p.m.       Base: $27
+                Pagado                      Consejos: $6
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 8, 17));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.tips().value()).isEqualByComparingTo("6");
     }
 
     @Test
