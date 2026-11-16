@@ -13,7 +13,7 @@ import import_core as release
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.1.1"  # The real library POM version; the tests read that POM.
+VERSION = "0.1.2"  # The real library POM version; the tests read that POM.
 SHA = "a" * 40
 POM = (ROOT / release.POM_PATH).read_bytes()
 ENV = {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main",

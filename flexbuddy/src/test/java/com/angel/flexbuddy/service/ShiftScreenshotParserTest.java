@@ -25,7 +25,10 @@ class ShiftScreenshotParserTest {
                 "Total $90.50\nPropinas\n$18.50 Base $72.00",
                 "Total $90.50\nPago base $72.00\nPropinas $18.50",
                 "Propinas $18.50\nImporte base $72.00\nTotal $90.50",
-                "Total $90.50\nGanancias base\n\n$72.00\nPropinas\n$18.50")) {
+                "Total $90.50\nGanancias base\n\n$72.00\nPropinas\n$18.50",
+                // The current Spanish Block details screen calls the tip line "Consejos".
+                "Base $72.00\nConsejos (i) $18.50\nImporte total $90.50",
+                "Importe total $90.50\nConsejos\n$18.50\nBase\n$72.00")) {
             ParsedShiftData result = parser.parse(text, 2026);
             assertThat(result.basePay().value()).as(text).isEqualByComparingTo("72.00");
             assertThat(result.tips().value()).as(text).isEqualByComparingTo("18.50");
@@ -150,6 +153,84 @@ class ShiftScreenshotParserTest {
         ParsedShiftData result = parser.parse(text + "\nInicio\n9:00\nTerminar en\n10:00", 2026);
 
         assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // The current Spanish Block details header: weekday, then month, then day.
+            "jue, oct 22|2026-10-22",
+            "sáb., nov 8|2026-11-08",
+            "SAB, NOV 8|2026-11-08",
+            "mié, ene 7|2026-01-07",
+            "martes, oct 21|2026-10-21",
+            // "mar" here is martes, not marzo.
+            "mar, oct 21|2026-10-21",
+            "dom., sept 6|2026-09-06"
+    })
+    void parse_readsSpanishWeekdayMonthDay(String text, LocalDate expected) {
+        ParsedShiftData result = parser.parse(text + "\nInicio\n9:00\nTerminar en\n10:00", 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @Test
+    void parse_readsTheSpanishBlockDetailsScreen() {
+        // Laid out like the Spanish app's Block details screen; every value is made up.
+        String rawText = """
+                Detalles del bloque
+                jue, oct 15, 6:30 p.m. - 8:30 p.m.
+                $60
+                Pago programado para el lun, oct 19
+                Ganancias
+                Base $41
+                Consejos (i) $19
+                Importe total $60
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 10, 15));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(18, 30));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(20, 30));
+        assertThat(result.basePay().value()).isEqualByComparingTo("41");
+        assertThat(result.tips().value()).isEqualByComparingTo("19");
+    }
+
+    @Test
+    void parse_takesAnEarningsListDateFromTheBlockWhoseTimesAreUsed() {
+        // The Earnings list puts "Payment sent" rows above the blocks, and OCR splits each row over two lines.
+        String rawText = """
+                Earnings
+                Payment sent                $71
+                Wed, Aug 19
+                Mon, Aug 17                 $33
+                4:45 PM - 6:15 PM           Base: $27
+                Paid                        Tips: $6
+                Mon, Aug 17                 $27
+                2:45 PM - 4:15 PM           Base: $27
+                Paid                        Tips: $0
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 8, 17));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.endTime().value()).isEqualTo(LocalTime.of(18, 15));
+        assertThat(result.basePay().value()).isEqualByComparingTo("27");
+        assertThat(result.tips().value()).isEqualByComparingTo("6");
+    }
+
+    @Test
+    void parse_keepsTheHeaderDateAbovePaymentDatesOnBlockDetails() {
+        for (String rawText : java.util.List.of(
+                "Block details\nFri, Dec 18, 12:30 pm - 2:30 pm\n$97\nPayment scheduled for Fri, Dec 25\nBase $38\nTips $59",
+                "BLOCK DETAILS\nThu, Aug 13\n9:15 PM - 10:15 PM\nPayment sent Tue, Aug 18\nBase $26.50\nTips $16.16",
+                "Wednesday, 10/14\nSpringfield (DXX9) - Whole Foods\n7:45 AM - 9:45 AM\n$30.00 - $60.00\n$30.00 + tips")) {
+            ParsedShiftData result = parser.parse(rawText, 2026);
+            LocalDate header = rawText.contains("Dec 18") ? LocalDate.of(2026, 12, 18)
+                    : rawText.contains("Aug 13") ? LocalDate.of(2026, 8, 13) : LocalDate.of(2026, 10, 14);
+            assertThat(result.date().value()).as(rawText).isEqualTo(header);
+        }
     }
 
     @Test

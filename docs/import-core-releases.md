@@ -8,10 +8,14 @@ Every release needs the owner's approval of that actual release; merging a versi
 - **0.1.0**, published November 15, 2026 from tag `import-core-v0.1.0` (commit 2057ab8). Not usable on Android 8
   to 13: it calls `Stream.toList()` and `Matcher.results()`, which Android only has from API 34 and D8 does not
   backport, so every import there throws `NoSuchMethodError`.
-- **0.1.1**, prepared in NA-12-api26, not yet tagged or published. Replaces those calls with API-26-safe code that
-  returns the same results (same elements, order and unmodifiable lists); no parsing, warning or matching rule
-  changes. `AndroidApiCompatibilityTest` now refuses both calls. The server's source-module dependency is bumped
-  with it. Release it with the steps below, using `0.1.1` and tag `import-core-v0.1.1` in place of `0.1.0`.
+- **0.1.1**, published November 15, 2026 from tag `import-core-v0.1.1` (commit 61d15cf). Replaces those calls with
+  API-26-safe code that returns the same results (same elements, order and unmodifiable lists); no parsing, warning
+  or matching rule changes. `AndroidApiCompatibilityTest` now refuses both calls.
+- **0.1.2**, prepared in NA-12-parser-fixes, not yet tagged or published. Reads the Spanish app's "Consejos" tip
+  line and its "jue, oct 22" date header, and takes an Earnings list's date from the block whose times are used
+  instead of a "Payment sent" row above it. Other screens parse as before. The server's source-module dependency is
+  bumped with it. Release it with the steps below, using `0.1.2` and tag `import-core-v0.1.2`; consumers keep
+  pinning 0.1.1 (below) until 0.1.2 is published.
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.

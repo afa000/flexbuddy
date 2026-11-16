@@ -45,6 +45,15 @@ public class ShiftScreenshotParser {
                     + "(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?"
                     + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\b");
     /**
+     * The Spanish Block details header puts a weekday first, then the month, then the day: "jue, oct 22", "sáb., nov 8".
+     * Matched on folded text. Requiring a month right after the weekday keeps "mar" (martes) from being read as March.
+     */
+    private static final Pattern SPANISH_WEEKDAY_DATE_PATTERN = Pattern.compile(
+            "\\b(?:lun|mar|mie|jue|vie|sab|dom)[a-z]*\\.?,?\\s+"
+                    + "(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?"
+                    + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\s+"
+                    + "(3[01]|[12]?[0-9])\\b");
+    /**
      * Flex leaves out ":00" on the hour, so 16:30 - 21, 19 - 22 and 5:30 p.m. - 8 p.m. are all ranges. Either side
      * may have minutes and a meridiem; a range where neither side has minutes needs a duration on its line.
      */
@@ -67,7 +76,7 @@ public class ShiftScreenshotParser {
             "(?:[$£€]|\\b(?:MXN|GBP|EUR)(?![A-Za-z]))\\s*([0-9]+(?:,[0-9]{3})*(?:\\.[0-9]{1,2})?)"
                     + "|\\b([0-9]+(?:[.,][0-9]{2})?)\\s*(?:MXN|GBP|EUR)\\b");
     private static final Pattern MONEY_LABEL_PATTERN = Pattern.compile(
-            "\\b(?:(?:pago|importe|ganancias)\\s+base|base(?:\\s+pay)?|(tips|propinas)|(total))\\b",
+            "\\b(?:(?:pago|importe|ganancias)\\s+base|base(?:\\s+pay)?|(tips|propinas|consejos)|(total))\\b",
             Pattern.CASE_INSENSITIVE);
     private static final Map<String, Month> MONTHS = Map.ofEntries(
             Map.entry("jan", Month.JANUARY), Map.entry("feb", Month.FEBRUARY),
@@ -108,8 +117,8 @@ public class ShiftScreenshotParser {
         List<OcrLine> safeLines = lines == null ? List.of() : lines;
         List<ImportWarning> warnings = new ArrayList<>();
         ParsedField<String> station = parseStation(safeLines);
-        ParsedField<LocalDate> date = parseDate(safeLines, year);
-        ParsedField<LocalTime>[] times = parseTimes(safeLines);
+        ParsedTimes times = parseTimes(safeLines);
+        ParsedField<LocalDate> date = parseDate(safeLines, year, times.rangeLine());
         ParsedMoney money = parseMoney(safeLines);
 
         if (date.value() != null && shouldUsePreviousYear(date.value(), context.today())) {
@@ -117,8 +126,11 @@ public class ShiftScreenshotParser {
             warnings.add(new ImportWarning("YEAR_ROLLOVER", WarningSeverity.INFO, "date",
                     "import.warning.yearRollover"));
         }
-        return new ParsedShiftData(station, date, times[0], times[1], money.basePay(), money.tips(), warnings);
+        return new ParsedShiftData(station, date, times.start(), times.end(), money.basePay(), money.tips(), warnings);
     }
+
+    /** The start and end, and the position of the line the range was read from, or -1 when it came from labels. */
+    private record ParsedTimes(ParsedField<LocalTime> start, ParsedField<LocalTime> end, int rangeLine) {}
 
     /** True when the text contains a word that only Spanish uses. */
     public static boolean looksSpanish(List<OcrLine> lines) {
@@ -145,37 +157,65 @@ public class ShiftScreenshotParser {
         return ParsedField.missing();
     }
 
-    private ParsedField<LocalDate> parseDate(List<OcrLine> lines, int year) {
+    /**
+     * An Earnings list shows several dated rows, with "Payment sent" rows above the blocks, so the block's own date
+     * is the one on the time range's line or the line above it. Otherwise the first date on the screen is used.
+     */
+    private ParsedField<LocalDate> parseDate(List<OcrLine> lines, int year, int rangeLine) {
         boolean spanish = looksSpanish(lines);
         boolean british = lines.stream().anyMatch(line -> BRITISH_PATTERN.matcher(line.text()).find());
-        for (OcrLine line : lines) {
-            Matcher numericDate = NUMERIC_DATE_PATTERN.matcher(line.text());
-            if (numericDate.find()) {
-                // Mexican and British Flex write the day first and US Spanish the month first, padded (07/28).
-                boolean dayFirst = british || spanish && !numericDate.group(1).startsWith("0");
-                LocalDate date = numericDate(year, numericDate.group(1), numericDate.group(2), dayFirst);
-                if (date != null) return ParsedField.found(date, line);
-            }
-            Matcher namedDate = NAMED_DATE_PATTERN.matcher(line.text());
-            if (namedDate.find()) {
-                Month month = MONTHS.get(namedDate.group(1).substring(0, 3).toLowerCase(Locale.ROOT));
-                LocalDate date = createDate(year, month.getValue(), Integer.parseInt(namedDate.group(2)));
-                if (date != null) return ParsedField.found(date, line);
-            }
+        for (int index = rangeLine; index >= 0 && index >= rangeLine - 1; index--) {
+            OcrLine line = lines.get(index);
+            LocalDate date = englishDate(line, year, spanish, british);
+            if (date == null) date = spanishDate(line, year);
+            if (date != null) return ParsedField.found(date, line);
         }
         for (OcrLine line : lines) {
-            Matcher spanishDate = SPANISH_DATE_PATTERN.matcher(fold(line.text()));
-            if (spanishDate.find()) {
-                Month month = SPANISH_MONTHS.get(spanishDate.group(2).substring(0, 3));
-                LocalDate date = createDate(year, month.getValue(), Integer.parseInt(spanishDate.group(1)));
-                if (date != null) return ParsedField.found(date, line);
-            }
+            LocalDate date = englishDate(line, year, spanish, british);
+            if (date != null) return ParsedField.found(date, line);
+        }
+        for (OcrLine line : lines) {
+            LocalDate date = spanishDate(line, year);
+            if (date != null) return ParsedField.found(date, line);
         }
         return ParsedField.missing();
     }
 
-    @SuppressWarnings("unchecked")
-    private ParsedField<LocalTime>[] parseTimes(List<OcrLine> lines) {
+    /** A numeric date such as 9/6, or an English weekday and month such as Fri, Sep 4. */
+    private LocalDate englishDate(OcrLine line, int year, boolean spanish, boolean british) {
+        Matcher numericDate = NUMERIC_DATE_PATTERN.matcher(line.text());
+        if (numericDate.find()) {
+            // Mexican and British Flex write the day first and US Spanish the month first, padded (07/28).
+            boolean dayFirst = british || spanish && !numericDate.group(1).startsWith("0");
+            LocalDate date = numericDate(year, numericDate.group(1), numericDate.group(2), dayFirst);
+            if (date != null) return date;
+        }
+        Matcher namedDate = NAMED_DATE_PATTERN.matcher(line.text());
+        if (namedDate.find()) {
+            Month month = MONTHS.get(namedDate.group(1).substring(0, 3).toLowerCase(Locale.ROOT));
+            return createDate(year, month.getValue(), Integer.parseInt(namedDate.group(2)));
+        }
+        return null;
+    }
+
+    /** "jue, oct 22", then the day-first forms such as 13 de octubre. */
+    private LocalDate spanishDate(OcrLine line, int year) {
+        String folded = fold(line.text());
+        Matcher weekdayDate = SPANISH_WEEKDAY_DATE_PATTERN.matcher(folded);
+        if (weekdayDate.find()) {
+            Month month = SPANISH_MONTHS.get(weekdayDate.group(1).substring(0, 3));
+            LocalDate date = createDate(year, month.getValue(), Integer.parseInt(weekdayDate.group(2)));
+            if (date != null) return date;
+        }
+        Matcher spanishDate = SPANISH_DATE_PATTERN.matcher(folded);
+        if (spanishDate.find()) {
+            Month month = SPANISH_MONTHS.get(spanishDate.group(2).substring(0, 3));
+            return createDate(year, month.getValue(), Integer.parseInt(spanishDate.group(1)));
+        }
+        return null;
+    }
+
+    private ParsedTimes parseTimes(List<OcrLine> lines) {
         for (int index = 0; index < lines.size(); index++) {
             OcrLine line = lines.get(index);
             String text = line.text();
@@ -191,7 +231,7 @@ public class ShiftScreenshotParser {
                 if (bareHours && !DURATION_PATTERN.matcher(text).find()) continue;
                 LocalTime start = toLocalTime(matcher.group(1), matcher.group(2), matcher.group(3));
                 LocalTime end = toLocalTime(matcher.group(4), matcher.group(5), matcher.group(6));
-                return new ParsedField[] {ParsedField.found(start, line), ParsedField.found(end, line)};
+                return new ParsedTimes(ParsedField.found(start, line), ParsedField.found(end, line), index);
             }
         }
         // Flex also shows the start and end under their own labels, in either language.
@@ -203,9 +243,9 @@ public class ShiftScreenshotParser {
                 Matcher matcher = TIME_TOKEN_PATTERN.matcher(line.text());
                 while (matcher.find()) all.add(ParsedField.found(toLocalTime(matcher), line));
             }
-            if (all.size() == 2) return new ParsedField[] {all.get(0), all.get(1)};
+            if (all.size() == 2) return new ParsedTimes(all.get(0), all.get(1), -1);
         }
-        return new ParsedField[] {start, end};
+        return new ParsedTimes(start, end, -1);
     }
 
     /** The first time after the label, on its own line or one of the next two. */

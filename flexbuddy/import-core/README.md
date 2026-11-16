@@ -1,6 +1,6 @@
 # Shared screenshot import rules
 
-`com.angel:flexbuddy-import-core:0.1.1` is a plain Java 21 JAR with no runtime dependencies. It contains the
+`com.angel:flexbuddy-import-core:0.1.2` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules. It performs
 no OCR, translation, persistence, file access or network calls. Releases are listed in
 [docs/import-core-releases.md](../../docs/import-core-releases.md).
