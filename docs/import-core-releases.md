@@ -11,11 +11,10 @@ Every release needs the owner's approval of that actual release; merging a versi
 - **0.1.1**, published November 15, 2026 from tag `import-core-v0.1.1` (commit 61d15cf). Replaces those calls with
   API-26-safe code that returns the same results (same elements, order and unmodifiable lists); no parsing, warning
   or matching rule changes. `AndroidApiCompatibilityTest` now refuses both calls.
-- **0.1.2**, prepared in NA-12-parser-fixes, not yet tagged or published. Reads the Spanish app's "Consejos" tip
-  line and its "jue, oct 22" date header, and takes an Earnings list's date from the block whose times are used
-  instead of a "Payment sent" row above it. Other screens parse as before. The server's source-module dependency is
-  bumped with it. Release it with the steps below, using `0.1.2` and tag `import-core-v0.1.2`; consumers keep
-  pinning 0.1.1 (below) until 0.1.2 is published.
+- **0.1.2**, published November 15, 2026 from tag `import-core-v0.1.2` (commit f6392ce, Publish import core run
+  43787558971). Reads the Spanish app's "Consejos" tip line and its "jue, oct 22" date header, and takes an Earnings
+  list's date from the block whose times are used instead of a "Payment sent" row above it. Other screens parse as
+  before. The Android app pins it from FB-039. **Use 0.1.2.**
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.
@@ -101,9 +100,9 @@ environment rather than a literal token:
 ```
 
 The consumer's Maven repository id must be `flexbuddy-packages`, its URL must be the registry URL above, and its
-dependency must pin `com.angel:flexbuddy-import-core:0.1.1`. This task does not modify anyone's existing settings.
+dependency must pin `com.angel:flexbuddy-import-core:0.1.2`. This task does not modify anyone's existing settings.
 
-For the later Android task, inside the existing `dependencyResolutionManagement.repositories` block:
+The Android app (FB-038, FB-039) uses this, inside its `dependencyResolutionManagement.repositories` block:
 
 ```kotlin
 maven {
@@ -116,10 +115,12 @@ maven {
 }
 ```
 
-Pin `implementation("com.angel:flexbuddy-import-core:0.1.1")` in the app module. In its CI, the owner supplies the
-two environment variables from repository secrets only to jobs that need authenticated dependency resolution.
-Do not supply them to untrusted fork jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
-Actual resolution remains untested until the owner approves/releases the first version and configures a reader.
+Pin `implementation("com.angel:flexbuddy-import-core:0.1.2")` in the app module, with the release run's manifest
+hashes in Gradle dependency verification. In its CI, the owner supplies the two environment variables from
+repository secrets only to jobs that need authenticated dependency resolution. Do not supply them to untrusted fork
+jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
+Resolution is proven: a clean Maven consumer read 0.1.0 with a read-only token, and the Android CI resolves 0.1.2
+with the repository secrets.
 
 ## Failure and partial publication
 
