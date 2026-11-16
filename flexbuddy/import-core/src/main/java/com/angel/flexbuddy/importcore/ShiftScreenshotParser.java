@@ -46,13 +46,16 @@ public class ShiftScreenshotParser {
                     + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\b");
     /**
      * The Spanish Block details header puts a weekday first, then the month, then the day: "jue, oct 22", "sáb., nov 8".
-     * Matched on folded text. Requiring a month right after the weekday keeps "mar" (martes) from being read as March.
+     * Matched on folded text. Requiring a month right after the weekday keeps "mar" (martes) from being read as March,
+     * and the day must not start a time, so "13 MARTES OCTUBRE 16:45 - 21:15" stays the 13th.
      */
     private static final Pattern SPANISH_WEEKDAY_DATE_PATTERN = Pattern.compile(
             "\\b(?:lun|mar|mie|jue|vie|sab|dom)[a-z]*\\.?,?\\s+"
                     + "(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?"
                     + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\s+"
-                    + "(3[01]|[12]?[0-9])\\b");
+                    + "(3[01]|[12]?[0-9])\\b(?!\\s*[:.]\\d)");
+    /** "Payment scheduled for Fri, Dec 25" and "Pago programado para el lun, oct 19" date the payment, not the block. */
+    private static final Pattern PAYMENT_LINE_PATTERN = Pattern.compile("\\b(?:payment|pago)\\b");
     /**
      * Flex leaves out ":00" on the hour, so 16:30 - 21, 19 - 22 and 5:30 p.m. - 8 p.m. are all ranges. Either side
      * may have minutes and a meridiem; a range where neither side has minutes needs a duration on its line.
@@ -159,15 +162,17 @@ public class ShiftScreenshotParser {
 
     /**
      * An Earnings list shows several dated rows, with "Payment sent" rows above the blocks, so the block's own date
-     * is the one on the time range's line or the line above it. Otherwise the first date on the screen is used.
+     * is the one on the time range's line or the line above it. A payment line there is skipped, and the loose Spanish
+     * forms are only tried there on a Spanish screen. Otherwise the first date on the screen is used, as before.
      */
     private ParsedField<LocalDate> parseDate(List<OcrLine> lines, int year, int rangeLine) {
         boolean spanish = looksSpanish(lines);
         boolean british = lines.stream().anyMatch(line -> BRITISH_PATTERN.matcher(line.text()).find());
         for (int index = rangeLine; index >= 0 && index >= rangeLine - 1; index--) {
             OcrLine line = lines.get(index);
+            if (PAYMENT_LINE_PATTERN.matcher(fold(line.text())).find()) continue;
             LocalDate date = englishDate(line, year, spanish, british);
-            if (date == null) date = spanishDate(line, year);
+            if (date == null && spanish) date = spanishDate(line, year);
             if (date != null) return ParsedField.found(date, line);
         }
         for (OcrLine line : lines) {

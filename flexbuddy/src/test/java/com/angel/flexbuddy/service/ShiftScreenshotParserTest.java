@@ -220,17 +220,36 @@ class ShiftScreenshotParserTest {
         assertThat(result.tips().value()).isEqualByComparingTo("6");
     }
 
-    @Test
-    void parse_keepsTheHeaderDateAbovePaymentDatesOnBlockDetails() {
-        for (String rawText : java.util.List.of(
-                "Block details\nFri, Dec 18, 12:30 pm - 2:30 pm\n$97\nPayment scheduled for Fri, Dec 25\nBase $38\nTips $59",
-                "BLOCK DETAILS\nThu, Aug 13\n9:15 PM - 10:15 PM\nPayment sent Tue, Aug 18\nBase $26.50\nTips $16.16",
-                "Wednesday, 10/14\nSpringfield (DXX9) - Whole Foods\n7:45 AM - 9:45 AM\n$30.00 - $60.00\n$30.00 + tips")) {
-            ParsedShiftData result = parser.parse(rawText, 2026);
-            LocalDate header = rawText.contains("Dec 18") ? LocalDate.of(2026, 12, 18)
-                    : rawText.contains("Aug 13") ? LocalDate.of(2026, 8, 13) : LocalDate.of(2026, 10, 14);
-            assertThat(result.date().value()).as(rawText).isEqualTo(header);
-        }
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "Block details\\nFri, Dec 18, 12:30 pm - 2:30 pm\\n$97\\nPayment scheduled for Fri, Dec 25\\nBase $38|2026-12-18",
+            "BLOCK DETAILS\\nThu, Aug 13\\n9:15 PM - 10:15 PM\\nPayment sent Tue, Aug 18\\nBase $26.50|2026-08-13",
+            "Wednesday, 10/14\\nSpringfield (DXX9) - Whole Foods\\n7:45 AM - 9:45 AM\\n$30.00 - $60.00|2026-10-14",
+            // A payment date directly above the time range is not the block's date.
+            "Block details\\nFri, Dec 18\\n$97\\nPayment scheduled for Fri, Dec 25\\n12:30 pm - 2:30 pm\\nBase $38|2026-12-18",
+            "13 de octubre\\nPago programado para el lun, oct 19\\n16:30 - 21:00|2026-10-13",
+            // Spanish date patterns are not tried near the range on an English screen.
+            "Fri, Sep 4\\nUpdated 2 hours ago\\n17:30 - 20:30|2026-09-04",
+            "Fri, Sep 4\\n12 hours may vary\\n17:30 - 20:30|2026-09-04",
+            "Fri, Sep 4\\nMarket Oct 22\\n17:30 - 20:30|2026-09-04"
+    })
+    void parse_keepsTheHeaderDateWhenTheLinesNearTheRangeHoldAnotherDate(String rawText, LocalDate expected) {
+        ParsedShiftData result = parser.parse(rawText.replace("\\n", "\n"), 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            // A day-first Spanish date with the range on the same OCR line: the hour is not the day.
+            "13 MARTES OCTUBRE 16:45 - 21:15|2026-10-13",
+            "5 MIERCOLES MARZO 9:00 - 10:00|2026-03-05",
+            "jue, oct 22, 7:45 p.m. - 9:45 p.m.|2026-10-22"
+    })
+    void parse_neverReadsTheStartHourAsTheDay(String line, LocalDate expected) {
+        ParsedShiftData result = parser.parse(line, 2026);
+
+        assertThat(result.date().value()).isEqualTo(expected);
     }
 
     @Test
