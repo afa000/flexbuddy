@@ -46,11 +46,12 @@ public class ShiftScreenshotParser {
                     + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\b");
     /**
      * The Spanish Block details header puts a weekday first, then the month, then the day: "jue, oct 22", "sáb., nov 8".
-     * Matched on folded text. Requiring a month right after the weekday keeps "mar" (martes) from being read as March,
-     * and the day must not start a time, so "13 MARTES OCTUBRE 16:45 - 21:15" stays the 13th.
+     * Matched on folded text. The weekday must be a whole Spanish weekday word, so English text such as "Market Oct 22"
+     * never matches; requiring a month right after it keeps "mar" (martes) from being read as March; and the day must
+     * not start a time, so "13 MARTES OCTUBRE 16:45 - 21:15" stays the 13th.
      */
     private static final Pattern SPANISH_WEEKDAY_DATE_PATTERN = Pattern.compile(
-            "\\b(?:lun|mar|mie|jue|vie|sab|dom)[a-z]*\\.?,?\\s+"
+            "\\b(?:lun(?:es)?|mar(?:tes)?|mie(?:rcoles)?|jue(?:ves)?|vie(?:rnes)?|sab(?:ado)?|dom(?:ingo)?)\\b\\.?,?\\s+"
                     + "(ene(?:ro)?|feb(?:rero)?|mar(?:zo)?|abr(?:il)?|may(?:o)?|jun(?:io)?|jul(?:io)?|ago(?:sto)?"
                     + "|sep(?:t(?:iembre)?)?|set(?:iembre)?|oct(?:ubre)?|nov(?:iembre)?|dic(?:iembre)?)\\.?\\s+"
                     + "(3[01]|[12]?[0-9])\\b(?!\\s*[:.]\\d)");
@@ -162,8 +163,9 @@ public class ShiftScreenshotParser {
 
     /**
      * An Earnings list shows several dated rows, with "Payment sent" rows above the blocks, so the block's own date
-     * is the one on the time range's line or the line above it. A payment line there is skipped, and the loose Spanish
-     * forms are only tried there on a Spanish screen. Otherwise the first date on the screen is used, as before.
+     * is the one on the time range's line or the line above it. A payment line there is skipped. The strict Spanish
+     * weekday form ("lun, ago 17") is tried there on any screen, because short weekdays don't mark a screen as Spanish;
+     * the loose day-first forms only on a Spanish screen. Otherwise the first date on the screen is used, as before.
      */
     private ParsedField<LocalDate> parseDate(List<OcrLine> lines, int year, int rangeLine) {
         boolean spanish = looksSpanish(lines);
@@ -172,7 +174,8 @@ public class ShiftScreenshotParser {
             OcrLine line = lines.get(index);
             if (PAYMENT_LINE_PATTERN.matcher(fold(line.text())).find()) continue;
             LocalDate date = englishDate(line, year, spanish, british);
-            if (date == null && spanish) date = spanishDate(line, year);
+            if (date == null) date = spanishWeekdayDate(line, year);
+            if (date == null && spanish) date = spanishDayFirstDate(line, year);
             if (date != null) return ParsedField.found(date, line);
         }
         for (OcrLine line : lines) {
@@ -205,19 +208,24 @@ public class ShiftScreenshotParser {
 
     /** "jue, oct 22", then the day-first forms such as 13 de octubre. */
     private LocalDate spanishDate(OcrLine line, int year) {
-        String folded = fold(line.text());
-        Matcher weekdayDate = SPANISH_WEEKDAY_DATE_PATTERN.matcher(folded);
-        if (weekdayDate.find()) {
-            Month month = SPANISH_MONTHS.get(weekdayDate.group(1).substring(0, 3));
-            LocalDate date = createDate(year, month.getValue(), Integer.parseInt(weekdayDate.group(2)));
-            if (date != null) return date;
-        }
-        Matcher spanishDate = SPANISH_DATE_PATTERN.matcher(folded);
-        if (spanishDate.find()) {
-            Month month = SPANISH_MONTHS.get(spanishDate.group(2).substring(0, 3));
-            return createDate(year, month.getValue(), Integer.parseInt(spanishDate.group(1)));
-        }
-        return null;
+        LocalDate date = spanishWeekdayDate(line, year);
+        return date != null ? date : spanishDayFirstDate(line, year);
+    }
+
+    /** A Spanish weekday word, then the month, then the day: "jue, oct 22". */
+    private LocalDate spanishWeekdayDate(OcrLine line, int year) {
+        Matcher weekdayDate = SPANISH_WEEKDAY_DATE_PATTERN.matcher(fold(line.text()));
+        if (!weekdayDate.find()) return null;
+        Month month = SPANISH_MONTHS.get(weekdayDate.group(1).substring(0, 3));
+        return createDate(year, month.getValue(), Integer.parseInt(weekdayDate.group(2)));
+    }
+
+    /** The day-first forms: 13 de octubre, 13 MARTES OCTUBRE, mar., 13 oct. */
+    private LocalDate spanishDayFirstDate(OcrLine line, int year) {
+        Matcher spanishDate = SPANISH_DATE_PATTERN.matcher(fold(line.text()));
+        if (!spanishDate.find()) return null;
+        Month month = SPANISH_MONTHS.get(spanishDate.group(2).substring(0, 3));
+        return createDate(year, month.getValue(), Integer.parseInt(spanishDate.group(1)));
     }
 
     private ParsedTimes parseTimes(List<OcrLine> lines) {

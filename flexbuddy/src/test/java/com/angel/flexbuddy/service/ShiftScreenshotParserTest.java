@@ -253,6 +253,25 @@ class ShiftScreenshotParserTest {
     }
 
     @Test
+    void parse_takesASpanishEarningsListDateFromTheBlockWhoseTimesAreUsed() {
+        // Short weekday names and no word the parser uses to recognise a Spanish screen; values are made up.
+        String rawText = """
+                Ganancias
+                Pago enviado                $71
+                mie, ago 19
+                lun, ago 17                 $33
+                4:45 p.m. - 6:15 p.m.       Base: $27
+                Pagado                      Consejos: $6
+                """;
+
+        ParsedShiftData result = parser.parse(rawText, 2026);
+
+        assertThat(result.date().value()).isEqualTo(LocalDate.of(2026, 8, 17));
+        assertThat(result.startTime().value()).isEqualTo(LocalTime.of(16, 45));
+        assertThat(result.tips().value()).isEqualByComparingTo("6");
+    }
+
+    @Test
     void parse_readsSpanishNumericDateDayFirstAndEnglishMonthFirst() {
         ParsedShiftData spanish = parser.parse("domingo, 6/9\nInicio\n9:00\nTerminar en\n10:00", 2026);
         ParsedShiftData english = parser.parse("Sunday, 6/9\n15:15 - 19:15", 2026);
