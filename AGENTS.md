@@ -101,8 +101,9 @@ node --test "src/test/js/*.test.js"
 ## Android and the emulator
 
 - The Android emulator has the Play Store build of FlexBuddy installed. It is signed in to **production** as the Play
-  Reviewer account. Use it for read-only checks only (launch, offline start, cached screens). Never add, edit, delete or
-  queue anything there. Test anything that writes data against `localhost:8080` with a local test account.
+  Reviewer account, which Google's reviewers may open. It is kept for testing, so you may add, edit and delete data in
+  it when a test needs it: use made-up data only and remove what you added before you finish. Prefer `localhost:8080`
+  with a local test account for anything heavy or risky, and never touch any other production account.
 - In the Play Store listing, the Uninstall button under "Installed on all devices" removes the app from the owner's
   real phone. Never press it.
 - Keystores, passwords and signed builds never go in the repository, scripts, logs or chat. Signing is done by the

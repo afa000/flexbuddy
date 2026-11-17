@@ -498,8 +498,8 @@ Android build. A wrapper change (icons, share target, manifest settings) goes li
 3. You sign the APK and AAB yourself in an interactive terminal, following [android/README.md](../android/README.md).
    No agent handles the keystore or its password.
 4. Check the build on the emulator. The Play-installed app there is signed in to production as the Play Reviewer
-   account: launch, offline start and cached screens only, never add, edit or delete anything. Test anything that
-   writes data against `localhost:8080` with a local test account.
+   account. Agents may add, edit and delete made-up data there when a test needs it and must clean it up afterwards;
+   heavier write testing goes against `localhost:8080` with a local test account.
 5. Upload to Play yourself, then record the upload in
    [android/CHANGELOG-android.md](../android/CHANGELOG-android.md): what changed, how it was built and tested, and the
    track and date.
