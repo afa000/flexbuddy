@@ -360,6 +360,9 @@ least `MINIMUM_OVERLAP_MINUTES`) is small.
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
 
+Status (November 16, 2026): step 1 is task NA-13 (`.ai/tasks/NA-13.md`), library 0.2.0, not yet published. Still
+open: publishing 0.2.0, moving the CSV writers into the library (step 4's server half), and the app steps 2 to 6.
+
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
 join, and it makes the app useful with no signal and on a small data plan. Checked November 11, 2026:
 `GoalProgressCalculator` (37 lines), `PayPeriodCalculator` (80), `IrsMileageRates` (57) and `MileageRates` (31) depend

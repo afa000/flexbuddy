@@ -27,6 +27,9 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.SQLRestriction;
 
+import com.angel.flexbuddy.importcore.figures.BlockStatus;
+import com.angel.flexbuddy.importcore.figures.EarningsRules;
+
 @Entity
 @Table(name = "shift", indexes = {
         @Index(name = "idx_shift_owner_date", columnList = "owner_id,date"),
@@ -181,11 +184,7 @@ public class Shift implements Timestamped {
     }
 
     public int getTimeWorked() {
-        if (startTime == null || endTime == null) {
-            return 0;
-        }
-        int totalMinutes = (int) ChronoUnit.MINUTES.between(startTime, endTime);
-        return totalMinutes < 0 ? totalMinutes + (24 * 60) : totalMinutes;
+        return EarningsRules.timeWorked(startTime, endTime);
     }
 
     public BigDecimal getHourlyRate() {
@@ -210,25 +209,25 @@ public class Shift implements Timestamped {
 
     /** Completed shifts, and cancelled blocks that paid cancellation pay, earn money. Scheduled and forfeited ones do not. */
     public boolean countsTowardEarnings() {
-        return effectiveStatus() == ShiftStatus.COMPLETED || effectiveStatus() == ShiftStatus.CANCELLED;
+        return EarningsRules.countsTowardEarnings(figureStatus());
     }
 
     /** Only a worked block adds hours. */
     public boolean countsTowardHours() {
-        return effectiveStatus() == ShiftStatus.COMPLETED;
+        return EarningsRules.countsTowardHours(figureStatus());
     }
 
     /** The drive to the station happened for every block except one that is still scheduled. */
     public boolean countsTowardMiles() {
-        return effectiveStatus() != ShiftStatus.SCHEDULED;
+        return EarningsRules.countsTowardMiles(figureStatus());
     }
 
     public BigDecimal getEarnedBasePay() {
-        return countsTowardEarnings() && basePay != null ? basePay : BigDecimal.ZERO;
+        return EarningsRules.earnedBasePay(figureStatus(), basePay);
     }
 
     public BigDecimal getEarnedTips() {
-        return effectiveStatus() == ShiftStatus.COMPLETED && tips != null ? tips : BigDecimal.ZERO;
+        return EarningsRules.earnedTips(figureStatus(), tips);
     }
 
     public BigDecimal getEarnedPay() {
@@ -236,11 +235,11 @@ public class Shift implements Timestamped {
     }
 
     public int getWorkedMinutes() {
-        return countsTowardHours() ? getTimeWorked() : 0;
+        return EarningsRules.workedMinutes(figureStatus(), startTime, endTime);
     }
 
     public BigDecimal getCountedMiles() {
-        return countsTowardMiles() ? miles : null;
+        return EarningsRules.countedMiles(figureStatus(), miles);
     }
 
     /** Minutes between the actual start and finish, or null unless both were recorded. */
@@ -291,8 +290,9 @@ public class Shift implements Timestamped {
         return start == null || endTime == null ? null : start.plusMinutes(getTimeWorked());
     }
 
-    private ShiftStatus effectiveStatus() {
-        return status == null ? ShiftStatus.COMPLETED : status;
+    /** The status as the shared library's earnings rules read it; they treat a missing status as completed. */
+    private BlockStatus figureStatus() {
+        return status == null ? null : BlockStatus.valueOf(status.name());
     }
 
 }

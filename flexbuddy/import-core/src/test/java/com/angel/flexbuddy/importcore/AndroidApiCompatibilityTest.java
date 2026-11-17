@@ -22,8 +22,12 @@ import org.junit.jupiter.api.Test;
  * NoSuchMethodError and the screenshot import fails. Use Collectors.toList() or a list copy, and a
  * {@code while (matcher.find())} loop with {@code matcher.toMatchResult()}, instead.
  *
- * <p>This is a source scan of those two methods only; the native app's scan of the release JAR against Android's
- * API database is the full check.
+ * <p>Java 21's sequenced-collection methods ({@code getFirst}, {@code getLast}, {@code removeFirst},
+ * {@code removeLast}, {@code addFirst}, {@code addLast} and {@code reversed}) only exist on Android's {@code List}
+ * from API 35, so they are refused too: use {@code get(0)} and {@code get(size() - 1)}.
+ *
+ * <p>This is a source scan of those methods only; the native app's scan of the release JAR against Android's API
+ * database is the full check.
  */
 class AndroidApiCompatibilityTest {
     private static final Path MAIN_SOURCES = Path.of("src", "main", "java");
@@ -33,7 +37,12 @@ class AndroidApiCompatibilityTest {
     private static final Map<String, Pattern> FORBIDDEN = Map.of(
             "Stream.toList()", Pattern.compile(NOT_COLLECTORS + "\\.\\s*toList\\s*\\(\\s*\\)"),
             "Matcher.results()", Pattern.compile("\\.\\s*results\\s*\\(\\s*\\)"),
-            "Stream::toList / Matcher::results", Pattern.compile(NOT_COLLECTORS + "::\\s*(?:toList|results)\\b"));
+            "Stream::toList / Matcher::results", Pattern.compile(NOT_COLLECTORS + "::\\s*(?:toList|results)\\b"),
+            "a sequenced-collection method", Pattern.compile(
+                    "\\.\\s*(?:getFirst|getLast|removeFirst|removeLast|reversed)\\s*\\(\\s*\\)"
+                            + "|\\.\\s*(?:addFirst|addLast)\\s*\\("),
+            "a sequenced-collection method reference",
+            Pattern.compile("::\\s*(?:getFirst|getLast|removeFirst|removeLast|addFirst|addLast|reversed)\\b"));
 
     @Test
     void mainSourcesAvoidMethodsAndroidOnlyHasFromApi34() throws IOException {
@@ -50,7 +59,8 @@ class AndroidApiCompatibilityTest {
         }
         assertTrue(sources.size() > 0, "No main sources found under " + MAIN_SOURCES.toAbsolutePath());
         assertEquals(List.of(), found, "Android below API 34 (Android 14) has no Stream.toList() or "
-                + "Matcher.results(), and D8 does not backport them: replace these calls");
+                + "Matcher.results(), below API 35 no List.getFirst() and the other sequenced-collection methods, "
+                + "and D8 does not backport them: replace these calls");
     }
 
     @Test
@@ -62,6 +72,17 @@ class AndroidApiCompatibilityTest {
         assertEquals(2, forbiddenCalls("PATTERN.matcher(text).results().toList()").size());
         assertEquals(1, forbiddenCalls("Function<Stream<String>, List<String>> f = Stream::toList;").size());
         assertEquals(1, forbiddenCalls("Function<Matcher, Stream<MatchResult>> f = Matcher :: results;").size());
+    }
+
+    @Test
+    void theScanCatchesSequencedCollectionMethods() {
+        assertEquals(1, forbiddenCalls("sample.blocks().getFirst().station()").size());
+        assertEquals(1, forbiddenCalls("blocks.getLast()").size());
+        assertEquals(1, forbiddenCalls("blocks\n    .reversed()").size());
+        assertEquals(1, forbiddenCalls("queue.removeFirst()").size());
+        assertEquals(1, forbiddenCalls("list.addFirst(block)").size());
+        assertEquals(1, forbiddenCalls("Function<List<Block>, Block> f = List::getFirst;").size());
+        assertEquals(List.of(), forbiddenCalls("blocks.get(0); blocks.get(blocks.size() - 1); firstBlock()"));
     }
 
     @Test
