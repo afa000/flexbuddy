@@ -14,11 +14,14 @@ Every release needs the owner's approval of that actual release; merging a versi
 - **0.1.2**, published November 15, 2026 from tag `import-core-v0.1.2` (commit f6392ce, Publish import core run
   43787558971). Reads the Spanish app's "Consejos" tip line and its "jue, oct 22" date header, and takes an Earnings
   list's date from the block whose times are used instead of a "Payment sent" row above it. Other screens parse as
-  before. The Android app pins it from FB-039. **Use 0.1.2.**
-- **0.2.0**, not yet published; the app keeps 0.1.2. Adds the earnings figures in
-  `com.angel.flexbuddy.importcore.figures` (NA-13): the block earnings rules, net earnings, goal progress, pay
-  periods, IRS and custom mileage rates and the offer evaluator, which the server now delegates to. Screenshot
-  parsing, warnings and matching are unchanged from 0.1.2.
+  before. The Android app pins it from FB-039.
+- **0.2.0**, published November 17, 2026 from tag `import-core-v0.2.0` (commit b8f50bb, Publish import core run
+  44023503043). Adds the earnings figures in `com.angel.flexbuddy.importcore.figures` (NA-13): the block earnings
+  rules, net earnings, goal progress, pay periods, IRS and custom mileage rates and the offer evaluator, which the
+  server now delegates to. Screenshot parsing, warnings and matching are unchanged from 0.1.2. SHA-256: JAR
+  `21bd80c64e1611263f259973dce7cd4d5a2273b4a1b4f25a19a561a97fe70835`, POM
+  `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. The Android app still pins 0.1.2 until it
+  takes the figures. **Use 0.2.0.**
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.
