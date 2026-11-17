@@ -1,7 +1,6 @@
 package com.angel.flexbuddy.service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -9,60 +8,28 @@ import java.util.Map;
 import org.springframework.stereotype.Service;
 
 import com.angel.flexbuddy.dto.NetEarningsResult;
+import com.angel.flexbuddy.importcore.figures.CostCategory;
+import com.angel.flexbuddy.importcore.figures.NetEarnings;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.VehicleCostMethod;
 
+/** Gross, costs and net for blocks and their expenses, with the shared library's {@link NetEarnings}. */
 @Service
 public class NetEarningsCalculator {
     public NetEarningsResult calculate(List<Shift> shifts, List<Expense> expenses,
             VehicleCostMethod method, MileageRates rates) {
-        BigDecimal gross = money(shifts.stream().map(Shift::getEarnedPay).reduce(BigDecimal.ZERO, BigDecimal::add));
-        int minutes = shifts.stream().mapToInt(Shift::getWorkedMinutes).sum();
-        BigDecimal miles = shifts.stream().map(Shift::getCountedMiles).filter(v -> v != null)
-                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(1, RoundingMode.HALF_UP);
-        BigDecimal mileageCost = money(shifts.stream().map(shift -> mileage(shift, rates))
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-        EnumMap<ExpenseCategory, BigDecimal> categories = new EnumMap<>(ExpenseCategory.class);
-        for (ExpenseCategory category : ExpenseCategory.values()) categories.put(category, money(BigDecimal.ZERO));
-        expenses.forEach(expense -> categories.compute(expense.getCategory(),
-                (ignored, total) -> money(total.add(expense.getAmount()))));
-        BigDecimal actualVehicle = categories.get(ExpenseCategory.FUEL).add(categories.get(ExpenseCategory.MAINTENANCE));
-        BigDecimal vehicleCost = method == VehicleCostMethod.ACTUAL_EXPENSES ? actualVehicle : mileageCost;
-        BigDecimal outOfPocket = categories.get(ExpenseCategory.TOLL).add(categories.get(ExpenseCategory.PARKING))
-                .add(categories.get(ExpenseCategory.OTHER));
-        BigDecimal cashSpent = categories.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal deductions = money(vehicleCost.add(outOfPocket));
-        BigDecimal net = money(gross.subtract(deductions));
-        return new NetEarningsResult(shifts.size(), gross, minutes, miles, mileageCost, Map.copyOf(categories),
-                money(vehicleCost), money(outOfPocket), deductions, money(cashSpent), net,
-                hourly(gross, minutes), hourly(net, minutes), divide(net, shifts.size()),
-                miles.signum() == 0 ? null : gross.divide(miles, 2, RoundingMode.HALF_UP),
-                gross.signum() == 0 ? BigDecimal.ZERO.setScale(1)
-                        : net.multiply(BigDecimal.valueOf(100)).divide(gross, 1, RoundingMode.HALF_UP),
-                (int) shifts.stream().filter(shift -> shift.countsTowardHours() && shift.getMiles() == null).count());
-    }
-
-    /** One block's counted miles at its date's rate, unrounded; the total is rounded once. */
-    private static BigDecimal mileage(Shift shift, MileageRates rates) {
-        BigDecimal counted = shift.getCountedMiles();
-        if (counted == null || rates == null) return BigDecimal.ZERO;
-        BigDecimal rate = rates.rateOn(shift.getDate());
-        return rate == null ? BigDecimal.ZERO : counted.multiply(rate);
-    }
-
-    private static BigDecimal money(BigDecimal value) {
-        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal hourly(BigDecimal value, int minutes) {
-        return minutes == 0 ? BigDecimal.ZERO.setScale(2)
-                : value.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(minutes), 2, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal divide(BigDecimal value, int count) {
-        return count == 0 ? BigDecimal.ZERO.setScale(2)
-                : value.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
+        NetEarnings result = NetEarnings.calculate(FigureInputs.blocks(shifts), FigureInputs.costs(expenses),
+                FigureInputs.method(method), rates == null ? null : rates.figures());
+        EnumMap<ExpenseCategory, BigDecimal> totals = new EnumMap<>(ExpenseCategory.class);
+        for (Map.Entry<CostCategory, BigDecimal> entry : result.expenseTotals().entrySet()) {
+            totals.put(FigureInputs.category(entry.getKey()), entry.getValue());
+        }
+        return new NetEarningsResult(result.shifts(), result.grossEarnings(), result.minutesWorked(), result.miles(),
+                result.mileageCost(), Map.copyOf(totals), result.vehicleCost(), result.outOfPocketExpenses(),
+                result.totalDeductions(), result.cashSpent(), result.netEarnings(), result.grossHourlyRate(),
+                result.netHourlyRate(), result.netPerShift(), result.earningsPerMile(), result.netMargin(),
+                result.blocksWithoutMiles());
     }
 }

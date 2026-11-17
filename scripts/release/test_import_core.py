@@ -13,7 +13,7 @@ import import_core as release
 
 
 ROOT = Path(__file__).resolve().parents[2]
-VERSION = "0.1.2"  # The real library POM version; the tests read that POM.
+VERSION = "0.2.0"  # The real library POM version; the tests read that POM.
 SHA = "a" * 40
 POM = (ROOT / release.POM_PATH).read_bytes()
 ENV = {"GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_REF": "refs/heads/main",
@@ -149,7 +149,7 @@ class ReleaseTests(unittest.TestCase):
         with self.assertRaises(release.ReleaseError):
             release.check_payload(payload, VERSION, SHA)
         (payload / "screenshot.png").unlink()
-        manifest["version"] = "0.2.0"
+        manifest["version"] = "9.9.9"
         (payload / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         with self.assertRaises(release.ReleaseError):
             release.check_payload(payload, VERSION, SHA)
