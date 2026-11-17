@@ -357,6 +357,11 @@ least `MINIMUM_OVERLAP_MINUTES`) is small.
 
 ## NA-13 — Figures and tools that work offline
 
+Follow-up (November 17, 2026): Android FB-041 verified shared figures 0.2.0 on API 26/37. Server FB-042 supplies
+GET /api/v1/calculation-settings (see api-v1.md) as the read-only, per-account prerequisite for step 2, with
+custom-versus-IRS mileage semantics and conditional freshness. App caching and offline Home/Reports integration
+remain separate pending tasks; the settings, block and expense endpoints do not promise an atomic snapshot.
+
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
 

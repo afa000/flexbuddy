@@ -158,6 +158,55 @@ Reusing a revoked token returns 401 `unauthorized`.
 Password reset and account deletion revoke every app token and pending challenge, even with the API disabled.
 Tokens and challenges are excluded from backups. Expired credentials are purged daily while the API is enabled.
 
+### GET /api/v1/calculation-settings
+
+Added by FB-042 for NA-13 offline figures. Token required: yes. Read-only; no account selector or write endpoint.
+
+200 (made-up example):
+
+```json
+{
+  "timeZone": "America/New_York",
+  "vehicleCostMethod": "standard_mileage",
+  "customMileageRate": null,
+  "weeklyGoal": "600.00",
+  "monthlyGoal": null,
+  "goalBasis": "gross",
+  "payoutDays": ["tuesday", "friday"],
+  "payoutLagDays": 1
+}
+```
+
+This is the complete eight-field response. It maps the existing website settings service, including its defaults:
+
+- `timeZone`: the account's configured time-zone ID, defaulting to `America/New_York` when absent. If a legacy or
+  corrupt value is invalid, the consumer must fall back to `America/New_York`, as server calculations do through
+  `UserTimeService`. These are local dates in that zone, not UTC dates or the device's zone.
+- `vehicleCostMethod`: `standard_mileage` (default) or `actual_expenses`.
+- `customMileageRate`: decimal string with the saved rate's precision, or null for IRS mode. For example, a
+  custom rate is `"0.655"`; an explicit zero remains a decimal string, not null. IRS mode always returns null,
+  never today's effective IRS rate. The shared figures library supplies the IRS rate for each block's date.
+- `weeklyGoal`, `monthlyGoal`: money strings with two decimal places, or null when that goal is unset.
+- `goalBasis`: `gross` (default) or `net`.
+- `payoutDays`: lowercase weekday codes in Monday-to-Sunday order. The existing settings parser supplies
+  `tuesday` and `friday` when no stored day can be parsed.
+- `payoutLagDays`: integer, the existing stored/default lag (default 1).
+
+No private calendar feed link, sign-in/security settings, tax settings or reminder preferences are returned.
+Reading does not save settings or generate a calendar token. Existing bearer-token authentication runs before
+conditional requests; a web session alone cannot authorize this endpoint.
+
+Strong `ETag` and `Cache-Control: private, no-cache` follow Sync. Matching `If-None-Match` returns 304 with no body;
+a represented setting change returns the complete body with a new tag. Unrelated settings and the passage of
+time alone do not change the response. No `updatedAt` or delta cursor is supplied.
+
+The app must cache the body, ETag and its own last successful-check time **per account**; either 200 or 304 advances
+that check time. A changed settings tag requires recalculation even if block/expense cursors are unchanged.
+Settings, blocks and expenses are independent reads, not an atomic snapshot. The app must coordinate refreshes
+and use the oldest relevant successful-check time when describing calculation freshness; it must not present a
+partially refreshed result as fully synced. Cached figures may be stale offline. This contract does not replace
+the server's source-of-truth validation or let a client infer settings from computed Home totals.
+
 ### GET /api/v1/account
 
 Added by FB-005. Token required: yes.
