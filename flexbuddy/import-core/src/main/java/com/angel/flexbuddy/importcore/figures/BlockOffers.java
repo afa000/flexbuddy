@@ -65,9 +65,12 @@ public final class BlockOffers {
      * The station's last 90 days, then its whole history, then every block on the account, each counting only
      * completed blocks with worked minutes dated up to today. {@code blocks} are the account's live blocks, newest
      * first; the order is kept. The station is compared ignoring case and the offer's surrounding spaces.
+     *
+     * @throws IllegalArgumentException if the station is blank: the consumer validates it first, as the website does
      */
     public static <T> Sample<T> chooseSample(List<T> blocks, Function<? super T, Block> view, String station,
             LocalDate today) {
+        if (station == null || station.isBlank()) throw new IllegalArgumentException("The offer needs a station");
         String wanted = station.trim();
         LocalDate recentStart = today.minusDays(RECENT_DAYS - 1L);
         List<T> recent = worked(blocks, view, wanted, recentStart, today);

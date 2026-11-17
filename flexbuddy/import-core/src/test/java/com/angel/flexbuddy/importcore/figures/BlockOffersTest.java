@@ -2,6 +2,7 @@ package com.angel.flexbuddy.importcore.figures;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -75,6 +76,15 @@ class BlockOffersTest {
 
         assertEquals(Basis.ACCOUNT, sample.basis());
         assertEquals(List.of(counted), sample.blocks(), "a missing status is completed; today counts");
+    }
+
+    @Test
+    void aBlankStationIsRefusedRatherThanMatchingEveryBlock() {
+        List<Block> blocks = List.of(worked("VEA7", TODAY.minusDays(1), 240, "84.00"));
+
+        assertThrows(IllegalArgumentException.class, () -> choose(blocks, "   "));
+        assertThrows(IllegalArgumentException.class, () -> choose(blocks, ""));
+        assertThrows(IllegalArgumentException.class, () -> choose(blocks, null));
     }
 
     @Test

@@ -37,7 +37,8 @@ offline. The server's calculators delegate to it.
 - `NetEarnings` (gross, costs, net and the per-hour, per-block and per-mile figures), `GoalProgress`, `PayPeriods`,
   `IrsMileageRates` (the dated rate table) and `MileageRates` (custom or IRS).
 - `BlockOffers` is "Is this offer worth it?": `chooseSample` picks the station's last 90 days, then its whole
-  history, then the account; `evaluate` estimates the offer and compares it with a usual block.
+  history, then the account; `evaluate` estimates the offer and compares it with a usual block. A blank station is
+  refused, so validate it first as the website does.
 
 The consumer selects the data, always the signed-in account's live blocks and expenses only, and leaves out
 expenses that wait for a scheduled block. Pass the account's own date as `today`; the library never reads the clock,
