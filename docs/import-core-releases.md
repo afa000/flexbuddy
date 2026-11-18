@@ -21,20 +21,23 @@ Every release needs the owner's approval of that actual release; merging a versi
   server now delegates to. Screenshot parsing, warnings and matching are unchanged from 0.1.2. SHA-256: JAR
   `21bd80c64e1611263f259973dce7cd4d5a2273b4a1b4f25a19a561a97fe70835`, POM
   `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. Android FB-041 pins 0.2.0 and verified
-  the figure contracts on API26/37. **Use 0.2.0.**
+  the figure contracts on API26/37. This remains the merged Android baseline until FB-046 verifies 0.3.0.
+- **0.3.0**, published November 17, 2026 from annotated tag `import-core-v0.3.0`, source commit
+  `f4eb79d0d07c9902d71eead64f6195ab73ac1ec9` (FB-044, PR #57),
+  [Publish import core run 44234045242](https://github.com/afa000/flexbuddy/actions/runs/44234045242).
+  Adds `GoalPreparation` (90-day history boundary, goal averages and scheduled net estimate) and `PlannedWork`
+  (upcoming count/minutes/gross pay and overdue confirmations). Existing import and 0.2.0 figure APIs are unchanged.
+  The guarded workflow uploaded the tested JAR/POM and verified authenticated downloads. A separate read-only
+  registry download independently matched both release-manifest SHA-256 values:
+  JAR `7eff707f4d647364b1601a3695c3195680684943c5a32bcbd309f6d601d86216`,
+  POM `79e804387b07b36728976da25321905c42a3ffca83573a1b7e11227ad136b022`.
 
-### Prepared source: 0.3.0 (FB-044, not published)
-
-Adds `GoalPreparation` (90-day history boundary, goal averages and scheduled net estimate) and `PlannedWork`
-(upcoming count/minutes/gross pay and overdue confirmations). The server delegates its existing goal/planning
-preparation without changing API payloads or financial rules. The library and server source dependency move to
-0.3.0 together; screenshot rules and existing 0.2.0 signatures are unchanged. See the library README for caller
-selection and rounding contracts.
-
-No release tag, published artifact or release hash manifest is created by this task. The authenticated registry metadata and
-remote tags had no 0.3.0 entry when checked. Publication still needs separate owner authorization after reviewed
-source merges, followed by download/hash verification. Android continues to pin published 0.2.0; its eventual
-0.3.0 upgrade must independently verify resolved bytes and API26/current-API runtime support before adoption.
+The server adopts these helpers without changing its goal/planning results. See the library README for selection
+and rounding contracts. Android's merged FB-041/FB-043 baseline still pins verified 0.2.0; FB-046 separately pins
+0.3.0, audits the entire resolved JAR and tests API26/current-API runtime behavior before adoption. Registry byte
+verification does not prove a clean Maven/Gradle consumer or Android runtime. Offline Home goals/planning UI and
+Reports integration remain later work. The reader examples below intentionally retain the current Android 0.2.0
+baseline until that verification gate passes.
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.
@@ -142,8 +145,8 @@ hashes in Gradle dependency verification. In its CI, the owner supplies the two 
 repository secrets only to jobs that need authenticated dependency resolution. Do not supply them to untrusted fork
 jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
 Historical reader checks resolved 0.1.0 from a clean Maven consumer and 0.1.2 in Android CI with repository
-secrets. FB-041 subsequently pinned published 0.2.0 and verified its figures on API26/37. Source-only 0.3.0 remains
-subject to the separate publication and Android verification steps above.
+secrets. FB-041 subsequently pinned published 0.2.0 and verified its figures on API26/37. Published 0.3.0 remains
+subject to the separate Android pinning and runtime verification steps above.
 
 ## Failure and partial publication
 

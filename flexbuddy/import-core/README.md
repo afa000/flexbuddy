@@ -2,7 +2,7 @@
 
 `com.angel:flexbuddy-import-core:0.3.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules, and from
-0.2.0 the earnings figures (below). Source 0.3.0 adds goal and planned-work preparation; it is not yet published.
+0.2.0 the earnings figures (below). Published 0.3.0 adds goal and planned-work preparation (FB-044).
 The library performs no OCR, translation, persistence, file access or network calls.
 Releases are listed in [docs/import-core-releases.md](../../docs/import-core-releases.md).
 
@@ -46,7 +46,7 @@ expenses that wait for a scheduled block. Pass the account's own date as `today`
 locale or time zone. Amounts stay `BigDecimal` with the website's scales and rounding. Tax figures stay on the
 server, because they read payments and settings the phone may not have.
 
-## Goal and planned-work preparation (0.3.0 source, not yet published)
+## Goal and planned-work preparation (published 0.3.0)
 
 `GoalPreparation.historyStart(today)` exposes the inclusive 90-day window. Pass `fromHistory` the account's
 completed/cancelled report `NetEarnings` for that window (including all countable costs) and the completed-only
@@ -69,8 +69,10 @@ Both helpers use plain immutable values, retain no lists and perform no clock, z
 access. The consumer resolves the account-local date/time, scopes live rows to the account, selects periods and
 filters expenses by date and shared waiting-link rules. Goal period planned pay and upcoming planned pay are
 intentionally different. Existing 0.2.0 API signatures are unchanged. Server source adoption passes through its
-existing user-scoped queries and response DTOs. Publication, Android pinning and API26/current-API runtime checks
-remain separate steps; the source compatibility scan alone does not prove Android runtime compatibility.
+existing user-scoped queries and response DTOs. Release tag `import-core-v0.3.0` points to source commit
+`f4eb79d0d07c9902d71eead64f6195ab73ac1ec9`; run 44234045242 and its verified hashes are recorded in the release
+guide. Android pinning, the full resolved-JAR audit and API26/current-API runtime checks remain the separate FB-046
+gate. The source compatibility scan alone does not prove Android runtime compatibility.
 
 ## Building
 
@@ -90,12 +92,14 @@ Before running the application directly, install the local library from source:
 The repository's `scripts/verify.ps1` and CI run the reactor. Docker builds the same library from source inside the
 existing `flexbuddy/` context, without package credentials. Its executable server JAR embeds the thin library.
 
-The [manual publishing setup](../../docs/import-core-releases.md) keeps first publication owner-operated; no package
-has been published by this change. Android integration remains separate. Before choosing a phone OCR dependency,
-benchmark the same labelled screenshots and frozen parser version against the server for all six fields, including tips. The
-existing server sample test measures five fields and cannot alone establish that gate.
+The [manual publishing setup](../../docs/import-core-releases.md) keeps every release owner-approved. Published
+0.3.0 and its source/hash evidence are recorded there. Android adoption remains a separate verification step.
+Before choosing a phone OCR dependency, benchmark the same labelled screenshots and frozen parser version against
+the server for all six fields, including tips. The existing server sample test measures five fields and cannot
+alone establish that gate.
 
-Android compatibility must be checked with the consuming app's Java 21/D8 toolchain and minimum SDK 26. The existing
-parser uses Java collection factories/copying, records, `String.isBlank`, `Stream.toList` and `Matcher.results`.
-The app integration must verify desugaring/API support for these calls on API 26 before release; this server task
-does not claim an Android runtime check. No additional platform APIs are introduced by the extraction.
+Android compatibility must be checked with the consuming app's Java 21/D8 toolchain and minimum SDK 26. The
+library uses records, collection factories/copying, java.time and String.isBlank. Known unavailable calls such as
+Stream.toList and Matcher.results were removed after 0.1.0 and are refused by the source compatibility test.
+FB-046 must audit the entire resolved 0.3.0 JAR and run API26/current-API checks; source tests and publication do not
+establish that runtime gate. This release-record task does not perform or claim those Android checks.

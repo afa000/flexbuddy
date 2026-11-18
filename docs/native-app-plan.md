@@ -362,15 +362,18 @@ GET /api/v1/calculation-settings (see api-v1.md) as the read-only, per-account p
 custom-versus-IRS mileage semantics and conditional freshness. Android FB-043 (PR #12) caches settings and complete
 confirmed inputs, computes weekly Home earnings offline and
 keeps goal/planning cards separately dated as cached server data. Endpoints do not promise an atomic snapshot.
-FB-044 extracts goal/planned-work preparation into source library 0.3.0 with server adoption; publication and
-Android pinning/runtime verification/adoption remain separate pending steps. Reports integration is still pending.
+FB-044 extracts goal/planned-work preparation with server adoption. Library 0.3.0 is published from
+`import-core-v0.3.0` at `f4eb79d0d07c9902d71eead64f6195ab73ac1ec9` (run 44234045242); FB-045 records its
+verified release. Android pinning, the full JAR audit and API26/current-API verification are FB-046. Production
+Home goal/planning adoption and Reports integration remain separate pending steps.
 
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
 
-Status (November 17, 2026): step 1 is done (task NA-13, PR #53); library 0.2.0 is published. Still open: moving the
+Status (November 17, 2026): step 1 is done (task NA-13, PR #53); shared library 0.3.0 is published. Still open: moving the
 CSV writers into the library (step 4's server half), the remaining Home goal/planning and Reports parts of step 2,
-and app steps 3 to 6. Android already pins published 0.2.0; FB-044's source-only 0.3.0 is not yet an app dependency.
+and app steps 3 to 6. Android's merged baseline pins verified 0.2.0; published 0.3.0 must pass FB-046 before
+the app adopts it.
 
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
 join, and it makes the app useful with no signal and on a small data plan. Checked November 11, 2026:
