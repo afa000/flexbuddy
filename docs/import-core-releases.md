@@ -120,9 +120,11 @@ environment rather than a literal token:
 ```
 
 The consumer's Maven repository id must be `flexbuddy-packages`, its URL must be the registry URL above, and its
-dependency must pin `com.angel:flexbuddy-import-core:0.1.2`. This task does not modify anyone's existing settings.
+dependency must pin published `com.angel:flexbuddy-import-core:0.2.0`. This task does not modify anyone's existing
+settings.
 
-The Android app (FB-038, FB-039) uses this, inside its `dependencyResolutionManagement.repositories` block:
+The Android app (repository setup in FB-038/FB-039, pin upgraded in FB-041) uses this, inside its
+`dependencyResolutionManagement.repositories` block:
 
 ```kotlin
 maven {
@@ -135,12 +137,13 @@ maven {
 }
 ```
 
-Pin `implementation("com.angel:flexbuddy-import-core:0.1.2")` in the app module, with the release run's manifest
+Pin `implementation("com.angel:flexbuddy-import-core:0.2.0")` in the app module, with the release run's manifest
 hashes in Gradle dependency verification. In its CI, the owner supplies the two environment variables from
 repository secrets only to jobs that need authenticated dependency resolution. Do not supply them to untrusted fork
 jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
-Resolution is proven: a clean Maven consumer read 0.1.0 with a read-only token, and the Android CI resolves 0.1.2
-with the repository secrets.
+Historical reader checks resolved 0.1.0 from a clean Maven consumer and 0.1.2 in Android CI with repository
+secrets. FB-041 subsequently pinned published 0.2.0 and verified its figures on API26/37. Source-only 0.3.0 remains
+subject to the separate publication and Android verification steps above.
 
 ## Failure and partial publication
 
