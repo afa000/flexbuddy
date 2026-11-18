@@ -359,14 +359,18 @@ least `MINIMUM_OVERLAP_MINUTES`) is small.
 
 Follow-up (November 17, 2026): Android FB-041 verified shared figures 0.2.0 on API 26/37. Server FB-042 supplies
 GET /api/v1/calculation-settings (see api-v1.md) as the read-only, per-account prerequisite for step 2, with
-custom-versus-IRS mileage semantics and conditional freshness. App caching and offline Home/Reports integration
-remain separate pending tasks; the settings, block and expense endpoints do not promise an atomic snapshot.
+custom-versus-IRS mileage semantics and conditional freshness. Android FB-043 (PR #12) caches settings and complete
+confirmed inputs, computes weekly Home earnings offline and
+keeps goal/planning cards separately dated as cached server data. Endpoints do not promise an atomic snapshot.
+FB-044 extracts goal/planned-work preparation into source library 0.3.0 with server adoption; publication and
+Android pinning/runtime verification/adoption remain separate pending steps. Reports integration is still pending.
 
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
 
 Status (November 17, 2026): step 1 is done (task NA-13, PR #53); library 0.2.0 is published. Still open: moving the
-CSV writers into the library (step 4's server half) and the app steps 2 to 6, which start by pinning 0.2.0.
+CSV writers into the library (step 4's server half), the remaining Home goal/planning and Reports parts of step 2,
+and app steps 3 to 6. Android already pins published 0.2.0; FB-044's source-only 0.3.0 is not yet an app dependency.
 
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
 join, and it makes the app useful with no signal and on a small data plan. Checked November 11, 2026:

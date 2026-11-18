@@ -356,6 +356,43 @@ class ApiShiftIntegrationTest {
         assertThat(ids(home.get("missingMiles"))).doesNotContain(scheduled.getId());
     }
 
+    @Test
+    void homePreservesPreparedNetGoalsAndSeparatesPeriodPayFromUpcomingPay() throws Exception {
+        driver.setTimeZone("America/New_York");
+        driver.setMileageRate(BigDecimal.ZERO);
+        driver.setWeeklyGoal(new BigDecimal("600.00"));
+        driver.setMonthlyGoal(new BigDecimal("2000.00"));
+        driver.setGoalBasis(com.angel.flexbuddy.model.GoalBasis.NET);
+        users.saveAndFlush(driver);
+        save(driver, "ZZT9", LocalDate.of(2026, 11, 9), "100", "20");
+        save(driver, "ZZT9", LocalDate.of(2026, 10, 1), "80", "0");
+        Shift cancelled = save(driver, "ZZT9", LocalDate.of(2026, 11, 10), "20", "99");
+        cancelled.setStatus(ShiftStatus.CANCELLED);
+        shifts.saveAndFlush(cancelled);
+        for (var input : List.of(Map.entry(LocalDate.of(2026, 11, 14), "90"),
+                Map.entry(LocalDate.of(2026, 11, 19), "40"), Map.entry(LocalDate.of(2026, 10, 1), "999"))) {
+            Shift row = save(driver, "ZZT9", input.getKey(), input.getValue(), "99");
+            row.setStatus(ShiftStatus.SCHEDULED);
+            shifts.saveAndFlush(row);
+        }
+        save(other, "ZZX9", LocalDate.of(2026, 11, 9), "9000", "0");
+        JsonNode home = body(mvc.perform(get("/api/v1/home").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn());
+        var goal = home.get("goals").get("week");
+        assertThat(home.get("goals").get("basis").asText()).isEqualTo("net");
+        assertThat(goal).isEqualTo(json.readTree("""
+                {"goal":"600.00","earned":"140.00","planned":"90.00","remaining":"370.00",
+                 "percent":"23.3","onTrack":false,"blocksToGo":4,"averageBlockPay":"110.00",
+                 "averageBlockMinutes":180,"periodStart":"2026-11-09","periodEnd":"2026-11-15"}
+                """));
+        assertThat(home.get("week").get("expectedPay").asText()).isEqualTo("130.00");
+        assertThat(home.get("week").get("scheduledShifts").asInt()).isEqualTo(2);
+        assertThat(home.get("week").get("scheduledMinutes").asInt()).isEqualTo(360);
+        assertThat(home.get("week").get("needsConfirmation").asInt()).isEqualTo(1);
+        assertThat(home.get("week").get("totalEarnings").asText()).isEqualTo("140.00");
+        assertThat(home.get("goals").get("month").get("planned").asText()).isEqualTo("130.00");
+    }
+
     private AppUser account(String name, String email) {
         return users.save(new AppUser(name, email, encoder.encode(PASSWORD)));
     }

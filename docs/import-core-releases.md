@@ -20,8 +20,21 @@ Every release needs the owner's approval of that actual release; merging a versi
   rules, net earnings, goal progress, pay periods, IRS and custom mileage rates and the offer evaluator, which the
   server now delegates to. Screenshot parsing, warnings and matching are unchanged from 0.1.2. SHA-256: JAR
   `21bd80c64e1611263f259973dce7cd4d5a2273b4a1b4f25a19a561a97fe70835`, POM
-  `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. The Android app still pins 0.1.2 until it
-  takes the figures. **Use 0.2.0.**
+  `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. Android FB-041 pins 0.2.0 and verified
+  the figure contracts on API26/37. **Use 0.2.0.**
+
+### Prepared source: 0.3.0 (FB-044, not published)
+
+Adds `GoalPreparation` (90-day history boundary, goal averages and scheduled net estimate) and `PlannedWork`
+(upcoming count/minutes/gross pay and overdue confirmations). The server delegates its existing goal/planning
+preparation without changing API payloads or financial rules. The library and server source dependency move to
+0.3.0 together; screenshot rules and existing 0.2.0 signatures are unchanged. See the library README for caller
+selection and rounding contracts.
+
+No release tag, published artifact or release hash manifest is created by this task. The authenticated registry metadata and
+remote tags had no 0.3.0 entry when checked. Publication still needs separate owner authorization after reviewed
+source merges, followed by download/hash verification. Android continues to pin published 0.2.0; its eventual
+0.3.0 upgrade must independently verify resolved bytes and API26/current-API runtime support before adoption.
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.
