@@ -122,9 +122,10 @@ environment rather than a literal token:
 </settings>
 ```
 
-The consumer's Maven repository id must be `flexbuddy-packages`, its URL must be the registry URL above, and its
-dependency must pin published `com.angel:flexbuddy-import-core:0.2.0`. This task does not modify anyone's existing
-settings.
+The consumer's Maven repository id must be `flexbuddy-packages`, and its URL must be the registry URL above.
+A standalone Maven consumer pins the exact published version it intends to verify: 0.3.0 is available for its
+release-specific consumer check. Published `com.angel:flexbuddy-import-core:0.2.0` is the merged Android baseline
+example, not a universal Maven version requirement. This task does not modify anyone's existing settings.
 
 The Android app (repository setup in FB-038/FB-039, pin upgraded in FB-041) uses this, inside its
 `dependencyResolutionManagement.repositories` block:
@@ -181,6 +182,10 @@ CI runs these release tests in a separate read-only job. Unit tests use syntheti
 local Git fixtures; they never contact GitHub Packages, publish or access reader credentials. A temporary file-backed
 Maven deployment also verifies packaging/checksums during implementation validation, without a remote upload.
 
-First remote publication, authenticated clean-consumer resolution, Android Java 21/D8/API-26 desugaring and the
-six-field labelled OCR benchmark remain separate. The private sample test currently checks only five fields;
-successful packaging and the synthetic OCR checks are not the phone's go/no-go evidence.
+Remote publication through 0.3.0 is complete, as recorded above. Earlier authenticated Maven/Android resolution
+and runtime checks are historical release evidence, not pending first-publication work. The separate FB-046 gate
+covers 0.3.0's resolved consumer bytes, entire-JAR audit and Android Java 21/D8/API26/current-API runtime checks;
+this documentation task does not perform or claim those checks.
+
+OCR changes still require the six-field labelled phone benchmark gate. The server's private sample test checks
+only five fields; successful packaging and synthetic OCR checks alone do not establish that phone benchmark.
