@@ -453,7 +453,91 @@ class ShiftReportServiceTest {
 
         assertThat(goals.week()).isNull();
         assertThat(goals.month()).isNull();
-        org.mockito.Mockito.verifyNoInteractions(shiftService);
+        org.mockito.Mockito.verifyNoInteractions(shiftService, expenseService);
+    }
+
+    @Test
+    void goals_historyIncludesCancelledEarningsButOnlyCompletedBlocksInTheAverage() {
+        LocalDate today = NOW.toLocalDate();
+        Shift completed = shift("ZZT9", today.minusDays(89), "100.00", "0.00", 241);
+        Shift cancelled = withStatus(shift("ZZT9", today, "20.00", "90.00", 120), ShiftStatus.CANCELLED);
+        Shift outside = shift("ZZT9", today.minusDays(90), "900.00", "0.00", 120);
+        Shift future = shift("ZZT9", today.plusDays(1), "800.00", "0.00", 120);
+        stubGoalRows(List.of(completed, cancelled, outside, future));
+        when(settingsService.get(EMAIL)).thenReturn(goalSettings("600.00", null, com.angel.flexbuddy.model.GoalBasis.GROSS));
+        when(userTime.today(EMAIL)).thenReturn(today);
+
+        var goal = reportService.goals(EMAIL).week();
+
+        // Future completed rows in the selected goal period count, but not in history ending today.
+        assertThat(goal.earned()).isEqualTo(new BigDecimal("820.00"));
+        assertThat(goal.averageBlockPay()).isEqualTo(new BigDecimal("120.00"));
+        assertThat(goal.averageBlockMinutes()).isEqualTo(241);
+    }
+
+    @Test
+    void goals_preserveLeapMonthAndYearBoundariesAndMissingWeekTarget() {
+        for (LocalDate today : List.of(LocalDate.of(2024, 2, 29), LocalDate.of(2026, 12, 31), LocalDate.of(2027, 1, 1))) {
+            stubGoalRows(List.of());
+            when(settingsService.get(EMAIL)).thenReturn(goalSettings(null, "2000.00", com.angel.flexbuddy.model.GoalBasis.NET));
+            when(userTime.today(EMAIL)).thenReturn(today);
+            var result = reportService.goals(EMAIL);
+            assertThat(result.week()).isNull();
+            assertThat(result.month().periodStart()).isEqualTo(today.withDayOfMonth(1));
+            assertThat(result.month().periodEnd()).isEqualTo(java.time.YearMonth.from(today).atEndOfMonth());
+            assertThat(result.month().averageBlockPay()).isNull();
+            assertThat(result.month().averageBlockMinutes()).isNull();
+        }
+    }
+
+    @Test
+    void plannedWorkPreservesOvernightExactEndAndOldConfirmationBoundaries() {
+        LocalDate today = NOW.toLocalDate();
+        Shift atEnd = new Shift(null, "ZZT9", today, LocalTime.of(10, 0), LocalTime.NOON, new BigDecimal("100.00"), BigDecimal.TEN);
+        Shift overnight = new Shift(null, "ZZT9", today, LocalTime.of(23, 0), LocalTime.of(1, 0), new BigDecimal("80.00"), BigDecimal.TEN);
+        Shift previous = new Shift(null, "ZZT9", today.minusDays(1), LocalTime.of(23, 0), LocalTime.of(1, 0), new BigDecimal("90.00"), BigDecimal.ZERO);
+        Shift old = new Shift(null, "ZZT9", today.minusDays(100), LocalTime.of(8, 0), LocalTime.of(10, 0), BigDecimal.TEN, BigDecimal.ZERO);
+        Shift lastDay = new Shift(null, "ZZT9", today.plusDays(6), LocalTime.of(8, 0), LocalTime.of(9, 0), new BigDecimal("20.00"), BigDecimal.TEN);
+        List<Shift> rows = List.of(atEnd, overnight, previous, old, lastDay);
+        rows.forEach(row -> row.setStatus(ShiftStatus.SCHEDULED));
+        org.mockito.Mockito.doAnswer(invocation -> {
+            LocalDate from = invocation.getArgument(1);
+            LocalDate to = invocation.getArgument(2);
+            return rows.stream().filter(row -> from == null || !row.getDate().isBefore(from))
+                    .filter(row -> to == null || !row.getDate().isAfter(to)).toList();
+        }).when(shiftService).findScheduled(org.mockito.ArgumentMatchers.eq(EMAIL),
+                org.mockito.ArgumentMatchers.nullable(LocalDate.class), org.mockito.ArgumentMatchers.nullable(LocalDate.class));
+        var result = reportService.statistics(EMAIL, ALL);
+        assertThat(result.getScheduledShifts()).isEqualTo(2);
+        assertThat(result.getScheduledMinutes()).isEqualTo(180);
+        assertThat(result.getExpectedPay()).isEqualTo(new BigDecimal("100.00"));
+        assertThat(result.getNeedsConfirmation()).isEqualTo(3);
+        assertThat(result.getTotalEarnings()).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    @Test
+    void weeklyGoalCrossesTheYearWhileMonthlyGoalUsesOnlyTheNewMonth() {
+        LocalDate today = LocalDate.of(2027, 1, 1);
+        stubGoalRows(List.of(shift("ZZT9", LocalDate.of(2026, 12, 28), "100.00", "0", 180),
+                shift("ZZT9", LocalDate.of(2027, 1, 1), "50.00", "0", 180)));
+        when(settingsService.get(EMAIL)).thenReturn(goalSettings("600.00", "2000.00", com.angel.flexbuddy.model.GoalBasis.GROSS));
+        when(userTime.today(EMAIL)).thenReturn(today);
+        var result = reportService.goals(EMAIL);
+        assertThat(result.week().periodStart()).isEqualTo(LocalDate.of(2026, 12, 28));
+        assertThat(result.week().periodEnd()).isEqualTo(LocalDate.of(2027, 1, 3));
+        assertThat(result.week().earned()).isEqualTo(new BigDecimal("150.00"));
+        assertThat(result.month().periodStart()).isEqualTo(LocalDate.of(2027, 1, 1));
+        assertThat(result.month().earned()).isEqualTo(new BigDecimal("50.00"));
+    }
+
+    private void stubGoalRows(List<Shift> rows) {
+        when(shiftService.findFiltered(org.mockito.ArgumentMatchers.eq(EMAIL), org.mockito.ArgumentMatchers.any()))
+                .thenAnswer(invocation -> {
+                    ShiftFilter filter = invocation.getArgument(1);
+                    return rows.stream().filter(row -> filter.statuses().contains(row.getStatus()))
+                            .filter(row -> filter.from() == null || !row.getDate().isBefore(filter.from()))
+                            .filter(row -> filter.to() == null || !row.getDate().isAfter(filter.to())).toList();
+                });
     }
 
     private static com.angel.flexbuddy.dto.AccountSettingsResponse goalSettings(String weekly, String monthly,

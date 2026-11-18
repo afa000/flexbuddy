@@ -20,8 +20,21 @@ Every release needs the owner's approval of that actual release; merging a versi
   rules, net earnings, goal progress, pay periods, IRS and custom mileage rates and the offer evaluator, which the
   server now delegates to. Screenshot parsing, warnings and matching are unchanged from 0.1.2. SHA-256: JAR
   `21bd80c64e1611263f259973dce7cd4d5a2273b4a1b4f25a19a561a97fe70835`, POM
-  `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. The Android app still pins 0.1.2 until it
-  takes the figures. **Use 0.2.0.**
+  `79053a2caef9a222ee3a793d350ec746439d3a16536b69f5e07af6fe35fd18d8`. Android FB-041 pins 0.2.0 and verified
+  the figure contracts on API26/37. **Use 0.2.0.**
+
+### Prepared source: 0.3.0 (FB-044, not published)
+
+Adds `GoalPreparation` (90-day history boundary, goal averages and scheduled net estimate) and `PlannedWork`
+(upcoming count/minutes/gross pay and overdue confirmations). The server delegates its existing goal/planning
+preparation without changing API payloads or financial rules. The library and server source dependency move to
+0.3.0 together; screenshot rules and existing 0.2.0 signatures are unchanged. See the library README for caller
+selection and rounding contracts.
+
+No release tag, published artifact or release hash manifest is created by this task. The authenticated registry metadata and
+remote tags had no 0.3.0 entry when checked. Publication still needs separate owner authorization after reviewed
+source merges, followed by download/hash verification. Android continues to pin published 0.2.0; its eventual
+0.3.0 upgrade must independently verify resolved bytes and API26/current-API runtime support before adoption.
 
 The library remains part of the server's source reactor. Server verification, Docker and Render do not download
 this package or need a package credential. Publishing does not prove Android compatibility or OCR accuracy.
@@ -107,9 +120,11 @@ environment rather than a literal token:
 ```
 
 The consumer's Maven repository id must be `flexbuddy-packages`, its URL must be the registry URL above, and its
-dependency must pin `com.angel:flexbuddy-import-core:0.1.2`. This task does not modify anyone's existing settings.
+dependency must pin published `com.angel:flexbuddy-import-core:0.2.0`. This task does not modify anyone's existing
+settings.
 
-The Android app (FB-038, FB-039) uses this, inside its `dependencyResolutionManagement.repositories` block:
+The Android app (repository setup in FB-038/FB-039, pin upgraded in FB-041) uses this, inside its
+`dependencyResolutionManagement.repositories` block:
 
 ```kotlin
 maven {
@@ -122,12 +137,13 @@ maven {
 }
 ```
 
-Pin `implementation("com.angel:flexbuddy-import-core:0.1.2")` in the app module, with the release run's manifest
+Pin `implementation("com.angel:flexbuddy-import-core:0.2.0")` in the app module, with the release run's manifest
 hashes in Gradle dependency verification. In its CI, the owner supplies the two environment variables from
 repository secrets only to jobs that need authenticated dependency resolution. Do not supply them to untrusted fork
 jobs. Never use `mavenLocal()` or dynamic versions as the release dependency.
-Resolution is proven: a clean Maven consumer read 0.1.0 with a read-only token, and the Android CI resolves 0.1.2
-with the repository secrets.
+Historical reader checks resolved 0.1.0 from a clean Maven consumer and 0.1.2 in Android CI with repository
+secrets. FB-041 subsequently pinned published 0.2.0 and verified its figures on API26/37. Source-only 0.3.0 remains
+subject to the separate publication and Android verification steps above.
 
 ## Failure and partial publication
 

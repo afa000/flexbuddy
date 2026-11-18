@@ -1,11 +1,12 @@
 # Shared screenshot import rules
 
-`com.angel:flexbuddy-import-core:0.2.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
+`com.angel:flexbuddy-import-core:0.3.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules, and from
-0.2.0 the earnings figures (below). It performs no OCR, translation, persistence, file access or network calls.
+0.2.0 the earnings figures (below). Source 0.3.0 adds goal and planned-work preparation; it is not yet published.
+The library performs no OCR, translation, persistence, file access or network calls.
 Releases are listed in [docs/import-core-releases.md](../../docs/import-core-releases.md).
 
-The native Android app runs it from API 26 (Android 8). Don't use JDK methods Android lacks at that level unless D8
+The native Android consumer targets API 26 (Android 8) and later. Don't use JDK methods Android lacks at that level unless D8
 backports them; `AndroidApiCompatibilityTest` refuses `Stream.toList()` and `Matcher.results()` (API 34) and
 `List.getFirst()` and the other sequenced-collection methods (API 35).
 
@@ -44,6 +45,32 @@ The consumer selects the data, always the signed-in account's live blocks and ex
 expenses that wait for a scheduled block. Pass the account's own date as `today`; the library never reads the clock,
 locale or time zone. Amounts stay `BigDecimal` with the website's scales and rounding. Tax figures stay on the
 server, because they read payments and settings the phone may not have.
+
+## Goal and planned-work preparation (0.3.0 source, not yet published)
+
+`GoalPreparation.historyStart(today)` exposes the inclusive 90-day window. Pass `fromHistory` the account's
+completed/cancelled report `NetEarnings` for that window (including all countable costs) and the completed-only
+block sample. It computes gross/net average pay, float-rounded average minutes and the four-decimal historical
+net/gross share. No completed sample means null averages. Zero gross uses share one; negative or above-one shares
+are preserved. `earned(period)` selects the same goal basis. `plannedPay(periodScheduled)` sums base pay only and
+scales it by that share. **Pass its unrounded result into `GoalProgress.of`**: rounding first changes remaining,
+pace and blocks-to-go. Scheduled period inputs include overdue rows; the caller selects the goal's dates.
+
+`PlannedWork.of(upcomingCandidates, unconfirmedCandidates, now)` computes separate upcoming gross pay/count/minutes
+and overdue confirmation count. The first list may come from today's date through today+6; only ends strictly
+after now count. The second must include all scheduled dates through today, including old rows, and ends at/before
+now need confirmation. Today may appear in both lists without double counting. Android can pass the same full
+confirmed scheduled cache to both. Non-scheduled statuses are ignored; date/start/end/base pay are required for
+eligible rows. End uses start plus shared duration, matching the server's overnight and equal-time behavior.
+Previous-day overnight work does not become upcoming merely because it ends today. Scheduled tips count in neither
+projection and never become confirmed earnings.
+
+Both helpers use plain immutable values, retain no lists and perform no clock, zone, locale, framework or I/O
+access. The consumer resolves the account-local date/time, scopes live rows to the account, selects periods and
+filters expenses by date and shared waiting-link rules. Goal period planned pay and upcoming planned pay are
+intentionally different. Existing 0.2.0 API signatures are unchanged. Server source adoption passes through its
+existing user-scoped queries and response DTOs. Publication, Android pinning and API26/current-API runtime checks
+remain separate steps; the source compatibility scan alone does not prove Android runtime compatibility.
 
 ## Building
 

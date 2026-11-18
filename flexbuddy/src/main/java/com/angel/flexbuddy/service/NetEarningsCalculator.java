@@ -20,8 +20,7 @@ import com.angel.flexbuddy.model.VehicleCostMethod;
 public class NetEarningsCalculator {
     public NetEarningsResult calculate(List<Shift> shifts, List<Expense> expenses,
             VehicleCostMethod method, MileageRates rates) {
-        NetEarnings result = NetEarnings.calculate(FigureInputs.blocks(shifts), FigureInputs.costs(expenses),
-                FigureInputs.method(method), rates == null ? null : rates.figures());
+        NetEarnings result = figures(shifts, expenses, method, rates);
         EnumMap<ExpenseCategory, BigDecimal> totals = new EnumMap<>(ExpenseCategory.class);
         for (Map.Entry<CostCategory, BigDecimal> entry : result.expenseTotals().entrySet()) {
             totals.put(FigureInputs.category(entry.getKey()), entry.getValue());
@@ -31,5 +30,11 @@ public class NetEarningsCalculator {
                 result.totalDeductions(), result.cashSpent(), result.netEarnings(), result.grossHourlyRate(),
                 result.netHourlyRate(), result.netPerShift(), result.earningsPerMile(), result.netMargin(),
                 result.blocksWithoutMiles());
+    }
+
+    /** Shared result for other plain-input calculators; existing callers retain the server DTO. */
+    NetEarnings figures(List<Shift> shifts, List<Expense> expenses, VehicleCostMethod method, MileageRates rates) {
+        return NetEarnings.calculate(FigureInputs.blocks(shifts), FigureInputs.costs(expenses),
+                FigureInputs.method(method), rates == null ? null : rates.figures());
     }
 }

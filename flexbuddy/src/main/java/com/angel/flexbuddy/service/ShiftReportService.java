@@ -23,6 +23,9 @@ import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.i18n.UserLocales;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.angel.flexbuddy.importcore.figures.GoalPreparation;
+import com.angel.flexbuddy.importcore.figures.NetEarnings;
+import com.angel.flexbuddy.importcore.figures.PlannedWork;
 import com.angel.flexbuddy.dto.AccountSettingsResponse;
 import com.angel.flexbuddy.dto.EarningsBucket;
 import com.angel.flexbuddy.dto.EarningsReportResponse;
@@ -183,8 +186,6 @@ public class ShiftReportService {
         return payoutDate.isAfter(today) ? com.angel.flexbuddy.dto.PayoutStatus.UPCOMING : com.angel.flexbuddy.dto.PayoutStatus.UNCHECKED;
     }
 
-    static final int GOAL_HISTORY_DAYS = 90;
-
     /** This week's and this month's goal progress on the driver's chosen basis; weeks run Monday to Sunday. */
     @Transactional(readOnly = true)
     public com.angel.flexbuddy.dto.GoalsResponse goals(String email) {
@@ -193,43 +194,31 @@ public class ShiftReportService {
             return new com.angel.flexbuddy.dto.GoalsResponse(settings.goalBasis(), null, null);
         }
         LocalDate today = userTime.today(email);
-        boolean net = settings.goalBasis() == com.angel.flexbuddy.model.GoalBasis.NET;
-        NetEarningsResult history = earningsBetween(email, today.minusDays(GOAL_HISTORY_DAYS - 1L), today, settings);
+        LocalDate historyStart = GoalPreparation.historyStart(today);
+        NetEarnings history = earningsBetween(email, historyStart, today, settings);
         List<Shift> recent = shiftService.findFiltered(email,
-                ShiftFilter.report(today.minusDays(GOAL_HISTORY_DAYS - 1L), today, null, null)
-                        .withStatuses(Set.of(ShiftStatus.COMPLETED)));
-        int blocks = recent.size();
-        BigDecimal averageBlockPay = blocks == 0 ? null
-                : divide(net ? history.netEarnings() : history.grossEarnings(), blocks);
-        Integer averageBlockMinutes = blocks == 0 ? null
-                : Math.round((float) recent.stream().mapToInt(Shift::getWorkedMinutes).sum() / blocks);
-        // Scheduled pay is gross, so on a net basis it is scaled by the share of pay usually kept.
-        BigDecimal keptShare = !net || history.grossEarnings().signum() == 0 ? BigDecimal.ONE
-                : history.netEarnings().divide(history.grossEarnings(), 4, RoundingMode.HALF_UP);
-
+                ShiftFilter.report(historyStart, today, null, null).withStatuses(Set.of(ShiftStatus.COMPLETED)));
+        GoalPreparation preparation = GoalPreparation.fromHistory(history, FigureInputs.blocks(recent),
+                settings.goalBasis() == com.angel.flexbuddy.model.GoalBasis.NET);
         LocalDate weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
         YearMonth month = YearMonth.from(today);
         return new com.angel.flexbuddy.dto.GoalsResponse(settings.goalBasis(),
-                goal(email, settings.weeklyGoal(), weekStart, weekStart.plusDays(6), today, net, keptShare,
-                        averageBlockPay, averageBlockMinutes, settings),
-                goal(email, settings.monthlyGoal(), month.atDay(1), month.atEndOfMonth(), today, net, keptShare,
-                        averageBlockPay, averageBlockMinutes, settings));
+                goal(email, settings.weeklyGoal(), weekStart, weekStart.plusDays(6), today, preparation, settings),
+                goal(email, settings.monthlyGoal(), month.atDay(1), month.atEndOfMonth(), today, preparation, settings));
     }
 
     private com.angel.flexbuddy.dto.GoalProgress goal(String email, BigDecimal target, LocalDate start, LocalDate end,
-            LocalDate today, boolean net, BigDecimal keptShare, BigDecimal averageBlockPay, Integer averageBlockMinutes,
-            AccountSettingsResponse settings) {
+            LocalDate today, GoalPreparation preparation, AccountSettingsResponse settings) {
         if (target == null) return null;
-        NetEarningsResult period = earningsBetween(email, start, end, settings);
-        BigDecimal planned = shiftService.findScheduled(email, start, end).stream()
-                .map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add).multiply(keptShare);
-        return goalCalculator.progress(target, net ? period.netEarnings() : period.grossEarnings(), planned,
-                averageBlockPay, averageBlockMinutes, start, end, today);
+        NetEarnings period = earningsBetween(email, start, end, settings);
+        BigDecimal planned = preparation.plannedPay(FigureInputs.blocks(shiftService.findScheduled(email, start, end)));
+        return goalCalculator.progress(target, preparation.earned(period), planned,
+                preparation.averageBlockPay(), preparation.averageBlockMinutes(), start, end, today);
     }
 
-    private NetEarningsResult earningsBetween(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {
+    private NetEarnings earningsBetween(String email, LocalDate from, LocalDate to, AccountSettingsResponse settings) {
         ShiftFilter filter = ShiftFilter.report(from, to, null, null);
-        return calculator.calculate(shiftService.findFiltered(email, filter), reportExpenses(email, filter),
+        return calculator.figures(shiftService.findFiltered(email, filter), reportExpenses(email, filter),
                 settings.vehicleCostMethod(), settings.mileageRates());
     }
 
@@ -312,21 +301,17 @@ public class ShiftReportService {
     /** Planned work for the next seven days in the driver's zone, plus unworked blocks for the dashboard tiles. */
     private ScheduleSnapshot scheduleSnapshot(String email, ShiftFilter filter, LocalDateTime now) {
         LocalDate today = now.toLocalDate();
-        List<Shift> planned = shiftService.findScheduled(email, today, today.plusDays(6)).stream()
-                .filter(shift -> shift.getEndDateTime().isAfter(now))
-                .toList();
-        int needsConfirmation = (int) shiftService.findScheduled(email, null, today).stream()
-                .filter(shift -> !shift.getEndDateTime().isAfter(now))
-                .count();
+        PlannedWork planned = PlannedWork.of(
+                FigureInputs.blocks(shiftService.findScheduled(email, today, today.plusDays(6))),
+                FigureInputs.blocks(shiftService.findScheduled(email, null, today)), now);
         List<Shift> unworked = shiftService.findFiltered(email,
                 filter.withStatuses(Set.of(ShiftStatus.CANCELLED, ShiftStatus.FORFEITED)));
         YearMonth month = YearMonth.from(today);
         List<Shift> forfeitedThisMonth = shiftService.findFiltered(email,
                 ShiftFilter.report(month.atDay(1), month.atEndOfMonth(), null, null)
                         .withStatuses(Set.of(ShiftStatus.FORFEITED)));
-        return new ScheduleSnapshot(planned.size(), planned.stream().mapToInt(Shift::getTimeWorked).sum(),
-                money(planned.stream().map(Shift::getBasePay).reduce(BigDecimal.ZERO, BigDecimal::add)),
-                needsConfirmation, count(unworked, ShiftStatus.CANCELLED), count(unworked, ShiftStatus.FORFEITED),
+        return new ScheduleSnapshot(planned.plannedShifts(), planned.plannedMinutes(), planned.expectedPay(),
+                planned.needsConfirmation(), count(unworked, ShiftStatus.CANCELLED), count(unworked, ShiftStatus.FORFEITED),
                 forfeitedThisMonth.size(), late(unworked), late(forfeitedThisMonth));
     }
 

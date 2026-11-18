@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.angel</groupId>
     <artifactId>flexbuddy-import-core</artifactId>
-    <version>0.2.0</version>
+    <version>0.3.0</version>
     <name>FlexBuddy shared import and figures core</name>
     <description>Shared screenshot parsing and matching rules, and the earnings figures, with no runtime dependencies.</description>
     <distributionManagement>
