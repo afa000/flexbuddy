@@ -3,33 +3,33 @@
 How Claude Code, Codex, Antigravity and OpenCode with a local model work on FlexBuddy without losing context between
 them. The rules every agent follows are in [AGENTS.md](../AGENTS.md); this page covers setup and the day-to-day loop.
 
-Claude Code, Codex and Antigravity are interchangeable for the whole loop. Each has a top model and a routine model,
-and the two tiers line up:
+Claude Code, Codex and Antigravity are interchangeable for the whole loop. Choose the model by the task's risk
+and the work it calls for.
 
 | Tier | Claude Code | Codex | Antigravity |
 |---|---|---|---|
-| Top: specs, reviews, high-risk code, debugging | **Opus** | **Sol** (`gpt-6.1-sol`) | **Gemini 4 Argon** (`gemini-4-argon-high`) |
-| Routine: a well-specified task, more cheaply | **Sonnet** | **Terra** (`gpt-6.1-terra`) | **Gemini 4 Hydrogen** (`gemini-4-hydrogen-medium`) |
+| Top for specs, fresh reviews, high-risk code and complex debugging | **Opus** | **GPT-6.2 Astra** for the hardest work, or **GPT-6.2 Sol** at High or above | **Gemini 4 Neon** (`gemini-4-neon-high`) by default. **Gemini 4 Argon** (`gemini-4-argon-high`) for deep design analysis, a second opinion or fallback |
+| Routine for well-specified implementation | **Sonnet** | **GPT-6.2 Sol** at Medium for general coding, **GPT-6.1 Terra** for focused visual work or small fixes | **Gemini 4 Hydrogen** (`gemini-4-hydrogen-medium`) |
 
-Where this page says **Opus**, read "Opus, Sol or Argon"; where it says **Sonnet**, read "Sonnet, Terra or Hydrogen".
 All three read `AGENTS.md` and the skills in `.agents/skills/`, and all three have the same guard configured. Claude
 Code starts a skill with `/implement-task FB-xxx`, Codex with `$implement-task FB-xxx`; in Antigravity, ask for the
 `implement-task` skill by name ("Use the implement-task skill for FB-xxx").
 
 ### Starting a task in Codex or Antigravity
 
-1. **Plan** in a new Codex session on Sol: give the planning prompt under
-   [A task from start to merge](#a-task-from-start-to-merge). Codex writes `.ai/tasks/FB-xxx.md` on `ai/FB-xxx`.
-2. **Implement** in a new session: `git switch ai/FB-xxx`, then `$implement-task FB-xxx`. Use Sol for high-risk work,
-   Terra (`/model`) for routine work.
-3. **Prepare the pull request:** `$prepare-review FB-xxx` runs `verify.ps1` and builds the packet. Approve the push of
+1. **Plan** using the short or separate planning path under [A task from start to merge](#a-task-from-start-to-merge).
+   Codex writes `.ai/tasks/FB-xxx.md` on `ai/FB-xxx`.
+2. **Implement** in the current session for a short same-session plan. If planning ran separately, start a new session.
+   Run `git switch ai/FB-xxx`, then `$implement-task FB-xxx`. Use the model named in
+   the spec. Sol at Medium is the default for routine coding. Use Astra or Sol at High or above for high-risk code.
+3. **Prepare the pull request:** `$prepare-review FB-xxx` verifies the clean commit and builds the packet. Approve the push of
    the `ai/` branch and `gh pr create` when Codex asks; the guard refuses anything aimed at `main`.
 4. **Review** in a fresh session, Codex or Claude Code: `$review-task FB-xxx`. Fixes go back to the implementer.
 5. **Merge** in GitHub yourself.
 
-Antigravity follows the same five steps: plan on Argon, implement on Argon for high-risk work or Hydrogen for routine
-work (pick it in the model picker, `/model` in `agy`, or `agy --model`), ask for each skill by name, and approve the
-`ai/` branch push and `gh pr create` when it asks.
+Antigravity follows the same five steps. Default to Neon for planning and fresh reviews, then use the model named in
+the spec for implementation. Neon or Argon handles high-risk code, and Hydrogen handles routine work. Ask for each
+skill by name and approve the `ai/` branch push and `gh pr create` when it asks.
 
 Mixing tools is fine between steps, never within one: the repository files carry everything the next tool needs.
 
@@ -38,15 +38,16 @@ can pick up where another stopped.
 
 ## The loop
 
-1. A top model (Claude Code with Opus, Codex with Sol or Antigravity with Argon) writes the task in
-   `.ai/tasks/FB-xxx.md`, including its risk and who implements it, and pushes it on a new `ai/FB-xxx` branch.
+1. Write the task in `.ai/tasks/FB-xxx.md`, including its risk and implementer, and commit it on a new
+   `ai/FB-xxx` branch. Ask before pushing if the next step needs a remote branch.
 2. The implementer the task names works on that branch, one agent at a time
    ([which one](#which-tool-for-which-task)).
-3. [`scripts/verify.ps1`](../scripts/verify.ps1) runs the Java and JavaScript suites; CI adds the PostgreSQL migration
-   test on the pull request, and you can run it locally too ([setup](#local-postgresql-18-and-mailpit)).
+3. Run focused checks during implementation. Before opening a pull request,
+   [`scripts/verify.ps1`](../scripts/verify.ps1) verifies both suites on the clean commit. CI adds the PostgreSQL
+   migration test, which you can also run locally ([setup](#local-postgresql-18-and-mailpit)).
 4. [`scripts/review-packet.ps1`](../scripts/review-packet.ps1) turns the task, the handoff report and the results into
    the pull request description.
-5. A fresh session on a top model (Opus, Sol or Argon) reviews the pull request with the `review-task` skill. You
+5. A fresh session on a top model reviews the pull request with the `review-task` skill. You
    merge it yourself; merging to `main` deploys to Render.
 
 ### The native app's repository
@@ -229,13 +230,18 @@ OpenCode account, send the code to that provider, and are free only "for a limit
 
 ### Codex
 
-The Codex app (or the `codex` CLI, 0.159.0 or later for Terra) needs no project setup beyond what's committed:
+The Codex app or CLI needs no project setup beyond what's committed. GPT-6.2 Astra and Sol require CLI 0.166.0 or later.
+[OpenAI's Codex model availability](https://help.openai.com/en/articles/20001275-chatgpt-work-and-codex)
 
 - It reads `AGENTS.md` and the skills in `.agents/skills/`; start one with `$implement-task FB-xxx`, `$prepare-review`
   or `$review-task`.
-- Your own `~/.codex/config.toml` picks the model: `model = "gpt-6.1-sol"` (the Opus role). For a Terra session, run
-  `codex -m gpt-6.1-terra` or pick it with `/model`. There's deliberately no project `.codex/config.toml`, so the
-  repository never overrides your choice.
+- Your own `~/.codex/config.toml` sets `model = "gpt-6.2-sol"`. Use `/model` to choose another available model
+  or adjust effort for a task. The matching CLI IDs are `gpt-6.2-sol`, `gpt-6.2-astra` and `gpt-6.1-terra`.
+- Start most coding on **Sol Medium**. Use **Astra** for the hardest design, debugging or multi-file changes when
+  it is available. **Sol High or above** is also eligible for specs, fresh reviews and high-risk code. Use **Terra**
+  for screenshot comparisons, browser and desktop checks, and focused fixes where the result is easy to verify.
+  **Luna**, if available, is an option for bounded support work like extracting fields or triaging logs.
+  [OpenAI's model selection guide](https://developers.openai.com/api/docs/guides/model-selection)
 - The project must be trusted in `~/.codex/config.toml` (it is), or Codex skips `.codex/hooks.json` and the rules.
   The first time, review the two guard hooks in Settings > Hooks (desktop) or `/hooks` (CLI). They find the repository root with git, so they work
   from any folder (`flexbuddy/` included) and in PowerShell, cmd or bash.
@@ -250,11 +256,22 @@ from the workspace root ([rules docs](https://antigravity.google/docs/rules/)) a
 `.agents/hooks.json`, so it needs no extra setup beyond trusting the folder. Run the smoke test under
 [Proving a tool works](#proving-a-tool-works) before giving it a real task.
 
-- **Models:** **Gemini 4 Argon** is the top model (the Opus/Sol role). In the CLI it comes in three efforts:
-  `gemini-4-argon-high` for specs, reviews and high-risk code, `-medium` and `-low` for lighter work. **Gemini 4
-  Hydrogen** is the routine model (the Sonnet/Terra role), in four efforts: `gemini-4-hydrogen-low`, `-medium`,
-  `-high` and `-xhigh`; `-medium` suits routine implementation. Pick either in the model picker, with `/model` in
-  `agy`, or with `agy --model <id>`; `agy models` lists what your sign-in offers (both, on November 12, 2026).
+- **Gemini 4 Neon:** Default to `gemini-4-neon-high` for specs, fresh reviews, multi-file features and refactors,
+  complex debugging and high-risk implementation. Google's coding results and Antigravity guidance favor Neon for
+  sustained, tool-heavy coding. Use `gemini-4-neon-xhigh` when a particularly difficult problem needs deeper reasoning.
+  [Google's Neon announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-neon/)
+- **Gemini 4 Argon:** Use `gemini-4-argon-high` when the work centers on deep architecture trade-offs, an ambiguous
+  diagnosis that needs a second opinion, or a fallback for any top-model assignment.
+  [Google's Argon announcement](https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-argon/)
+- **Gemini 4 Hydrogen:** Use `gemini-4-hydrogen-medium` for clearly scoped fixes, tests, docs and routine
+  implementation. Google's Antigravity guidance puts Hydrogen in the fast execution role.
+  [Google's Hydrogen announcement](https://antigravity.google/blog/gemini-4-hydrogen-in-google-antigravity/)
+- **Model selection:** Use the app's model picker, `/model` in `agy`, or `agy --model <id>`. Run `agy models`
+  for account-specific IDs. Neon and Hydrogen offer Low, Medium, High and Extra (`xhigh` in the CLI). Argon offers
+  Low, Medium and High. Orchestrator (Neon) plans with Neon and implements with Hydrogen. Choose it only for
+  low- or medium-risk implementation when the spec names that mode. High-risk implementation uses a standalone
+  top model, and the pull request review runs in a fresh top-model session.
+  [Antigravity model selector and CLI reference](https://antigravity.google/docs/models)
 - `git push` of an `ai/` branch and `gh pr create` ask for approval, as in Claude Code and Codex. Your own
   `~/.gemini/antigravity-cli/settings.json` currently denies every `git push`, so either push from another tool or
   approve a one-off exception.
@@ -262,6 +279,14 @@ from the workspace root ([rules docs](https://antigravity.google/docs/rules/)) a
 ### Claude Code
 
 `CLAUDE.md` imports `AGENTS.md`. Claude Code reviews from the local checkout with `gh`.
+
+- **Opus** for specs, fresh reviews, high-risk code and ambiguous debugging. Choose `opus` directly for high-risk
+  edits. The `opusplan` alias uses Opus for planning and switches to Sonnet for implementation.
+  [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+- **Sonnet** at Medium for well-scoped features, fixes and tests. Use **Haiku** for fast, bounded read-only work
+  such as locating code and summarizing logs.
+  [Anthropic's Sonnet 5.5 guidance](https://www.anthropic.com/claude-sonnet-5-5)
+  [Anthropic's Haiku 5.5 guidance](https://www.anthropic.com/claude-haiku-5-5)
 
 ## Proving a tool works
 
@@ -287,8 +312,8 @@ for narrow low-risk work; nothing depends on it.
 
 **Every task, whoever implements it:**
 
-- **Plan:** a top model, **Opus**, **Sol** or **Argon**. The spec names the files to read, so the implementer doesn't
-  explore.
+- **Plan:** use a separate top-model session for ambiguous or high-risk work. For a small, clearly scoped low-risk
+  task, the implementer can write the short spec in the same session. The spec names the files to read.
 - **Review:** a fresh session on a top model with the `review-task` skill, before merging. It may be the same tool
   that implemented the task, as long as it is a new session.
 
@@ -296,26 +321,23 @@ for narrow low-risk work; nothing depends on it.
 
 | Risk | What it covers | Implementer | Never |
 |---|---|---|---|
-| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | A top model: Claude Code with **Opus**, Codex with **Sol** or Antigravity with **Gemini 4 Argon** (high effort) | Sonnet, Terra, Hydrogen or a local model. When usage is tight, switch between the three top models or wait for usage to reset |
-| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | A top model, or a routine one: **Sonnet**, **Terra** or **Gemini 4 Hydrogen** | A local model |
-| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | Any of the six, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) | |
+| High | Sign-in and security, payments and subscriptions, migrations, backup/restore, earnings and tax figures, deleting data, the app's tokens and offline outbox | Standalone **Opus**, **Astra**, **Sol** (High or above), **Gemini 4 Neon** (High or Extra) or **Gemini 4 Argon** (High) | Any model outside the top tier, including edits delegated by `opusplan` or Orchestrator |
+| Medium | A feature with a clear spec across a few files, an API endpoint on an existing service, UI and responsive work, Kotlin/Compose screens | **Sonnet**, **Sol Medium** or **Gemini 4 Hydrogen** for routine code. **Terra** for visual checks and focused fixes. Use a top model for complex work. **Orchestrator (Neon)** can pair planning with Hydrogen implementation | A local model |
+| Low | One-function fixes, tests for a pure JavaScript function, docs, CSS, release notes drafts | A routine model from the opening table, or **OpenCode + Gemma** (`run-agent.ps1 -Agent local`) for a small, explicit task with a checkable result. Top models and Orchestrator (Neon) are also eligible | |
 
-- **Name the implementer in the spec** by tool and model, for example `Antigravity (Gemini 4 Argon)`. When a task
+- **Name the implementer in the spec** by tool and model, for example `Antigravity (Gemini 4 Neon)`. When a task
   goes to someone else, say so in its `Implementer:` line with the date, as FB-011 to FB-024 do.
-- **Escalate after two failed attempts:** local model → a routine model → a top model, or from one top model to
-  another. Record the attempts in the handoff report so the next tool doesn't repeat them.
+- **Escalate after two failed attempts:** local model → routine model → top model. In Antigravity, move
+  from Hydrogen to Neon, then try Neon Extra or Argon High for a fresh diagnosis. For high-risk work, stay with
+  a standalone top model. Record the attempts in the handoff report so the next tool doesn't repeat them.
 - **Android wrapper, emulator and Play Console work** go to any of the three on a top model; AGENTS.md's emulator and
   signing rules apply to all of them, and signing and Play uploads stay yours.
 - **The native Android app:** the same table and the same three tools, in its own repository. A top model handles
   anything touching sign-in, tokens, the outbox, earnings or background location, and reviews all of it.
-- **Picking the model:** Claude Code's model picker, Codex's `/model`, Antigravity's model picker (`/model` or
-  `--model` in `agy`):
-  - **Opus**, **Sol** or **Argon** for specs, design decisions, reviews, high-risk code and debugging;
-  - **Sonnet**, **Terra** or **Hydrogen** to implement a well-specified task more cheaply;
-  - **Haiku**, or the Explore subagent, for broad searches and reading logs.
+- **Picking the model:** Use each tool's model picker or `/model`, then choose by risk and the strengths above.
 - **Reasoning effort:** high for specs, reviews and high-risk code; medium for routine implementation; low for docs and
   one-line fixes. Claude Code: `/effort`. Codex: `model_reasoning_effort`, or the effort choice in `/model`.
-  Antigravity: the model's effort (`gemini-4-argon-high`, `-medium`, `-low`) or `agy --effort`.
+  Antigravity: the model's effort suffix (such as `gemini-4-neon-high`) or `agy --effort`.
 - **Keep one tool per task**, and review with a fresh session of any of the three.
 
 Never let two agents edit the same working tree at once. Take turns, or give the second agent its own Git worktree.
@@ -330,7 +352,7 @@ local model. These habits keep tasks inside them:
 2. **One task per session.** Start a new session (in Claude Code, or `/clear`) for each task, and another for its
    review. A long session re-reads its whole history on every message.
 3. **A routine model to build when usage is tight.** A top model plans and reviews; a well-specified task builds fine
-   on Sonnet, Terra or Hydrogen. Switch with the model picker.
+   on Sonnet, Sol Medium or Hydrogen. Use Terra when the work centers on visual checks or a focused fix.
 4. **Search, don't read.** Grep the message catalogs (`messages.properties` is 94 KB, the Spanish one 103 KB) and
    other large files for the keys you need; Claude Code's guard refuses a whole-catalog read. Use an Explore subagent
    for "where is X" questions.
@@ -343,8 +365,9 @@ local model. These habits keep tasks inside them:
 
 ## A task from start to merge
 
-**Plan.** In a new session on a top model (Claude Code with Opus, Codex with Sol or Antigravity with Argon), give
-this prompt:
+**Plan.** For a small, clearly scoped low-risk task, write a short specification in the implementation session.
+Include the intended change, files to read, an observable acceptance check and how to run it. Commit the spec on
+the task branch before editing. For ambiguous or high-risk work, use a fresh top-model session and give this prompt:
 
 ```text
 You are the software architect for FlexBuddy.
@@ -353,16 +376,17 @@ Feature request: [DESCRIBE FEATURE]
 
 Pick the next free FB-number: check .ai/tasks/ on main and the ai/FB-* branches on origin, in this
 repository and in flexbuddy-android (git ls-remote --heads https://github.com/afa000/flexbuddy-android 'ai/FB-*').
-Create branch ai/<task-id> from main, write .ai/tasks/<task-id>.md from .ai/tasks/TEMPLATE.md,
-commit it and push the branch. Do not implement the feature.
+Create branch ai/<task-id> from main and write .ai/tasks/<task-id>.md from .ai/tasks/TEMPLATE.md.
+Commit the spec locally before ending the planning session. Ask for approval to push only
+if the implementer needs the branch on the remote. Do not implement the feature.
 Set Risk and Implementer from the table in docs/agent-workflow.md, and list every file the
 implementer needs under "Files to read". Keep the task small enough for one agent session.
 ```
 
 Pushing an `ai/` branch deploys nothing; Render only deploys `main`. The old `plan/<slug>` branches stay as history.
 
-**Implement.** Use the implementer the task names. Start a new session on the model it names (a top model for high
-risk; a routine one may save usage otherwise), switch to the branch and run the skill:
+**Implement.** Use the implementer and model the task names. Continue in the same session for a short same-session
+plan. If planning ran separately, start a new implementation session. Switch to the task branch and run the skill:
 
 ```powershell
 git fetch origin
@@ -376,33 +400,33 @@ From Claude Code, `run-agent.ps1` can also start an unattended Antigravity or lo
 ([below](#running-everything-from-one-claude-code-session)). In a tool that doesn't load skills, say "Follow
 .agents/skills/implement-task/SKILL.md for FB-001."
 
-**Verify and open the pull request.** Commit first: the checks record the commit they tested, and the packet warns when
-that is no longer the latest one. Any untracked file counts as an uncommitted change: `verify.ps1` then reports "with
-uncommitted changes" and `review-packet.ps1` refuses to run. Commit it, delete it, or add it to `.gitignore` (or, for a
-file only on your machine, `.git/info/exclude`).
+**Verify and open the pull request.** Run the focused checks from the spec while implementing. Commit before full
+verification for review. The checks record the full SHA, and `-ReusePassing` reuses a passing result for that exact
+clean commit when it covers the suites needed for this run. Untracked files count as uncommitted changes.
+`verify.ps1` labels the result as dirty, and `review-packet.ps1` requires a clean tree. Commit the file, remove it,
+or add it to `.gitignore`. Use `.git/info/exclude` for a file that belongs only on your machine.
 
 ```powershell
 git add <changed files>
 git commit -m "feat(scope): ..."
 git fetch origin main
-.\scripts\verify.ps1 -TaskId FB-001
+.\scripts\verify.ps1 -TaskId FB-001 -ReusePassing
 .\scripts\review-packet.ps1 -TaskId FB-001
 git push -u origin ai/FB-001
 gh pr create --base main --title "feat(scope): ..." --body-file .ai/reviews/FB-001.md
 ```
 
-Read the packet for secrets before it becomes the pull request description. `/prepare-review FB-001` does these
-steps and stops before pushing.
+Read the packet for secrets before it becomes the pull request description. `/prepare-review FB-001` verifies
+the committed changes and builds the packet. Ask for approval before pushing the branch or opening the PR.
 
-**Review and merge.** Wait for the Java and JS checks. Then, in a new session on a top model (Opus, Sol or Argon; not
-the session that wrote the code):
+**Review and merge.** Wait for the required CI checks. Start a fresh session on a top model:
 
 > /review-task FB-001 (or `$review-task`, or "Use the review-task skill for FB-001")
 
-The review reads only the task, the packet and the diff, and reports findings without changing code. Fixes go back to
-the implementer, or to a top model for a high-risk task, and the review runs again on the new commit. You
-merge the pull request yourself, in GitHub; the guard refuses `gh pr merge` in all three tools. Merging to `main` deploys to Render, and
-GitHub refuses the merge until both checks pass.
+The reviewer pins the diff and CI evidence to the recorded PR head and labels the findings with that SHA. Fixes go
+back to the implementer, or to a top model for a high-risk task. Review the new head after any push. You merge
+the pull request yourself in GitHub after the reviewed head matches the current head and required checks pass.
+Merging to `main` deploys to Render.
 
 ## Running everything from one Claude Code session
 
@@ -413,11 +437,11 @@ edit (a separate Git worktree if you are working in the main one at the same tim
 ```powershell
 .\scripts\run-agent.ps1 -Agent local -TaskId FB-003
 .\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Prompt "Only do step 1 of the task's handoff plan."
-.\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Model gemini-4-argon-high
+.\scripts\run-agent.ps1 -Agent antigravity -TaskId FB-003 -Model gemini-4-neon-high
 ```
 
-For Antigravity, `-Model` takes an id from `agy models` (Argon for high-risk work, Hydrogen for routine
-work); without it the run uses your own `agy` default, and the log records which.
+For Antigravity, pass an explicit `-Model` ID from `agy models` to match the task spec. When you omit it,
+the run uses your `agy` default. The log records the model selection.
 
 Without `-Prompt`, the agent implements the task with the `implement-task` skill and writes its handoff report. The
 run is timed and saved to `.ai/artifacts/<task-id>/agent-<agent>-<time>.log`, with the agent's answer, its tool log,
@@ -547,9 +571,10 @@ Then the same two jobs with Gemma 4 12B at 32K, also fully on the GPU:
 | Read-only prompt | 101 s | Every path and command right, nothing invented; less detail than Qwen (no file names) |
 | FB-002 tests, from the same handoff | 111 s | 2 new tests plus an assertion on the existing click test; all 3 fail without the fix. Its handoff report kept stale "no tests were written" lines |
 
-Gemma was faster and more accurate on both, so it is the local model to use, with Qwen as a fallback. One caveat:
-Gemma's FB-002 run started with the fix already committed and a shorter handoff report, a slightly easier start than
-Qwen had.
+Use Gemma 4 12B at 32K as the local default for small tasks with explicit acceptance checks. It did better on these
+trials, and its FB-002 run started with the fix already committed and a shorter handoff report. Use Qwen as a fallback
+when Gemma is unavailable. Escalate repeated correctness failures to a hosted model and verify any local model's
+edits and test claims.
 
 The [smoke test](#proving-a-tool-works) on November 11, 2026 (FB-027), with the version 2 OpenCode config:
 

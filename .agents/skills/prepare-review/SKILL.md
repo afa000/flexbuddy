@@ -11,8 +11,9 @@ Input: a task id such as `FB-001`.
    If the implementation report is missing or lists open acceptance criteria, say so and stop.
 2. Check that you are on `ai/<task-id>` and that `git status` is clean. If there are
    uncommitted changes, ask before committing them.
-3. Run `git fetch origin main`, then `.\scripts\verify.ps1 -TaskId <task-id>` from the
-   repository root.
+3. Run `git fetch origin main`, then `.\scripts\verify.ps1 -TaskId <task-id> -ReusePassing` from the
+   repository root. Read `.ai/artifacts/<task-id>/summary.md`. The script reuses both passing suite results
+   only when they match the exact clean commit and include PostgreSQL coverage if configured for this run.
 4. If a check fails, report the failure. Do not continue to the packet.
 5. Run `.\scripts\review-packet.ps1 -TaskId <task-id>`.
 6. Read `.ai/reviews/<task-id>.md` and check it for secrets, private calendar links and real

@@ -21,7 +21,9 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 ## How work is organised
 
 - Each task has a specification in `.ai/tasks/<task-id>.md` (ids `FB-001`, `FB-002`, ...; see `TEMPLATE.md`) and its own
-  branch `ai/<task-id>`. The specification is committed on that branch before implementation starts.
+  branch `ai/<task-id>`. Commit the specification before implementation. For a small, clearly scoped low-risk task,
+  the implementer can write a short spec in the same session. Use a separate top-model planning session for
+  ambiguous or high-risk work.
 - Design references for a task go in `.ai/design/<task-id>/`.
 - Repeatable procedures live in `.agents/skills/`: `implement-task` to build a task, `prepare-review` to get it ready for
   a pull request, and `review-task` to review that pull request in a fresh session. Claude Code reaches them as
@@ -30,11 +32,20 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 - `.ai/implementations/<task-id>.md` is the handoff report between agents and `.ai/reviews/<task-id>.md` is the review
   packet. Both are local files, ignored by Git.
 - Only one agent edits a working tree at a time.
-- Each task names its risk and its implementer. Three tools are equals, each with a top model and a routine model:
-  Claude Code (Opus, Sonnet), Codex (Sol, Terra) and Antigravity (Gemini 4 Argon, Gemini 4 Hydrogen). High-risk work
-  (sign-in, payments, migrations, backup/restore, earnings and tax figures, deleting data) is implemented by a top
-  model, Opus, Sol or Argon, never by Sonnet, Terra, Hydrogen or a local model. If you are not the named implementer and
-  the owner hasn't handed the task to you, stop and say so.
+- Each task names its risk and its implementer. The top models for specs, fresh reviews and high-risk implementation
+  are Claude Code (Opus), Codex (GPT-6.2 Astra when available or GPT-6.2 Sol at High or above) and Antigravity
+  (Gemini 4 Neon or Gemini 4 Argon). High-risk work includes sign-in, payments, migrations, backup/restore, earnings
+  and tax figures, and deleting data. Use a standalone top model for high-risk implementation. If you are not the
+  named implementer and the owner hasn't handed the task to you, stop and say so.
+- In Claude Code, use Opus for work that needs careful judgment, Sonnet for well-scoped implementation and Haiku
+  for quick searches and log summaries. For high-risk implementation, select Opus directly because `opusplan`
+  switches to Sonnet when it edits.
+- In Codex, use Sol at Medium for most coding, Astra for the hardest engineering work, and Terra for screenshot
+  interpretation, browser or desktop checks, and narrowly scoped fixes.
+- In Antigravity, default to Gemini 4 Neon (High) for specs, reviews, high-risk implementation and complex coding.
+  Use Gemini 4 Argon (High) for architecture trade-offs, deeply ambiguous problems, a second opinion or a top-model
+  fallback. Use Gemini 4 Hydrogen for routine implementation. Orchestrator hands
+  implementation to Hydrogen, so it is eligible only for low- and medium-risk implementation.
 - Read `verify.ps1`'s `summary.md`, not the full logs, unless a check failed.
 
 ## Before changing anything
@@ -51,6 +62,7 @@ FlexBuddy is a shift and earnings tracker for delivery drivers, live at https://
 Render deploys every push to `main` once the GitHub checks pass. There is no staging environment.
 
 - Never push, merge or force-push without the owner's explicit approval for that push.
+- Ask before opening a pull request. A local task branch is enough until a remote handoff or review needs it.
 - Work on a feature branch, not directly on `main`.
 - Never edit production data, Render settings or environment variables.
 - `FLEXBUDDY_TWO_FACTOR_KEY` must never be regenerated: it would lock out every driver who uses an authenticator app.
@@ -61,8 +73,10 @@ Render deploys every push to `main` once the GitHub checks pass. There is no sta
 
 Run what your change touches and report every check you did not run. Never claim a check passed unless you ran it.
 
-From the repository root, `.\scripts\verify.ps1 -TaskId <task-id>` runs both suites and writes a summary to
-`.ai/artifacts/<task-id>/`. To run them one at a time, from `flexbuddy/`:
+Run focused checks during implementation. Before opening a pull request, prepare verification for the clean commit.
+From the repository root, `.\scripts\verify.ps1 -TaskId <task-id> -ReusePassing` runs both suites or reuses matching
+passing results from `.ai/artifacts/<task-id>/summary.md`. Omit `-ReusePassing` to force a fresh run.
+To run the suites one at a time, from `flexbuddy/`:
 
 ```powershell
 .\mvnw.cmd -B -ntp verify
