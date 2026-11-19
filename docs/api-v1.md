@@ -207,6 +207,41 @@ and use the oldest relevant successful-check time when describing calculation fr
 partially refreshed result as fully synced. Cached figures may be stale offline. This contract does not replace
 the server's source-of-truth validation or let a client infer settings from computed Home totals.
 
+### GET /api/v1/tax/summary
+
+Added by FB-050 for NA-08 and NA-13. Token required: yes. The bearer token selects the account.
+
+Request: optional `year` query parameter, an integer from 2000 through 2100 inclusive. When omitted, the year
+defaults to the current year in the account's time zone.
+
+- 200 returns the complete summary. Money fields are two-decimal strings, `percent` is a decimal string in
+  percentage points (for example, `"25.50"` for 25.5%), and dates are ISO local dates.
+  - `year` is the selected integer tax year. `netYearToDate` is net earnings for the entire selected calendar
+    year, using the same blocks, expenses and settings as the website.
+  - `reserveToDate` is the estimated reserve based on the driver's configured percentage applied to positive
+    annual net earnings. `paid` is the total of all recorded payments for the year. `remaining` is the
+    reserve less that total, floored at zero.
+  - `thisWeekNet` is net earnings for the current Monday through Sunday in the account's time zone, even when
+    a different tax year is selected. `thisWeekSetAside` is the estimate based on the configured percentage
+    and positive net for that week.
+  - `nextDueDate` is the first configured due date in the selected year's schedule on or after the account's
+    current date. It is null after the final due date passes.
+  - `quarters` contains four entries in estimated-payment period order. Each has the integer `quarter` (1–4),
+    inclusive period dates `from` and `to`, configured `dueDate`, period net earnings `net`, estimated
+    `setAside` based on the configured percentage and positive period net, and `paid` for payments assigned
+    to that quarter. Payments without a quarter count toward annual `paid` only.
+  - With no configured percentage, `percent`, `reserveToDate`, `remaining`, `thisWeekSetAside` and every
+    quarter's `setAside` are null. A saved zero percentage yields zero estimates. The payload contains payment
+    totals only.
+- 304 has an empty body when an authenticated `If-None-Match` matches the current representation. Both 200 and
+  304 send a strong `ETag` and `Cache-Control: private, no-cache`. A changed representation returns 200 with a
+  new ETag. Store the summary, its ETag and the last successful fetch or revalidation time per account and
+  selected tax year. Either 200 or 304 advances that time. The summary has no delta cursor.
+- 400 returns `{"error":"invalid","fields":{"year":"invalid"}}` for a malformed or out-of-range year.
+- 401 returns `{"error":"unauthorized"}` when the bearer token is missing or invalid, including requests with
+  only a website session.
+- 404 when the API is disabled (see Availability).
+
 ### GET /api/v1/account
 
 Added by FB-005. Token required: yes.
