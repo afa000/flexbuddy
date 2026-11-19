@@ -23,11 +23,11 @@ function Read-Git {
 $commit = (Read-Git rev-parse HEAD).Trim()
 $startedClean = -not (Read-Git status --porcelain --untracked-files=normal)
 $runPostgres = $env:FLEXBUDDY_TEST_POSTGRES_URL -cmatch '^jdbc:postgresql://.+$'
-$mavenEvidence = "- Maven test evidence: both reactor modules ran tests"
+$mavenEvidence = "- Maven test evidence: default Surefire selection ran in both reactor modules"
 $postgresRan = "- PostgreSQL migration test: PASS"
 $postgresSkipped = "- PostgreSQL migration test: skipped locally. CI runs it on the pull request."
 
-# Full verification uses the reactor's default test selection. Keep unrelated JVM options, such as a test agent.
+# Reject direct test overrides while retaining unrelated JVM options, such as a test agent.
 $mavenOptions = @($env:MAVEN_ARGS, $env:MAVEN_OPTS, $env:JDK_JAVA_OPTIONS, $env:JAVA_TOOL_OPTIONS, $env:_JAVA_OPTIONS)
 foreach ($config in @(".mvn\maven.config", ".mvn\jvm.config")) {
     $path = Join-Path $app $config
@@ -67,9 +67,27 @@ function Invoke-Check([string]$Name, [string]$Command, [string]$Log) {
     if ($exit -eq 0) { "PASS" } else { "FAIL (exit $exit)" }
 }
 
+# Pin Surefire's default scanning rules above settings-profile properties. Keep the
+# per-test selector empty so JUnit can discover nested tests through their outer class.
+$emptySelection = Join-Path $logs "surefire-empty-selection.txt"
+Set-Content -Encoding Ascii -LiteralPath $emptySelection -Value "" -NoNewline
+$mavenFlags = @(
+    '-B', '-ntp', '-Dstyle.color=never'
+    '-Dtest='
+    '-Dsurefire.includes=**/Test*.java,**/*Test.java,**/*Tests.java,**/*TestCase.java'
+    '-Dsurefire.excludes=**/*$*'
+    ('"-Dsurefire.includesFile={0}"' -f $emptySelection)
+    ('"-Dsurefire.excludesFile={0}"' -f $emptySelection)
+    '-Dgroups=', '-DexcludedGroups='
+    '-Dsurefire.includeJUnit5Engines=', '-Dsurefire.excludeJUnit5Engines='
+    '-Djunit.jupiter.conditions.deactivate='
+    '-DskipTests=false', '-Dmaven.test.skip=false', '-Dmaven.test.skip.exec=false'
+    '-Dmaven.test.failure.ignore=false'
+) -join ' '
+
 Push-Location $app
 try {
-    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd -B -ntp -Dstyle.color=never -f reactor/pom.xml verify" "maven.log"
+    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd $mavenFlags -f reactor/pom.xml verify" "maven.log"
     $js = Invoke-Check "JavaScript tests" "node --test src/test/js/*.test.js" "javascript.log"
 }
 finally {
