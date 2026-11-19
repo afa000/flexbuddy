@@ -31,6 +31,11 @@ Every release needs the owner's approval of that actual release; merging a versi
   registry download independently matched both release-manifest SHA-256 values:
   JAR `7eff707f4d647364b1601a3695c3195680684943c5a32bcbd309f6d601d86216`,
   POM `79e804387b07b36728976da25321905c42a3ffca83573a1b7e11227ad136b022`.
+- **0.4.0**, unreleased: source version only, pending the owner's review, tag and publication (FB-053). Adds the
+  blocks and expenses CSV writers in `com.angel.flexbuddy.importcore.export` (`ShiftCsv`, `ExpenseCsv` and their
+  plain `ShiftCsvRow` / `ExpenseCsvRow` inputs), which the server's CSV downloads now delegate to with unchanged
+  bytes. Import, figures and 0.3.0 APIs are unchanged. No tag `import-core-v0.4.0` exists yet and nothing is
+  published; Android keeps its current pin until 0.4.0 is published and verified.
 
 The server adopts these helpers without changing its goal/planning results. See the library README for selection
 and rounding contracts. Android's merged FB-041/FB-043 baseline still pins verified 0.2.0; FB-046 separately pins

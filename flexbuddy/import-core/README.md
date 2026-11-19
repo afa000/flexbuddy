@@ -1,9 +1,11 @@
 # Shared screenshot import rules
 
-`com.angel:flexbuddy-import-core:0.3.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
+`com.angel:flexbuddy-import-core:0.4.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules, and from
-0.2.0 the earnings figures (below). Published 0.3.0 adds goal and planned-work preparation (FB-044).
-The library performs no OCR, translation, persistence, file access or network calls.
+0.2.0 the earnings figures (below). Published 0.3.0 adds goal and planned-work preparation (FB-044). Source version
+0.4.0, not yet published, adds the blocks and expenses CSV writers (FB-053).
+The library performs no OCR, translation, persistence or network calls, and opens no files: the CSV writers write
+only to the stream they are given.
 Releases are listed in [docs/import-core-releases.md](../../docs/import-core-releases.md).
 
 The native Android consumer targets API 26 (Android 8) and later. Don't use JDK methods Android lacks at that level unless D8
@@ -73,6 +75,31 @@ existing user-scoped queries and response DTOs. Release tag `import-core-v0.3.0`
 `f4eb79d0d07c9902d71eead64f6195ab73ac1ec9`; run 44234045242 and its verified hashes are recorded in the release
 guide. Android pinning, the full resolved-JAR audit and API26/current-API runtime checks remain the separate FB-046
 gate. The source compatibility scan alone does not prove Android runtime compatibility.
+
+## Blocks and expenses CSV (source 0.4.0, unpublished)
+
+`com.angel.flexbuddy.importcore.export` writes the website's two CSV downloads, byte for byte, so the app can build
+the same files offline. The server's `ShiftCsvWriter` and `ExpenseCsvWriter` are thin adapters over it.
+
+- `ShiftCsv.write(rows, output)` takes `ShiftCsvRow`s: every value a blocks row prints, already computed (id, date,
+  station, times, minutes worked, pay, tips, total, rates, miles, mileage cost, linked expenses, net figures,
+  created/updated instants, the status name, the recorded details and the late-forfeit flag). UTF-8 **with** a BOM,
+  CRLF, a cell quoted only when it needs it, money at two decimals HALF_UP. Only the station is guarded against
+  spreadsheet formulas. It flushes and leaves the stream open.
+- `ExpenseCsv.write(rows, output)` takes `ExpenseCsvRow`s (date, category name, amount, note, block id, station).
+  UTF-8 **without** a BOM, CRLF, every cell quoted, and every cell is guarded against formulas. It closes the stream.
+
+These differences between the two files are the website's existing behavior and stay; the Javadoc spells out each
+rule. The writers only format. **The consumer selects only the signed-in account's rows**, with the same filters as
+the website (the blocks export defaults to completed and cancelled blocks), and computes the figures with the shared
+calculators (`NetEarnings`, `EarningsRules`) first, so a scheduled block still counts toward nothing. Status and
+category are passed as their names; the library reads no clock, locale or time zone. Existing 0.3.0 API signatures
+are unchanged.
+
+The golden files in `src/test/resources/com/angel/flexbuddy/importcore/export/` and the rows in the test class
+`CsvExportFixtures` are the parity fixtures: the server's `CsvExportGoldenBytesTest` and the library's
+`CsvExportTest` expect the same bytes, and the native app's export test can reuse them. Git leaves those files'
+line ends alone (`-text`).
 
 ## Building
 
