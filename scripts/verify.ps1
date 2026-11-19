@@ -23,14 +23,30 @@ function Read-Git {
 $commit = (Read-Git rev-parse HEAD).Trim()
 $startedClean = -not (Read-Git status --porcelain --untracked-files=normal)
 $runPostgres = $env:FLEXBUDDY_TEST_POSTGRES_URL -cmatch '^jdbc:postgresql://.+$'
-$postgresRan = "- PostgreSQL migration test: enabled in the Maven verification"
+$mavenEvidence = "- Maven test evidence: both reactor modules ran tests"
+$postgresRan = "- PostgreSQL migration test: PASS"
 $postgresSkipped = "- PostgreSQL migration test: skipped locally. CI runs it on the pull request."
+
+# Full verification uses the reactor's default test selection. Keep unrelated JVM options, such as a test agent.
+$mavenOptions = @($env:MAVEN_ARGS, $env:MAVEN_OPTS, $env:JDK_JAVA_OPTIONS, $env:JAVA_TOOL_OPTIONS, $env:_JAVA_OPTIONS)
+foreach ($config in @(".mvn\maven.config", ".mvn\jvm.config")) {
+    $path = Join-Path $app $config
+    if (Test-Path -LiteralPath $path) {
+        $mavenOptions += Get-Content -LiteralPath $path -Raw
+    }
+}
+$testSelection = '(?i)(?:^|\s|["''])-D\s*["'']?(?:test|skipTests|maven\.test\.skip(?:\.exec)?|maven\.test\.failure\.ignore|groups|excludedGroups|surefire\.(?:includes|excludes)(?:File)?|surefire\.(?:include|exclude)JUnit5Engines|junit\.jupiter\.conditions\.deactivate)(?=[\s="''#]|$)'
+if (($mavenOptions -join "`n") -match $testSelection) {
+    throw "Remove Maven test selection, skip, or failure-ignore options before running full verification."
+}
+
 if ($ReusePassing -and $startedClean -and (Test-Path -LiteralPath $summaryPath)) {
     $previous = Get-Content -LiteralPath $summaryPath -Encoding UTF8
     $postgresMatches = ($previous -ccontains $postgresRan) -or
         (-not $runPostgres -and ($previous -ccontains $postgresSkipped))
     if (($previous -ccontains "- Commit: $commit (clean)") -and
         ($previous -ccontains "- Maven verification: PASS") -and
+        ($previous -ccontains $mavenEvidence) -and
         ($previous -ccontains "- JavaScript tests: PASS") -and $postgresMatches) {
         Write-Host "Reusing passing verification for $commit. Summary: .ai/artifacts/$TaskId/summary.md"
         return
@@ -47,17 +63,44 @@ function Invoke-Check([string]$Name, [string]$Command, [string]$Log) {
     Write-Host "Running $Name..."
     cmd /c "$Command 2>&1" | Tee-Object -Variable output | Out-Host
     $exit = $LASTEXITCODE
-    $output | Set-Content -Encoding UTF8 (Join-Path $logs $Log)
+    Set-Content -Encoding UTF8 -LiteralPath (Join-Path $logs $Log) -Value ($output -join [Environment]::NewLine)
     if ($exit -eq 0) { "PASS" } else { "FAIL (exit $exit)" }
 }
 
 Push-Location $app
 try {
-    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd -B -ntp -f reactor/pom.xml verify" "maven.log"
+    $maven = Invoke-Check "Maven verification" ".\mvnw.cmd -B -ntp -Dstyle.color=never -f reactor/pom.xml verify" "maven.log"
     $js = Invoke-Check "JavaScript tests" "node --test src/test/js/*.test.js" "javascript.log"
 }
 finally {
     Pop-Location
+}
+
+# Read only the current invocation's log. Reports in target may be left over from another run.
+$module = $null
+$testedModules = @{}
+$migrationPassed = $false
+$mavenCompleted = $false
+$counts = 'Tests run: (?<total>\d+), Failures: 0, Errors: 0, Skipped: (?<skipped>\d+)'
+foreach ($line in (Get-Content -LiteralPath (Join-Path $logs "maven.log") -Encoding UTF8)) {
+    if ($line -match '^\[INFO\] --- surefire:[^ ]+:test .* @ (?<module>\S+) ---\s*$') {
+        $module = $Matches.module
+    } elseif ($line -match "^\[INFO\] $counts\s*$" -and $module) {
+        $testedModules[$module] = [int]$Matches.total -gt [int]$Matches.skipped
+        $module = $null
+    } elseif ($line -match "^\[INFO\] $counts, .* -- in com\.angel\.flexbuddy\.migration\.PostgresMigrationTest\s*$") {
+        $migrationPassed = [int]$Matches.total -gt 0 -and [int]$Matches.skipped -eq 0
+    } elseif ($line -match '^\[INFO\] BUILD SUCCESS\s*$') {
+        $mavenCompleted = $true
+    }
+}
+$bothModulesRan = $testedModules['flexbuddy-import-core'] -and $testedModules['flexbuddy']
+if ($maven -eq "PASS" -and -not $mavenCompleted) {
+    $maven = "FAIL (missing Maven build success)"
+} elseif ($maven -eq "PASS" -and -not $bothModulesRan) {
+    $maven = "FAIL (missing passing test results for one or both reactor modules)"
+} elseif ($maven -eq "PASS" -and $runPostgres -and -not $migrationPassed) {
+    $maven = "FAIL (configured PostgreSQL migration test did not pass)"
 }
 
 $finishedCommit = (Read-Git rev-parse HEAD).Trim()
@@ -69,7 +112,14 @@ $tree = if ($finishedCommit -ne $commit) {
 } else {
     "with uncommitted changes"
 }
-$postgres = if ($runPostgres) { $postgresRan } else { $postgresSkipped }
+$evidence = if ($bothModulesRan) { $mavenEvidence } else { "- Maven test evidence: incomplete" }
+$postgres = if ($migrationPassed) {
+    $postgresRan
+} elseif ($runPostgres) {
+    "- PostgreSQL migration test: no passing result recorded"
+} else {
+    $postgresSkipped
+}
 
 @"
 # Verification: $TaskId
@@ -77,6 +127,7 @@ $postgres = if ($runPostgres) { $postgresRan } else { $postgresSkipped }
 - Commit: $commit ($tree)
 - Run at: $(Get-Date -Format "yyyy-MM-dd HH:mm")
 - Maven verification: $maven
+$evidence
 - JavaScript tests: $js
 $postgres
 

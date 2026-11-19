@@ -6,7 +6,7 @@ and validation. Add the other sections when they affect implementation or review
 Status: Ready for implementation
 Risk: high | medium | low (see "Which tool for which task" in docs/agent-workflow.md)
 Implementer: Claude Code (Opus or Sonnet) | Codex (Astra, Sol or Terra) | Antigravity (Gemini 4 Neon, Argon or Hydrogen) | Antigravity with Orchestrator (Neon) | OpenCode + local model
-Review: fresh Claude Code (Opus), Codex (Astra or Sol at High or above) or Antigravity (Gemini 4 Neon or Gemini 4 Argon) session, review-task skill
+Review: fresh Claude Code (Opus), Codex (Astra or Sol at High or above) or Antigravity (standalone Gemini 4 Neon High or Gemini 4 Argon High) session, review-task skill
 
 ## Objective
 

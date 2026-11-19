@@ -19,7 +19,8 @@ Code starts a skill with `/implement-task FB-xxx`, Codex with `$implement-task F
 
 1. **Plan** using the short or separate planning path under [A task from start to merge](#a-task-from-start-to-merge).
    Codex writes `.ai/tasks/FB-xxx.md` on `ai/FB-xxx`.
-2. **Implement** in a new session: `git switch ai/FB-xxx`, then `$implement-task FB-xxx`. Use the model named in
+2. **Implement** in the current session for a short same-session plan. If planning ran separately, start a new session.
+   Run `git switch ai/FB-xxx`, then `$implement-task FB-xxx`. Use the model named in
    the spec. Sol at Medium is the default for routine coding. Use Astra or Sol at High or above for high-risk code.
 3. **Prepare the pull request:** `$prepare-review FB-xxx` verifies the clean commit and builds the packet. Approve the push of
    the `ai/` branch and `gh pr create` when Codex asks; the guard refuses anything aimed at `main`.
@@ -384,8 +385,8 @@ implementer needs under "Files to read". Keep the task small enough for one agen
 
 Pushing an `ai/` branch deploys nothing; Render only deploys `main`. The old `plan/<slug>` branches stay as history.
 
-**Implement.** Use the implementer the task names. Start a new session on the model it names (a top model for high
-risk; a routine one may save usage otherwise), switch to the branch and run the skill:
+**Implement.** Use the implementer and model the task names. Continue in the same session for a short same-session
+plan. If planning ran separately, start a new implementation session. Switch to the task branch and run the skill:
 
 ```powershell
 git fetch origin
