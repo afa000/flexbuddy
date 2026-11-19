@@ -12,6 +12,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Writes the blocks CSV that the website downloads, byte for byte. It only formats: the consumer selects the
@@ -43,7 +44,7 @@ public final class ShiftCsv {
             "odometer_start", "odometer_end", "stops", "packages", "returns", "minutes_per_stop", "late_forfeit"
     };
     private static final String FORFEITED = "FORFEITED";
-    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm");
+    private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
 
     private ShiftCsv() {
     }

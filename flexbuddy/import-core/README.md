@@ -87,7 +87,10 @@ the same files offline. The server's `ShiftCsvWriter` and `ExpenseCsvWriter` are
   CRLF, a cell quoted only when it needs it, money at two decimals HALF_UP. Only the station is guarded against
   spreadsheet formulas. It flushes and leaves the stream open.
 - `ExpenseCsv.write(rows, output)` takes `ExpenseCsvRow`s (date, category name, amount, note, block id, station).
-  UTF-8 **without** a BOM, CRLF, every cell quoted, and every cell is guarded against formulas. It closes the stream.
+  UTF-8 **without** a BOM, CRLF and every cell quoted. Any cell whose text starts with `=`, `+`, `@` or `-` gets a
+  `'` prefix (so a negative amount does too), but a tab or CR is not guarded, and a cell with a line break after its
+  first character is not prefixed either, because the check is `matches("^[=+@-].*")` and `.` stops at a line break.
+  Keep that exact rule to match the website. It closes the stream.
 
 These differences between the two files are the website's existing behavior and stay; the Javadoc spells out each
 rule. The writers only format. **The consumer selects only the signed-in account's rows**, with the same filters as
@@ -98,8 +101,9 @@ are unchanged.
 
 The golden files in `src/test/resources/com/angel/flexbuddy/importcore/export/` and the rows in the test class
 `CsvExportFixtures` are the parity fixtures: the server's `CsvExportGoldenBytesTest` and the library's
-`CsvExportTest` expect the same bytes, and the native app's export test can reuse them. Git leaves those files'
-line ends alone (`-text`).
+`CsvExportTest` expect the same bytes. They are test sources, so they are **not** in the published JAR: the native
+app copies the golden files and the fixture rows into its own export test. Git leaves those files' line ends alone
+(`-text`).
 
 ## Building
 
