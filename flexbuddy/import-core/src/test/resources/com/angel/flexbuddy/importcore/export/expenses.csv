@@ -1,0 +1,11 @@
+Date,Category,Amount,Note,Shift ID,Station
+"2026-09-06","FUEL","42.50","Shell, exit 12","101","DLA8"
+"2026-09-07","TOLL","3.5","He said ""hi""","",""
+"2026-09-08","PARKING","'-5.00","'=SUM(A1:A9)","102","'+VEA7"
+"2026-09-09","MAINTENANCE","120","line one
+line two","103","'@home"
+"2026-09-10","OTHER","0.10","Peaje en Peñalolén — café y ñandú","103","Estación Peñalolén"
+"","","","","",""
+"2026-09-11","OTHER","1E+3","=a
+b","","	Tab"
+"2026-09-12","FUEL","7.125","'-minus note","104","'-East"

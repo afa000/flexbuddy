@@ -1,0 +1,1 @@
+﻿id,date,station,start_time,end_time,minutes_worked,hours_worked,base_pay,tips,total_pay,hourly_rate,miles,mileage_cost,expenses,net_pay,net_hourly_rate,earnings_per_mile,created_at,updated_at,status,actual_start,actual_end,actual_minutes,actual_hourly_rate,odometer_start,odometer_end,stops,packages,returns,minutes_per_stop,late_forfeit
