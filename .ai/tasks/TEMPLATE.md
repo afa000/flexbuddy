@@ -1,9 +1,12 @@
 # Task: <task-id> - <title>
 
+For a small, clearly scoped low-risk task, keep the header, objective, files to read, observable acceptance criteria
+and validation. Add the other sections when they affect implementation or review.
+
 Status: Ready for implementation
 Risk: high | medium | low (see "Which tool for which task" in docs/agent-workflow.md)
-Implementer: Claude Code (Opus) | Codex (Sol) | Antigravity (Gemini 4 Argon) | Claude Code (Sonnet) | Codex (Terra) | Antigravity (Gemini 4 Hydrogen) | OpenCode + local model
-Review: fresh Claude Code (Opus), Codex (Sol) or Antigravity (Gemini 4 Argon) session, review-task skill
+Implementer: Claude Code (Opus or Sonnet) | Codex (Astra, Sol or Terra) | Antigravity (Gemini 4 Neon, Argon or Hydrogen) | Antigravity with Orchestrator (Neon) | OpenCode + local model
+Review: fresh Claude Code (Opus), Codex (Astra or Sol at High or above) or Antigravity (Gemini 4 Neon or Gemini 4 Argon) session, review-task skill
 
 ## Objective
 

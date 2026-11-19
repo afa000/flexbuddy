@@ -19,7 +19,7 @@ function Invoke-Git {
 
 Push-Location $root
 try {
-    if (Invoke-Git status --porcelain) {
+    if (Invoke-Git status --porcelain --untracked-files=normal) {
         throw "Commit or stash changes first: uncommitted edits would be missing from the packet."
     }
     $branch = (Invoke-Git branch --show-current).Trim()
@@ -39,10 +39,10 @@ try {
         Get-Content $implementation -Raw -Encoding UTF8
     } else { "Implementation report missing." }
 
-    $head = (Invoke-Git rev-parse --short HEAD).Trim()
+    $head = (Invoke-Git rev-parse HEAD).Trim()
     $verificationText = if (Test-Path $verification) {
         $summary = Get-Content $verification -Raw -Encoding UTF8
-        if ($summary -notmatch "Commit: $head \(clean\)") {
+        if (($summary -split '\r?\n') -cnotcontains "- Commit: $head (clean)") {
             $warning = "**Warning: this verification did not run on the current commit ($head)."
             $summary = "$warning Run verify.ps1 again.**`n`n$summary"
         }

@@ -16,9 +16,9 @@ Input: a task id such as `FB-001`, with its specification in `.ai/tasks/<task-id
    implementer and it isn't you, and the owner hasn't handed it to you, stop and say so.
 4. Implement only what the task asks for, following the existing patterns.
 5. Add or update tests for the change.
-6. Run the checks: `.\scripts\verify.ps1 -TaskId <task-id>` from the repository root.
-   Read `.ai/artifacts/<task-id>/summary.md`; open the logs only for a failed check, and only
-   around the failure. If something fails, fix it or report it. Never hide a failure.
+6. Run the focused checks in the task spec and any checks required by `AGENTS.md` for the files you touched.
+   Run the full suites here if the spec calls for them or focused checks cannot cover the change. Otherwise,
+   `prepare-review` runs both suites on the committed result. Fix or report failures and record checks still due.
 7. Read your own diff and remove anything unrelated to the task.
 8. Write `.ai/implementations/<task-id>.md` with:
    - a summary and the changed files
