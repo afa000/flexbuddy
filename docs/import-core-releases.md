@@ -31,11 +31,17 @@ Every release needs the owner's approval of that actual release; merging a versi
   registry download independently matched both release-manifest SHA-256 values:
   JAR `7eff707f4d647364b1601a3695c3195680684943c5a32bcbd309f6d601d86216`,
   POM `79e804387b07b36728976da25321905c42a3ffca83573a1b7e11227ad136b022`.
-- **0.4.0**, unreleased: source version only, pending the owner's review, tag and publication (FB-053). Adds the
+- **0.4.0**, published November 19, 2026 from annotated tag `import-core-v0.4.0`, source commit
+  `a246fe6ed2747faecefafb8cbf848c4fc3da4f2e` (FB-053, PR #61),
+  [Publish import core run 44624897743](https://github.com/afa000/flexbuddy/actions/runs/44624897743). Adds the
   blocks and expenses CSV writers in `com.angel.flexbuddy.importcore.export` (`ShiftCsv`, `ExpenseCsv` and their
   plain `ShiftCsvRow` / `ExpenseCsvRow` inputs), which the server's CSV downloads now delegate to with unchanged
-  bytes. Import, figures and 0.3.0 APIs are unchanged. No tag `import-core-v0.4.0` exists yet and nothing is
-  published; Android keeps its current pin until 0.4.0 is published and verified.
+  bytes. Import, figures and 0.3.0 APIs are unchanged. The guarded workflow uploaded the tested JAR/POM and
+  verified authenticated downloads against the release manifest: JAR
+  `01d10d13b95a10a98c1732002a0d9103a0a6dd7f669dcda0e2697b7f5f60397b`, POM
+  `b674e0ae844d4509a668abcf344021e101efb9ec86de8f215c839543930e0cae`. The run's release artifact matched those
+  hashes when downloaded locally. A separate read-only registry download was not done: the local credential has no
+  `read:packages` scope. Android keeps its current pin until its own task pins and verifies 0.4.0.
 
 The server adopts these helpers without changing its goal/planning results. See the library README for selection
 and rounding contracts. Android's merged FB-041/FB-043 baseline still pins verified 0.2.0; FB-046 separately pins

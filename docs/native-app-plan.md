@@ -368,16 +368,15 @@ verified release. Android pinning, the full JAR audit and API26/current-API veri
 
 Follow-up (November 19, 2026): steps 3 and 5 are done, Home goal/planning runs offline, and the tax year summary is
 served to the app (FB-050, `GET /api/v1/tax/summary`). Step 4's server half is FB-053: the blocks and expenses
-CSV writers move into the library as `com.angel.flexbuddy.importcore.export` (`ShiftCsv`, `ExpenseCsv`) in source
-version 0.4.0, not yet published, with golden-bytes fixtures the app's parity test can reuse. The website's
+CSV writers move into the library as `com.angel.flexbuddy.importcore.export` (`ShiftCsv`, `ExpenseCsv`) in
+version 0.4.0, published November 19, 2026 from `import-core-v0.4.0` (run 44624897743), with golden-bytes fixtures the app's parity test can reuse. The website's
 downloads stay byte-for-byte the same. Reports, the app half of step 4 and step 6 remain open.
 
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
 
 Status (November 19, 2026): steps 1, 3 and 5 are done, as are Home goal/planning (step 2) and the tax year summary;
-shared library 0.3.0 is published. Step 4's server half (the CSV writers in the library, source 0.4.0) is FB-053,
-which waits for review and for the owner to publish 0.4.0. Still open: Reports (the rest of step 2), the app half of
+step 4's server half is done (FB-053, PR #61) and shared library 0.4.0 is published. Still open: Reports (the rest of step 2), the app half of
 step 4 (the export screen) and step 6.
 
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
