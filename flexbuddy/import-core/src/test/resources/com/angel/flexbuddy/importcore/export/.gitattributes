@@ -1,0 +1,2 @@
+# Golden CSV exports: CRLF row ends and bare LF inside quoted cells are the expected bytes. Never convert them.
+*.csv -text
