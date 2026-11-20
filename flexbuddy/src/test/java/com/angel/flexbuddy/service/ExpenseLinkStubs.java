@@ -24,10 +24,7 @@ final class ExpenseLinkStubs {
         lenient().when(expenseService.countable(any(), any())).thenAnswer(invocation -> {
             List<Expense> expenses = invocation.getArgument(1);
             Map<Long, ExpenseService.LinkedShift> links = links(expenses);
-            return expenses.stream().filter(expense -> {
-                ExpenseService.LinkedShift link = ExpenseService.linkOf(expense, links);
-                return link == null || !link.waiting();
-            }).toList();
+            return expenses.stream().filter(expense -> !FigureInputs.reportCost(expense, links).waits()).toList();
         });
     }
 

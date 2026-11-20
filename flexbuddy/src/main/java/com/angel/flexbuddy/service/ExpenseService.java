@@ -19,7 +19,6 @@ import com.angel.flexbuddy.dto.ExpenseResponse;
 import com.angel.flexbuddy.dto.ExpenseSummaryResponse;
 import com.angel.flexbuddy.exception.ExpenseNotFoundException;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
-import com.angel.flexbuddy.importcore.figures.EarningsRules;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
@@ -53,8 +52,6 @@ public class ExpenseService {
 
     /** The block an expense is linked to, deleted or not. Status is never null; an old row without one was completed. */
     public record LinkedShift(Long id, String station, ShiftStatus status, boolean deleted) {
-        /** An expense on a block that is still scheduled waits for it; one on a deleted block counts by its date. */
-        boolean waiting() { return EarningsRules.expenseWaits(FigureInputs.status(status), deleted); }
     }
 
     /**

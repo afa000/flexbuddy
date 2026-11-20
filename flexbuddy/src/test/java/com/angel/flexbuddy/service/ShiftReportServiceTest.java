@@ -705,6 +705,24 @@ class ShiftReportServiceTest {
     }
 
     @Test
+    void stationsWithTheSameNetAreOrderedByTheirLabelInTheRequestsLanguage() {
+        // Mid1 and the unlinked bucket (a block with a blank station) both net 100.00.
+        when(shiftService.findFiltered(EMAIL, ALL)).thenReturn(List.of(
+                shift("Mid1", LocalDate.of(2026, 9, 7), "100.00", "0", 240),
+                shift(" ", LocalDate.of(2026, 9, 8), "100.00", "0", 240)));
+
+        assertThat(reportService.earnings(EMAIL, ALL, GroupBy.STATION).buckets())
+                .extracting(EarningsBucket::label).containsExactly("Mid1", "Unlinked expenses");
+        org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.forLanguageTag("es"));
+        try {
+            assertThat(reportService.earnings(EMAIL, ALL, GroupBy.STATION).buckets())
+                    .extracting(EarningsBucket::label).containsExactly("Gastos sin vincular", "Mid1");
+        } finally {
+            org.springframework.context.i18n.LocaleContextHolder.resetLocaleContext();
+        }
+    }
+
+    @Test
     void spanishReportsTranslateLabelsWithoutChangingBucketKeys() {
         org.springframework.context.i18n.LocaleContextHolder.setLocale(java.util.Locale.forLanguageTag("es"));
         try {
