@@ -42,11 +42,17 @@ Every release needs the owner's approval of that actual release; merging a versi
   `b674e0ae844d4509a668abcf344021e101efb9ec86de8f215c839543930e0cae`. The run's release artifact matched those
   hashes when downloaded locally. A separate read-only registry download was not done: the local credential has no
   `read:packages` scope. Android keeps its current pin until its own task pins and verifies 0.4.0.
-- **0.5.0**, unreleased: the version on the branch, pending the owner's publication. Adds the earnings report in
-  `com.angel.flexbuddy.importcore.figures` (FB-055): `EarningsReport` with its plain `ReportBlock` / `ReportCost`
-  inputs, `RouteRules` and the `ReportSelection` helpers, which the server's earnings report now delegates to with
-  unchanged responses. Import, figures, export and 0.4.0 APIs are unchanged. Not tagged or published; its tag,
-  run and hashes are recorded here once the owner publishes it. Android's Reports screen (FB-056) pins it after that.
+- **0.5.0**, published November 20, 2026 from annotated tag `import-core-v0.5.0`, source commit
+  `1df2cbf142d474b63bf9a701e8372b74f8dde51f` (FB-055, PR #63),
+  [Publish import core run 44812258745](https://github.com/afa000/flexbuddy/actions/runs/44812258745). Adds the
+  earnings report in `com.angel.flexbuddy.importcore.figures` (`EarningsReport` with its plain `ReportBlock` /
+  `ReportCost` inputs, `RouteRules` and the `ReportSelection` helpers), which the server's earnings report now
+  delegates to with unchanged responses. Import, figures, export and 0.4.0 APIs are unchanged. The guarded workflow
+  uploaded the tested JAR/POM and verified authenticated downloads against the release manifest: JAR
+  `91b698a18e690b0b32b93519b69f33a93336b840d5a4d9753ded6c6021c8106c`, POM
+  `af8761039f39d0f793d7ec10e6507a5cfb4d5abbae4766152607397bf7fa769e`. The run's release artifact matched those
+  hashes when downloaded locally. A separate read-only registry download was not done. Android's Reports screen
+  (FB-056) pins and verifies it in its own task.
 
 The server adopts these helpers without changing its goal/planning results. See the library README for selection
 and rounding contracts. Android's merged FB-041/FB-043 baseline still pins verified 0.2.0; FB-046 separately pins
