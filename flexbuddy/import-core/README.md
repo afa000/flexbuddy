@@ -3,8 +3,8 @@
 `com.angel:flexbuddy-import-core:0.5.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules, and from
 0.2.0 the earnings figures (below). Published 0.3.0 adds goal and planned-work preparation (FB-044). Published
-0.4.0 adds the blocks and expenses CSV writers (FB-053). 0.5.0, not yet published, adds the earnings report
-(FB-055).
+0.4.0 adds the blocks and expenses CSV writers (FB-053). Published
+0.5.0 adds the earnings report (FB-055).
 The library performs no OCR, translation, persistence or network calls, and opens no files: the CSV writers write
 only to the stream they are given.
 Releases are listed in [docs/import-core-releases.md](../../docs/import-core-releases.md).
@@ -106,7 +106,7 @@ The golden files in `src/test/resources/com/angel/flexbuddy/importcore/export/` 
 app copies the golden files and the fixture rows into its own export test. Git leaves those files' line ends alone
 (`-text`).
 
-## Earnings report (0.5.0, unreleased)
+## Earnings report (published 0.5.0)
 
 `EarningsReport` in `com.angel.flexbuddy.importcore.figures` is the website's Reports page rollup, so the app can
 show the same reports offline. The server's `ShiftReportService.earnings` delegates to it.

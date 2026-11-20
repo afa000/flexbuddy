@@ -374,8 +374,8 @@ downloads stay byte-for-byte the same. Reports, the app half of step 4 and step 
 
 Follow-up (November 20, 2026): the server half of Reports (the rest of step 2) is FB-055: the earnings report rollup
 moves into the library as `EarningsReport` in version 0.5.0, with selection helpers and shared fixtures for the
-app's parity test, and the website's report responses stay the same. 0.5.0 is not yet published. The app half, the
-Reports screen computed offline, is FB-056, written once 0.5.0 is published.
+app's parity test, and the website's report responses stay the same. 0.5.0 was published November 20, 2026 from
+`import-core-v0.5.0` (run 44812258745). The app half, the Reports screen computed offline, is FB-056.
 
 Risk: high (earnings, net and tax figures computed on the phone). Implementer: Claude Code. Repositories: both.
 Comes after NA-12, which creates the shared library.
@@ -384,7 +384,7 @@ Status (November 19, 2026): steps 1, 3 and 5 are done, as are Home goal/planning
 step 4's server half is done (FB-053, PR #61) and shared library 0.4.0 is published. Still open: Reports (the rest of step 2), the app half of
 step 4 (the export screen) and step 6.
 
-Status (November 20, 2026): the server half of Reports is FB-055 (library 0.5.0, unpublished); the app half is
+Status (November 20, 2026): the server half of Reports is FB-055 (PR #63; library 0.5.0 published); the app half is
 FB-056. The app half of step 4 and step 6 are still open.
 
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
