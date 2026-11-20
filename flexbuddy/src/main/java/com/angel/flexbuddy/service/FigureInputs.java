@@ -2,11 +2,16 @@ package com.angel.flexbuddy.service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+import com.angel.flexbuddy.dto.GroupBy;
 import com.angel.flexbuddy.importcore.figures.Block;
 import com.angel.flexbuddy.importcore.figures.BlockStatus;
 import com.angel.flexbuddy.importcore.figures.Cost;
 import com.angel.flexbuddy.importcore.figures.CostCategory;
+import com.angel.flexbuddy.importcore.figures.EarningsReport;
+import com.angel.flexbuddy.importcore.figures.ReportBlock;
+import com.angel.flexbuddy.importcore.figures.ReportCost;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
 import com.angel.flexbuddy.model.Shift;
@@ -57,5 +62,33 @@ public final class FigureInputs {
         List<Cost> costs = new ArrayList<>(expenses.size());
         for (Expense expense : expenses) costs.add(cost(expense));
         return costs;
+    }
+
+    public static ReportBlock reportBlock(Shift shift) {
+        return new ReportBlock(shift.getId(), block(shift), shift.getActualMinutes(), shift.getStops(),
+                shift.getPackages(), shift.getReturns());
+    }
+
+    public static List<ReportBlock> reportBlocks(List<Shift> shifts) {
+        List<ReportBlock> blocks = new ArrayList<>(shifts.size());
+        for (Shift shift : shifts) blocks.add(reportBlock(shift));
+        return blocks;
+    }
+
+    /** An expense with the block it is linked to, from {@link ExpenseService#linkedShifts}; unlinked when not found. */
+    public static ReportCost reportCost(Expense expense, Map<Long, ExpenseService.LinkedShift> links) {
+        ExpenseService.LinkedShift link = ExpenseService.linkOf(expense, links);
+        return link == null ? ReportCost.unlinked(cost(expense))
+                : new ReportCost(cost(expense), link.id(), status(link.status()), link.deleted(), link.station());
+    }
+
+    public static List<ReportCost> reportCosts(List<Expense> expenses, Map<Long, ExpenseService.LinkedShift> links) {
+        List<ReportCost> costs = new ArrayList<>(expenses.size());
+        for (Expense expense : expenses) costs.add(reportCost(expense, links));
+        return costs;
+    }
+
+    public static EarningsReport.GroupBy groupBy(GroupBy groupBy) {
+        return groupBy == null ? null : EarningsReport.GroupBy.valueOf(groupBy.name());
     }
 }

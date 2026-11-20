@@ -88,16 +88,12 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Expense> countable(String email, List<Expense> expenses) {
         java.util.Map<Long, LinkedShift> links = linkedShifts(email, expenses);
-        return expenses.stream().filter(expense -> {
-            LinkedShift link = linkOf(expense, links);
-            return link == null || !link.waiting();
-        }).toList();
+        return expenses.stream().filter(expense -> !FigureInputs.reportCost(expense, links).waits()).toList();
     }
 
     /** The station an expense counts under: its block's, unless the block is deleted, when it counts as unlinked. */
     public static String countedStation(Expense expense, java.util.Map<Long, LinkedShift> links) {
-        LinkedShift link = linkOf(expense, links);
-        return link == null || link.deleted() ? null : link.station();
+        return FigureInputs.reportCost(expense, links).countedStation();
     }
 
     @Transactional(readOnly = true)

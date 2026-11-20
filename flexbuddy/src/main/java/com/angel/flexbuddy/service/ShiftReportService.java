@@ -7,11 +7,9 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
-import java.time.temporal.IsoFields;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -23,6 +21,7 @@ import com.angel.flexbuddy.i18n.Messages;
 import com.angel.flexbuddy.i18n.UserLocales;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.angel.flexbuddy.importcore.figures.EarningsReport;
 import com.angel.flexbuddy.importcore.figures.GoalPreparation;
 import com.angel.flexbuddy.importcore.figures.NetEarnings;
 import com.angel.flexbuddy.importcore.figures.PlannedWork;
@@ -38,7 +37,6 @@ import com.angel.flexbuddy.dto.ShiftStatisticsResponse;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.Shift;
 import com.angel.flexbuddy.model.ShiftStatus;
-import com.angel.flexbuddy.model.VehicleCostMethod;
 
 @Service
 public class ShiftReportService {
@@ -255,32 +253,6 @@ public class ShiftReportService {
         return shifts.stream().filter(shift -> shift.getFinishedEarlyMinutes() != null).toList();
     }
 
-    /** Worked blocks with stops recorded; route averages ignore every other block. */
-    private static List<Shift> routeShifts(List<Shift> shifts) {
-        return shifts.stream().filter(shift -> shift.getMinutesPerStop() != null).toList();
-    }
-
-    private static BigDecimal averageStops(List<Shift> shifts) {
-        List<Shift> route = routeShifts(shifts);
-        return route.isEmpty() ? null : BigDecimal.valueOf(route.stream().mapToInt(Shift::getStops).sum())
-                .divide(BigDecimal.valueOf(route.size()), 1, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal averageMinutesPerStop(List<Shift> shifts) {
-        List<Shift> route = routeShifts(shifts);
-        return route.isEmpty() ? null : BigDecimal.valueOf(route.stream().mapToInt(Shift::getClockedMinutes).sum())
-                .divide(BigDecimal.valueOf(route.stream().mapToInt(Shift::getStops).sum()), 1, RoundingMode.HALF_UP);
-    }
-
-    /** Returns as a percentage of everything carried, over blocks that recorded both. */
-    private static BigDecimal returnsRate(List<Shift> shifts) {
-        List<Shift> counted = shifts.stream().filter(shift -> shift.getReturnsBase() != null).toList();
-        if (counted.isEmpty()) return null;
-        long returned = counted.stream().mapToLong(Shift::getReturns).sum();
-        long carried = counted.stream().mapToLong(Shift::getReturnsBase).sum();
-        return BigDecimal.valueOf(returned * 100).divide(BigDecimal.valueOf(carried), 1, RoundingMode.HALF_UP);
-    }
-
     private static int clockedMinutes(List<Shift> shifts) {
         return shifts.stream().mapToInt(Shift::getClockedMinutes).sum();
     }
@@ -320,62 +292,52 @@ public class ShiftReportService {
         List<Shift> shifts = shiftService.findFiltered(email, filter);
         List<Expense> expenses = reportExpenses(email, filter);
         AccountSettingsResponse settings = settingsService.get(email);
-        Map<String, GroupAccumulator> groups = new LinkedHashMap<>();
-        shifts.forEach(shift -> addShift(groups, shift, groupBy));
         Map<Long, ExpenseService.LinkedShift> links = expenseService.linkedShifts(email, expenses);
-        expenses.forEach(expense -> addExpense(groups, expense, groupBy, links));
-        List<EarningsBucket> buckets = new ArrayList<>(groups.values().stream()
-                .map(group -> group.bucket(settings)).toList());
-        if (groupBy == GroupBy.STATION) buckets.sort(Comparator.comparing(EarningsBucket::netEarnings).reversed()
-                .thenComparing(EarningsBucket::label, String.CASE_INSENSITIVE_ORDER));
-        else buckets.sort(Comparator.comparing(EarningsBucket::periodStart, Comparator.nullsLast(Comparator.naturalOrder())));
-        NetEarningsResult total = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRates());
-        EarningsTotals totals = new EarningsTotals(shifts.size(), money(sum(shifts, true)), money(sum(shifts, false)),
-                total.grossEarnings(), total.minutesWorked(), total.grossHourlyRate(), total.miles(), total.mileageCost(),
-                total.cashSpent(), total.totalDeductions(), total.netEarnings(), total.netHourlyRate());
+        EarningsReport report = EarningsReport.calculate(FigureInputs.reportBlocks(shifts),
+                FigureInputs.reportCosts(expenses, links), FigureInputs.groupBy(groupBy),
+                FigureInputs.method(settings.vehicleCostMethod()), settings.mileageRates().figures(),
+                Messages.current("report.unlinkedExpenses"));
+        List<EarningsBucket> buckets = new ArrayList<>(report.buckets().size());
+        for (EarningsReport.Bucket bucket : report.buckets()) buckets.add(bucket(bucket, groupBy));
+        EarningsReport.Figures total = report.totals();
+        EarningsTotals totals = new EarningsTotals(total.shifts(), total.basePay(), total.tips(),
+                total.totalEarnings(), total.minutesWorked(), total.hourlyRate(), total.miles(), total.mileageCost(),
+                total.expenses(), total.deductions(), total.netEarnings(), total.netHourlyRate());
         return new EarningsReportResponse(groupBy.name().toLowerCase(Locale.ROOT), filter.from(), filter.to(), buckets, totals);
     }
 
-    private void addShift(Map<String, GroupAccumulator> groups, Shift shift, GroupBy groupBy) {
-        GroupKey key = groupKey(shift.getDate(), shift.getStation(), groupBy);
-        groups.computeIfAbsent(key.key(), ignored -> new GroupAccumulator(key)).shifts.add(shift);
+    private static EarningsBucket bucket(EarningsReport.Bucket bucket, GroupBy groupBy) {
+        EarningsReport.Figures figures = bucket.figures();
+        return new EarningsBucket(bucket.key(), label(bucket, groupBy), bucket.periodStart(), bucket.periodEnd(),
+                figures.shifts(), figures.basePay(), figures.tips(), figures.totalEarnings(), figures.minutesWorked(),
+                figures.hourlyRate(), figures.miles(), figures.mileageCost(), figures.expenses(), figures.deductions(),
+                figures.netEarnings(), figures.netHourlyRate(), figures.timedShifts(), figures.clockedMinutes(),
+                figures.clockedHourlyRate(), figures.averageFinishedEarlyMinutes(), figures.shiftsWithRouteData(),
+                figures.averageStops(), figures.averageMinutesPerStop(), figures.returnsRate(),
+                figures.netMissingMiles());
     }
 
-    private void addExpense(Map<String, GroupAccumulator> groups, Expense expense, GroupBy groupBy,
-            Map<Long, ExpenseService.LinkedShift> links) {
-        String station = ExpenseService.countedStation(expense, links);
-        GroupKey key = groupKey(expense.getDate(), station, groupBy);
-        groups.computeIfAbsent(key.key(), ignored -> new GroupAccumulator(key)).expenses.add(expense);
+    /** The bucket's name in the request's language; the library's buckets carry none. */
+    private static String label(EarningsReport.Bucket bucket, GroupBy groupBy) {
+        Locale locale = UserLocales.clamp(LocaleContextHolder.getLocale());
+        return switch (bucket.kind()) {
+            case STATION -> bucket.station();
+            case UNLINKED -> Messages.current("report.unlinkedExpenses");
+            case UNKNOWN_DATE -> Messages.current("report.unknownDate");
+            case PERIOD -> switch (groupBy) {
+                case WEEK -> Messages.current("report.weekOf", DateTimeFormatter.ofPattern(
+                        Messages.current("format.reportDay"), locale).format(bucket.periodStart()));
+                case MONTH -> MONTH_LABEL.withLocale(locale).format(YearMonth.from(bucket.periodStart()));
+                case YEAR -> String.valueOf(bucket.periodStart().getYear());
+                case STATION -> throw new IllegalStateException();
+            };
+        };
     }
 
     /** Expenses linked to a block that has not happened yet are not counted; ones on a deleted block count by date. */
     private List<Expense> reportExpenses(String email, ShiftFilter filter) {
         return expenseService.countable(email, expenseService.findFiltered(email, new ExpenseFilter(filter.from(),
                 filter.to(), filter.station(), filter.query(), null, null)));
-    }
-
-    private GroupKey groupKey(LocalDate date, String station, GroupBy groupBy) {
-        if (groupBy == GroupBy.STATION) {
-            boolean unlinked = station == null || station.isBlank();
-            String value = unlinked ? Messages.current("report.unlinkedExpenses") : station.trim();
-            return new GroupKey(unlinked ? "unlinked expenses" : value.toLowerCase(Locale.ROOT), value, null, null);
-        }
-        if (date == null) return new GroupKey("unknown", Messages.current("report.unknownDate"), null, null);
-        return switch (groupBy) {
-            case WEEK -> {
-                LocalDate start = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-                yield new GroupKey(String.format("%d-W%02d", date.get(IsoFields.WEEK_BASED_YEAR),
-                        date.get(IsoFields.WEEK_OF_WEEK_BASED_YEAR)), Messages.current("report.weekOf", DateTimeFormatter.ofPattern(
-                                Messages.current("format.reportDay"), UserLocales.clamp(LocaleContextHolder.getLocale())).format(start)), start, start.plusDays(6));
-            }
-            case MONTH -> {
-                YearMonth month = YearMonth.from(date);
-                yield new GroupKey(month.toString(), MONTH_LABEL.withLocale(UserLocales.clamp(LocaleContextHolder.getLocale())).format(month), month.atDay(1), month.atEndOfMonth());
-            }
-            case YEAR -> new GroupKey(String.valueOf(date.getYear()), String.valueOf(date.getYear()),
-                    LocalDate.of(date.getYear(), 1, 1), LocalDate.of(date.getYear(), 12, 31));
-            case STATION -> throw new IllegalStateException();
-        };
     }
 
     private BigDecimal sum(List<Shift> shifts, boolean base) {
@@ -394,21 +356,4 @@ public class ShiftReportService {
     private record ScheduleSnapshot(int plannedShifts, int plannedMinutes, BigDecimal expectedPay,
             int needsConfirmation, int cancelled, int forfeited, int forfeitedThisMonth, int lateForfeited,
             int lateForfeitedThisMonth) {}
-    private record GroupKey(String key, String label, LocalDate start, LocalDate end) {}
-    private final class GroupAccumulator {
-        private final GroupKey key;
-        private final List<Shift> shifts = new ArrayList<>();
-        private final List<Expense> expenses = new ArrayList<>();
-        private GroupAccumulator(GroupKey key) { this.key = key; }
-        private EarningsBucket bucket(AccountSettingsResponse settings) {
-            NetEarningsResult net = calculator.calculate(shifts, expenses, settings.vehicleCostMethod(), settings.mileageRates());
-            return new EarningsBucket(key.key(), key.label(), key.start(), key.end(), shifts.size(), money(sum(shifts, true)),
-                    money(sum(shifts, false)), net.grossEarnings(), net.minutesWorked(), net.grossHourlyRate(), net.miles(),
-                    net.mileageCost(), net.cashSpent(), net.totalDeductions(), net.netEarnings(), net.netHourlyRate(),
-                    timed(shifts).size(), clockedMinutes(shifts), hourly(net.grossEarnings(), clockedMinutes(shifts)),
-                    averageFinishedEarly(shifts), routeShifts(shifts).size(), averageStops(shifts),
-                    averageMinutesPerStop(shifts), returnsRate(shifts),
-                    settings.vehicleCostMethod() == VehicleCostMethod.ACTUAL_EXPENSES ? 0 : net.blocksWithoutMiles());
-        }
-    }
 }
