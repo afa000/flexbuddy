@@ -19,7 +19,6 @@ import com.angel.flexbuddy.dto.ExpenseResponse;
 import com.angel.flexbuddy.dto.ExpenseSummaryResponse;
 import com.angel.flexbuddy.exception.ExpenseNotFoundException;
 import com.angel.flexbuddy.exception.ShiftNotFoundException;
-import com.angel.flexbuddy.importcore.figures.EarningsRules;
 import com.angel.flexbuddy.model.AppUser;
 import com.angel.flexbuddy.model.Expense;
 import com.angel.flexbuddy.model.ExpenseCategory;
@@ -53,8 +52,6 @@ public class ExpenseService {
 
     /** The block an expense is linked to, deleted or not. Status is never null; an old row without one was completed. */
     public record LinkedShift(Long id, String station, ShiftStatus status, boolean deleted) {
-        /** An expense on a block that is still scheduled waits for it; one on a deleted block counts by its date. */
-        boolean waiting() { return EarningsRules.expenseWaits(FigureInputs.status(status), deleted); }
     }
 
     /**
@@ -88,16 +85,12 @@ public class ExpenseService {
     @Transactional(readOnly = true)
     public List<Expense> countable(String email, List<Expense> expenses) {
         java.util.Map<Long, LinkedShift> links = linkedShifts(email, expenses);
-        return expenses.stream().filter(expense -> {
-            LinkedShift link = linkOf(expense, links);
-            return link == null || !link.waiting();
-        }).toList();
+        return expenses.stream().filter(expense -> !FigureInputs.reportCost(expense, links).waits()).toList();
     }
 
     /** The station an expense counts under: its block's, unless the block is deleted, when it counts as unlinked. */
     public static String countedStation(Expense expense, java.util.Map<Long, LinkedShift> links) {
-        LinkedShift link = linkOf(expense, links);
-        return link == null || link.deleted() ? null : link.station();
+        return FigureInputs.reportCost(expense, links).countedStation();
     }
 
     @Transactional(readOnly = true)

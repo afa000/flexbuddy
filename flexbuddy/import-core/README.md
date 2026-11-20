@@ -1,9 +1,10 @@
 # Shared screenshot import rules
 
-`com.angel:flexbuddy-import-core:0.4.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
+`com.angel:flexbuddy-import-core:0.5.0` is a plain Java 21 JAR with no runtime dependencies. It contains the
 screenshot parser, immutable OCR/result types, confidence and warning rules, and block matching rules, and from
 0.2.0 the earnings figures (below). Published 0.3.0 adds goal and planned-work preparation (FB-044). Published
-0.4.0 adds the blocks and expenses CSV writers (FB-053).
+0.4.0 adds the blocks and expenses CSV writers (FB-053). 0.5.0, not yet published, adds the earnings report
+(FB-055).
 The library performs no OCR, translation, persistence or network calls, and opens no files: the CSV writers write
 only to the stream they are given.
 Releases are listed in [docs/import-core-releases.md](../../docs/import-core-releases.md).
@@ -104,6 +105,37 @@ The golden files in `src/test/resources/com/angel/flexbuddy/importcore/export/` 
 `CsvExportTest` expect the same bytes. They are test sources, so they are **not** in the published JAR: the native
 app copies the golden files and the fixture rows into its own export test. Git leaves those files' line ends alone
 (`-text`).
+
+## Earnings report (0.5.0, unreleased)
+
+`EarningsReport` in `com.angel.flexbuddy.importcore.figures` is the website's Reports page rollup, so the app can
+show the same reports offline. The server's `ShiftReportService.earnings` delegates to it.
+
+- Inputs: `ReportBlock` is a `Block` plus its id, actual minutes (`RouteRules.actualMinutes`), stops, packages and
+  returns. `ReportCost` is a `Cost` plus the block it is linked to (id, status, deleted flag and station, all null
+  when unlinked or when the block can't be found).
+- `RouteRules` holds the per-block rules for clocked minutes, early finish, minutes per stop, returns base and
+  returns rate; the server's `Shift` getters delegate to it. `ReportCost.waits()` and `countedStation()` are the
+  rules the server's `ExpenseService.countable` and `countedStation` use: an expense on a live scheduled block
+  waits, and one on a deleted block counts by its date under no station.
+- `ReportSelection` restates the website's report queries over plain values: `blockMatches` (inclusive dates,
+  station, statuses defaulting to completed and cancelled) and `costMatches` (inclusive dates, station through a
+  live linked block, then the wait rule). The station filter is trimmed and compared case-insensitively with the
+  station as stored, which is not trimmed. The website's text search is not included. **The consumer selects only
+  the signed-in account's live rows** before applying these.
+- `EarningsReport.calculate(blocks, costs, groupBy, method, rates, unlinkedLabel)` returns buckets and totals with
+  every figure the website shows, with `NetEarnings` and the website's rounding. Each bucket has a stable key, a
+  kind (period, station, unlinked or unknown date), its period or trimmed station, and **no label**: the consumer
+  names buckets in its own language. Station buckets sort by net, then by label, so pass the consumer's own
+  localized "unlinked expenses" label; it is used for that order only. Pass rows in the website's order (blocks
+  newest first by date and start, expenses newest first by date and id), because a station bucket takes the first
+  row's spelling and ties keep their first-seen order.
+
+The rows in the test class `EarningsReportFixtures` and the expected figures in
+`src/test/resources/com/angel/flexbuddy/importcore/figures/earnings-report.txt` are the parity fixtures. The
+server's `EarningsReportGoldenTest` seeds the same rows and checks its report against that file, and checks that
+the selection helpers pick the same rows as its queries. Like the CSV fixtures, they are not in the published JAR.
+Existing 0.4.0 API signatures are unchanged.
 
 ## Building
 

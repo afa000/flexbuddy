@@ -7,6 +7,10 @@ import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.angel.flexbuddy.importcore.figures.Rounding.divide;
+import static com.angel.flexbuddy.importcore.figures.Rounding.hourly;
+import static com.angel.flexbuddy.importcore.figures.Rounding.money;
+
 /**
  * Gross, costs and net for a set of blocks and the expenses that count with them. Scheduled blocks add nothing (see
  * {@link EarningsRules}). The consumer passes only the signed-in account's live blocks and countable expenses.
@@ -64,19 +68,5 @@ public record NetEarnings(int shifts, BigDecimal grossEarnings, int minutesWorke
         if (counted == null || rates == null) return BigDecimal.ZERO;
         BigDecimal rate = rates.rateOn(block.date());
         return rate == null ? BigDecimal.ZERO : counted.multiply(rate);
-    }
-
-    private static BigDecimal money(BigDecimal value) {
-        return (value == null ? BigDecimal.ZERO : value).setScale(2, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal hourly(BigDecimal value, int minutes) {
-        return minutes == 0 ? BigDecimal.ZERO.setScale(2)
-                : value.multiply(BigDecimal.valueOf(60)).divide(BigDecimal.valueOf(minutes), 2, RoundingMode.HALF_UP);
-    }
-
-    private static BigDecimal divide(BigDecimal value, int count) {
-        return count == 0 ? BigDecimal.ZERO.setScale(2)
-                : value.divide(BigDecimal.valueOf(count), 2, RoundingMode.HALF_UP);
     }
 }

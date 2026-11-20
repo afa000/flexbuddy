@@ -5,7 +5,6 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
-import java.time.temporal.ChronoUnit;
 import java.time.Instant;
 
 import jakarta.persistence.Entity;
@@ -29,6 +28,7 @@ import org.hibernate.annotations.SQLRestriction;
 
 import com.angel.flexbuddy.importcore.figures.BlockStatus;
 import com.angel.flexbuddy.importcore.figures.EarningsRules;
+import com.angel.flexbuddy.importcore.figures.RouteRules;
 
 @Entity
 @Table(name = "shift", indexes = {
@@ -244,41 +244,31 @@ public class Shift implements Timestamped {
 
     /** Minutes between the actual start and finish, or null unless both were recorded. */
     public Integer getActualMinutes() {
-        if (actualStart == null || actualEnd == null) return null;
-        int minutes = (int) ChronoUnit.MINUTES.between(actualStart, actualEnd);
-        return minutes < 0 ? minutes + (24 * 60) : minutes;
+        return RouteRules.actualMinutes(actualStart, actualEnd);
     }
 
     /** Time on the clock for a worked block: the actual duration when recorded, otherwise the scheduled one. */
     public int getClockedMinutes() {
-        if (!countsTowardHours()) return 0;
-        Integer actual = getActualMinutes();
-        return actual == null ? getTimeWorked() : actual;
+        return RouteRules.clockedMinutes(figureStatus(), startTime, endTime, getActualMinutes());
     }
 
     /** How much sooner than scheduled a worked block finished; negative when it ran over. */
     public Integer getFinishedEarlyMinutes() {
-        Integer actual = getActualMinutes();
-        return actual == null || !countsTowardHours() ? null : getTimeWorked() - actual;
+        return RouteRules.finishedEarlyMinutes(figureStatus(), startTime, endTime, getActualMinutes());
     }
 
     /** Minutes on the clock per stop for a worked block with stops recorded, to one decimal place. */
     public BigDecimal getMinutesPerStop() {
-        if (!countsTowardHours() || stops == null || stops == 0) return null;
-        return BigDecimal.valueOf(getClockedMinutes()).divide(BigDecimal.valueOf(stops), 1, RoundingMode.HALF_UP);
+        return RouteRules.minutesPerStop(figureStatus(), startTime, endTime, getActualMinutes(), stops);
     }
 
     /** Packages that came back as a share of those carried, or of stops when packages were not counted. */
     public Integer getReturnsBase() {
-        if (returns == null) return null;
-        Integer base = packages != null ? packages : stops;
-        return base == null || base == 0 ? null : base;
+        return RouteRules.returnsBase(stops, packages, returns);
     }
 
     public BigDecimal getReturnsRate() {
-        Integer base = getReturnsBase();
-        return base == null ? null
-                : BigDecimal.valueOf(returns * 100L).divide(BigDecimal.valueOf(base), 1, RoundingMode.HALF_UP);
+        return RouteRules.returnsRate(stops, packages, returns);
     }
 
     public LocalDateTime getStartDateTime() {
