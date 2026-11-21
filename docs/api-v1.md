@@ -281,7 +281,7 @@ defaults to 90.
   ascending `recordedOn` order. Empty (`[]`) when no entry applies.
   - `level` is a lowercase standing code: `fantastic`, `great`, `fair`, or `at_risk`. Standing is only what the driver
     logged; the server never calculates it.
-  - `note` is the trimmed driver note, or `null` when unset.
+  - `note` is the trimmed driver note, or `null` when unset or blank.
 - `events` lists non-deleted forfeited and cancelled blocks with `date` from `from` through `to` inclusive, ordered
   oldest first (`date` ascending, then `startTime` ascending). Empty (`[]`) when none exist. Scheduled, completed,
   and soft-deleted blocks are excluded.
