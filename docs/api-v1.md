@@ -242,6 +242,62 @@ defaults to the current year in the account's time zone.
   only a website session.
 - 404 when the API is disabled (see Availability).
 
+### GET /api/v1/standing
+
+Added by FB-057 for NA-08. Token required: yes. Read-only; the bearer token selects the account.
+
+Request: optional `days` query parameter, a base-10 integer from 7 through 365 inclusive. When omitted, `days`
+defaults to 90.
+
+200 (made-up example):
+
+```json
+{
+  "from": "2026-08-23",
+  "to": "2026-11-20",
+  "current": {
+    "recordedOn": "2026-10-14",
+    "level": "fair",
+    "note": "After late forfeit"
+  },
+  "entries": [
+    {"recordedOn": "2026-06-01", "level": "great", "note": null},
+    {"recordedOn": "2026-10-14", "level": "fair", "note": "After late forfeit"}
+  ],
+  "events": [
+    {"date": "2026-10-10", "startTime": "09:00", "station": "DXX1", "kind": "late_forfeit"},
+    {"date": "2026-10-18", "startTime": "14:30", "station": "VEA7", "kind": "forfeited"},
+    {"date": "2026-11-02", "startTime": "18:00", "station": "BDL4", "kind": "cancelled"}
+  ]
+}
+```
+
+- `from` and `to` are inclusive ISO local dates in the account's time zone (`to` is today in that zone; `from` is
+  `to` minus `days - 1`).
+- `current` is the account's latest logged standing entry overall (which may have `recordedOn` earlier than `from`),
+  or `null` when nothing has ever been logged.
+- `entries` starts with the carry-in entry in force on `from` (the latest entry with `recordedOn` before `from`,
+  keeping its real `recordedOn` date), if any, followed by entries logged from `from` through `to` inclusive in
+  ascending `recordedOn` order. Empty (`[]`) when no entry applies.
+  - `level` is a lowercase standing code: `fantastic`, `great`, `fair`, or `at_risk`. Standing is only what the driver
+    logged; the server never calculates it.
+  - `note` is the trimmed driver note, or `null` when unset or blank.
+- `events` lists non-deleted forfeited and cancelled blocks with `date` from `from` through `to` inclusive, ordered
+  oldest first (`date` ascending, then `startTime` ascending). Empty (`[]`) when none exist. Scheduled, completed,
+  and soft-deleted blocks are excluded.
+  - `date` is an ISO local date (`YYYY-MM-DD`); `startTime` is a local time with no seconds (`HH:mm`); `station` is
+    the block's station string.
+  - `kind` is a lowercase event code: `forfeited`, `late_forfeit`, or `cancelled`.
+- 304 has an empty body when an authenticated `If-None-Match` matches the current representation. Both 200 and 304
+  send a strong `ETag` and `Cache-Control: private, no-cache`. Any change to the returned standing entries, in-window
+  block events, or the account's local date returns 200 with the updated body and a new ETag. Store the response, its
+  ETag, and the last successful fetch or revalidation time per account and window (`days`). Either 200 or 304 advances
+  that time. The response has no delta cursor.
+- 400 returns `{"error":"invalid","fields":{"days":"invalid"}}` for a malformed or out-of-range `days` value.
+- 401 returns `{"error":"unauthorized"}` when the bearer token is missing or invalid, including requests with only a
+  website session.
+- 404 when the API is disabled (see Availability).
+
 ### GET /api/v1/account
 
 Added by FB-005. Token required: yes.

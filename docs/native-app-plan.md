@@ -384,8 +384,9 @@ Status (November 19, 2026): steps 1, 3 and 5 are done, as are Home goal/planning
 step 4's server half is done (FB-053, PR #61) and shared library 0.4.0 is published. Still open: Reports (the rest of step 2), the app half of
 step 4 (the export screen) and step 6.
 
-Status (November 20, 2026): the server half of Reports is FB-055 (PR #63; library 0.5.0 published); the app half is
-FB-056. The app half of step 4 and step 6 are still open.
+Status (November 20, 2026): steps 1 through 5 are done — FB-054 (offline CSV export, step 4) and FB-056 (offline
+Reports over library 0.5.0 from FB-055, PR #63, completing step 2) are merged. Only step 6 (reminders on the phone,
+with NA-09) remains open.
 
 Moving this work to the phone won't lower the Render bill, which is a flat plan. It keeps the server small as drivers
 join, and it makes the app useful with no signal and on a small data plan. Checked November 11, 2026:
