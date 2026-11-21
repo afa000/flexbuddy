@@ -247,6 +247,10 @@ Risk: medium. Implementer: Claude Code or Antigravity.
 - App: local reminder notifications (WorkManager), with the Android 13 notification permission asked when first needed.
 - App: links to the website for two-step setup, backup/restore, Google linking and account deletion.
 
+Follow-up (November 20, 2026): the server half is FB-059, `GET` and `PUT /api/v1/account/settings/...` for language,
+time zone, goals, tax, reminders, mileage and payouts, guarded by the settings `ETag` (`If-Match`) with no migration.
+It is rated high risk because it writes the inputs to earnings and tax figures. The app half follows as its own task.
+
 ## NA-10 — Turning it on, and the switch
 
 Risk: high (production API and the Play app). Implementer: Claude Code builds and documents; the owner sets the
