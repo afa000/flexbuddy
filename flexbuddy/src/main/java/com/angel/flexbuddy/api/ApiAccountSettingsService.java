@@ -3,7 +3,6 @@ package com.angel.flexbuddy.api;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.util.EnumSet;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -279,12 +278,10 @@ public class ApiAccountSettingsService {
         }
 
         private static <E extends Enum<E>> E parse(String value, Class<E> type) {
-            if (!value.equals(value.toLowerCase(Locale.ROOT))) return null;
-            try {
-                return Enum.valueOf(type, value.toUpperCase(Locale.ROOT));
-            } catch (IllegalArgumentException exception) {
-                return null;
+            for (E option : type.getEnumConstants()) {
+                if (value.equals(ApiValues.code(option))) return option;
             }
+            return null;
         }
 
         private <T> T invalid(String name) {
