@@ -69,6 +69,7 @@ class DisabledApiIntegrationTest {
         assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiShiftController.class)).isEmpty();
         assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiCalculationSettingsController.class)).isEmpty();
         assertThat(context.getBeansOfType(ApiTaxSummaryController.class)).isEmpty();
+        assertThat(context.getBeansOfType(ApiStandingController.class)).isEmpty();
         assertThat(context.getBeansOfType(com.angel.flexbuddy.api.ApiShiftService.class)).isEmpty();
         assertThat(context.getBeansOfType(ApiShiftWriteController.class)).isEmpty();
         assertThat(context.getBeansOfType(ApiShiftWriteService.class)).isEmpty();
@@ -86,7 +87,8 @@ class DisabledApiIntegrationTest {
                 "/api/v1/calculation-settings", "/api/v1/shifts", "/api/v1/shifts/1", "/api/v1/shifts/1/start", "/api/v1/shifts/1/status",
                 "/api/v1/shifts/1/not-worked", "/api/v1/shifts/1/restore", "/api/v1/home",
                 "/api/v1/expenses", "/api/v1/expenses/1", "/api/v1/expenses/1/restore", "/api/v1/payouts",
-                "/api/v1/payouts/2026-11-13", "/api/v1/shifts/import-preview", "/api/v1/tax/summary"}) {
+                "/api/v1/payouts/2026-11-13", "/api/v1/shifts/import-preview", "/api/v1/tax/summary",
+                "/api/v1/standing"}) {
             mvc.perform(get(path)).andExpect(status().isNotFound()).andExpect(header().doesNotExist("Location"));
             mvc.perform(post(path)).andExpect(status().isNotFound());
             mvc.perform(delete(path)).andExpect(status().isNotFound());
