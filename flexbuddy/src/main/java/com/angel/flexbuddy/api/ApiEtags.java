@@ -21,12 +21,32 @@ final class ApiEtags {
 
     static ResponseEntity<byte[]> withEtag(ObjectMapper mapper, Object body, WebRequest request) {
         byte[] json = mapper.writeValueAsBytes(body);
-        String etag = "\"" + sha256(json) + "\"";
+        String etag = tag(json);
         if (request.checkNotModified(etag)) {
             return ResponseEntity.status(304).eTag(etag).header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL).build();
         }
         return ResponseEntity.ok().eTag(etag).header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL)
                 .contentType(MediaType.APPLICATION_JSON).body(json);
+    }
+
+    /** The tag a read of {@code body} carries, so a write can compare it with the phone's If-Match. */
+    static String tag(ObjectMapper mapper, Object body) {
+        return tag(mapper.writeValueAsBytes(body));
+    }
+
+    /** A write's answer: the body as a read would send it, with that read's tag, never a 304. */
+    static ResponseEntity<byte[]> written(ObjectMapper mapper, Object body) {
+        byte[] json = mapper.writeValueAsBytes(body);
+        return ResponseEntity.ok().eTag(tag(json)).header(HttpHeaders.CACHE_CONTROL, CACHE_CONTROL)
+                .contentType(MediaType.APPLICATION_JSON).body(json);
+    }
+
+    static String cacheControl() {
+        return CACHE_CONTROL;
+    }
+
+    private static String tag(byte[] json) {
+        return "\"" + sha256(json) + "\"";
     }
 
     private static String sha256(byte[] bytes) {

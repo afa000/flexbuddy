@@ -35,6 +35,8 @@ payouts, NA-07 screenshot import. The API remains disabled by default.
   - `429`: locked or rate-limited: `{"error": "locked", "retryAfterMinutes": n}`
 - **Retried writes.** Every create or change sends an `Idempotency-Key` header with a new UUID per action. A retry with
   the same key never adds a second record. This is the header the website's offline outbox already uses.
+  The one exception is the settings writes (`PUT /api/v1/account/settings/{group}`): each replaces a whole group
+  and is guarded by `If-Match` instead, so they need no key and ignore one that is sent.
   NA-05 block writes and NA-06 expense and payout writes require it, including delete and restore. UUIDs are
   case-insensitive. Keys belong to the account, across its devices and every API write endpoint: a key used for a block
   can't be used again for an expense or a payout. Reusing a key with a different action, id or bound request body
@@ -160,7 +162,8 @@ Tokens and challenges are excluded from backups. Expired credentials are purged 
 
 ### GET /api/v1/calculation-settings
 
-Added by FB-042 for NA-13 offline figures. Token required: yes. Read-only; no account selector or write endpoint.
+Added by FB-042 for NA-13 offline figures. Token required: yes. Read-only, with no account selector. These
+settings are changed through `PUT /api/v1/account/settings/{group}` (FB-059), and a change there changes this tag.
 
 200 (made-up example):
 
@@ -308,6 +311,97 @@ Added by FB-005. Token required: yes.
 This is also the account shape in a successful sign-in response. The token chooses the account.
 Missing, malformed, unknown, expired or revoked tokens return 401 `unauthorized`, without a redirect.
 Browser sessions and remember-me cookies cannot authenticate these endpoints.
+
+### GET /api/v1/account/settings
+
+Added by FB-059 for the app's Settings screen (NA-09). Token required: yes. No account selector.
+
+200 (made-up example), the complete sixteen-field body:
+
+```json
+{
+  "language": "es",
+  "timeZone": "America/New_York",
+  "vehicleCostMethod": "standard_mileage",
+  "customMileageRate": null,
+  "weeklyGoal": "600.00",
+  "monthlyGoal": null,
+  "goalBasis": "gross",
+  "payoutDays": ["tuesday", "friday"],
+  "payoutLagDays": 1,
+  "taxSetAsidePercent": "25.00",
+  "remindTax": true,
+  "remindBeforeMinutes": 60,
+  "remindConfirm": true,
+  "remindMiles": true,
+  "askMissingMiles": true,
+  "forfeitCutoffMinutes": 45
+}
+```
+
+- `timeZone`, `vehicleCostMethod`, `customMileageRate`, `weeklyGoal`, `monthlyGoal`, `goalBasis`, `payoutDays` and
+  `payoutLagDays` mean exactly what they mean in `GET /api/v1/calculation-settings`, with the same defaults and
+  formats; the two endpoints share one mapping.
+- `language`: `en`, `es`, or null to follow the device.
+- `taxSetAsidePercent`: the share of net earnings to put aside, a decimal string with two decimals, or null when the
+  reserve is off. `remindTax`: whether tax due-date reminders are on.
+- `remindBeforeMinutes`: minutes before a block's start to remind, one of `30`, `60`, `120` or `720`, or null when
+  block-start reminders are off. `remindConfirm`: remind to confirm a block after it ends. `remindMiles`: remind to
+  log miles shortly after a block ends without any. `askMissingMiles`: show recent blocks without miles on Home and in
+  its Needs attention card.
+  `forfeitCutoffMinutes`: `0` to `720`, how close to the start a dropped block counts as a late forfeit.
+- Never returned: the private calendar feed link or token, today's IRS rate, sign-in, two-step and Google details.
+  Reading never saves anything and never creates a calendar token.
+
+Strong `ETag` and `Cache-Control: private, no-cache` follow Sync; a matching `If-None-Match` returns 304 with no body.
+Any change to a returned field, from the app or the website, changes the tag. Keep the tag: every write needs it.
+
+### PUT /api/v1/account/settings/{group}
+
+Added by FB-059. Token required: yes, plus `If-Match`. No `Idempotency-Key` (see Conventions).
+
+| Group | Body (made-up example) |
+|---|---|
+| `language` | `{"language":"es"}` |
+| `time-zone` | `{"timeZone":"America/Chicago"}` |
+| `goals` | `{"weeklyGoal":"600.00","monthlyGoal":null,"goalBasis":"net"}` |
+| `tax` | `{"taxSetAsidePercent":"25.00","remindTax":true}` |
+| `reminders` | `{"remindBeforeMinutes":60,"remindConfirm":true,"remindMiles":true,"askMissingMiles":false,"forfeitCutoffMinutes":45}` |
+| `mileage` | `{"vehicleCostMethod":"actual_expenses","customMileageRate":"0.655"}` |
+| `payouts` | `{"payoutDays":["tuesday","friday"],"payoutLagDays":1}` |
+
+- **Each write replaces its whole group.** `language`, `weeklyGoal`, `monthlyGoal`, `taxSetAsidePercent`,
+  `remindBeforeMinutes` and `customMileageRate` are cleared when null or left out (`customMileageRate` null means the
+  IRS rate). Every other field is required. Other fields in the body are ignored; `reminders` never changes the time
+  zone, which only `time-zone` changes.
+- **Types.** Decimals are strings (`"25.00"`, `"0.655"`); a JSON number there is refused. Minutes and days are JSON
+  integers, switches are JSON booleans, codes are lower case as the read returns them. `payoutDays` is an array of
+  weekday codes in any order, without repeats.
+- **Limits are the website's:** `remindBeforeMinutes` 30, 60, 120 or 720; `forfeitCutoffMinutes` 0 to 720;
+  `payoutLagDays` 0 to 14 and at least one payout day; `taxSetAsidePercent` 0.01 to 60 with at most two decimals;
+  goals more than 0 with at most eight digits and two decimals; `customMileageRate` 0 to 5 with at most three
+  decimals; a valid IANA `timeZone`; `language` `en` or `es`.
+- **`If-Match`** carries the `ETag` of the settings the phone last saw, from the read or an earlier write:
+  - it matches: the group is saved;
+  - it doesn't, but the group already holds exactly these values (a retry after a lost answer): success, nothing is
+    written;
+  - otherwise: `409`, nothing is saved. Reload, show the driver the current values, and send again with the new tag.
+
+  A website change made in the same instant as an app write is not detected; the website stays last-write-wins.
+
+Responses:
+
+- `200`: the full read body, with its new `ETag` and `Cache-Control: private, no-cache`. That tag is the one the next
+  read returns.
+- `400 {"error":"invalid","fields":{"<field>":"invalid"}}`: each missing, mistyped or out-of-range field, or
+  `{"If-Match":"invalid"}` when the header is missing or isn't a strong tag. Nothing is saved.
+- `400 {"error":"invalid"}`: the body isn't a JSON object.
+- `401 {"error":"unauthorized"}`: missing, unknown, expired or revoked token, or a browser session alone.
+- `404`: an unknown group, or the API is off.
+- `409 {"error":"conflict","current":{...}}`: the settings changed since the phone's tag. `current` is the full read
+  body, and the response's `ETag` is its tag.
+
+Saving the language here doesn't touch the website's language cookie; emails follow the saved language.
 
 ### GET /api/v1/shifts
 
